@@ -1,0 +1,66 @@
+{{ define "main" }}
+<section class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="max-w-4xl mx-auto">
+        <!-- Page Header -->
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-text-primary mb-4">{{ .Title }}</h1>
+            {{ if .Description }}
+            <p class="text-lg text-text-secondary">{{ .Description }}</p>
+            {{ end }}
+        </header>
+        
+        <!-- Content List -->
+        <div class="space-y-6">
+            {{ range .Pages }}
+            <article class="card hover:shadow-lg transition-shadow">
+                <a href="{{ .Permalink }}" class="block">
+                    <h2 class="text-2xl font-semibold text-text-primary mb-2 hover:text-sage transition-colors">
+                        {{ .Title }}
+                    </h2>
+                    <div class="text-sm text-text-secondary mb-3">
+                        <time datetime="{{ .Date.Format "2006-01-02" }}">
+                            {{ .Date.Format "January 2, 2006" }}
+                        </time>
+                        {{ if .Params.readingTime }}
+                        <span class="mx-2">•</span>
+                        <span>{{ .Params.readingTime }} min read</span>
+                        {{ end }}
+                    </div>
+                    <p class="text-text-secondary">
+                        {{ .Summary | truncate 200 }}
+                    </p>
+                    <div class="mt-4">
+                        <span class="text-sage hover:text-sage-dark font-medium">
+                            Read more →
+                        </span>
+                    </div>
+                </a>
+            </article>
+            {{ end }}
+        </div>
+        
+        <!-- Pagination if needed -->
+        {{ if gt .Paginator.TotalPages 1 }}
+        <nav class="mt-12 flex justify-center">
+            <div class="flex space-x-2">
+                {{ if .Paginator.HasPrev }}
+                <a href="{{ .Paginator.Prev.URL }}" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50">
+                    Previous
+                </a>
+                {{ end }}
+                {{ range .Paginator.Pagers }}
+                <a href="{{ .URL }}" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 {{ if eq . $.Paginator }}bg-sage text-white border-sage{{ end }}">
+                    {{ .PageNumber }}
+                </a>
+                {{ end }}
+                {{ if .Paginator.HasNext }}
+                <a href="{{ .Paginator.Next.URL }}" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50">
+                    Next
+                </a>
+                {{ end }}
+            </div>
+        </nav>
+        {{ end }}
+    </div>
+</section>
+{{ end }}
