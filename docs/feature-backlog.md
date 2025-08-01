@@ -10,53 +10,41 @@
 ### BUFO-001: Initialize Hugo Site
 **Priority:** P0  
 **Effort:** Small  
-**Status:** COMPLETED  
-**Completed:** 2025-01-26  
+**Status:** NOT STARTED  
 **Acceptance Criteria:**
-- [x] Hugo installed and configured
-- [x] Custom theme scaffolding created
-- [x] GitHub repository structured properly
-- [x] Basic .gitignore configured
-**Implementation Notes:** Hugo site initialized with custom 'bufoindex' theme, proper directory structure, and configuration for GitHub Pages deployment.
-
+- [ ] Hugo installed and configured
+- [ ] Custom theme scaffolding created
+- [ ] GitHub repository structured properly
+- [ ] Basic .gitignore configured
 ### BUFO-002: Design System Setup
 **Priority:** P0  
 **Effort:** Medium  
-**Status:** COMPLETED  
-**Completed:** 2025-01-26  
+**Status:** NOT STARTED  
 **Acceptance Criteria:**
-- [x] Tailwind CSS configured with custom colors
-- [x] Typography scale defined (serif for articles, mono for data)
-- [x] Component library started (buttons, callouts, tables)
-- [x] Terminal-style components for math/data display
-- [x] Print stylesheet configured
-**Implementation Notes:** Tailwind configured with BufoIndex brand colors (sage green #7FB069, terminal black #0A0E1A), custom component classes, and print-friendly styles.
-
+- [ ] Tailwind CSS configured with custom colors
+- [ ] Typography scale defined (serif for articles, mono for data)
+- [ ] Component library started (buttons, callouts, tables)
+- [ ] Terminal-style components for math/data display
+- [ ] Print stylesheet configured
 ### BUFO-003: GitHub Actions Deployment
 **Priority:** P0  
 **Effort:** Small  
-**Status:** COMPLETED  
-**Completed:** 2025-01-26  
+**Status:** NOT STARTED  
 **Acceptance Criteria:**
-- [x] Hugo build action configured
-- [x] Auto-deploy to GitHub Pages on main push
-- [x] Build status badge in README
+- [ ] Hugo build action configured
+- [ ] Auto-deploy to GitHub Pages on main push
+- [ ] Build status badge in README
 - [ ] Deploy preview for PRs (optional)
-**Implementation Notes:** GitHub Actions workflow created for automated Hugo deployment with Tailwind CSS build step. README.md created with build status badge. PR previews remain optional.
-
 ### BUFO-004: Homepage Design
 **Priority:** P0  
 **Effort:** Medium  
-**Status:** COMPLETED  
-**Completed:** 2025-01-26  
+**Status:** NOT STARTED  
 **Acceptance Criteria:**
-- [x] Clear value proposition above fold
-- [x] Navigation to articles and tools
-- [x] Subtle Bufo branding (sage green accents)
-- [x] Mobile responsive layout
-- [x] Educational disclaimer in footer
-**Implementation Notes:** Created responsive homepage with hero section, feature cards, mobile menu, and base templates (baseof.html, single.html, list.html) for the entire site.
-
+- [ ] Clear value proposition above fold
+- [ ] Navigation to articles and tools
+- [ ] Subtle Bufo branding (sage green accents)
+- [ ] Mobile responsive layout
+- [ ] Educational disclaimer in footer
 ---
 
 ## Epic 2: Article Infrastructure
@@ -64,42 +52,33 @@
 ### BUFO-005: Article Template
 **Priority:** P0  
 **Effort:** Medium  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Markdown template with frontmatter
-- [x] KaTeX integration for math formulas
-- [x] Syntax highlighting for calculations
-- [x] Terminal-style callout boxes
-- [x] Table of contents generation
-- [x] Reading time estimation
-**Implementation Notes:** Complete article template system with KaTeX math rendering, syntax highlighting, 4 terminal-style shortcodes (terminal, formula, calculation, note), automatic table of contents, and Hugo's built-in reading time estimation.
-
+- [ ] Markdown template with frontmatter
+- [ ] KaTeX integration for math formulas
+- [ ] Syntax highlighting for calculations
+- [ ] Terminal-style callout boxes
+- [ ] Table of contents generation
+- [ ] Reading time estimation
 ### BUFO-006: Article Navigation
 **Priority:** P1  
 **Effort:** Small  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Category pages (Concepts, Strategies, Advanced)
-- [x] Suggested next article at bottom
-- [x] Breadcrumb navigation
-- [x] Topic progression indicators
-**Implementation Notes:** Created category structure with index pages for Concepts, Strategies, and Advanced. Added breadcrumb navigation, next/previous article links, and visual progression indicators showing article position within each category.
-
+- [ ] Category pages (Concepts, Strategies, Advanced)
+- [ ] Suggested next article at bottom
+- [ ] Breadcrumb navigation
+- [ ] Topic progression indicators
 ### BUFO-007: About Page
 **Priority:** P1  
 **Effort:** Small  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Mission statement
-- [x] Brief mention of Bufo (the frog)
-- [x] Author background (percentages, no specifics)
-- [x] Contact information
-- [x] Educational disclaimer
-**Implementation Notes:** Created comprehensive About page with mission statement, Bufo etymology explanation, author background with percentage breakdowns, GitHub contact info, and detailed educational disclaimers covering risk warnings and affiliate transparency.
-
+- [ ] Mission statement
+- [ ] Brief mention of Bufo (the frog)
+- [ ] Author background (percentages, no specifics)
+- [ ] Contact information
+- [ ] Educational disclaimer
 ---
 
 ## Epic 3: Foundational Content
@@ -107,42 +86,33 @@
 ### BUFO-008: Article - Understanding Opportunity Cost
 **Priority:** P0  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] 2,000+ word comprehensive guide
-- [x] Real examples with calculations
-- [x] Interactive inline calculator
-- [x] Terminal-style formula displays
-- [x] Links to related tools
-**Implementation Notes:** 3,800+ word comprehensive guide with real estate, education, and investment examples. Python-based calculators, KaTeX formulas, and terminal-style displays throughout.
-
+- [ ] 2,000+ word comprehensive guide
+- [ ] Real examples with calculations
+- [ ] Interactive inline calculator
+- [ ] Terminal-style formula displays
+- [ ] Links to related tools
 ### BUFO-009: Article - Paycheck Allocation Strategies  
 **Priority:** P0  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Fixed expenses vs variable investing concept
-- [x] Percentage-based examples
-- [x] Flowchart visualization
-- [x] Consistent quality of life focus
-- [x] Automation strategies
-**Implementation Notes:** 4,200+ word guide with 50/30/20 rule breakdown, emergency fund strategies, and Python-based allocation calculators. Includes flowchart for decision making and automation setup guides.
-
+- [ ] Fixed expenses vs variable investing concept
+- [ ] Percentage-based examples
+- [ ] Flowchart visualization
+- [ ] Consistent quality of life focus
+- [ ] Automation strategies
 ### BUFO-010: Article - Why Tracking Wealth Matters
 **Priority:** P1  
 **Effort:** Medium  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Benefits of comprehensive tracking
-- [x] Tool comparison (Monarch focus)
-- [x] Setup best practices
-- [x] Monthly review process
-- [x] NO affiliate links (per requirements)
-**Implementation Notes:** 3,600+ word guide covering net worth calculations, tool comparisons (Monarch, Personal Capital, YNAB), and monthly review frameworks. No affiliate links included per requirements.
-
+- [ ] Benefits of comprehensive tracking
+- [ ] Tool comparison (Monarch focus)
+- [ ] Setup best practices
+- [ ] Monthly review process
+- [ ] NO affiliate links (per requirements)
 ---
 
 ## Epic 4: Strategy Articles
@@ -150,42 +120,33 @@
 ### BUFO-011: Article - Why SGOV Beats Your HYSA
 **Priority:** P0  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Tax efficiency calculations
-- [x] Liquidity comparison
-- [x] Risk analysis (minimal)
-- [x] State tax considerations
-- [x] Interactive yield calculator
-**Implementation Notes:** 4,000+ word analysis with detailed tax efficiency calculations, state-by-state comparison tables, and Python-based yield calculators. Covers T+1 settlement vs instant access trade-offs.
-
+- [ ] Tax efficiency calculations
+- [ ] Liquidity comparison
+- [ ] Risk analysis (minimal)
+- [ ] State tax considerations
+- [ ] Interactive yield calculator
 ### BUFO-012: Article - The CD Myth (Sometimes)
 **Priority:** P1  
 **Effort:** Medium  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] When CDs make sense (rarely)
-- [x] Opportunity cost analysis
-- [x] Ladder strategies debunked
-- [x] SGOV/T-Bill comparison
-- [x] Historical data visualization
-**Implementation Notes:** 3,200+ word analysis debunking CD ladder strategies with mathematical proof of opportunity costs. Includes rare scenarios where CDs make sense and historical rate comparisons.
-
+- [ ] When CDs make sense (rarely)
+- [ ] Opportunity cost analysis
+- [ ] Ladder strategies debunked
+- [ ] SGOV/T-Bill comparison
+- [ ] Historical data visualization
 ### BUFO-013: Article - Credit Card Optimization Guide
 **Priority:** P1  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Category spending analysis
-- [x] No-fee vs annual fee math
-- [x] Travel vs cashback strategies
-- [x] Recommended combinations
-- [x] Link to optimizer tool
-**Implementation Notes:** 4,500+ word comprehensive guide with spending category analysis, annual fee break-even calculations, and detailed card combination strategies (Chase Trifecta, Capital One Duo, etc.). Includes Python calculators for optimization.
-
+- [ ] Category spending analysis
+- [ ] No-fee vs annual fee math
+- [ ] Travel vs cashback strategies
+- [ ] Recommended combinations
+- [ ] Link to optimizer tool
 ---
 
 ## Epic 5: Advanced Strategy Articles
@@ -193,55 +154,43 @@
 ### BUFO-014: Article - Portfolio Lines of Credit
 **Priority:** P2  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Securities-based lending explained
-- [x] Risk management strategies
-- [x] Interest rate comparisons
-- [x] Use cases (real estate, opportunities)
-- [x] Major broker comparison
-**Implementation Notes:** 4,100+ word deep-dive into securities-based lending with comprehensive broker comparison (Interactive Brokers, Schwab, Fidelity, etc.), risk management frameworks, and real-world use case analysis.
-
+- [ ] Securities-based lending explained
+- [ ] Risk management strategies
+- [ ] Interest rate comparisons
+- [ ] Use cases (real estate, opportunities)
+- [ ] Major broker comparison
 ### BUFO-015: Article - Leveraged ETF Strategies
 **Priority:** P2  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Volatility drag explained with math
-- [x] Rebalancing strategies
-- [x] Risk/reward analysis
-- [x] Historical performance data
-- [x] Link to risk profiler tool
-**Implementation Notes:** 4,300+ word mathematical analysis of leveraged ETFs with volatility drag calculations, rebalancing strategies, and historical performance comparisons. Includes Python simulations and risk management frameworks.
-
+- [ ] Volatility drag explained with math
+- [ ] Rebalancing strategies
+- [ ] Risk/reward analysis
+- [ ] Historical performance data
+- [ ] Link to risk profiler tool
 ### BUFO-016: Article - Roth vs HSA vs 401(k) Prioritization
 **Priority:** P2  
 **Effort:** Large  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Tax efficiency comparison
-- [x] Why maxing isn't always optimal
-- [x] Age-based strategies
-- [x] State tax considerations
-- [x] Decision flowchart
-**Implementation Notes:** 4,600+ word comprehensive analysis with tax efficiency calculations across different income levels and ages. Includes decision flowcharts and state-specific tax considerations. Challenges conventional wisdom about contribution prioritization.
-
+- [ ] Tax efficiency comparison
+- [ ] Why maxing isn't always optimal
+- [ ] Age-based strategies
+- [ ] State tax considerations
+- [ ] Decision flowchart
 ### BUFO-017: Article - Margin Leverage Explained
 **Priority:** P3  
 **Effort:** Medium  
-**Status:** COMPLETED
-**Completed:** 2025-07-26
+**Status:** NOT STARTED
 **Acceptance Criteria:**
-- [x] Portfolio margin vs Reg T
-- [x] Risk management rules
-- [x] Interest rate comparison
-- [x] Tax implications
-- [x] Warning callouts
-**Implementation Notes:** 4,800+ word advanced guide covering portfolio margin vs Regulation T differences, comprehensive risk management rules, and broker rate comparisons. Includes extensive warning callouts and tax implications analysis.
-
+- [ ] Portfolio margin vs Reg T
+- [ ] Risk management rules
+- [ ] Interest rate comparison
+- [ ] Tax implications
+- [ ] Warning callouts
 ---
 
 ## Epic 6: Interactive Tools
@@ -281,87 +230,84 @@
 ### BUFO-020: Rent vs Buy Calculator
 **Priority:** P1  
 **Effort:** Large  
-**Status:** COMPLETED  
-**Completed:** 2025-07-26  
+**Status:** NOT STARTED  
 **Acceptance Criteria:**
-- [x] Property price and monthly rent inputs
-- [x] Mortgage parameters (down payment %, interest rate, term)
-- [x] Investment assumptions (stock returns, real estate appreciation)
-- [x] Tax considerations (property tax rate, income tax bracket)
-- [x] Maintenance and transaction costs
-- [x] Time horizon selector (5-30 years)
-- [x] Net worth comparison visualization over time
-- [x] Breakeven analysis showing crossover point
-- [x] US market adaptations (property tax by state, PMI, HOA)
-- [x] Terminal-style results display
-- [x] URL hash persistence for sharing scenarios
-- [x] Export results as CSV/JSON
+- [ ] Property price and monthly rent inputs
+- [ ] Mortgage parameters (down payment %, interest rate, term)
+- [ ] Investment assumptions (stock returns, real estate appreciation)
+- [ ] Tax considerations (property tax rate, income tax bracket)
+- [ ] Maintenance and transaction costs
+- [ ] Time horizon selector (5-30 years)
+- [ ] Net worth comparison visualization over time
+- [ ] Breakeven analysis showing crossover point
+- [ ] US market adaptations (property tax by state, PMI, HOA)
+- [ ] Terminal-style results display
+- [ ] URL hash persistence for sharing scenarios
+- [ ] Export results as CSV/JSON
 
 ### BUFO-029: Retirement Planning Dashboard
 **Priority:** P1  
 **Effort:** X-Large  
-**Status:** IN PROGRESS  
-**Started:** 2025-07-31  
+**Status:** NOT STARTED  
 
-#### Phase 1: Core Retirement Planning (COMPLETED)
+#### Phase 1: Core Retirement Planning (PLANNED)
 **Acceptance Criteria:**
-- [x] Three retirement scenario comparison (A/B/C) with real-time calculations
-- [x] Multiple financial inputs: starting age (18-65), retirement ages (30-80), target income, starting balance, current income
-- [x] Investment parameters: accumulation/retirement phase returns, volatility modeling, inflation adjustment
-- [x] Account type selection (Traditional/Roth/Taxable)
-- [x] Terminal-style interface matching BufoIndex theme
-- [x] URL hash persistence for sharing
-- [x] Export to CSV functionality
+- [ ] Three retirement scenario comparison (A/B/C) with real-time calculations
+- [ ] Multiple financial inputs: starting age (18-65), retirement ages (30-80), target income, starting balance, current income
+- [ ] Investment parameters: accumulation/retirement phase returns, volatility modeling, inflation adjustment
+- [ ] Account type selection (Traditional/Roth/Taxable)
+- [ ] Terminal-style interface matching BufoIndex theme
+- [ ] URL hash persistence for sharing
+- [ ] Export to CSV functionality
 
-#### Phase 2: Advanced Financial Calculations (COMPLETED)
+#### Phase 2: Advanced Financial Calculations (PLANNED)
 **Acceptance Criteria:**
-- [x] Federal tax brackets (2024 rates) with after-tax cost display
-- [x] State income tax for 10 states (CA, TX, NY, FL, WA, NV, IL, PA, OH, NC)
-- [x] Capital gains tax calculations and tax-efficient contribution strategies
-- [x] Social Security integration with age-based benefit adjustments (62-70)
-- [x] Early/late claiming calculations with automatic benefit adjustments
-- [x] Healthcare cost modeling with base projections, age adjustments, separate inflation rate (5.5%)
-- [x] Customizable healthcare multiplier (1x-3x) with pre/post Medicare differences
+- [ ] Federal tax brackets (2024 rates) with after-tax cost display
+- [ ] State income tax for 10 states (CA, TX, NY, FL, WA, NV, IL, PA, OH, NC)
+- [ ] Capital gains tax calculations and tax-efficient contribution strategies
+- [ ] Social Security integration with age-based benefit adjustments (62-70)
+- [ ] Early/late claiming calculations with automatic benefit adjustments
+- [ ] Healthcare cost modeling with base projections, age adjustments, separate inflation rate (5.5%)
+- [ ] Customizable healthcare multiplier (1x-3x) with pre/post Medicare differences
 
-#### Phase 3: Monte Carlo Simulation Engine (COMPLETED)
+#### Phase 3: Monte Carlo Simulation Engine (PLANNED)
 **Acceptance Criteria:**
-- [x] 100-10,000 configurable simulation runs
-- [x] Success probability calculation with sequence of returns risk analysis
-- [x] Portfolio survival probability by age with percentile distributions (10th, 25th, 50th, 75th, 90th)
-- [x] Worst-case and best-case portfolio balance tracking
-- [x] Minimum balance tracking throughout retirement
+- [ ] 100-10,000 configurable simulation runs
+- [ ] Success probability calculation with sequence of returns risk analysis
+- [ ] Portfolio survival probability by age with percentile distributions (10th, 25th, 50th, 75th, 90th)
+- [ ] Worst-case and best-case portfolio balance tracking
+- [ ] Minimum balance tracking throughout retirement
 
-#### Phase 4: Advanced Metrics & Insights (COMPLETED)
+#### Phase 4: Advanced Metrics & Insights (PLANNED)
 **Acceptance Criteria:**
-- [x] Personalized safe withdrawal rate calculation with visual indicator
-- [x] Break-even analysis timeline showing crossover points
-- [x] Risk analysis metrics with sequence of returns risk factor
-- [x] Portfolio survival mini-charts for each scenario
-- [x] Automated insights: early vs late retirement impact, tax strategy recommendations
-- [x] Social Security optimization suggestions and healthcare cost projections
-- [x] Inflation impact analysis and time vs money trade-offs
-- [x] Total contribution comparisons and return assumption validation
+- [ ] Personalized safe withdrawal rate calculation with visual indicator
+- [ ] Break-even analysis timeline showing crossover points
+- [ ] Risk analysis metrics with sequence of returns risk factor
+- [ ] Portfolio survival mini-charts for each scenario
+- [ ] Automated insights: early vs late retirement impact, tax strategy recommendations
+- [ ] Social Security optimization suggestions and healthcare cost projections
+- [ ] Inflation impact analysis and time vs money trade-offs
+- [ ] Total contribution comparisons and return assumption validation
 
-#### Phase 5: User Experience Enhancements (COMPLETED)
+#### Phase 5: User Experience Enhancements (PLANNED)
 **Acceptance Criteria:**
-- [x] Dark mode support with system preference detection and manual toggle
-- [x] Preset scenarios: Conservative (6% return, 10% volatility), Moderate (8% return, 15% volatility), Aggressive (12% return, 20% volatility), FIRE Movement optimized
-- [x] Guided tour functionality with 6-step interactive walkthrough
-- [x] Inflation toggle to switch between today's dollars and future dollars
-- [x] Input enhancements: range sliders with live values, currency formatting, percentage displays
-- [x] Real-time validation with error messages and tooltips for financial terms
-- [x] Loading states with smooth overlay and calculation progress indication
+- [ ] Dark mode support with system preference detection and manual toggle
+- [ ] Preset scenarios: Conservative (6% return, 10% volatility), Moderate (8% return, 15% volatility), Aggressive (12% return, 20% volatility), FIRE Movement optimized
+- [ ] Guided tour functionality with 6-step interactive walkthrough
+- [ ] Inflation toggle to switch between today's dollars and future dollars
+- [ ] Input enhancements: range sliders with live values, currency formatting, percentage displays
+- [ ] Real-time validation with error messages and tooltips for financial terms
+- [ ] Loading states with smooth overlay and calculation progress indication
 
-#### Phase 6: Data Visualization (IN PROGRESS)
+#### Phase 6: Terminal UI Architecture (PLANNED)
 **Acceptance Criteria:**
-- [ ] Interactive charts with Chart.js: annual withdrawal projections, net worth over time
-- [ ] Monte Carlo success probability visualization with zoom and pan functionality
-- [ ] Portfolio distribution at retirement with interactive legends
-- [ ] Click-to-select data points with detailed popups and hover tooltips
-- [ ] Milestone markers: Social Security eligibility (62), Medicare (65), full retirement age (67), RMDs (72)
-- [ ] Visual indicators: break-even point highlighting, portfolio depletion warnings
-- [ ] Success threshold lines and risk zone shading with confidence bands
-- [ ] Chart annotations for key events, market crash scenarios, life event markers
+- [ ] Modern component-based architecture with modular JavaScript framework
+- [ ] Terminal-style UI components: forms, displays, data tables
+- [ ] State management system with URL hash persistence
+- [ ] Theme system with dark/light mode and terminal aesthetics
+- [ ] Worker pool for background Monte Carlo calculations
+- [ ] App controller architecture for tool coordination
+- [ ] Reusable component library for future tools
 
 #### Phase 7: Advanced Financial Modeling (PLANNED)
 **Acceptance Criteria:**
@@ -392,15 +338,6 @@
 - [ ] Accessibility improvements: semantic HTML, ARIA labels, keyboard navigation
 - [ ] High contrast support in dark mode and graceful error handling
 
-**Implementation Notes:** 
-- Core calculator with Monte Carlo simulations complete
-- Phases 1-5 fully implemented with comprehensive financial modeling
-- Integrated with BufoIndex terminal theme and color palette
-- Modular JavaScript architecture following project patterns
-- Performance optimizations: memoized calculations, debounced updates, optimized chart rendering
-- Privacy-focused: client-side only calculations, no data transmission, no cookies or tracking
-
-**Current Status:** Phase 6 (Data Visualization) in progress, Phases 7-9 planned for future development
 
 ### BUFO-021: Tool Data Pipeline
 **Priority:** P1  
