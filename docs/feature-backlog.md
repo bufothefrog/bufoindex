@@ -16,6 +16,7 @@
 - [ ] Custom theme scaffolding created
 - [ ] GitHub repository structured properly
 - [ ] Basic .gitignore configured
+
 ### BUFO-002: Design System Setup
 **Priority:** P0  
 **Effort:** Medium  
@@ -26,6 +27,7 @@
 - [ ] Component library started (buttons, callouts, tables)
 - [ ] Terminal-style components for math/data display
 - [ ] Print stylesheet configured
+
 ### BUFO-003: GitHub Actions Deployment
 **Priority:** P0  
 **Effort:** Small  
@@ -35,6 +37,7 @@
 - [ ] Auto-deploy to GitHub Pages on main push
 - [ ] Build status badge in README
 - [ ] Deploy preview for PRs (optional)
+
 ### BUFO-004: Homepage Design
 **Priority:** P0  
 **Effort:** Medium  
@@ -45,6 +48,7 @@
 - [ ] Subtle Bufo branding (sage green accents)
 - [ ] Mobile responsive layout
 - [ ] Educational disclaimer in footer
+
 ---
 
 ## Epic 2: Article Infrastructure
@@ -60,6 +64,7 @@
 - [ ] Terminal-style callout boxes
 - [ ] Table of contents generation
 - [ ] Reading time estimation
+
 ### BUFO-006: Article Navigation
 **Priority:** P1  
 **Effort:** Small  
@@ -69,6 +74,7 @@
 - [ ] Suggested next article at bottom
 - [ ] Breadcrumb navigation
 - [ ] Topic progression indicators
+
 ### BUFO-007: About Page
 **Priority:** P1  
 **Effort:** Small  
@@ -79,6 +85,7 @@
 - [ ] Author background (percentages, no specifics)
 - [ ] Contact information
 - [ ] Educational disclaimer
+
 ---
 
 ## Epic 3: Foundational Content
@@ -93,6 +100,7 @@
 - [ ] Interactive inline calculator
 - [ ] Terminal-style formula displays
 - [ ] Links to related tools
+
 ### BUFO-009: Article - Paycheck Allocation Strategies  
 **Priority:** P0  
 **Effort:** Large  
@@ -103,6 +111,7 @@
 - [ ] Flowchart visualization
 - [ ] Consistent quality of life focus
 - [ ] Automation strategies
+
 ### BUFO-010: Article - Why Tracking Wealth Matters
 **Priority:** P1  
 **Effort:** Medium  
@@ -113,6 +122,7 @@
 - [ ] Setup best practices
 - [ ] Monthly review process
 - [ ] NO affiliate links (per requirements)
+
 ---
 
 ## Epic 4: Strategy Articles
@@ -127,6 +137,7 @@
 - [ ] Risk analysis (minimal)
 - [ ] State tax considerations
 - [ ] Interactive yield calculator
+
 ### BUFO-012: Article - The CD Myth (Sometimes)
 **Priority:** P1  
 **Effort:** Medium  
@@ -137,6 +148,7 @@
 - [ ] Ladder strategies debunked
 - [ ] SGOV/T-Bill comparison
 - [ ] Historical data visualization
+
 ### BUFO-013: Article - Credit Card Optimization Guide
 **Priority:** P1  
 **Effort:** Large  
@@ -147,6 +159,7 @@
 - [ ] Travel vs cashback strategies
 - [ ] Recommended combinations
 - [ ] Link to optimizer tool
+
 ---
 
 ## Epic 5: Advanced Strategy Articles
@@ -161,6 +174,7 @@
 - [ ] Interest rate comparisons
 - [ ] Use cases (real estate, opportunities)
 - [ ] Major broker comparison
+
 ### BUFO-015: Article - Leveraged ETF Strategies
 **Priority:** P2  
 **Effort:** Large  
@@ -171,6 +185,7 @@
 - [ ] Risk/reward analysis
 - [ ] Historical performance data
 - [ ] Link to risk profiler tool
+
 ### BUFO-016: Article - Roth vs HSA vs 401(k) Prioritization
 **Priority:** P2  
 **Effort:** Large  
@@ -181,6 +196,7 @@
 - [ ] Age-based strategies
 - [ ] State tax considerations
 - [ ] Decision flowchart
+
 ### BUFO-017: Article - Margin Leverage Explained
 **Priority:** P3  
 **Effort:** Medium  
@@ -191,6 +207,7 @@
 - [ ] Interest rate comparison
 - [ ] Tax implications
 - [ ] Warning callouts
+
 ---
 
 ## Epic 6: Interactive Tools

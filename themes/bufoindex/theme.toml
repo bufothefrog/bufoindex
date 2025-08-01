@@ -1,0 +1,12 @@
+name = 'BufoIndex'
+license = 'MIT'
+licenselink = 'https://github.com/bufothefrog/bufoindex/blob/main/LICENSE'
+description = 'Custom theme for BufoIndex personal finance education platform'
+homepage = 'https://github.com/bufothefrog/bufoindex'
+tags = ['finance', 'education', 'minimal', 'responsive']
+features = ['responsive', 'tailwind', 'katex', 'terminal-style']
+min_version = '0.120.0'
+
+[author]
+  name = 'BufoIndex'
+  homepage = 'https://github.com/bufothefrog'

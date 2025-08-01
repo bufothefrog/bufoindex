@@ -1,0 +1,39 @@
+{{/* Terminal-style note/warning display */}}
+{{ $type := .Get "type" | default "info" }}
+{{ $title := .Get "title" | default "" }}
+
+{{ $bgColor := "bg-blue-900" }}
+{{ $borderColor := "border-blue-500" }}
+{{ $iconColor := "text-blue-400" }}
+{{ $icon := "[INFO]" }}
+
+{{ if eq $type "warning" }}
+  {{ $bgColor = "bg-yellow-900" }}
+  {{ $borderColor = "border-yellow-500" }}
+  {{ $iconColor = "text-yellow-400" }}
+  {{ $icon = "[WARN]" }}
+{{ else if eq $type "error" }}
+  {{ $bgColor = "bg-red-900" }}
+  {{ $borderColor = "border-red-500" }}
+  {{ $iconColor = "text-red-400" }}
+  {{ $icon = "[ERROR]" }}
+{{ else if eq $type "success" }}
+  {{ $bgColor = "bg-green-900" }}
+  {{ $borderColor = "border-green-500" }}
+  {{ $iconColor = "text-green-400" }}
+  {{ $icon = "[OK]" }}
+{{ end }}
+
+<div class="note-block my-6 {{ $bgColor }} rounded-lg border {{ $borderColor }}">
+  <div class="p-4 font-mono text-sm">
+    <div class="flex items-start">
+      <span class="{{ $iconColor }} mr-2 font-bold">{{ $icon }}</span>
+      <div class="flex-1">
+        {{ if $title }}
+          <div class="text-white font-semibold mb-2">{{ $title }}</div>
+        {{ end }}
+        <div class="text-gray-300">{{ .Inner | markdownify }}</div>
+      </div>
+    </div>
+  </div>
+</div>

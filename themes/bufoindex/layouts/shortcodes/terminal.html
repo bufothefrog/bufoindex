@@ -1,0 +1,14 @@
+{{/* Terminal-style callout with customizable prompt and type */}}
+{{ $type := .Get "type" | default "info" }}
+{{ $prompt := .Get "prompt" | default "$" }}
+{{ $user := .Get "user" | default "user" }}
+
+<div class="terminal-block my-6 rounded-lg overflow-hidden {{ if eq $type "warning" }}border-l-4 border-yellow-500{{ else if eq $type "error" }}border-l-4 border-red-500{{ else if eq $type "success" }}border-l-4 border-green-500{{ else }}border-l-4 border-sage{{ end }}">
+  <div class="bg-gray-900 text-green-400 p-4 font-mono text-sm">
+    <div class="flex items-center mb-2">
+      <span class="text-gray-500">{{ $user }}@bufoindex:~{{ $prompt }}</span>
+      <span class="ml-2 text-white">{{ .Get "title" | default "Terminal Output" }}</span>
+    </div>
+    <div class="text-gray-300 whitespace-pre-wrap">{{ .Inner | safeHTML }}</div>
+  </div>
+</div>
