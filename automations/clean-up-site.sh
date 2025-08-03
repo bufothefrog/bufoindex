@@ -13,6 +13,10 @@ rm -rf node_modules
 echo "  ❌ Deleting public/"
 rm -rf public
 
+# Remove resources directory (Hugo build output)
+echo "  ❌ Deleting resources/"
+rm -rf resources
+
 # Remove Hugo build lock file
 echo "  ❌ Deleting .hugo_build.lock"
 rm -f .hugo_build.lock
@@ -24,9 +28,6 @@ rm -f package-lock.json
 # Remove Hugo cache/stats (if they exist)
 echo "  ❌ Deleting hugo_stats.json"
 rm -f hugo_stats.json
-
-echo "  ❌ Deleting resources/"
-rm -rf resources
 
 echo "✅ Site cleanup complete!"
 echo "💡 Run ./automations/install-site.sh to reinstall everything"
