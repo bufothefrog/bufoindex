@@ -9,7 +9,7 @@ Terminal-style calculators for modeling complex financial scenarios.
 
 ## Available Calculators
 
-### [Retirement Planning Calculator](/bufoindex/tools/retirement-calculator/)
+### [Retirement Planning Calculator](/tools/retirement-calculator/)
 Advanced retirement scenario modeling with multiple retirement ages, compound growth analysis, and 4% withdrawal rule calculations. Compare different retirement timelines and understand the trade-offs between time and money.
 
 **Features:**

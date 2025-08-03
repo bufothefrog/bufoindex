@@ -1,0 +1,138 @@
+<!-- Calculator Interface -->
+<div class="retirement-calculator bg-terminal-dark text-terminal-green font-mono border border-terminal-green rounded-lg p-6 mb-8">
+    <!-- Input Section -->
+    <div class="mb-8">
+        <div class="border-b border-terminal-green mb-4 pb-2">
+            <h2 class="text-terminal-green text-xl font-bold mb-0">RETIREMENT_CALCULATOR v1.0</h2>
+            <div class="text-terminal-green text-sm opacity-75">Enter parameters below. Press ENTER to calculate.</div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="terminal-input-group">
+                <label for="startingAge" class="block text-terminal-green text-sm mb-1">STARTING_AGE:</label>
+                <input type="number" id="startingAge" value="25" min="18" max="100" 
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="retirementAgeA" class="block text-terminal-green text-sm mb-1">RETIRE_AGE_A:</label>
+                <input type="number" id="retirementAgeA" value="40" min="30" max="100"
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="retirementAgeB" class="block text-terminal-green text-sm mb-1">RETIRE_AGE_B:</label>
+                <input type="number" id="retirementAgeB" value="45" min="30" max="100"
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="retirementAgeC" class="block text-terminal-green text-sm mb-1">RETIRE_AGE_C:</label>
+                <input type="number" id="retirementAgeC" value="50" min="30" max="100"
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="targetIncome" class="block text-terminal-green text-sm mb-1">TARGET_INCOME:</label>
+                <input type="text" id="targetIncome" value="120000" 
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="startingBalance" class="block text-terminal-green text-sm mb-1">INITIAL_BALANCE:</label>
+                <input type="text" id="startingBalance" value="100000"
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="inflationRate" class="block text-terminal-green text-sm mb-1">INFLATION_RATE:</label>
+                <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+            
+            <div class="terminal-input-group">
+                <label for="annualReturn" class="block text-terminal-green text-sm mb-1">ANNUAL_RETURN:</label>
+                <input type="number" id="annualReturn" value="10" min="0" max="30" step="0.1"
+                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Section -->
+    <div class="results-section mb-8">
+        <div class="border-b border-terminal-green mb-4 pb-2">
+            <h3 class="text-terminal-green text-lg font-bold mb-0">SCENARIO_ANALYSIS</h3>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="terminal-table w-full font-mono text-sm">
+                <thead>
+                    <tr class="border-b border-terminal-green">
+                        <th class="text-left py-2 px-3 text-terminal-green">SCENARIO</th>
+                        <th class="text-left py-2 px-3 text-terminal-green">RETIRE_AGE</th>
+                        <th class="text-left py-2 px-3 text-terminal-green">YEARS_LEFT</th>
+                        <th class="text-left py-2 px-3 text-terminal-green">FIRST_YR_INCOME</th>
+                        <th class="text-left py-2 px-3 text-terminal-green">PORTFOLIO_REQ</th>
+                        <th class="text-left py-2 px-3 text-terminal-green">MONTHLY_SAVE</th>
+                    </tr>
+                </thead>
+                <tbody id="summaryTableBody">
+                    <!-- Results populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Charts Section -->
+    <div class="charts-section mb-8">
+        <div class="border-b border-terminal-green mb-4 pb-2">
+            <h3 class="text-terminal-green text-lg font-bold mb-0">VISUALIZATIONS</h3>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-6">
+            <div class="terminal-chart">
+                <h4 class="text-terminal-green text-sm font-bold mb-3">ANNUAL_WITHDRAWALS</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 h-96 relative">
+                    <canvas id="withdrawalsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="terminal-chart">
+                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH_PROGRESSION</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 h-96 relative">
+                    <canvas id="netWorthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Insights Section -->
+    <div class="insights-section mb-8">
+        <div class="border-b border-terminal-green mb-4 pb-2">
+            <h3 class="text-terminal-green text-lg font-bold mb-0">KEY_INSIGHTS</h3>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="insightsContent">
+            <!-- Insights populated by JavaScript -->
+        </div>
+    </div>
+    
+    <!-- Export Section -->
+    <div class="export-section">
+        <div class="border-b border-terminal-green mb-4 pb-2">
+            <h3 class="text-terminal-green text-lg font-bold mb-0">EXPORT_DATA</h3>
+        </div>
+        
+        <div class="flex gap-4">
+            <button id="exportJSON" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 font-mono hover:bg-terminal-green hover:text-black transition-colors">
+                EXPORT_JSON
+            </button>
+            <button id="exportCSV" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 font-mono hover:bg-terminal-green hover:text-black transition-colors">
+                EXPORT_CSV
+            </button>
+            <button id="shareURL" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 font-mono hover:bg-terminal-green hover:text-black transition-colors">
+                SHARE_URL
+            </button>
+        </div>
+    </div>
+</div>

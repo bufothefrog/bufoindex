@@ -1,0 +1,39 @@
+{{ define "main" }}
+{{ $toolDir := .File.Dir }}
+
+<div class="container">
+    <div class="content mx-auto">
+        <!-- Load tool-specific styles -->
+        <link rel="stylesheet" href="{{ printf "%sstyles.css" $toolDir | relURL }}">
+
+        <!-- Page Title Only -->
+        <h1 class="text-3xl font-bold mb-8">{{ .Title }}</h1>
+
+        <!-- Load tool HTML interface -->
+        {{ readFile (printf "%stool.html" .File.Dir) | safeHTML }}
+
+        <!-- Display tool content (documentation) below calculator -->
+        <div class="prose max-w-none mt-12">
+            {{ .Content }}
+        </div>
+    </div>
+</div>
+
+<!-- Load external dependencies -->
+{{ if .Params.tool_dependencies }}
+    {{ range .Params.tool_dependencies }}
+        {{ if eq . "chartjs" }}
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+        {{ end }}
+        {{ if eq . "chartjs-plugin-zoom" }}
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+        {{ end }}
+    {{ end }}
+{{ end }}
+
+<!-- Load tool scripts -->
+<script src="{{ printf "%slib/calculations.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/export.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/url-state.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%sscript.js" $toolDir | relURL }}"></script>
+{{ end }}

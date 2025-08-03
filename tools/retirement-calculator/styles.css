@@ -1,0 +1,102 @@
+/* Retirement Calculator Tool Styles */
+
+/* Terminal Theme Colors */
+.bg-terminal-dark {
+  background-color: #0A0E1A;
+}
+
+.text-terminal-green {
+  color: #00FF41;
+}
+
+.border-terminal-green {
+  border-color: #00FF41;
+}
+
+/* Terminal Input Styling */
+.terminal-input {
+  background-color: #000000;
+  border: 1px solid #00FF41;
+  color: #00FF41;
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+.terminal-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #00FF41;
+  border-color: #00FF41;
+}
+
+/* Terminal Button Styling */
+.terminal-button {
+  background-color: #000000;
+  border: 1px solid #00FF41;
+  color: #00FF41;
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.terminal-button:hover {
+  background-color: #00FF41;
+  color: #000000;
+}
+
+/* Terminal Table Styling */
+.terminal-table {
+  border-collapse: collapse;
+}
+
+.terminal-table th,
+.terminal-table td {
+  border-bottom: 1px solid #00FF41;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.terminal-table th {
+  color: #00FF41;
+  font-weight: bold;
+  background-color: #0A0E1A;
+}
+
+.terminal-table td {
+  color: #00FF41;
+  background-color: transparent;
+}
+
+/* Terminal Insight Cards */
+.terminal-insight {
+  background-color: #000000;
+  border: 1px solid #00FF41;
+  padding: 1rem;
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+.terminal-insight-title {
+  color: #00FF41;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.terminal-insight-value {
+  color: #FFB86C;
+  font-size: 1.25rem;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.terminal-insight-text {
+  color: #00FF41;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Chart Container Styling */
+.chart-container {
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+  color: #00FF41;
+  overflow: hidden;
+}
