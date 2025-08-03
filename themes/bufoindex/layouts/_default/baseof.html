@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="{{ .Site.LanguageCode | default "en" }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ if .Title }}{{ .Title }} | {{ end }}{{ .Site.Title }}</title>
+    
+    <meta name="description" content="{{ if .Description }}{{ .Description }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+    <meta name="author" content="{{ .Site.Params.author }}">
+    
+    <link rel="stylesheet" href="{{ "css/style.css" | relURL }}">
+</head>
+
+<body>
+    <header class="py-8 border-b border-gray-200">
+        <div class="container">
+            <div class="flex justify-between items-center">
+                <div>
+                    <a href="{{ "/" | relURL }}" class="text-xl font-semibold text-gray-900 no-underline">
+                        {{ .Site.Title }}
+                    </a>
+                </div>
+                
+                <nav class="hidden md:flex space-x-1">
+                    {{ range .Site.Menus.main }}
+                    <a href="{{ .URL | relURL }}" 
+                       class="nav-link {{ if $.IsMenuCurrent "main" . }}active{{ end }}">
+                        {{ .Name }}
+                    </a>
+                    {{ end }}
+                </nav>
+                
+                <!-- Mobile menu button would go here if needed -->
+            </div>
+        </div>
+    </header>
+    
+    <main class="py-8">
+        {{ block "main" . }}{{ end }}
+    </main>
+    
+    <footer class="py-8 mt-16 border-t border-gray-200 bg-gray-50">
+        <div class="container">
+            <div class="text-center text-muted">
+                <p>&copy; {{ now.Format "2006" }} {{ .Site.Title }}. Educational content for personal finance.</p>
+                <p class="mt-2 text-sm">
+                    This site provides educational content only and is not personalized financial advice.
+                </p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

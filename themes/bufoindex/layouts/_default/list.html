@@ -1,0 +1,47 @@
+{{ define "main" }}
+<div class="container">
+    <div class="content">
+        <header class="mb-8">
+            <h1>{{ .Title }}</h1>
+            {{ if .Content }}
+            <div class="prose">
+                {{ .Content }}
+            </div>
+            {{ end }}
+        </header>
+        
+        {{ if .Pages }}
+        <div class="space-y-4">
+            {{ range .Pages }}
+            <article class="card">
+                <h2 class="mb-2">
+                    <a href="{{ .Permalink }}" class="text-xl font-semibold text-gray-900 no-underline hover:text-green-600">
+                        {{ .Title }}
+                    </a>
+                </h2>
+                
+                <div class="article-meta mb-3">
+                    {{ if .Date }}
+                    <time datetime="{{ .Date.Format "2006-01-02" }}">
+                        {{ .Date.Format "January 2, 2006" }}
+                    </time>
+                    {{ end }}
+                    {{ if .ReadingTime }}
+                    · {{ .ReadingTime }} min read
+                    {{ end }}
+                </div>
+                
+                {{ if .Summary }}
+                <p class="text-gray-600">{{ .Summary }}</p>
+                {{ end }}
+                
+                <a href="{{ .Permalink }}" class="btn mt-3">Read More</a>
+            </article>
+            {{ end }}
+        </div>
+        {{ else }}
+        <p class="text-muted">No articles yet in this section.</p>
+        {{ end }}
+    </div>
+</div>
+{{ end }}

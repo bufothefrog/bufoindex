@@ -1,0 +1,14 @@
+{{ define "main" }}
+<div class="container">
+    <div class="content text-center py-8">
+        <h1 class="text-4xl font-bold mb-4">{{ .Site.Title }}</h1>
+        <p class="text-xl text-muted mb-8">{{ .Site.Params.description }}</p>
+        
+        <div class="mb-8">
+            <a href="/articles/" class="btn mr-4">Articles</a>
+            <a href="/tools/" class="btn bg-gray-500 text-white hover:bg-gray-600">Tools</a>
+        </div>
+    </div>
+    
+</div>
+{{ end }}
