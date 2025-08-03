@@ -3,7 +3,8 @@ module.exports = {
   content: [
     './themes/bufoindex/layouts/**/*.html',
     './content/**/*.md',
-    './static/**/*.js'
+    './static/**/*.js',
+    './tools/**/*.{html,js}'
   ],
   theme: {
     extend: {

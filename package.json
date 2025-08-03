@@ -2,13 +2,11 @@
   "name": "bufoindex",
   "version": "1.0.0",
   "description": "Personal finance education platform built with Hugo",
-  "main": "index.js",
   "scripts": {
     "dev": "hugo server -D --watch",
     "build": "npm run build:css && hugo --gc --minify",
     "build:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --minify",
-    "watch:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --watch",
-    "serve": "hugo server -D"
+    "watch:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --watch"
   },
   "keywords": [
     "finance",
@@ -19,7 +17,6 @@
   "author": "Bufo",
   "license": "MIT",
   "devDependencies": {
-    "@tailwindcss/typography": "^0.5.10",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0"
