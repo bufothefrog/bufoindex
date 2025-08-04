@@ -77,29 +77,41 @@ class RetirementCalculator {
     }
 
     calculateScenarios() {
-        const params = URLStateManager.collectParametersFromForm();
-        const validated = URLStateManager.validateParameters(params);
+        const params = this.collectEnhancedParameters();
+        
+        // Calculate retirement readiness using new method
+        const readinessAnalysis = FinancialCalculations.calculateRetirementReadiness({
+            currentAge: params.startingAge,
+            targetRetirementAge: params.targetRetirementAge,
+            targetIncome: params.targetIncome,
+            currentIncome: params.currentIncome,
+            currentSavingsRate: params.currentSavingsRate / 100, // Convert to decimal
+            startingBalance: params.startingBalance,
+            state: params.state,
+            riskProfile: params.riskProfile,
+            inflationRate: params.inflationRate / 100
+        });
 
-        const scenarioConfigs = [
-            { label: 'A', retirementAge: validated.retirementAgeA, color: '#e74c3c' },
-            { label: 'B', retirementAge: validated.retirementAgeB, color: '#f39c12' },
-            { label: 'C', retirementAge: validated.retirementAgeC, color: '#27ae60' }
-        ];
-
-        this.scenarios = scenarioConfigs.map(config => {
-            const calculation = FinancialCalculations.calculateScenario({
-                startingAge: validated.startingAge,
-                retirementAge: config.retirementAge,
-                targetIncome: validated.targetIncome,
-                startingBalance: validated.startingBalance,
-                inflationRate: validated.inflationRate / 100,
-                annualReturn: validated.accumulationReturn / 100
-            });
-
+        // Store target goal assessment
+        this.targetGoalAssessment = readinessAnalysis.targetGoal;
+        
+        // Convert scenarios to format expected by rest of app
+        this.scenarios = readinessAnalysis.scenarios.map((scenario, index) => {
+            const colors = ['#e74c3c', '#f39c12', '#27ae60'];
             return {
-                ...config,
-                ...calculation,
-                retirementAge: config.retirementAge
+                label: scenario.label,
+                savingsRate: scenario.savingsRate,
+                retirementAge: scenario.achievableRetirementAge,
+                yearsUntilRetirement: scenario.yearsUntilRetirement,
+                monthlyContribution: scenario.monthlyContribution,
+                realismScore: scenario.realismScore,
+                realismRating: scenario.realismRating,
+                confidenceLevel: scenario.confidenceLevel,
+                valid: scenario.valid,
+                color: colors[index] || '#888888',
+                // Calculate additional fields for compatibility
+                inflatedTargetIncome: params.targetIncome * Math.pow(1 + params.inflationRate/100, scenario.yearsUntilRetirement),
+                targetPortfolioSize: (params.targetIncome * Math.pow(1 + params.inflationRate/100, scenario.yearsUntilRetirement)) / 0.04
             };
         });
 
@@ -115,23 +127,63 @@ class RetirementCalculator {
                 return `
                     <tr class="text-terminal-green opacity-50">
                         <td class="py-2 px-3">SCENARIO_${scenario.label}</td>
-                        <td class="py-2 px-3">${scenario.retirementAge}</td>
-                        <td class="py-2 px-3" colspan="4">INVALID: Retirement age must be after starting age</td>
+                        <td class="py-2 px-3">${Math.round(scenario.savingsRate * 100)}%</td>
+                        <td class="py-2 px-3" colspan="4">INVALID: Unable to retire with this savings rate</td>
                     </tr>
                 `;
             }
 
+            // Add realism color coding
+            const realismClass = this.getRealismColorClass(scenario.realismRating);
+            const confidenceMeter = this.generateConfidenceMeter(scenario.confidenceLevel);
+            
+            // Show Monte Carlo success rate if available
+            const successProb = scenario.monteCarloSuccessRate ? 
+                `${Math.round(scenario.monteCarloSuccessRate * 100)}%` : 
+                'Calculating...';
+
             return `
                 <tr class="text-terminal-green">
                     <td class="py-2 px-3">SCENARIO_${scenario.label}</td>
+                    <td class="py-2 px-3">${Math.round(scenario.savingsRate * 100)}%</td>
                     <td class="py-2 px-3">${scenario.retirementAge}</td>
-                    <td class="py-2 px-3">${scenario.yearsUntilRetirement}</td>
-                    <td class="py-2 px-3">${FinancialCalculations.formatCurrency(scenario.inflatedTargetIncome)}</td>
-                    <td class="py-2 px-3">${FinancialCalculations.formatCurrency(scenario.targetPortfolioSize)}</td>
+                    <td class="py-2 px-3 ${realismClass}">
+                        <div class="flex items-center gap-2">
+                            <span>${scenario.realismRating}</span>
+                            ${confidenceMeter}
+                        </div>
+                    </td>
+                    <td class="py-2 px-3">${successProb}</td>
                     <td class="py-2 px-3">${FinancialCalculations.formatCurrency(scenario.monthlyContribution)}</td>
                 </tr>
             `;
         }).join('');
+    }
+
+    getRealismColorClass(rating) {
+        switch (rating) {
+            case 'Highly Realistic': return 'text-green-400';
+            case 'Challenging but Achievable': return 'text-yellow-400';
+            case 'Unlikely': return 'text-orange-400';
+            case 'Unrealistic': return 'text-red-400';
+            default: return 'text-terminal-green';
+        }
+    }
+
+    generateConfidenceMeter(confidenceLevel) {
+        const width = Math.max(10, confidenceLevel); // Minimum 10% width for visibility
+        const color = confidenceLevel >= 80 ? '#00FF41' : 
+                      confidenceLevel >= 60 ? '#FFB86C' : 
+                      confidenceLevel >= 40 ? '#FF8C42' : '#FF6B6B';
+        
+        return `
+            <div class="inline-flex items-center gap-1">
+                <div class="w-16 h-2 bg-gray-800 border border-terminal-green">
+                    <div class="h-full" style="width: ${width}%; background-color: ${color};"></div>
+                </div>
+                <span class="text-xs">${confidenceLevel}%</span>
+            </div>
+        `;
     }
 
     generateInsights() {
@@ -179,11 +231,74 @@ class RetirementCalculator {
         return insights;
     }
 
+    generateNewStyleInsights() {
+        if (!this.targetGoalAssessment || !this.scenarios) return [];
+
+        const insights = [];
+        const params = this.collectEnhancedParameters();
+
+        // Target Goal Assessment
+        const targetRating = this.targetGoalAssessment.realismAssessment.rating;
+        const requiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
+        const currentRate = Math.round(params.currentSavingsRate);
+
+        insights.push({
+            title: 'RETIREMENT_GOAL_ASSESSMENT',
+            value: targetRating,
+            text: `Your goal to retire at ${params.targetRetirementAge} with $${FinancialCalculations.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
+        });
+
+        // Savings Rate Impact
+        const currentScenario = this.scenarios.find(s => s.label === 'Current');
+        const aggressiveScenario = this.scenarios.find(s => s.label === 'Aggressive');
+        
+        if (currentScenario && aggressiveScenario && currentScenario.valid && aggressiveScenario.valid) {
+            const yearsSaved = currentScenario.retirementAge - aggressiveScenario.retirementAge;
+            insights.push({
+                title: 'SAVINGS_RATE_IMPACT',
+                value: `${yearsSaved} years`,
+                text: `Increasing your savings rate by 20% (from ${Math.round(currentScenario.savingsRate*100)}% to ${Math.round(aggressiveScenario.savingsRate*100)}%) allows you to retire ${yearsSaved} years earlier.`
+            });
+        }
+
+        // Cost of Living Impact
+        const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
+        const colNames = ['', 'Very High', 'High', 'Moderate', 'Low'];
+        const maxSavings = Math.round(window.SavingsFeasibility.calculateMaxRealisticSavings(params.currentIncome, params.state) * 100);
+        
+        insights.push({
+            title: 'LOCATION_IMPACT',
+            value: `${maxSavings}% max`,
+            text: `Living in ${params.state} (${colNames[colTier]} cost of living) limits realistic savings to approximately ${maxSavings}% of income at your income level.`
+        });
+
+        // Risk Profile Impact
+        const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile);
+        insights.push({
+            title: 'RISK_PROFILE',
+            value: riskData.name,
+            text: `Your ${riskData.name} investment approach assumes ${Math.round(riskData.accumulation.return*100)}% returns during accumulation and ${Math.round(riskData.retirement.return*100)}% during retirement.`
+        });
+
+        // Action Items
+        if (!this.targetGoalAssessment.isRealistic) {
+            const minRequiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
+            insights.push({
+                title: 'ACTION_REQUIRED',
+                value: `${minRequiredRate}% needed`,
+                text: `To achieve your goal, consider: 1) Increase savings rate to ${minRequiredRate}%, 2) Retire later, 3) Reduce target income, or 4) Move to lower cost area.`
+            });
+        }
+
+        return insights;
+    }
+
     updateInsights() {
         const insightsContainer = document.getElementById('insightsContent');
         if (!insightsContainer) return;
 
-        const insights = this.generateInsights();
+        // Use new savings-focused insights if we have the new data structure
+        const insights = this.targetGoalAssessment ? this.generateNewStyleInsights() : this.generateInsights();
 
         insightsContainer.innerHTML = insights.map(insight => `
             <div class="terminal-insight">
@@ -470,17 +585,83 @@ class RetirementCalculator {
     async updateAll() {
         // Calculate basic scenarios first
         this.calculateScenarios();
+        this.updateTargetGoalAssessment();
         this.updateSummaryTable();
         
         // Run Monte Carlo simulation and financial modeling asynchronously
         await this.runMonteCarloAnalysis();
         await this.runFinancialModeling();
         
+        // Update table again with Monte Carlo results
+        this.updateSummaryTable();
+        
         // Generate insights after all data is available
         this.updateInsights();
         
         // Update all charts
         this.updateCharts();
+    }
+
+    updateTargetGoalAssessment() {
+        const container = document.getElementById('targetGoalContent');
+        if (!container || !this.targetGoalAssessment) return;
+
+        const params = this.collectEnhancedParameters();
+        const assessment = this.targetGoalAssessment;
+        const realismClass = this.getRealismColorClass(assessment.realismAssessment.rating);
+        const requiredRate = Math.round(assessment.requiredSavingsRate * 100);
+        const currentRate = Math.round(params.currentSavingsRate);
+        const rateDifference = requiredRate - currentRate;
+        
+        // Generate confidence meter for overall assessment
+        const confidenceMeter = this.generateConfidenceMeter(assessment.realismAssessment.score);
+        
+        // Generate actionable recommendations
+        let recommendations = [];
+        if (!assessment.isRealistic) {
+            if (rateDifference <= 10) {
+                recommendations.push(`Increase savings rate by ${rateDifference}% (achievable with discipline)`);
+            } else {
+                recommendations.push(`Consider retiring ${Math.ceil(rateDifference / 5)} years later`);
+                recommendations.push(`Reduce target income to $${FinancialCalculations.formatCurrency(params.targetIncome * 0.8)}`);
+            }
+            
+            const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
+            if (colTier <= 2) {
+                recommendations.push('Consider moving to a lower cost of living area');
+            }
+        } else {
+            recommendations.push('Your retirement goal appears achievable with your current plan');
+            recommendations.push('Consider the scenarios below to potentially retire earlier');
+        }
+
+        container.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="text-terminal-green font-bold mb-3">YOUR RETIREMENT GOAL</h4>
+                    <div class="space-y-2 text-sm">
+                        <div><span class="opacity-75">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
+                        <div><span class="opacity-75">Target Annual Income:</span> $${FinancialCalculations.formatCurrency(params.targetIncome)}</div>
+                        <div><span class="opacity-75">Current Savings Rate:</span> ${currentRate}%</div>
+                        <div><span class="opacity-75">Required Savings Rate:</span> <span class="${rateDifference > 0 ? 'text-orange-400' : 'text-green-400'}">${requiredRate}%</span></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-terminal-green font-bold mb-3">ASSESSMENT</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="${realismClass} font-bold">${assessment.realismAssessment.rating}</span>
+                            ${confidenceMeter}
+                        </div>
+                        
+                        <div class="text-sm space-y-1">
+                            ${recommendations.map(rec => `<div class="opacity-90">• ${rec}</div>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     // Export functions
@@ -595,28 +776,43 @@ class RetirementCalculator {
      */
     async runMonteCarloAnalysis() {
         const params = this.collectEnhancedParameters();
-        const validated = URLStateManager.validateParameters(params);
 
-        const scenarioConfigs = [
-            { retirementAge: validated.retirementAgeA },
-            { retirementAge: validated.retirementAgeB },
-            { retirementAge: validated.retirementAgeC }
-        ];
+        // Generate scenario configs from our savings rate scenarios
+        const scenarioConfigs = this.scenarios.filter(s => s.valid).map(scenario => ({
+            retirementAge: scenario.retirementAge,
+            label: scenario.label,
+            savingsRate: scenario.savingsRate
+        }));
+
+        if (scenarioConfigs.length === 0) {
+            console.warn('No valid scenarios for Monte Carlo analysis');
+            return;
+        }
 
         const assumptions = {
-            startingAge: validated.startingAge,
-            startingBalance: validated.startingBalance,
-            targetIncome: validated.targetIncome,
-            inflationRate: validated.inflationRate,
-            accumulationReturn: validated.accumulationReturn || 10,
-            retirementReturn: validated.retirementReturn || 7,
-            volatility: validated.volatility || 15,
-            monteCarloRuns: parseInt(validated.monteCarloRuns || 1000)
+            startingAge: params.startingAge,
+            startingBalance: params.startingBalance,
+            targetIncome: params.targetIncome,
+            inflationRate: params.inflationRate,
+            accumulationReturn: params.accumulationReturn,
+            retirementReturn: params.retirementReturn,
+            volatility: params.volatility,
+            monteCarloRuns: parseInt(params.monteCarloRuns || 1000)
         };
 
         // Run Monte Carlo simulation
         try {
             this.monteCarloResults = await this.runMonteCarloSimulation(scenarioConfigs, assumptions);
+            
+            // Update scenarios with Monte Carlo success rates
+            if (this.monteCarloResults && this.monteCarloResults.scenarios) {
+                this.monteCarloResults.scenarios.forEach((mcResult, index) => {
+                    if (this.scenarios[index]) {
+                        this.scenarios[index].monteCarloSuccessRate = mcResult.successRate;
+                        this.scenarios[index].portfolioStats = mcResult.portfolioAtRetirement;
+                    }
+                });
+            }
         } catch (error) {
             console.error('Monte Carlo simulation failed:', error);
         }
@@ -740,20 +936,27 @@ class RetirementCalculator {
     collectEnhancedParameters() {
         const basic = URLStateManager.collectParametersFromForm();
         
-        // Add new fields
+        // Add new fields for savings-rate based calculations
         const enhanced = {
             ...basic,
             currentIncome: this.getInputValue('currentIncome', 'currency'),
-            accumulationReturn: this.getInputValue('accumulationReturn', 'number') || 10,
-            retirementReturn: this.getInputValue('retirementReturn', 'number') || 7,
-            volatility: this.getInputValue('volatility', 'number') || 15,
+            targetRetirementAge: this.getInputValue('targetRetirementAge', 'number') || 45,
+            currentSavingsRate: this.getInputValue('currentSavingsRate', 'number') || 15,
+            state: this.getSelectValue('state') || 'TX',
+            riskProfile: this.getSelectValue('riskProfile') || 'moderate',
+            // Keep these for compatibility with existing systems
             monteCarloRuns: this.getInputValue('monteCarloRuns', 'number') || 1000,
             accountType: this.getSelectValue('accountType') || 'Traditional 401k/IRA',
-            state: this.getSelectValue('state') || 'California',
             socialSecurityAge: this.getInputValue('socialSecurityAge', 'number') || 67,
             socialSecurityBenefit: this.getInputValue('socialSecurityBenefit', 'currency') || 2000,
             healthcareMultiplier: parseFloat(this.getSelectValue('healthcareMultiplier')) || 1.0
         };
+
+        // Get risk profile returns
+        const riskData = window.SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
+        enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
+        enhanced.retirementReturn = riskData.retirement.return * 100;
+        enhanced.volatility = riskData.accumulation.volatility * 100;
 
         return enhanced;
     }

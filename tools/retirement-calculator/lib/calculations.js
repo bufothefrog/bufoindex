@@ -628,6 +628,228 @@ class FinancialCalculations {
                 : 'Traditional 4% rule appears suitable for your scenario'
         };
     }
+
+    /**
+     * NEW METHOD: Calculate retirement readiness based on savings rate and target age
+     * @param {Object} params - Retirement planning parameters
+     * @returns {Object} - Comprehensive retirement readiness analysis
+     */
+    static calculateRetirementReadiness(params) {
+        const {
+            currentAge,
+            targetRetirementAge,
+            targetIncome,
+            currentIncome,
+            currentSavingsRate, // decimal (e.g., 0.15 for 15%)
+            startingBalance,
+            state = 'TX',
+            riskProfile = 'moderate',
+            inflationRate = 0.03
+        } = params;
+
+        // Get risk profile data
+        const riskData = window.SavingsFeasibility.getRiskProfile(riskProfile);
+        const accumulationReturn = riskData.accumulation.return;
+        const retirementReturn = riskData.retirement.return;
+        const volatility = riskData.accumulation.volatility;
+
+        // Calculate required savings rate for target goal
+        const requiredSavingsRate = window.SavingsFeasibility.calculateRequiredSavingsRate({
+            currentAge,
+            targetAge: targetRetirementAge,
+            targetIncome,
+            currentIncome,
+            startingBalance,
+            inflationRate,
+            annualReturn: accumulationReturn
+        });
+
+        // Assess realism of required savings rate
+        const realismAssessment = window.SavingsFeasibility.assessSavingsRateIncrease(
+            currentSavingsRate,
+            requiredSavingsRate,
+            currentIncome,
+            state
+        );
+
+        // Generate three savings rate scenarios
+        const savingsScenarios = window.SavingsFeasibility.generateSavingsRateScenarios(currentSavingsRate);
+        
+        // Calculate what retirement age is achievable with each savings rate
+        const scenarioResults = savingsScenarios.map((scenario, index) => {
+            const achievableAge = this.calculateAchievableRetirementAge({
+                currentAge,
+                targetIncome,
+                currentIncome,
+                savingsRate: scenario.rate,
+                startingBalance,
+                inflationRate,
+                annualReturn: accumulationReturn
+            });
+
+            // Assess realism of this savings rate
+            const realism = window.SavingsFeasibility.assessSavingsRateIncrease(
+                currentSavingsRate,
+                scenario.rate,
+                currentIncome,
+                state
+            );
+
+            return {
+                label: scenario.label,
+                savingsRate: scenario.rate,
+                description: scenario.description,
+                achievableRetirementAge: achievableAge,
+                yearsUntilRetirement: Math.max(0, achievableAge - currentAge),
+                monthlyContribution: (scenario.rate * currentIncome) / 12,
+                realismScore: realism.score,
+                realismRating: realism.rating,
+                confidenceLevel: window.SavingsFeasibility.getConfidenceLevel(realism.score),
+                valid: achievableAge <= 100 && achievableAge > currentAge
+            };
+        });
+
+        return {
+            targetGoal: {
+                retirementAge: targetRetirementAge,
+                targetIncome,
+                requiredSavingsRate,
+                realismAssessment,
+                isRealistic: realismAssessment.score >= 60
+            },
+            scenarios: scenarioResults,
+            riskProfile: riskData,
+            marketAssumptions: {
+                accumulationReturn,
+                retirementReturn,
+                volatility,
+                inflationRate
+            }
+        };
+    }
+
+    /**
+     * NEW METHOD: Calculate what retirement age is achievable with given savings rate
+     * @param {Object} params - Savings parameters
+     * @returns {number} - Achievable retirement age
+     */
+    static calculateAchievableRetirementAge(params) {
+        const {
+            currentAge,
+            targetIncome,
+            currentIncome,
+            savingsRate,
+            startingBalance,
+            inflationRate,
+            annualReturn
+        } = params;
+
+        const annualContribution = currentIncome * savingsRate;
+        
+        // Binary search to find retirement age
+        let minAge = currentAge + 1;
+        let maxAge = 100;
+        let bestAge = maxAge;
+
+        while (minAge <= maxAge) {
+            const testAge = Math.floor((minAge + maxAge) / 2);
+            const yearsToSave = testAge - currentAge;
+            
+            if (yearsToSave <= 0) {
+                minAge = testAge + 1;
+                continue;
+            }
+
+            // Calculate portfolio value at test retirement age
+            let portfolioValue = startingBalance;
+            for (let year = 0; year < yearsToSave; year++) {
+                portfolioValue = portfolioValue * (1 + annualReturn) + annualContribution;
+            }
+
+            // Calculate required portfolio for target income (inflation-adjusted)
+            const inflatedTargetIncome = targetIncome * Math.pow(1 + inflationRate, yearsToSave);
+            const requiredPortfolio = inflatedTargetIncome / 0.04; // 4% rule
+
+            if (portfolioValue >= requiredPortfolio) {
+                bestAge = testAge;
+                maxAge = testAge - 1; // Try for earlier retirement
+            } else {
+                minAge = testAge + 1; // Need to work longer
+            }
+        }
+
+        return bestAge;
+    }
+
+    /**
+     * NEW METHOD: Generate savings rate scenarios for Monte Carlo analysis
+     * @param {Object} params - Base parameters
+     * @returns {Array} - Array of scenario objects for Monte Carlo simulation
+     */
+    static generateSavingsRateScenarios(params) {
+        const readinessAnalysis = this.calculateRetirementReadiness(params);
+        
+        return readinessAnalysis.scenarios.map(scenario => ({
+            retirementAge: scenario.achievableRetirementAge,
+            targetIncome: params.targetIncome,
+            startingAge: params.currentAge,
+            startingBalance: params.startingBalance,
+            endAge: params.endAge || 85,
+            lifeExpectancy: 100,
+            savingsRate: scenario.savingsRate,
+            label: scenario.label,
+            realismRating: scenario.realismRating,
+            confidenceLevel: scenario.confidenceLevel
+        }));
+    }
+}
+
+    /**
+     * NEW METHOD: Calculate minimum required savings rate to achieve goal
+     * @param {Object} params - Goal parameters
+     * @returns {Object} - Required savings rate analysis
+     */
+    static calculateMinimumSavingsRate(params) {
+        const {
+            currentAge,
+            targetRetirementAge,
+            targetIncome,
+            currentIncome,
+            startingBalance,
+            inflationRate = 0.03,
+            annualReturn = 0.08
+        } = params;
+
+        const yearsToRetirement = targetRetirementAge - currentAge;
+        if (yearsToRetirement <= 0) {
+            return { savingsRate: 0, achievable: false };
+        }
+
+        // Calculate required portfolio size
+        const inflatedTargetIncome = targetIncome * Math.pow(1 + inflationRate, yearsToRetirement);
+        const requiredPortfolio = inflatedTargetIncome / 0.04;
+
+        // Calculate required annual contribution
+        let requiredAnnualContribution = 0;
+        if (annualReturn === 0) {
+            requiredAnnualContribution = (requiredPortfolio - startingBalance) / yearsToRetirement;
+        } else {
+            const factor = Math.pow(1 + annualReturn, yearsToRetirement);
+            const numerator = requiredPortfolio - startingBalance * factor;
+            const denominator = (factor - 1) / annualReturn;
+            requiredAnnualContribution = numerator / denominator;
+        }
+
+        const requiredSavingsRate = Math.max(0, requiredAnnualContribution / currentIncome);
+        
+        return {
+            savingsRate: requiredSavingsRate,
+            achievable: requiredSavingsRate <= 0.80, // Assume 80% is absolute maximum
+            requiredMonthlyContribution: requiredAnnualContribution / 12,
+            requiredPortfolio,
+            inflatedTargetIncome
+        };
+    }
 }
 
 // Export for use in other modules

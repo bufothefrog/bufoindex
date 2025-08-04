@@ -50,40 +50,7 @@
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-                <div class="terminal-input-group">
-                    <label for="retirementAgeA" class="block text-terminal-green text-sm mb-1 terminal-label">
-                        RETIRE_AGE_A:
-                        <span class="terminal-help" title="Early retirement scenario - typically ages 35-45 for FIRE (Financial Independence, Retire Early) movement.">?</span>
-                    </label>
-                    <input type="number" id="retirementAgeA" value="40" min="30" max="100"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="age">
-                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                </div>
-                
-                <div class="terminal-input-group">
-                    <label for="retirementAgeB" class="block text-terminal-green text-sm mb-1 terminal-label">
-                        RETIRE_AGE_B:
-                        <span class="terminal-help" title="Mid-career retirement scenario - balanced approach between savings intensity and working years.">?</span>
-                    </label>
-                    <input type="number" id="retirementAgeB" value="45" min="30" max="100"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="age">
-                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                </div>
-                
-                <div class="terminal-input-group">
-                    <label for="retirementAgeC" class="block text-terminal-green text-sm mb-1 terminal-label">
-                        RETIRE_AGE_C:
-                        <span class="terminal-help" title="Traditional retirement scenario - closer to standard retirement age with more conservative savings requirements.">?</span>
-                    </label>
-                    <input type="number" id="retirementAgeC" value="50" min="30" max="100"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="age">
-                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                </div>
-                
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 <div class="terminal-input-group">
                     <label for="startingAge" class="block text-terminal-green text-sm mb-1 terminal-label">
                         CURRENT_AGE:
@@ -93,6 +60,59 @@
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
                            data-validation="age">
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="targetRetirementAge" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        TARGET_RETIRE_AGE:
+                        <span class="terminal-help" title="Age at which you want to retire. Calculator will assess if this is realistic with your current situation.">?</span>
+                    </label>
+                    <input type="number" id="targetRetirementAge" value="45" min="30" max="100"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="age">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="currentSavingsRate" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        CURRENT_SAVINGS_RATE:
+                        <span class="terminal-help" title="Percentage of gross income you currently save for retirement. Include 401k, IRA, and other retirement savings.">?</span>
+                    </label>
+                    <input type="number" id="currentSavingsRate" value="15" min="0" max="80" step="0.5"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="percentage">
+                    <span class="text-terminal-green text-xs opacity-75">%</span>
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="state" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        STATE:
+                        <span class="terminal-help" title="Your state affects cost of living and realistic savings capacity. Used for feasibility calculations.">?</span>
+                    </label>
+                    <select id="state" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                        <option value="CA">California (Very High COL)</option>
+                        <option value="NY">New York (Very High COL)</option>
+                        <option value="HI">Hawaii (Very High COL)</option>
+                        <option value="MA">Massachusetts (Very High COL)</option>
+                        <option value="WA">Washington (High COL)</option>
+                        <option value="OR">Oregon (High COL)</option>
+                        <option value="CT">Connecticut (High COL)</option>
+                        <option value="NJ">New Jersey (High COL)</option>
+                        <option value="TX" selected>Texas (Moderate COL)</option>
+                        <option value="FL">Florida (Moderate COL)</option>
+                        <option value="CO">Colorado (Moderate COL)</option>
+                        <option value="AZ">Arizona (Moderate COL)</option>
+                        <option value="NC">North Carolina (Moderate COL)</option>
+                        <option value="GA">Georgia (Moderate COL)</option>
+                        <option value="TN">Tennessee (Moderate COL)</option>
+                        <option value="OH">Ohio (Low COL)</option>
+                        <option value="MI">Michigan (Low COL)</option>
+                        <option value="PA">Pennsylvania (Low COL)</option>
+                        <option value="IN">Indiana (Low COL)</option>
+                        <option value="MO">Missouri (Low COL)</option>
+                        <option value="Other">Other State</option>
+                    </select>
                 </div>
                 
             </div>
@@ -137,25 +157,17 @@
                         
                         
                         <div class="terminal-input-group">
-                            <label for="accumulationReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                ACCUMULATION_RETURN:
-                                <span class="terminal-help" title="Expected annual return during working years. Typically higher (8-12%) due to aggressive asset allocation.">?</span>
+                            <label for="riskProfile" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                RISK_PROFILE:
+                                <span class="terminal-help" title="Investment risk level determines expected returns and volatility. Higher risk = higher potential returns but more uncertainty.">?</span>
                             </label>
-                            <input type="number" id="accumulationReturn" value="10" min="0" max="30" step="0.1"
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="percentage">
-                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                        </div>
-                        
-                        <div class="terminal-input-group">
-                            <label for="retirementReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                RETIREMENT_RETURN:
-                                <span class="terminal-help" title="Expected annual return during retirement. Typically lower (5-8%) due to conservative asset allocation.">?</span>
-                            </label>
-                            <input type="number" id="retirementReturn" value="7" min="0" max="20" step="0.1"
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="percentage">
-                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                            <select id="riskProfile" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                                <option value="conservative">Conservative (6% / 4%)</option>
+                                <option value="moderate" selected>Moderate (8% / 6%)</option>
+                                <option value="aggressive">Aggressive (10% / 7%)</option>
+                                <option value="high_risk">High Risk 2x (14% / 7%)</option>
+                                <option value="ultra_high_risk">Ultra High Risk 3x (18% / 7%)</option>
+                            </select>
                         </div>
                         
                         <div class="terminal-input-group">
@@ -258,10 +270,22 @@
         </div>
     </div>
     
+    <!-- Target Goal Assessment Section -->
+    <div class="target-goal-section mb-8">
+        <div class="border-b border-terminal-green mb-4 pb-2">
+            <h3 class="text-terminal-green text-lg font-bold mb-0">> RETIREMENT_GOAL_ASSESSMENT</h3>
+        </div>
+        
+        <div id="targetGoalContent" class="terminal-goal-assessment bg-black border border-terminal-green p-4 mb-4">
+            <!-- Target goal assessment populated by JavaScript -->
+        </div>
+    </div>
+    
     <!-- Results Section -->
     <div class="results-section mb-8">
         <div class="border-b border-terminal-green mb-4 pb-2">
-            <h3 class="text-terminal-green text-lg font-bold mb-0">> SCENARIO_ANALYSIS</h3>
+            <h3 class="text-terminal-green text-lg font-bold mb-0">> SAVINGS_RATE_SCENARIOS</h3>
+            <div class="text-terminal-green text-sm opacity-75">// Compare retirement ages achievable with different savings rates</div>
         </div>
         
         <div class="overflow-x-auto -mx-6 px-6 lg:mx-0 lg:px-0">
@@ -269,10 +293,10 @@
                 <thead>
                     <tr class="border-b border-terminal-green">
                         <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SCENARIO</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SAVINGS_RATE</th>
                         <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">RETIRE_AGE</th>
-                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">YEARS_LEFT</th>
-                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">FIRST_YR_INCOME</th>
-                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">PORTFOLIO_REQ</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">REALISM_RATING</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SUCCESS_PROB</th>
                         <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">MONTHLY_SAVE</th>
                     </tr>
                 </thead>
@@ -419,4 +443,5 @@
 <script src="lib/insights-engine.js"></script>
 <script src="lib/export.js"></script>
 <script src="lib/chart-configs.js"></script>
+<script src="lib/savings-feasibility.js"></script>
 <script src="script.js"></script>
