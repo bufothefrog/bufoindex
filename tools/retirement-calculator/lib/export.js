@@ -111,7 +111,7 @@ class ExportUtility {
                 exportDate: new Date().toISOString(),
                 calculatorVersion: '2.0',
                 analysisType: monteCarloResults && financialModelingResults ? 'Monte Carlo with Financial Modeling' : 'Deterministic',
-                description: 'BufoIndex Retirement Planning Calculator - Comprehensive Analysis Results'
+                description: 'BufoIndex > Retirement Planning Calculator - Comprehensive Analysis Results'
             },
             parameters: {
                 userDecisions: {

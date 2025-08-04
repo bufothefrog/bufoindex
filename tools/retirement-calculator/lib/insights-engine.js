@@ -15,38 +15,14 @@ class InsightsEngine {
         const insights = [];
         
         try {
-            // 1. Early vs Late Retirement Impact
+            // 1. Early vs Late Retirement Impact - Most useful comparison
             insights.push(...this.generateRetirementTimingInsights(monteCarloResults, financialModelingResults, parameters));
             
-            // 2. Monte Carlo Analysis Results
+            // 2. Monte Carlo Success Rate - Critical risk assessment  
             insights.push(...this.generateMonteCarloInsights(monteCarloResults, parameters));
             
-            // 3. Portfolio Range at Retirement
-            insights.push(...this.generatePortfolioRangeInsights(monteCarloResults));
-            
-            // 4. Inflation Impact Analysis
-            insights.push(...this.generateInflationImpactInsights(monteCarloResults, financialModelingResults, parameters));
-            
-            // 5. 4% Rule Validation
-            insights.push(...this.generateFourPercentRuleInsights(monteCarloResults, parameters));
-            
-            // 6. Return Rate Sensitivity
-            insights.push(...this.generateReturnSensitivityInsights(monteCarloResults, parameters));
-            
-            // 7. Tax Strategy Optimization
-            insights.push(...this.generateTaxOptimizationInsights(financialModelingResults, parameters));
-            
-            // 8. Time vs Money Trade-off Analysis
+            // 3. Time vs Money Trade-off Analysis - Practical actionable insight
             insights.push(...this.generateTradeoffAnalysisInsights(monteCarloResults, financialModelingResults, parameters));
-            
-            // Additional insights based on available data
-            if (financialModelingResults.socialSecurityOptimization) {
-                insights.push(...this.generateSocialSecurityInsights(financialModelingResults));
-            }
-            
-            if (financialModelingResults.healthcareProjections) {
-                insights.push(...this.generateHealthcareInsights(financialModelingResults));
-            }
             
         } catch (error) {
             console.error('Error generating advanced insights:', error);

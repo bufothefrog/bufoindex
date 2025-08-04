@@ -167,31 +167,7 @@ class RetirementCalculator {
                 value: `${contributionRatio}%`,
                 text: `Retiring ${timeDifference} years earlier requires ${contributionRatio}% higher monthly contributions (${FinancialCalculations.formatCurrency(contributionDifference)} more per month).`
             });
-
-            const earlyTotalContributions = earliest.monthlyContribution * 12 * earliest.yearsUntilRetirement;
-            const lateTotalContributions = latest.monthlyContribution * 12 * latest.yearsUntilRetirement;
-
-            insights.push({
-                title: 'TOTAL_CONTRIBUTION_IMPACT',
-                value: FinancialCalculations.formatCurrency(Math.abs(earlyTotalContributions - lateTotalContributions)),
-                text: earlyTotalContributions > lateTotalContributions ? 
-                    `Early retirement requires ${FinancialCalculations.formatCurrency(earlyTotalContributions - lateTotalContributions)} more in total contributions despite fewer working years.` :
-                    `Late retirement allows ${FinancialCalculations.formatCurrency(lateTotalContributions - earlyTotalContributions)} more in total contributions over the longer timeframe.`
-            });
         }
-
-        const inflationImpact = Math.round(((earliest.inflatedTargetIncome / validated.targetIncome) - 1) * 100);
-        insights.push({
-            title: 'INFLATION_IMPACT',
-            value: `${inflationImpact}%`,
-            text: `Your ${FinancialCalculations.formatCurrency(validated.targetIncome)} target income today will require ${FinancialCalculations.formatCurrency(earliest.inflatedTargetIncome)} in nominal dollars at early retirement due to ${validated.inflationRate}% annual inflation.`
-        });
-
-        insights.push({
-            title: 'PORTFOLIO_REQUIREMENT',
-            value: FinancialCalculations.formatCurrency(earliest.targetPortfolioSize),
-            text: `To withdraw ${FinancialCalculations.formatCurrency(earliest.inflatedTargetIncome)} annually using the 4% rule, you need a portfolio worth ${FinancialCalculations.formatCurrency(earliest.targetPortfolioSize)} at retirement.`
-        });
 
         insights.push({
             title: 'SAVINGS_RATE',
@@ -235,8 +211,12 @@ class RetirementCalculator {
 
         // Generate withdrawal data
         const labels = [];
-        for (let age = 35; age <= 100; age += 5) {
+        for (let age = validated.startingAge; age <= validated.endAge; age += 5) {
             labels.push(age);
+        }
+        // Ensure we include the endAge if it's not divisible by 5
+        if (validated.endAge % 5 !== 0 && labels[labels.length - 1] < validated.endAge) {
+            labels.push(validated.endAge);
         }
 
         // Calculate earliest retirement age for starting point
@@ -258,7 +238,7 @@ class RetirementCalculator {
         const maxWithdrawal = validated.targetIncome * Math.pow(1 + validated.inflationRate/100, maxYears);
 
         const datasets = [{
-            label: 'Annual Withdrawal (Inflation Adjusted)',
+            label: 'Retirement Withdrawals (Inflation Adjusted)',
             data: data,
             borderColor: '#00FF41',
             backgroundColor: 'transparent',
@@ -311,7 +291,7 @@ class RetirementCalculator {
                 },
                 scales: {
                     x: {
-                        min: validated.startingAge,
+                        min: earliestRetirementAge,
                         max: validated.endAge,
                         grid: {
                             color: '#00FF4120',
@@ -350,7 +330,7 @@ class RetirementCalculator {
                         },
                         title: {
                             display: true,
-                            text: 'Annual Withdrawal',
+                            text: 'Retirement Withdrawals',
                             color: '#00FF41',
                             font: {
                                 family: 'IBM Plex Mono, Fira Code, monospace'
