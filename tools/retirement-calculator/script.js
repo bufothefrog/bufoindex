@@ -77,45 +77,59 @@ class RetirementCalculator {
     }
 
     calculateScenarios() {
-        const params = this.collectEnhancedParameters();
-        
-        // Calculate retirement readiness using new method
-        const readinessAnalysis = FinancialCalculations.calculateRetirementReadiness({
-            currentAge: params.startingAge,
-            targetRetirementAge: params.targetRetirementAge,
-            targetIncome: params.targetIncome,
-            currentIncome: params.currentIncome,
-            currentSavingsRate: params.currentSavingsRate / 100, // Convert to decimal
-            startingBalance: params.startingBalance,
-            state: params.state,
-            riskProfile: params.riskProfile,
-            inflationRate: params.inflationRate / 100
-        });
+        try {
+            const params = this.collectEnhancedParameters();
+            console.log('Enhanced parameters:', params);
+            
+            // Calculate retirement readiness using new method
+            const readinessAnalysis = FinancialCalculations.calculateRetirementReadiness({
+                currentAge: params.startingAge,
+                targetRetirementAge: params.targetRetirementAge,
+                targetIncome: params.targetIncome,
+                currentIncome: params.currentIncome,
+                currentSavingsRate: params.currentSavingsRate / 100, // Convert to decimal
+                startingBalance: params.startingBalance,
+                state: params.state,
+                riskProfile: params.riskProfile,
+                inflationRate: params.inflationRate / 100
+            });
 
-        // Store target goal assessment
-        this.targetGoalAssessment = readinessAnalysis.targetGoal;
-        
-        // Convert scenarios to format expected by rest of app
-        this.scenarios = readinessAnalysis.scenarios.map((scenario, index) => {
-            const colors = ['#e74c3c', '#f39c12', '#27ae60'];
-            return {
-                label: scenario.label,
-                savingsRate: scenario.savingsRate,
-                retirementAge: scenario.achievableRetirementAge,
-                yearsUntilRetirement: scenario.yearsUntilRetirement,
-                monthlyContribution: scenario.monthlyContribution,
-                realismScore: scenario.realismScore,
-                realismRating: scenario.realismRating,
-                confidenceLevel: scenario.confidenceLevel,
-                valid: scenario.valid,
-                color: colors[index] || '#888888',
-                // Calculate additional fields for compatibility
-                inflatedTargetIncome: params.targetIncome * Math.pow(1 + params.inflationRate/100, scenario.yearsUntilRetirement),
-                targetPortfolioSize: (params.targetIncome * Math.pow(1 + params.inflationRate/100, scenario.yearsUntilRetirement)) / 0.04
-            };
-        });
+            console.log('Readiness analysis:', readinessAnalysis);
 
-        return this.scenarios;
+            // Store target goal assessment
+            this.targetGoalAssessment = readinessAnalysis.targetGoal;
+            console.log('Target goal assessment:', this.targetGoalAssessment);
+            
+            // Convert scenarios to format expected by rest of app
+            this.scenarios = readinessAnalysis.scenarios.map((scenario, index) => {
+                const colors = ['#e74c3c', '#f39c12', '#27ae60'];
+                const yearsUntilRetirement = Math.max(0, scenario.achievableRetirementAge - params.startingAge);
+                return {
+                    label: scenario.label,
+                    savingsRate: scenario.savingsRate,
+                    retirementAge: scenario.achievableRetirementAge,
+                    yearsUntilRetirement: yearsUntilRetirement,
+                    monthlyContribution: scenario.monthlyContribution,
+                    realismScore: scenario.realismScore,
+                    realismRating: scenario.realismRating,
+                    confidenceLevel: scenario.confidenceLevel,
+                    valid: scenario.valid,
+                    color: colors[index] || '#888888',
+                    // Calculate additional fields for compatibility
+                    inflatedTargetIncome: params.targetIncome * Math.pow(1 + params.inflationRate/100, yearsUntilRetirement),
+                    targetPortfolioSize: (params.targetIncome * Math.pow(1 + params.inflationRate/100, yearsUntilRetirement)) / 0.04
+                };
+            });
+
+            console.log('Generated scenarios:', this.scenarios);
+            return this.scenarios;
+        } catch (error) {
+            console.error('Error in calculateScenarios:', error);
+            // Return empty scenarios if calculation fails
+            this.scenarios = [];
+            this.targetGoalAssessment = null;
+            return this.scenarios;
+        }
     }
 
     updateSummaryTable() {
@@ -232,65 +246,76 @@ class RetirementCalculator {
     }
 
     generateNewStyleInsights() {
-        if (!this.targetGoalAssessment || !this.scenarios) return [];
-
-        const insights = [];
-        const params = this.collectEnhancedParameters();
-
-        // Target Goal Assessment
-        const targetRating = this.targetGoalAssessment.realismAssessment.rating;
-        const requiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
-        const currentRate = Math.round(params.currentSavingsRate);
-
-        insights.push({
-            title: 'RETIREMENT_GOAL_ASSESSMENT',
-            value: targetRating,
-            text: `Your goal to retire at ${params.targetRetirementAge} with $${FinancialCalculations.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
-        });
-
-        // Savings Rate Impact
-        const currentScenario = this.scenarios.find(s => s.label === 'Current');
-        const aggressiveScenario = this.scenarios.find(s => s.label === 'Aggressive');
-        
-        if (currentScenario && aggressiveScenario && currentScenario.valid && aggressiveScenario.valid) {
-            const yearsSaved = currentScenario.retirementAge - aggressiveScenario.retirementAge;
-            insights.push({
-                title: 'SAVINGS_RATE_IMPACT',
-                value: `${yearsSaved} years`,
-                text: `Increasing your savings rate by 20% (from ${Math.round(currentScenario.savingsRate*100)}% to ${Math.round(aggressiveScenario.savingsRate*100)}%) allows you to retire ${yearsSaved} years earlier.`
+        if (!this.targetGoalAssessment || !this.scenarios) {
+            console.warn('Missing data for new style insights:', {
+                targetGoalAssessment: !!this.targetGoalAssessment,
+                scenarios: !!this.scenarios
             });
+            return [];
         }
 
-        // Cost of Living Impact
-        const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
-        const colNames = ['', 'Very High', 'High', 'Moderate', 'Low'];
-        const maxSavings = Math.round(window.SavingsFeasibility.calculateMaxRealisticSavings(params.currentIncome, params.state) * 100);
-        
-        insights.push({
-            title: 'LOCATION_IMPACT',
-            value: `${maxSavings}% max`,
-            text: `Living in ${params.state} (${colNames[colTier]} cost of living) limits realistic savings to approximately ${maxSavings}% of income at your income level.`
-        });
+        try {
+            const insights = [];
+            const params = this.collectEnhancedParameters();
 
-        // Risk Profile Impact
-        const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile);
-        insights.push({
-            title: 'RISK_PROFILE',
-            value: riskData.name,
-            text: `Your ${riskData.name} investment approach assumes ${Math.round(riskData.accumulation.return*100)}% returns during accumulation and ${Math.round(riskData.retirement.return*100)}% during retirement.`
-        });
+            // Target Goal Assessment
+            const targetRating = this.targetGoalAssessment.realismAssessment.rating;
+            const requiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
+            const currentRate = Math.round(params.currentSavingsRate);
 
-        // Action Items
-        if (!this.targetGoalAssessment.isRealistic) {
-            const minRequiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
             insights.push({
-                title: 'ACTION_REQUIRED',
-                value: `${minRequiredRate}% needed`,
-                text: `To achieve your goal, consider: 1) Increase savings rate to ${minRequiredRate}%, 2) Retire later, 3) Reduce target income, or 4) Move to lower cost area.`
+                title: 'RETIREMENT_GOAL_ASSESSMENT',
+                value: targetRating,
+                text: `Your goal to retire at ${params.targetRetirementAge} with $${FinancialCalculations.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
             });
-        }
 
-        return insights;
+            // Savings Rate Impact
+            const currentScenario = this.scenarios.find(s => s.label === 'Current');
+            const aggressiveScenario = this.scenarios.find(s => s.label === 'Aggressive');
+            
+            if (currentScenario && aggressiveScenario && currentScenario.valid && aggressiveScenario.valid) {
+                const yearsSaved = currentScenario.retirementAge - aggressiveScenario.retirementAge;
+                insights.push({
+                    title: 'SAVINGS_RATE_IMPACT',
+                    value: `${yearsSaved} years`,
+                    text: `Increasing your savings rate by 20% (from ${Math.round(currentScenario.savingsRate*100)}% to ${Math.round(aggressiveScenario.savingsRate*100)}%) allows you to retire ${yearsSaved} years earlier.`
+                });
+            }
+
+            // Cost of Living Impact
+            const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
+            const colNames = ['', 'Very High', 'High', 'Moderate', 'Low'];
+            const maxSavings = Math.round(window.SavingsFeasibility.calculateMaxRealisticSavings(params.currentIncome, params.state) * 100);
+            
+            insights.push({
+                title: 'LOCATION_IMPACT',
+                value: `${maxSavings}% max`,
+                text: `Living in ${params.state} (${colNames[colTier]} cost of living) limits realistic savings to approximately ${maxSavings}% of income at your income level.`
+            });
+
+            // Risk Profile Impact
+            const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile);
+            insights.push({
+                title: 'RISK_PROFILE',
+                value: riskData.name,
+                text: `Your ${riskData.name} investment approach assumes ${Math.round(riskData.accumulation.return*100)}% returns during accumulation and ${Math.round(riskData.retirement.return*100)}% during retirement.`
+            });
+
+            // Action Items
+            if (!this.targetGoalAssessment.isRealistic) {
+                const minRequiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
+                insights.push({
+                    title: 'ACTION_REQUIRED',
+                    value: `${minRequiredRate}% needed`,
+                    text: `To achieve your goal, consider: 1) Increase savings rate to ${minRequiredRate}%, 2) Retire later, 3) Reduce target income, or 4) Move to lower cost area.`
+                });
+            }
+
+            return insights;
+        } catch (error) {
+            console.error('Error generating new style insights:', error);
+            return this.generateInsights(); // Fallback to old insights
+        }
     }
 
     updateInsights() {
@@ -321,36 +346,39 @@ class RetirementCalculator {
     }
 
     updateWithdrawalsChart() {
-        const params = URLStateManager.collectParametersFromForm();
-        const validated = URLStateManager.validateParameters(params);
+        const params = this.collectEnhancedParameters();
 
         // Generate withdrawal data
         const labels = [];
-        for (let age = validated.startingAge; age <= validated.endAge; age += 5) {
+        const endAge = params.endAge || 85;
+        for (let age = params.startingAge; age <= endAge; age += 5) {
             labels.push(age);
         }
         // Ensure we include the endAge if it's not divisible by 5
-        if (validated.endAge % 5 !== 0 && labels[labels.length - 1] < validated.endAge) {
-            labels.push(validated.endAge);
+        if (endAge % 5 !== 0 && labels[labels.length - 1] < endAge) {
+            labels.push(endAge);
         }
 
-        // Calculate earliest retirement age for starting point
-        const earliestRetirementAge = Math.min(validated.retirementAgeA, validated.retirementAgeB, validated.retirementAgeC);
+        // Calculate earliest retirement age for starting point from our scenarios
+        const validScenarios = this.scenarios.filter(s => s.valid);
+        if (validScenarios.length === 0) return;
+        
+        const earliestRetirementAge = Math.min(...validScenarios.map(s => s.retirementAge));
         
         // Single dataset showing withdrawals starting from earliest retirement age
         const data = labels.map(age => {
             if (age >= earliestRetirementAge) {
                 const yearsFromStart = age - earliestRetirementAge;
-                const withdrawal = validated.targetIncome * Math.pow(1 + validated.inflationRate/100, yearsFromStart);
+                const withdrawal = params.targetIncome * Math.pow(1 + params.inflationRate/100, yearsFromStart);
                 return withdrawal;
             }
             return null;
         });
 
         // Calculate max withdrawal for zoom limits
-        const maxAge = validated.endAge;
+        const maxAge = endAge;
         const maxYears = maxAge - earliestRetirementAge;
-        const maxWithdrawal = validated.targetIncome * Math.pow(1 + validated.inflationRate/100, maxYears);
+        const maxWithdrawal = params.targetIncome * Math.pow(1 + params.inflationRate/100, maxYears);
 
         const datasets = [{
             label: 'Retirement Withdrawals (Inflation Adjusted)',
@@ -407,7 +435,7 @@ class RetirementCalculator {
                 scales: {
                     x: {
                         min: earliestRetirementAge,
-                        max: validated.endAge,
+                        max: endAge,
                         grid: {
                             color: '#00FF4120',
                             borderColor: '#00FF41'
@@ -428,7 +456,7 @@ class RetirementCalculator {
                         }
                     },
                     y: {
-                        min: -validated.targetIncome * 0.0475, // 4.75% buffer below zero (5% reduced by 5%)
+                        min: -params.targetIncome * 0.0475, // 4.75% buffer below zero (5% reduced by 5%)
                         max: maxWithdrawal * 1.045, // 4.5% buffer above max (10% reduced by 5%)
                         grid: {
                             color: '#00FF4120',
@@ -461,16 +489,23 @@ class RetirementCalculator {
         const validScenarios = this.scenarios.filter(s => s.valid);
         if (validScenarios.length === 0) return;
 
-        const params = URLStateManager.collectParametersFromForm();
-        const validated = URLStateManager.validateParameters(params);
+        const params = this.collectEnhancedParameters();
 
-        // Generate net worth data
+        // Generate net worth data using enhanced parameters
         const datasets = validScenarios.map(scenario => {
-            const progression = FinancialCalculations.generateNetWorthProgression(scenario, {
-                startingAge: validated.startingAge,
-                startingBalance: validated.startingBalance,
-                annualReturn: validated.accumulationReturn / 100,
-                inflationRate: validated.inflationRate / 100
+            // Create a compatible scenario object for the progression calculation
+            const compatibleScenario = {
+                retirementAge: scenario.retirementAge,
+                targetPortfolioSize: scenario.targetPortfolioSize,
+                inflatedTargetIncome: scenario.inflatedTargetIncome,
+                annualContribution: scenario.monthlyContribution * 12
+            };
+
+            const progression = FinancialCalculations.generateNetWorthProgression(compatibleScenario, {
+                startingAge: params.startingAge,
+                startingBalance: params.startingBalance,
+                annualReturn: params.accumulationReturn / 100,
+                inflationRate: params.inflationRate / 100
             });
 
             const data = progression.map(p => ({
@@ -479,9 +514,9 @@ class RetirementCalculator {
             }));
 
             return {
-                label: `Scenario ${scenario.label} (Retire at ${scenario.retirementAge})`,
+                label: `${scenario.label} (${Math.round(scenario.savingsRate*100)}% → Retire at ${scenario.retirementAge})`,
                 data: data,
-                borderColor: scenario.label === 'A' ? '#e74c3c' : scenario.label === 'B' ? '#f39c12' : '#27ae60',
+                borderColor: scenario.color,
                 backgroundColor: 'transparent',
                 borderWidth: 3,
                 pointRadius: 0,
@@ -551,8 +586,8 @@ class RetirementCalculator {
                                 family: 'IBM Plex Mono, Fira Code, monospace'
                             }
                         },
-                        min: validated.startingAge,
-                        max: validated.endAge
+                        min: params.startingAge,
+                        max: params.endAge || 85
                     },
                     y: {
                         grid: {
@@ -604,64 +639,86 @@ class RetirementCalculator {
 
     updateTargetGoalAssessment() {
         const container = document.getElementById('targetGoalContent');
-        if (!container || !this.targetGoalAssessment) return;
-
-        const params = this.collectEnhancedParameters();
-        const assessment = this.targetGoalAssessment;
-        const realismClass = this.getRealismColorClass(assessment.realismAssessment.rating);
-        const requiredRate = Math.round(assessment.requiredSavingsRate * 100);
-        const currentRate = Math.round(params.currentSavingsRate);
-        const rateDifference = requiredRate - currentRate;
+        if (!container) {
+            console.warn('Target goal container not found');
+            return;
+        }
         
-        // Generate confidence meter for overall assessment
-        const confidenceMeter = this.generateConfidenceMeter(assessment.realismAssessment.score);
-        
-        // Generate actionable recommendations
-        let recommendations = [];
-        if (!assessment.isRealistic) {
-            if (rateDifference <= 10) {
-                recommendations.push(`Increase savings rate by ${rateDifference}% (achievable with discipline)`);
-            } else {
-                recommendations.push(`Consider retiring ${Math.ceil(rateDifference / 5)} years later`);
-                recommendations.push(`Reduce target income to $${FinancialCalculations.formatCurrency(params.targetIncome * 0.8)}`);
-            }
-            
-            const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
-            if (colTier <= 2) {
-                recommendations.push('Consider moving to a lower cost of living area');
-            }
-        } else {
-            recommendations.push('Your retirement goal appears achievable with your current plan');
-            recommendations.push('Consider the scenarios below to potentially retire earlier');
+        if (!this.targetGoalAssessment) {
+            console.warn('Target goal assessment not available');
+            container.innerHTML = `
+                <div class="text-terminal-green opacity-75 text-center py-4">
+                    CALCULATING RETIREMENT GOAL ASSESSMENT...
+                </div>
+            `;
+            return;
         }
 
-        container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h4 class="text-terminal-green font-bold mb-3">YOUR RETIREMENT GOAL</h4>
-                    <div class="space-y-2 text-sm">
-                        <div><span class="opacity-75">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
-                        <div><span class="opacity-75">Target Annual Income:</span> $${FinancialCalculations.formatCurrency(params.targetIncome)}</div>
-                        <div><span class="opacity-75">Current Savings Rate:</span> ${currentRate}%</div>
-                        <div><span class="opacity-75">Required Savings Rate:</span> <span class="${rateDifference > 0 ? 'text-orange-400' : 'text-green-400'}">${requiredRate}%</span></div>
-                    </div>
-                </div>
+        try {
+            const params = this.collectEnhancedParameters();
+            const assessment = this.targetGoalAssessment;
+            const realismClass = this.getRealismColorClass(assessment.realismAssessment.rating);
+            const requiredRate = Math.round(assessment.requiredSavingsRate * 100);
+            const currentRate = Math.round(params.currentSavingsRate);
+            const rateDifference = requiredRate - currentRate;
+            
+            // Generate confidence meter for overall assessment
+            const confidenceMeter = this.generateConfidenceMeter(Math.round(assessment.realismAssessment.score));
+            
+            // Generate actionable recommendations
+            let recommendations = [];
+            if (!assessment.isRealistic) {
+                if (rateDifference <= 10) {
+                    recommendations.push(`Increase savings rate by ${rateDifference}% (achievable with discipline)`);
+                } else {
+                    recommendations.push(`Consider retiring ${Math.ceil(rateDifference / 5)} years later`);
+                    recommendations.push(`Reduce target income to $${FinancialCalculations.formatCurrency(Math.round(params.targetIncome * 0.8))}`);
+                }
                 
-                <div>
-                    <h4 class="text-terminal-green font-bold mb-3">ASSESSMENT</h4>
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="${realismClass} font-bold">${assessment.realismAssessment.rating}</span>
-                            ${confidenceMeter}
+                const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
+                if (colTier <= 2) {
+                    recommendations.push('Consider moving to a lower cost of living area');
+                }
+            } else {
+                recommendations.push('Your retirement goal appears achievable with your current plan');
+                recommendations.push('Consider the scenarios below to potentially retire earlier');
+            }
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-terminal-green font-bold mb-3">YOUR RETIREMENT GOAL</h4>
+                        <div class="space-y-2 text-sm">
+                            <div><span class="opacity-75">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
+                            <div><span class="opacity-75">Target Annual Income:</span> $${FinancialCalculations.formatCurrency(params.targetIncome)}</div>
+                            <div><span class="opacity-75">Current Savings Rate:</span> ${currentRate}%</div>
+                            <div><span class="opacity-75">Required Savings Rate:</span> <span class="${rateDifference > 0 ? 'text-orange-400' : 'text-green-400'}">${requiredRate}%</span></div>
                         </div>
-                        
-                        <div class="text-sm space-y-1">
-                            ${recommendations.map(rec => `<div class="opacity-90">• ${rec}</div>`).join('')}
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-terminal-green font-bold mb-3">ASSESSMENT</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-3">
+                                <span class="${realismClass} font-bold">${assessment.realismAssessment.rating}</span>
+                                ${confidenceMeter}
+                            </div>
+                            
+                            <div class="text-sm space-y-1">
+                                ${recommendations.map(rec => `<div class="opacity-90">• ${rec}</div>`).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        } catch (error) {
+            console.error('Error updating target goal assessment:', error);
+            container.innerHTML = `
+                <div class="text-red-400 text-center py-4">
+                    ERROR: Unable to generate retirement goal assessment
+                </div>
+            `;
+        }
     }
 
     // Export functions
