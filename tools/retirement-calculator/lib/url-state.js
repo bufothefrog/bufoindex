@@ -69,21 +69,24 @@ class URLStateManager {
     static getDefaultParameters() {
         return {
             startingAge: 25,
-            retirementAgeA: 40,
-            retirementAgeB: 45,
-            retirementAgeC: 50,
+            targetRetirementAge: 45,
+            currentSavingsRate: 15,
             endAge: 85,
             targetIncome: 120000,
             startingBalance: 100000,
             inflationRate: 3,
-            // New enhanced parameters
             currentIncome: 80000,
+            state: 'TX',
+            riskProfile: 'moderate',
+            // Legacy parameters for compatibility
+            retirementAgeA: 40,
+            retirementAgeB: 45,
+            retirementAgeC: 50,
             accumulationReturn: 10,
             retirementReturn: 7,
             volatility: 15,
             monteCarloRuns: 1000,
-            accountType: 'Traditional 401k/IRA',
-            state: 'California',
+            accountType: 'Taxable',
             socialSecurityAge: 67,
             socialSecurityBenefit: 2000,
             healthcareMultiplier: 1.0,
@@ -104,17 +107,22 @@ class URLStateManager {
     static validateParameters(params) {
         const validated = { ...params };
 
-        // Age validations
-        validated.startingAge = Math.max(18, Math.min(100, validated.startingAge));
-        validated.retirementAgeA = Math.max(30, Math.min(100, validated.retirementAgeA));
-        validated.retirementAgeB = Math.max(30, Math.min(100, validated.retirementAgeB));
-        validated.retirementAgeC = Math.max(30, Math.min(100, validated.retirementAgeC));
-
-        // Ensure retirement ages are after starting age
+        // NEW: Primary age validations
+        validated.startingAge = Math.max(18, Math.min(100, validated.startingAge || 25));
+        validated.targetRetirementAge = Math.max(30, Math.min(100, validated.targetRetirementAge || 45));
+        validated.targetRetirementAge = Math.max(validated.startingAge + 1, validated.targetRetirementAge);
+        validated.endAge = Math.max(65, Math.min(110, validated.endAge || 85));
+        
+        // NEW: Savings rate validation
+        validated.currentSavingsRate = Math.max(0, Math.min(80, validated.currentSavingsRate || 15));
+        
+        // Legacy age validations (for backward compatibility)
+        validated.retirementAgeA = Math.max(30, Math.min(100, validated.retirementAgeA || 40));
+        validated.retirementAgeB = Math.max(30, Math.min(100, validated.retirementAgeB || 45));
+        validated.retirementAgeC = Math.max(30, Math.min(100, validated.retirementAgeC || 50));
         validated.retirementAgeA = Math.max(validated.startingAge + 1, validated.retirementAgeA);
         validated.retirementAgeB = Math.max(validated.startingAge + 1, validated.retirementAgeB);
         validated.retirementAgeC = Math.max(validated.startingAge + 1, validated.retirementAgeC);
-        validated.endAge = Math.max(65, Math.min(110, validated.endAge || 85));
 
         // Financial validations
         validated.targetIncome = Math.max(1000, validated.targetIncome);
@@ -139,15 +147,21 @@ class URLStateManager {
         validated.retirementTaxRate = Math.max(0, Math.min(50, validated.retirementTaxRate || 15));
         validated.healthcareInflation = Math.max(0, Math.min(20, validated.healthcareInflation || 5));
 
+        // NEW: Risk profile validation
+        const validRiskProfiles = ['conservative', 'moderate', 'aggressive', 'high_risk', 'ultra_high_risk'];
+        if (!validRiskProfiles.includes(validated.riskProfile)) {
+            validated.riskProfile = 'moderate';
+        }
+        
         // String validations with defaults
-        const validAccountTypes = ['Traditional 401k/IRA', 'Roth', 'Taxable'];
+        const validAccountTypes = ['Taxable', 'Traditional 401k/IRA', 'Roth'];
         if (!validAccountTypes.includes(validated.accountType)) {
-            validated.accountType = 'Traditional 401k/IRA';
+            validated.accountType = 'Taxable';
         }
 
-        const validStates = ['California', 'Federal Only'];
-        if (!validStates.includes(validated.state)) {
-            validated.state = 'California';
+        // Accept any state code for now (we have all 50 states)
+        if (!validated.state || validated.state.length !== 2) {
+            validated.state = 'TX';
         }
 
         const validFilingStatuses = ['Single', 'Married Filing Jointly'];
@@ -164,24 +178,27 @@ class URLStateManager {
     static applyParametersToForm(params) {
         const validated = this.validateParameters(params);
 
-        // Update basic form inputs
+        // Update NEW form inputs
         this.setInputValue('startingAge', validated.startingAge);
+        this.setInputValue('targetRetirementAge', validated.targetRetirementAge);
+        this.setInputValue('currentSavingsRate', validated.currentSavingsRate);
+        this.setInputValue('targetIncome', validated.targetIncome.toLocaleString());
+        this.setInputValue('startingBalance', validated.startingBalance.toLocaleString());
+        this.setInputValue('currentIncome', validated.currentIncome.toLocaleString());
+        this.setSelectValue('state', validated.state);
+        this.setSelectValue('riskProfile', validated.riskProfile);
+        this.setInputValue('inflationRate', validated.inflationRate);
+        this.setInputValue('endAge', validated.endAge);
+
+        // Update legacy parameters (for backward compatibility)
         this.setInputValue('retirementAgeA', validated.retirementAgeA);
         this.setInputValue('retirementAgeB', validated.retirementAgeB);
         this.setInputValue('retirementAgeC', validated.retirementAgeC);
-        this.setInputValue('endAge', validated.endAge);
-        this.setInputValue('targetIncome', validated.targetIncome.toLocaleString());
-        this.setInputValue('startingBalance', validated.startingBalance.toLocaleString());
-        this.setInputValue('inflationRate', validated.inflationRate);
-
-        // Update enhanced parameters
-        this.setInputValue('currentIncome', validated.currentIncome.toLocaleString());
         this.setInputValue('accumulationReturn', validated.accumulationReturn);
         this.setInputValue('retirementReturn', validated.retirementReturn);
         this.setInputValue('volatility', validated.volatility);
         this.setSelectValue('monteCarloRuns', validated.monteCarloRuns);
         this.setSelectValue('accountType', validated.accountType);
-        this.setSelectValue('state', validated.state);
         this.setInputValue('socialSecurityAge', validated.socialSecurityAge);
         this.setInputValue('socialSecurityBenefit', validated.socialSecurityBenefit.toLocaleString());
         this.setSelectValue('healthcareMultiplier', validated.healthcareMultiplier);
@@ -214,24 +231,27 @@ class URLStateManager {
      */
     static collectParametersFromForm() {
         return {
-            // Basic parameters
+            // NEW: Primary parameters for savings-focused approach
             startingAge: this.getIntValue('startingAge'),
-            retirementAgeA: this.getIntValue('retirementAgeA'),
-            retirementAgeB: this.getIntValue('retirementAgeB'),
-            retirementAgeC: this.getIntValue('retirementAgeC'),
-            endAge: this.getIntValue('endAge'),
+            targetRetirementAge: this.getIntValue('targetRetirementAge'),
+            currentSavingsRate: this.getFloatValue('currentSavingsRate'),
             targetIncome: this.getCurrencyValue('targetIncome'),
             startingBalance: this.getCurrencyValue('startingBalance'),
-            inflationRate: this.getFloatValue('inflationRate'),
-            
-            // Enhanced parameters
             currentIncome: this.getCurrencyValue('currentIncome'),
+            state: this.getSelectValue('state'),
+            riskProfile: this.getSelectValue('riskProfile'),
+            inflationRate: this.getFloatValue('inflationRate'),
+            endAge: this.getIntValue('endAge'),
+            
+            // Legacy parameters for backward compatibility
+            retirementAgeA: this.getIntValue('retirementAgeA') || 40,
+            retirementAgeB: this.getIntValue('retirementAgeB') || 45,
+            retirementAgeC: this.getIntValue('retirementAgeC') || 50,
             accumulationReturn: this.getFloatValue('accumulationReturn'),
             retirementReturn: this.getFloatValue('retirementReturn'),
             volatility: this.getFloatValue('volatility'),
             monteCarloRuns: this.getIntValue('monteCarloRuns'),
             accountType: this.getSelectValue('accountType'),
-            state: this.getSelectValue('state'),
             socialSecurityAge: this.getIntValue('socialSecurityAge'),
             socialSecurityBenefit: this.getCurrencyValue('socialSecurityBenefit'),
             healthcareMultiplier: this.getFloatValue('healthcareMultiplier')

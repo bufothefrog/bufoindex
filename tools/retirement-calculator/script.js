@@ -991,31 +991,77 @@ class RetirementCalculator {
      * Collect enhanced parameters including new fields
      */
     collectEnhancedParameters() {
-        const basic = URLStateManager.collectParametersFromForm();
-        
-        // Add new fields for savings-rate based calculations
-        const enhanced = {
-            ...basic,
-            currentIncome: this.getInputValue('currentIncome', 'currency'),
-            targetRetirementAge: this.getInputValue('targetRetirementAge', 'number') || 45,
-            currentSavingsRate: this.getInputValue('currentSavingsRate', 'number') || 15,
-            state: this.getSelectValue('state') || 'TX',
-            riskProfile: this.getSelectValue('riskProfile') || 'moderate',
-            // Keep these for compatibility with existing systems
-            monteCarloRuns: this.getInputValue('monteCarloRuns', 'number') || 1000,
-            accountType: this.getSelectValue('accountType') || 'Traditional 401k/IRA',
-            socialSecurityAge: this.getInputValue('socialSecurityAge', 'number') || 67,
-            socialSecurityBenefit: this.getInputValue('socialSecurityBenefit', 'currency') || 2000,
-            healthcareMultiplier: parseFloat(this.getSelectValue('healthcareMultiplier')) || 1.0
-        };
+        try {
+            // Try to get basic parameters from URL state manager
+            let basic = {};
+            try {
+                basic = URLStateManager.collectParametersFromForm() || {};
+            } catch (error) {
+                console.warn('URLStateManager failed, using direct form access:', error);
+                basic = {};
+            }
+            
+            // Collect parameters directly from form elements with fallbacks
+            const enhanced = {
+                // NEW: Primary parameters
+                startingAge: this.getInputValue('startingAge', 'number'),
+                targetRetirementAge: this.getInputValue('targetRetirementAge', 'number'),
+                currentSavingsRate: this.getInputValue('currentSavingsRate', 'number'),
+                targetIncome: this.getInputValue('targetIncome', 'currency'),
+                startingBalance: this.getInputValue('startingBalance', 'currency'),
+                currentIncome: this.getInputValue('currentIncome', 'currency'),
+                state: this.getSelectValue('state'),
+                riskProfile: this.getSelectValue('riskProfile'),
+                inflationRate: this.getInputValue('inflationRate', 'number'),
+                endAge: this.getInputValue('endAge', 'number'),
+                
+                // Merge any successfully collected basic parameters
+                ...basic,
+                
+                // Legacy compatibility
+                monteCarloRuns: this.getInputValue('monteCarloRuns', 'number') || 1000,
+                accountType: this.getSelectValue('accountType'),
+                socialSecurityAge: this.getInputValue('socialSecurityAge', 'number') || 67,
+                socialSecurityBenefit: this.getInputValue('socialSecurityBenefit', 'currency') || 2000,
+                healthcareMultiplier: parseFloat(this.getSelectValue('healthcareMultiplier')) || 1.0
+            };
 
-        // Get risk profile returns
-        const riskData = window.SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
-        enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
-        enhanced.retirementReturn = riskData.retirement.return * 100;
-        enhanced.volatility = riskData.accumulation.volatility * 100;
+            // Get risk profile returns
+            if (window.SavingsFeasibility) {
+                const riskData = window.SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
+                enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
+                enhanced.retirementReturn = riskData.retirement.return * 100;
+                enhanced.volatility = riskData.accumulation.volatility * 100;
+            } else {
+                console.warn('SavingsFeasibility not loaded, using default returns');
+                enhanced.accumulationReturn = 8;
+                enhanced.retirementReturn = 6;
+                enhanced.volatility = 12;
+            }
 
-        return enhanced;
+            console.log('Collected enhanced parameters:', enhanced);
+            return enhanced;
+        } catch (error) {
+            console.error('Error collecting enhanced parameters:', error);
+            // Return safe defaults
+            return {
+                startingAge: 25,
+                targetRetirementAge: 45,
+                currentSavingsRate: 15,
+                targetIncome: 120000,
+                startingBalance: 100000,
+                currentIncome: 80000,
+                state: 'TX',
+                riskProfile: 'moderate',
+                inflationRate: 3,
+                endAge: 85,
+                accumulationReturn: 8,
+                retirementReturn: 6,
+                volatility: 12,
+                monteCarloRuns: 1000,
+                accountType: 'Taxable'
+            };
+        }
     }
 
     /**
@@ -1023,15 +1069,37 @@ class RetirementCalculator {
      */
     getInputValue(id, type = 'number') {
         const element = document.getElementById(id);
-        if (!element) return null;
+        if (!element) {
+            console.warn(`Element with id '${id}' not found`);
+            // Return default values for missing elements
+            const defaults = {
+                'targetRetirementAge': 45,
+                'currentSavingsRate': 15,
+                'currentIncome': 80000,
+                'targetIncome': 120000,
+                'startingBalance': 100000,
+                'startingAge': 25,
+                'inflationRate': 3,
+                'endAge': 85
+            };
+            const defaultValue = defaults[id] || 0;
+            
+            if (type === 'currency') {
+                return defaultValue;
+            } else if (type === 'number') {
+                return defaultValue;
+            } else {
+                return defaultValue.toString();
+            }
+        }
         
         switch (type) {
             case 'currency':
-                return FinancialCalculations.parseCurrency(element.value);
+                return FinancialCalculations.parseCurrency(element.value) || 0;
             case 'number':
                 return parseFloat(element.value) || 0;
             default:
-                return element.value;
+                return element.value || '';
         }
     }
 
@@ -1040,7 +1108,17 @@ class RetirementCalculator {
      */
     getSelectValue(id) {
         const element = document.getElementById(id);
-        return element ? element.value : null;
+        if (!element) {
+            console.warn(`Select element with id '${id}' not found`);
+            // Return default values for missing selects
+            const defaults = {
+                'state': 'TX',
+                'riskProfile': 'moderate',
+                'accountType': 'Taxable'
+            };
+            return defaults[id] || '';
+        }
+        return element.value || '';
     }
 
     /**
