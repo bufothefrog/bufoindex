@@ -20,6 +20,15 @@ class RetirementCalculator {
         
         this.init();
     }
+    
+    // Helper function for currency formatting (fallback if FinancialCalculations not loaded)
+    formatCurrency(amount) {
+        if (typeof FinancialCalculations !== 'undefined' && FinancialCalculations.formatCurrency) {
+            return FinancialCalculations.formatCurrency(amount);
+        }
+        // Fallback formatting
+        return Math.round(amount).toLocaleString();
+    }
 
     init() {
         // Load state from URL or use defaults
@@ -80,6 +89,11 @@ class RetirementCalculator {
         try {
             const params = this.collectEnhancedParameters();
             console.log('Enhanced parameters:', params);
+            
+            // Check if FinancialCalculations is available
+            if (typeof FinancialCalculations === 'undefined') {
+                throw new Error('FinancialCalculations not loaded');
+            }
             
             // Calculate retirement readiness using new method
             const readinessAnalysis = FinancialCalculations.calculateRetirementReadiness({
@@ -168,7 +182,7 @@ class RetirementCalculator {
                         </div>
                     </td>
                     <td class="py-2 px-3">${successProb}</td>
-                    <td class="py-2 px-3">${FinancialCalculations.formatCurrency(scenario.monthlyContribution)}</td>
+                    <td class="py-2 px-3">${this.formatCurrency(scenario.monthlyContribution)}</td>
                 </tr>
             `;
         }).join('');
@@ -231,7 +245,7 @@ class RetirementCalculator {
             insights.push({
                 title: 'TIME_VS_MONEY_TRADEOFF',
                 value: `${contributionRatio}%`,
-                text: `Retiring ${timeDifference} years earlier requires ${contributionRatio}% higher monthly contributions (${FinancialCalculations.formatCurrency(contributionDifference)} more per month).`
+                text: `Retiring ${timeDifference} years earlier requires ${contributionRatio}% higher monthly contributions (${this.formatCurrency(contributionDifference)} more per month).`
             });
         }
 
@@ -266,7 +280,7 @@ class RetirementCalculator {
             insights.push({
                 title: 'RETIREMENT_GOAL_ASSESSMENT',
                 value: targetRating,
-                text: `Your goal to retire at ${params.targetRetirementAge} with $${FinancialCalculations.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
+                text: `Your goal to retire at ${params.targetRetirementAge} with $${this.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
             });
 
             // Savings Rate Impact
@@ -427,7 +441,7 @@ class RetirementCalculator {
                         },
                         callbacks: {
                             label: function(context) {
-                                return context.dataset.label + ': $' + FinancialCalculations.formatCurrency(context.parsed.y);
+                                return context.dataset.label + ': $' + (Math.round(context.parsed.y).toLocaleString());
                             }
                         }
                     },
@@ -468,7 +482,7 @@ class RetirementCalculator {
                                 family: 'IBM Plex Mono, Fira Code, monospace'
                             },
                             callback: function(value) {
-                                return '$' + FinancialCalculations.formatCurrency(value);
+                                return '$' + (Math.round(value).toLocaleString());
                             }
                         },
                         title: {
@@ -560,7 +574,7 @@ class RetirementCalculator {
                         },
                         callbacks: {
                             label: function(context) {
-                                return context.dataset.label + ': $' + FinancialCalculations.formatCurrency(context.parsed.y);
+                                return context.dataset.label + ': $' + (Math.round(context.parsed.y).toLocaleString());
                             }
                         }
                     },
@@ -600,7 +614,7 @@ class RetirementCalculator {
                                 family: 'IBM Plex Mono, Fira Code, monospace'
                             },
                             callback: function(value) {
-                                return '$' + FinancialCalculations.formatCurrency(value);
+                                return '$' + (Math.round(value).toLocaleString());
                             }
                         },
                         title: {
@@ -672,7 +686,7 @@ class RetirementCalculator {
                     recommendations.push(`Increase savings rate by ${rateDifference}% (achievable with discipline)`);
                 } else {
                     recommendations.push(`Consider retiring ${Math.ceil(rateDifference / 5)} years later`);
-                    recommendations.push(`Reduce target income to $${FinancialCalculations.formatCurrency(Math.round(params.targetIncome * 0.8))}`);
+                    recommendations.push(`Reduce target income to $${this.formatCurrency(Math.round(params.targetIncome * 0.8))}`);
                 }
                 
                 const colTier = window.SavingsFeasibility.getStateCOLTier(params.state);
@@ -690,7 +704,7 @@ class RetirementCalculator {
                         <h4 class="text-terminal-green font-bold mb-3">YOUR RETIREMENT GOAL</h4>
                         <div class="space-y-2 text-sm">
                             <div><span class="opacity-75">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
-                            <div><span class="opacity-75">Target Annual Income:</span> $${FinancialCalculations.formatCurrency(params.targetIncome)}</div>
+                            <div><span class="opacity-75">Target Annual Income:</span> $${this.formatCurrency(params.targetIncome)}</div>
                             <div><span class="opacity-75">Current Savings Rate:</span> ${currentRate}%</div>
                             <div><span class="opacity-75">Required Savings Rate:</span> <span class="${rateDifference > 0 ? 'text-orange-400' : 'text-green-400'}">${requiredRate}%</span></div>
                         </div>
@@ -1027,11 +1041,18 @@ class RetirementCalculator {
             };
 
             // Get risk profile returns
-            if (window.SavingsFeasibility) {
-                const riskData = window.SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
-                enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
-                enhanced.retirementReturn = riskData.retirement.return * 100;
-                enhanced.volatility = riskData.accumulation.volatility * 100;
+            if (typeof SavingsFeasibility !== 'undefined') {
+                try {
+                    const riskData = SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
+                    enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
+                    enhanced.retirementReturn = riskData.retirement.return * 100;
+                    enhanced.volatility = riskData.accumulation.volatility * 100;
+                } catch (error) {
+                    console.warn('Error getting risk profile, using defaults:', error);
+                    enhanced.accumulationReturn = 8;
+                    enhanced.retirementReturn = 6;
+                    enhanced.volatility = 12;
+                }
             } else {
                 console.warn('SavingsFeasibility not loaded, using default returns');
                 enhanced.accumulationReturn = 8;
@@ -1095,7 +1116,11 @@ class RetirementCalculator {
         
         switch (type) {
             case 'currency':
-                return FinancialCalculations.parseCurrency(element.value) || 0;
+                // Use built-in currency parsing instead of FinancialCalculations
+                if (typeof element.value === 'string') {
+                    return parseFloat(element.value.replace(/[$,]/g, '')) || 0;
+                }
+                return parseFloat(element.value) || 0;
             case 'number':
                 return parseFloat(element.value) || 0;
             default:
@@ -1220,7 +1245,7 @@ class RetirementCalculator {
                         },
                         callbacks: {
                             label: function(context) {
-                                return context.dataset.label + ': $' + FinancialCalculations.formatCurrency(context.parsed.y);
+                                return context.dataset.label + ': $' + (Math.round(context.parsed.y).toLocaleString());
                             }
                         }
                     }
@@ -1260,7 +1285,7 @@ class RetirementCalculator {
                                 family: 'IBM Plex Mono, Fira Code, monospace'
                             },
                             callback: function(value) {
-                                return '$' + FinancialCalculations.formatCurrency(value);
+                                return '$' + (Math.round(value).toLocaleString());
                             }
                         },
                         title: {
@@ -1309,11 +1334,26 @@ function toggleAssumptions() {
 
 // Initialize calculator when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Register Chart.js zoom plugin if available
-    if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
-        Chart.register(ChartZoom);
-    }
+    // Wait for all dependencies to load
+    const checkDependencies = () => {
+        if (typeof FinancialCalculations === 'undefined' || 
+            typeof SavingsFeasibility === 'undefined' || 
+            typeof URLStateManager === 'undefined') {
+            console.log('Waiting for dependencies to load...');
+            setTimeout(checkDependencies, 100);
+            return;
+        }
+        
+        console.log('All dependencies loaded, initializing calculator');
+        
+        // Register Chart.js zoom plugin if available
+        if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
+            Chart.register(ChartZoom);
+        }
+        
+        // Initialize calculator
+        new RetirementCalculator();
+    };
     
-    // Initialize calculator
-    new RetirementCalculator();
+    checkDependencies();
 });
