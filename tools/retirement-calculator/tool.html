@@ -20,7 +20,7 @@
                 <div class="terminal-input-group">
                     <label for="targetIncome" class="block text-terminal-green text-sm mb-1 terminal-label">
                         TARGET_INCOME:
-                        <span class="terminal-help" title="Annual retirement income needed in today's dollars">?</span>
+                        <span class="terminal-help" title="Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement.">?</span>
                     </label>
                     <input type="text" id="targetIncome" value="120000" 
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -31,7 +31,7 @@
                 <div class="terminal-input-group">
                     <label for="startingBalance" class="block text-terminal-green text-sm mb-1 terminal-label">
                         INITIAL_BALANCE:
-                        <span class="terminal-help" title="Current portfolio value">?</span>
+                        <span class="terminal-help" title="Current value of your retirement portfolio. Can be $0 if starting fresh.">?</span>
                     </label>
                     <input type="text" id="startingBalance" value="100000"
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -42,7 +42,7 @@
                 <div class="terminal-input-group">
                     <label for="currentIncome" class="block text-terminal-green text-sm mb-1 terminal-label">
                         CURRENT_INCOME:
-                        <span class="terminal-help" title="Current annual income for calculations">?</span>
+                        <span class="terminal-help" title="Your current annual income, used for tax planning and savings rate calculations.">?</span>
                     </label>
                     <input type="text" id="currentIncome" value="80000"
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -55,7 +55,7 @@
                 <div class="terminal-input-group">
                     <label for="retirementAgeA" class="block text-terminal-green text-sm mb-1 terminal-label">
                         RETIRE_AGE_A:
-                        <span class="terminal-help" title="Early retirement scenario">?</span>
+                        <span class="terminal-help" title="Early retirement scenario - typically ages 35-45 for FIRE (Financial Independence, Retire Early) movement.">?</span>
                     </label>
                     <input type="number" id="retirementAgeA" value="40" min="30" max="100"
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -66,7 +66,7 @@
                 <div class="terminal-input-group">
                     <label for="retirementAgeB" class="block text-terminal-green text-sm mb-1 terminal-label">
                         RETIRE_AGE_B:
-                        <span class="terminal-help" title="Mid retirement scenario">?</span>
+                        <span class="terminal-help" title="Mid-career retirement scenario - balanced approach between savings intensity and working years.">?</span>
                     </label>
                     <input type="number" id="retirementAgeB" value="45" min="30" max="100"
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -77,7 +77,7 @@
                 <div class="terminal-input-group">
                     <label for="retirementAgeC" class="block text-terminal-green text-sm mb-1 terminal-label">
                         RETIRE_AGE_C:
-                        <span class="terminal-help" title="Late retirement scenario">?</span>
+                        <span class="terminal-help" title="Traditional retirement scenario - closer to standard retirement age with more conservative savings requirements.">?</span>
                     </label>
                     <input type="number" id="retirementAgeC" value="50" min="30" max="100"
                            class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -105,7 +105,7 @@
                         <div class="terminal-input-group">
                             <label for="startingAge" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 STARTING_AGE:
-                                <span class="terminal-help" title="Age when you start saving">?</span>
+                                <span class="terminal-help" title="Age when you begin serious retirement savings. Earlier start allows compound growth to work longer.">?</span>
                             </label>
                             <input type="number" id="startingAge" value="25" min="18" max="100" 
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -116,7 +116,7 @@
                         <div class="terminal-input-group">
                             <label for="inflationRate" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 INFLATION_RATE:
-                                <span class="terminal-help" title="Annual inflation rate (%)">?</span>
+                                <span class="terminal-help" title="Expected annual inflation rate. Historical US average is ~3%. Affects purchasing power over time.">?</span>
                             </label>
                             <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -127,7 +127,7 @@
                         <div class="terminal-input-group">
                             <label for="annualReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 BASE_ANNUAL_RETURN:
-                                <span class="terminal-help" title="Base expected annual return (%)">?</span>
+                                <span class="terminal-help" title="Backward compatibility field. Use ACCUMULATION_RETURN and RETIREMENT_RETURN for more precise modeling.">?</span>
                             </label>
                             <input type="number" id="annualReturn" value="10" min="0" max="30" step="0.1"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -138,7 +138,7 @@
                         <div class="terminal-input-group">
                             <label for="accumulationReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 ACCUMULATION_RETURN:
-                                <span class="terminal-help" title="Expected return during working years (%)">?</span>
+                                <span class="terminal-help" title="Expected annual return during working years. Typically higher (8-12%) due to aggressive asset allocation.">?</span>
                             </label>
                             <input type="number" id="accumulationReturn" value="10" min="0" max="30" step="0.1"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -149,7 +149,7 @@
                         <div class="terminal-input-group">
                             <label for="retirementReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 RETIREMENT_RETURN:
-                                <span class="terminal-help" title="Expected return during retirement (%)">?</span>
+                                <span class="terminal-help" title="Expected annual return during retirement. Typically lower (5-8%) due to conservative asset allocation.">?</span>
                             </label>
                             <input type="number" id="retirementReturn" value="7" min="0" max="20" step="0.1"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -160,7 +160,7 @@
                         <div class="terminal-input-group">
                             <label for="volatility" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 RETURN_VOLATILITY:
-                                <span class="terminal-help" title="Standard deviation of returns (%)">?</span>
+                                <span class="terminal-help" title="Standard deviation of annual returns. Stock market typically 15-20%. Higher volatility = more uncertainty.">?</span>
                             </label>
                             <input type="number" id="volatility" value="15" min="0" max="50" step="1"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -171,7 +171,7 @@
                         <div class="terminal-input-group">
                             <label for="monteCarloRuns" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 MONTE_CARLO_RUNS:
-                                <span class="terminal-help" title="Number of simulations to run">?</span>
+                                <span class="terminal-help" title="Number of market scenarios to simulate. More runs = more accuracy but slower calculation. 1000+ recommended.">?</span>
                             </label>
                             <select id="monteCarloRuns" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
                                 <option value="100">100</option>
@@ -191,7 +191,7 @@
                         <div class="terminal-input-group">
                             <label for="accountType" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 ACCOUNT_TYPE:
-                                <span class="terminal-help" title="Primary retirement account type">?</span>
+                                <span class="terminal-help" title="Primary retirement account type. Traditional = tax-deferred, Roth = tax-free, Taxable = after-tax investments.">?</span>
                             </label>
                             <select id="accountType" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
                                 <option value="Traditional 401k/IRA" selected>Traditional 401k/IRA</option>
@@ -203,7 +203,7 @@
                         <div class="terminal-input-group">
                             <label for="state" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 STATE:
-                                <span class="terminal-help" title="State for tax calculations">?</span>
+                                <span class="terminal-help" title="State for tax calculations. Different states have different income tax rates. California has high taxes, Texas/Florida have none.">?</span>
                             </label>
                             <select id="state" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
                                 <option value="California" selected>California</option>
@@ -219,7 +219,7 @@
                         <div class="terminal-input-group">
                             <label for="socialSecurityAge" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 SS_START_AGE:
-                                <span class="terminal-help" title="Age to start Social Security (62-70)">?</span>
+                                <span class="terminal-help" title="Age to claim Social Security benefits. Earlier = reduced benefits, later = increased benefits up to age 70.">?</span>
                             </label>
                             <input type="number" id="socialSecurityAge" value="67" min="62" max="70"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -230,7 +230,7 @@
                         <div class="terminal-input-group">
                             <label for="socialSecurityBenefit" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 SS_MONTHLY_BENEFIT:
-                                <span class="terminal-help" title="Expected monthly Social Security benefit">?</span>
+                                <span class="terminal-help" title="Expected monthly Social Security benefit at full retirement age. Check your Social Security statement for estimate.">?</span>
                             </label>
                             <input type="text" id="socialSecurityBenefit" value="2000"
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
@@ -241,7 +241,7 @@
                         <div class="terminal-input-group">
                             <label for="healthcareMultiplier" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 HEALTHCARE_MULTIPLIER:
-                                <span class="terminal-help" title="Healthcare cost multiplier">?</span>
+                                <span class="terminal-help" title="Healthcare cost multiplier. 1.0x = average health, 1.5x = some issues, 2.0x+ = significant health concerns or long-term care.">?</span>
                             </label>
                             <select id="healthcareMultiplier" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
                                 <option value="1.0" selected>1.0x (Average)</option>
@@ -289,27 +289,7 @@
             <div class="text-terminal-green text-sm opacity-75">Monte Carlo analysis with confidence bands</div>
         </div>
         
-        <!-- Success Probability Chart (Full Width) -->
-        <div class="mb-6">
-            <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">MONTE_CARLO_SUCCESS_PROBABILITY</h4>
-                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-64 sm:h-80 relative flex">
-                    <canvas id="successProbabilityChart" style="height: 100%; width: 100%;"></canvas>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Portfolio Distribution Chart (Full Width) -->
-        <div class="mb-6">
-            <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">PORTFOLIO_DISTRIBUTION_AT_RETIREMENT</h4>
-                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 relative flex">
-                    <canvas id="portfolioDistributionChart" style="height: 100%; width: 100%;"></canvas>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Original Charts Grid -->
+        <!-- All Charts Grid -->
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
             <div class="terminal-chart">
                 <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH_PROGRESSION_WITH_CONFIDENCE</h4>
@@ -322,6 +302,20 @@
                 <h4 class="text-terminal-green text-sm font-bold mb-3">ANNUAL_WITHDRAWAL_REQUIREMENTS</h4>
                 <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
                     <canvas id="withdrawalsChart" style="height: 100%; width: 100%;"></canvas>
+                </div>
+            </div>
+            
+            <div class="terminal-chart">
+                <h4 class="text-terminal-green text-sm font-bold mb-3">MONTE_CARLO_SUCCESS_PROBABILITY</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
+                    <canvas id="successProbabilityChart" style="height: 100%; width: 100%;"></canvas>
+                </div>
+            </div>
+            
+            <div class="terminal-chart">
+                <h4 class="text-terminal-green text-sm font-bold mb-3">PORTFOLIO_DISTRIBUTION_AT_RETIREMENT</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
+                    <canvas id="portfolioDistributionChart" style="height: 100%; width: 100%;"></canvas>
                 </div>
             </div>
         </div>
