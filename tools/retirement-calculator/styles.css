@@ -100,3 +100,210 @@
   color: #00FF41;
   overflow: hidden;
 }
+
+/* Enhanced Form Styling */
+.terminal-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.terminal-help {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-color: #00FF41;
+  color: #000000;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 16px;
+  font-size: 10px;
+  font-weight: bold;
+  cursor: help;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.terminal-help:hover {
+  opacity: 1;
+}
+
+.terminal-select {
+  background-color: #000000;
+  border: 1px solid #00FF41;
+  color: #00FF41;
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2300FF41' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+.terminal-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #00FF41;
+  border-color: #00FF41;
+}
+
+.terminal-select option {
+  background-color: #000000;
+  color: #00FF41;
+}
+
+.terminal-error {
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.terminal-toggle {
+  color: #FFB86C;
+  font-size: 0.75rem;
+  font-weight: normal;
+  transition: color 0.2s ease;
+}
+
+.terminal-toggle:hover {
+  color: #00FF41;
+}
+
+/* Input Validation States */
+.terminal-input.border-red-400 {
+  border-color: #FF5555;
+  box-shadow: 0 0 0 1px #FF5555;
+}
+
+.terminal-input.border-red-400:focus {
+  box-shadow: 0 0 0 2px #FF5555;
+}
+
+/* Section Headers */
+.retirement-calculator h3 {
+  text-shadow: 0 0 5px #00FF41;
+}
+
+.retirement-calculator h4 {
+  color: #FFB86C;
+  text-shadow: 0 0 3px #FFB86C;
+}
+
+/* Enhanced Input Groups */
+.terminal-input-group {
+  position: relative;
+}
+
+.terminal-input-group:hover .terminal-help {
+  opacity: 1;
+}
+
+/* Animation for sections */
+#assumptionsSection {
+  transition: all 0.3s ease;
+}
+
+#assumptionsSection.hidden {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+}
+
+#assumptionsSection:not(.hidden) {
+  opacity: 1;
+  max-height: 2000px;
+}
+
+/* Chart-specific styling */
+.terminal-chart h4 {
+  position: relative;
+  padding-left: 0.5rem;
+}
+
+.terminal-chart h4::before {
+  content: ">";
+  position: absolute;
+  left: 0;
+  color: #FFB86C;
+  font-weight: bold;
+}
+
+/* Loading states for charts */
+.chart-container.loading {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 255, 65, 0.1) 10px,
+    rgba(0, 255, 65, 0.1) 20px
+  );
+  animation: loading-scan 2s linear infinite;
+}
+
+@keyframes loading-scan {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+/* Responsive enhancements */
+@media (max-width: 640px) {
+  .terminal-help {
+    display: none;
+  }
+  
+  .terminal-label {
+    font-size: 0.75rem;
+  }
+  
+  .terminal-select {
+    padding-right: 2rem;
+    background-size: 1.2em 1.2em;
+  }
+}
+
+/* Enhanced tooltip styling */
+.terminal-input[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background-color: #0A0E1A;
+  border: 1px solid #00FF41;
+  color: #00FF41;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  z-index: 10;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Focus improvements */
+.retirement-calculator *:focus {
+  outline: none;
+}
+
+.retirement-calculator .terminal-input:focus,
+.retirement-calculator .terminal-select:focus {
+  box-shadow: 0 0 0 2px #00FF41, 0 0 10px rgba(0, 255, 65, 0.3);
+  border-color: #00FF41;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .terminal-help {
+    background-color: #FFFFFF;
+    color: #000000;
+  }
+  
+  .text-terminal-green {
+    color: #00FF00;
+  }
+  
+  .border-terminal-green {
+    border-color: #00FF00;
+  }
+}

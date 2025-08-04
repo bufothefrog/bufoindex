@@ -180,6 +180,453 @@ class FinancialCalculations {
         
         return progression;
     }
+
+    /**
+     * Calculate multiple scenarios with Monte Carlo analysis and advanced financial modeling
+     * @param {Array<Object>} scenarioConfigs - Array of scenario configurations
+     * @param {Object} assumptions - Market assumptions including volatility
+     * @param {Object} taxParameters - Optional tax and financial modeling parameters
+     * @returns {Object} - Comprehensive results including stochastic analysis and tax planning
+     */
+    static calculateScenariosWithMonteCarlo(scenarioConfigs, assumptions, taxParameters = null) {
+        const {
+            startingAge,
+            startingBalance,
+            targetIncome,
+            inflationRate,
+            accumulationReturn,
+            retirementReturn,
+            volatility = 0.15,
+            monteCarloRuns = 1000
+        } = assumptions;
+
+        // Prepare scenarios for Monte Carlo simulation
+        const scenarios = scenarioConfigs.map(config => ({
+            retirementAge: config.retirementAge,
+            targetIncome,
+            startingAge,
+            startingBalance,
+            lifeExpectancy: 100
+        }));
+
+        // Run Monte Carlo simulations
+        const monteCarloResults = MonteCarloEngine.runSimulations(scenarios, {
+            inflationRate: inflationRate / 100,
+            accumulationReturn: accumulationReturn / 100,
+            retirementReturn: retirementReturn / 100,
+            volatility: volatility / 100,
+            monteCarloRuns
+        });
+
+        // Calculate deterministic scenarios for comparison
+        const deterministicScenarios = scenarioConfigs.map(config => {
+            const deterministicResult = this.calculateScenario({
+                startingAge,
+                retirementAge: config.retirementAge,
+                targetIncome,
+                startingBalance,
+                inflationRate: inflationRate / 100,
+                annualReturn: accumulationReturn / 100
+            });
+
+            return {
+                ...config,
+                ...deterministicResult,
+                retirementAge: config.retirementAge
+            };
+        });
+
+        // Enhanced results with tax planning if parameters provided
+        let enhancedResults = {
+            deterministicScenarios,
+            monteCarloResults,
+            assumptions: {
+                ...assumptions,
+                volatility,
+                monteCarloRuns
+            },
+            riskAnalysis: this.generateRiskAnalysis(monteCarloResults),
+            comparison: this.compareStochasticToDeterministic(deterministicScenarios, monteCarloResults)
+        };
+
+        // Add advanced financial modeling if tax parameters provided
+        if (taxParameters && window.FinancialModeling) {
+            enhancedResults.taxPlanning = this.generateTaxPlanningAnalysis(deterministicScenarios, taxParameters);
+            enhancedResults.socialSecurity = this.generateSocialSecurityAnalysis(scenarioConfigs, taxParameters);
+            enhancedResults.healthcareCosts = this.generateHealthcareAnalysis(scenarioConfigs, taxParameters);
+            enhancedResults.accountOptimization = this.generateAccountOptimizationAnalysis(taxParameters);
+        }
+
+        return enhancedResults;
+    }
+
+    /**
+     * Generate tax planning analysis for scenarios
+     * @param {Array<Object>} scenarios - Deterministic scenarios
+     * @param {Object} taxParameters - Tax calculation parameters
+     * @returns {Object} - Tax planning analysis
+     */
+    static generateTaxPlanningAnalysis(scenarios, taxParameters) {
+        const {
+            accountType = 'Traditional 401k/IRA',
+            state = 'California',
+            filingStatus = 'Single',
+            currentIncome = 80000
+        } = taxParameters;
+
+        return scenarios.map((scenario, index) => {
+            const scenarioLetter = String.fromCharCode(65 + index);
+            const grossWithdrawal = scenario.inflatedTargetIncome;
+            const retirementAge = scenario.retirementAge;
+            
+            const taxResult = window.FinancialModeling.calculateTaxAdjustedWithdrawal(
+                grossWithdrawal,
+                accountType,
+                state,
+                retirementAge,
+                filingStatus
+            );
+
+            return {
+                scenario: scenarioLetter,
+                retirementAge,
+                grossWithdrawal: Math.round(grossWithdrawal),
+                netWithdrawal: Math.round(taxResult.netIncome),
+                totalTax: Math.round(taxResult.totalTax),
+                federalTax: Math.round(taxResult.federalTax),
+                stateTax: Math.round(taxResult.stateTax),
+                effectiveTaxRate: Math.round(taxResult.effectiveRate * 100) / 100,
+                marginalTaxRate: Math.round(taxResult.marginalRate * 100) / 100,
+                accountType,
+                taxOptimizationPotential: this.calculateTaxOptimizationPotential(grossWithdrawal, state, retirementAge, filingStatus)
+            };
+        });
+    }
+
+    /**
+     * Calculate tax optimization potential across account types
+     * @param {number} grossWithdrawal - Gross withdrawal amount
+     * @param {string} state - State for tax calculation
+     * @param {number} age - Age at withdrawal
+     * @param {string} filingStatus - Filing status
+     * @returns {Object} - Tax optimization analysis
+     */
+    static calculateTaxOptimizationPotential(grossWithdrawal, state, age, filingStatus) {
+        const accountTypes = ['Traditional 401k/IRA', 'Roth', 'Taxable'];
+        const results = {};
+        
+        accountTypes.forEach(accountType => {
+            const taxResult = window.FinancialModeling.calculateTaxAdjustedWithdrawal(
+                grossWithdrawal,
+                accountType,
+                state,
+                age,
+                filingStatus
+            );
+            
+            results[accountType] = {
+                totalTax: taxResult.totalTax,
+                netIncome: taxResult.netIncome,
+                effectiveRate: taxResult.effectiveRate
+            };
+        });
+
+        // Find best and worst options
+        const sortedByTax = Object.entries(results).sort((a, b) => a[1].totalTax - b[1].totalTax);
+        const bestOption = sortedByTax[0];
+        const worstOption = sortedByTax[sortedByTax.length - 1];
+        
+        return {
+            bestAccountType: bestOption[0],
+            worstAccountType: worstOption[0],
+            maxTaxSavings: Math.round(worstOption[1].totalTax - bestOption[1].totalTax),
+            allOptions: results
+        };
+    }
+
+    /**
+     * Generate Social Security optimization analysis
+     * @param {Array<Object>} scenarioConfigs - Scenario configurations
+     * @param {Object} taxParameters - Tax parameters including SS info
+     * @returns {Object} - Social Security analysis
+     */
+    static generateSocialSecurityAnalysis(scenarioConfigs, taxParameters) {
+        const {
+            currentAge = 30,
+            expectedSsBenefit = 2000,
+            lifeExpectancy = 85
+        } = taxParameters;
+
+        return scenarioConfigs.map((config, index) => {
+            const scenarioLetter = String.fromCharCode(65 + index);
+            const analysis = window.FinancialModeling.optimizeSocialSecurity(
+                currentAge,
+                config.retirementAge,
+                expectedSsBenefit,
+                lifeExpectancy
+            );
+
+            return {
+                scenario: scenarioLetter,
+                retirementAge: config.retirementAge,
+                optimalClaimingAge: analysis.optimal.claimingAge,
+                optimalMonthlyBenefit: analysis.optimal.monthlyBenefit,
+                optimalAnnualBenefit: analysis.optimal.monthlyBenefit * 12,
+                lifetimeValue: analysis.optimal.lifetimeValue,
+                recommendation: analysis.recommendation,
+                fullRetirementAge: analysis.fullRetirementAge
+            };
+        });
+    }
+
+    /**
+     * Generate healthcare cost analysis
+     * @param {Array<Object>} scenarioConfigs - Scenario configurations
+     * @param {Object} taxParameters - Parameters including healthcare multiplier
+     * @returns {Object} - Healthcare cost analysis
+     */
+    static generateHealthcareAnalysis(scenarioConfigs, taxParameters) {
+        const {
+            currentAge = 30,
+            healthcareMultiplier = 1.0,
+            healthcareInflation = 0.05
+        } = taxParameters;
+
+        return scenarioConfigs.map((config, index) => {
+            const scenarioLetter = String.fromCharCode(65 + index);
+            const yearsInRetirement = 85 - config.retirementAge; // Assume life expectancy of 85
+            
+            const analysis = window.FinancialModeling.calculateHealthcareCosts(
+                config.retirementAge,
+                null, // Use age-based default
+                healthcareMultiplier,
+                healthcareInflation,
+                yearsInRetirement
+            );
+
+            return {
+                scenario: scenarioLetter,
+                retirementAge: config.retirementAge,
+                yearsInRetirement,
+                averageAnnualCost: analysis.averageAnnualCost,
+                totalLifetimeCost: analysis.totalCumulativeCost,
+                firstYearCost: analysis.projectedCosts[0]?.annualCost || 0,
+                finalYearCost: analysis.finalYearCost,
+                healthcareMultiplier,
+                medicareTransition: analysis.medicareTransition
+            };
+        });
+    }
+
+    /**
+     * Generate account type optimization analysis
+     * @param {Object} taxParameters - Tax parameters
+     * @returns {Object} - Account optimization recommendations
+     */
+    static generateAccountOptimizationAnalysis(taxParameters) {
+        const {
+            currentIncome = 80000,
+            currentTaxRate = 0.22,
+            retirementTaxRate = 0.15,
+            yearsToRetirement = 20
+        } = taxParameters;
+
+        const analysis = window.FinancialModeling.determineOptimalAccountType(
+            currentIncome,
+            retirementTaxRate,
+            currentTaxRate,
+            yearsToRetirement
+        );
+
+        return {
+            recommendedAccountType: analysis.recommendedType,
+            estimatedTaxSavings: analysis.taxSavings,
+            strategy: analysis.strategy,
+            allRecommendations: analysis.analysis.recommendations,
+            contributionComparison: {
+                traditional: {
+                    immediateDeduction: Math.round(20000 * currentTaxRate),
+                    futureValue: Math.round(20000 * Math.pow(1.07, yearsToRetirement)),
+                    futureTaxes: Math.round(20000 * Math.pow(1.07, yearsToRetirement) * retirementTaxRate)
+                },
+                roth: {
+                    immediateTaxCost: Math.round(20000 * currentTaxRate),
+                    futureValue: Math.round(20000 * Math.pow(1.07, yearsToRetirement)),
+                    futureTaxes: 0
+                }
+            }
+        };
+    }
+
+    /**
+     * Generate risk analysis from Monte Carlo results
+     * @param {Object} monteCarloResults - Results from Monte Carlo simulation
+     * @returns {Object} - Risk analysis summary
+     */
+    static generateRiskAnalysis(monteCarloResults) {
+        const riskSummary = {
+            overallRisk: 'LOW',
+            keyFindings: [],
+            sequenceOfReturnsRisk: {},
+            portfolioSurvivalRates: {}
+        };
+
+        monteCarloResults.scenarios.forEach(scenario => {
+            const successRate = scenario.successRate;
+            const scenarioLetter = scenario.scenario;
+
+            // Determine risk level
+            let riskLevel = 'LOW';
+            if (successRate < 0.7) riskLevel = 'HIGH';
+            else if (successRate < 0.85) riskLevel = 'MEDIUM';
+
+            riskSummary.portfolioSurvivalRates[scenarioLetter] = {
+                successRate,
+                riskLevel,
+                confidenceLevel: Math.round(successRate * 100)
+            };
+
+            // Analyze sequence of returns risk
+            if (scenario.allSimulations) {
+                const sequenceAnalysis = StatisticalAnalysis.analyzeSequenceOfReturnsRisk(scenario.allSimulations);
+                riskSummary.sequenceOfReturnsRisk[scenarioLetter] = {
+                    correlation: sequenceAnalysis.correlation,
+                    earlyYearImpact: sequenceAnalysis.earlyYearImpact,
+                    riskLevel: sequenceAnalysis.earlyYearImpact > 0.2 ? 'HIGH' : 'MEDIUM'
+                };
+            }
+
+            // Generate key findings
+            if (successRate < 0.8) {
+                riskSummary.keyFindings.push(`Scenario ${scenarioLetter}: ${Math.round((1 - successRate) * 100)}% chance of portfolio depletion`);
+            }
+
+            if (scenario.failureAgeDistribution && scenario.failureAgeDistribution.length > 0) {
+                const avgFailureAge = scenario.failureAgeDistribution.reduce((sum, age) => sum + age, 0) / scenario.failureAgeDistribution.length;
+                riskSummary.keyFindings.push(`Scenario ${scenarioLetter}: Average failure age is ${Math.round(avgFailureAge)} years`);
+            }
+        });
+
+        // Set overall risk level
+        const allSuccessRates = monteCarloResults.scenarios.map(s => s.successRate);
+        const minSuccessRate = Math.min(...allSuccessRates);
+        
+        if (minSuccessRate < 0.7) riskSummary.overallRisk = 'HIGH';
+        else if (minSuccessRate < 0.85) riskSummary.overallRisk = 'MEDIUM';
+
+        return riskSummary;
+    }
+
+    /**
+     * Compare stochastic results to deterministic calculations
+     * @param {Array<Object>} deterministicScenarios - Deterministic scenario results
+     * @param {Object} monteCarloResults - Monte Carlo simulation results
+     * @returns {Object} - Comparison analysis
+     */
+    static compareStochasticToDeterministic(deterministicScenarios, monteCarloResults) {
+        const comparison = {
+            portfolioSizeDifferences: {},
+            contributionDifferences: {},
+            insights: []
+        };
+
+        deterministicScenarios.forEach((detScenario, index) => {
+            const mcScenario = monteCarloResults.scenarios[index];
+            const scenarioLetter = String.fromCharCode(65 + index);
+
+            if (detScenario.valid && mcScenario) {
+                // Compare portfolio sizes
+                const detPortfolio = detScenario.targetPortfolioSize;
+                const mcMedianPortfolio = mcScenario.portfolioAtRetirement.median;
+                const portfolioDiff = ((mcMedianPortfolio - detPortfolio) / detPortfolio) * 100;
+
+                comparison.portfolioSizeDifferences[scenarioLetter] = {
+                    deterministic: detPortfolio,
+                    monteCarloMedian: mcMedianPortfolio,
+                    percentageDifference: portfolioDiff,
+                    range: {
+                        low: mcScenario.portfolioAtRetirement.percentile10,
+                        high: mcScenario.portfolioAtRetirement.percentile90
+                    }
+                };
+
+                // Compare required contributions
+                const detContribution = detScenario.monthlyContribution;
+                // For Monte Carlo, we use the same deterministic contribution calculation
+                // since we're analyzing the outcome uncertainty, not contribution uncertainty
+                comparison.contributionDifferences[scenarioLetter] = {
+                    deterministic: detContribution,
+                    successProbability: mcScenario.successRate
+                };
+
+                // Generate insights
+                if (Math.abs(portfolioDiff) > 10) {
+                    comparison.insights.push(
+                        `Scenario ${scenarioLetter}: Monte Carlo median portfolio differs from deterministic by ${Math.round(Math.abs(portfolioDiff))}%`
+                    );
+                }
+
+                if (mcScenario.successRate < 0.9) {
+                    comparison.insights.push(
+                        `Scenario ${scenarioLetter}: Only ${Math.round(mcScenario.successRate * 100)}% success rate despite meeting deterministic requirements`
+                    );
+                }
+            }
+        });
+
+        return comparison;
+    }
+
+    /**
+     * Calculate safe withdrawal rate based on Monte Carlo analysis
+     * @param {Object} scenario - Scenario parameters
+     * @param {Object} assumptions - Market assumptions
+     * @param {number} targetSuccessRate - Desired success rate (e.g., 0.95 for 95%)
+     * @returns {Object} - Safe withdrawal rate analysis
+     */
+    static calculateSafeWithdrawalRate(scenario, assumptions, targetSuccessRate = 0.95) {
+        const testWithdrawalRates = [0.03, 0.035, 0.04, 0.045, 0.05, 0.055, 0.06];
+        const results = [];
+
+        testWithdrawalRates.forEach(withdrawalRate => {
+            // Adjust target income based on withdrawal rate
+            const adjustedTargetIncome = scenario.targetIncome * (withdrawalRate / 0.04);
+            
+            const testScenario = {
+                ...scenario,
+                targetIncome: adjustedTargetIncome
+            };
+
+            // Run limited Monte Carlo simulation (fewer runs for performance)
+            const testResults = MonteCarloEngine.runSimulations([testScenario], {
+                ...assumptions,
+                monteCarloRuns: 500
+            });
+
+            if (testResults.scenarios.length > 0) {
+                results.push({
+                    withdrawalRate,
+                    successRate: testResults.scenarios[0].successRate,
+                    medianPortfolio: testResults.scenarios[0].portfolioAtRetirement.median
+                });
+            }
+        });
+
+        // Find the highest withdrawal rate that meets the target success rate
+        const safeWithdrawalRates = results.filter(r => r.successRate >= targetSuccessRate);
+        const maxSafeRate = safeWithdrawalRates.length > 0 
+            ? Math.max(...safeWithdrawalRates.map(r => r.withdrawalRate))
+            : Math.min(...testWithdrawalRates);
+
+        return {
+            safeWithdrawalRate: maxSafeRate,
+            targetSuccessRate,
+            allResults: results,
+            recommendation: maxSafeRate < 0.04 
+                ? 'Consider more conservative withdrawal rate than traditional 4% rule'
+                : 'Traditional 4% rule appears suitable for your scenario'
+        };
+    }
 }
 
 // Export for use in other modules

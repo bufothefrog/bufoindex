@@ -1,59 +1,258 @@
 <!-- Calculator Interface -->
-<div class="retirement-calculator bg-terminal-dark text-terminal-green font-mono border border-terminal-green rounded-lg p-6 mb-8">
+<div class="retirement-calculator bg-terminal-dark text-terminal-green font-mono border border-terminal-green rounded-lg p-6 lg:p-8 xl:p-10 mb-8">
     <!-- Input Section -->
     <div class="mb-8">
         <div class="border-b border-terminal-green mb-4 pb-2">
-            <h2 class="text-terminal-green text-xl font-bold mb-0">RETIREMENT_CALCULATOR v1.0</h2>
+            <h2 class="text-terminal-green text-xl font-bold mb-0">RETIREMENT_CALCULATOR v2.0</h2>
             <div class="text-terminal-green text-sm opacity-75">Enter parameters below. Press ENTER to calculate.</div>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="terminal-input-group">
-                <label for="startingAge" class="block text-terminal-green text-sm mb-1">STARTING_AGE:</label>
-                <input type="number" id="startingAge" value="25" min="18" max="100" 
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+        <!-- User Decisions Section -->
+        <div class="mb-6">
+            <div class="border-b border-terminal-green mb-4 pb-2">
+                <h3 class="text-terminal-green text-lg font-bold mb-0 flex items-center">
+                    <span class="mr-2">USER_DECISIONS</span>
+                    <span class="text-xs opacity-75 font-normal">[Primary scenario parameters]</span>
+                </h3>
             </div>
             
-            <div class="terminal-input-group">
-                <label for="retirementAgeA" class="block text-terminal-green text-sm mb-1">RETIRE_AGE_A:</label>
-                <input type="number" id="retirementAgeA" value="40" min="30" max="100"
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
+                <div class="terminal-input-group">
+                    <label for="targetIncome" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        TARGET_INCOME:
+                        <span class="terminal-help" title="Annual retirement income needed in today's dollars">?</span>
+                    </label>
+                    <input type="text" id="targetIncome" value="120000" 
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="currency" data-min="10000" data-max="10000000">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="startingBalance" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        INITIAL_BALANCE:
+                        <span class="terminal-help" title="Current portfolio value">?</span>
+                    </label>
+                    <input type="text" id="startingBalance" value="100000"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="currency" data-min="0" data-max="50000000">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="currentIncome" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        CURRENT_INCOME:
+                        <span class="terminal-help" title="Current annual income for calculations">?</span>
+                    </label>
+                    <input type="text" id="currentIncome" value="80000"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="currency" data-min="10000" data-max="5000000">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
             </div>
             
-            <div class="terminal-input-group">
-                <label for="retirementAgeB" class="block text-terminal-green text-sm mb-1">RETIRE_AGE_B:</label>
-                <input type="number" id="retirementAgeB" value="45" min="30" max="100"
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+                <div class="terminal-input-group">
+                    <label for="retirementAgeA" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        RETIRE_AGE_A:
+                        <span class="terminal-help" title="Early retirement scenario">?</span>
+                    </label>
+                    <input type="number" id="retirementAgeA" value="40" min="30" max="100"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="age">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="retirementAgeB" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        RETIRE_AGE_B:
+                        <span class="terminal-help" title="Mid retirement scenario">?</span>
+                    </label>
+                    <input type="number" id="retirementAgeB" value="45" min="30" max="100"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="age">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
+                <div class="terminal-input-group">
+                    <label for="retirementAgeC" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        RETIRE_AGE_C:
+                        <span class="terminal-help" title="Late retirement scenario">?</span>
+                    </label>
+                    <input type="number" id="retirementAgeC" value="50" min="30" max="100"
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="age">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Assumptions Section (Collapsible) -->
+        <div class="mb-6">
+            <div class="border-b border-terminal-green mb-4 pb-2">
+                <h3 class="text-terminal-green text-lg font-bold mb-0 flex items-center cursor-pointer" onclick="toggleAssumptions()">
+                    <span class="mr-2">ASSUMPTIONS</span>
+                    <span id="assumptionsToggle" class="terminal-toggle">[EXPAND]</span>
+                    <span class="text-xs opacity-75 font-normal ml-2">[Advanced parameters]</span>
+                </h3>
             </div>
             
-            <div class="terminal-input-group">
-                <label for="retirementAgeC" class="block text-terminal-green text-sm mb-1">RETIRE_AGE_C:</label>
-                <input type="number" id="retirementAgeC" value="50" min="30" max="100"
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-            </div>
-            
-            <div class="terminal-input-group">
-                <label for="targetIncome" class="block text-terminal-green text-sm mb-1">TARGET_INCOME:</label>
-                <input type="text" id="targetIncome" value="120000" 
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-            </div>
-            
-            <div class="terminal-input-group">
-                <label for="startingBalance" class="block text-terminal-green text-sm mb-1">INITIAL_BALANCE:</label>
-                <input type="text" id="startingBalance" value="100000"
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-            </div>
-            
-            <div class="terminal-input-group">
-                <label for="inflationRate" class="block text-terminal-green text-sm mb-1">INFLATION_RATE:</label>
-                <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-            </div>
-            
-            <div class="terminal-input-group">
-                <label for="annualReturn" class="block text-terminal-green text-sm mb-1">ANNUAL_RETURN:</label>
-                <input type="number" id="annualReturn" value="10" min="0" max="30" step="0.1"
-                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+            <div id="assumptionsSection" class="hidden">
+                <!-- Market Assumptions -->
+                <div class="mb-4">
+                    <h4 class="text-terminal-green text-sm font-bold mb-3 uppercase">Market Parameters</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                        <div class="terminal-input-group">
+                            <label for="startingAge" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                STARTING_AGE:
+                                <span class="terminal-help" title="Age when you start saving">?</span>
+                            </label>
+                            <input type="number" id="startingAge" value="25" min="18" max="100" 
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="age">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="inflationRate" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                INFLATION_RATE:
+                                <span class="terminal-help" title="Annual inflation rate (%)">?</span>
+                            </label>
+                            <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="percentage">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="annualReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                BASE_ANNUAL_RETURN:
+                                <span class="terminal-help" title="Base expected annual return (%)">?</span>
+                            </label>
+                            <input type="number" id="annualReturn" value="10" min="0" max="30" step="0.1"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="percentage">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="accumulationReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                ACCUMULATION_RETURN:
+                                <span class="terminal-help" title="Expected return during working years (%)">?</span>
+                            </label>
+                            <input type="number" id="accumulationReturn" value="10" min="0" max="30" step="0.1"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="percentage">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="retirementReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                RETIREMENT_RETURN:
+                                <span class="terminal-help" title="Expected return during retirement (%)">?</span>
+                            </label>
+                            <input type="number" id="retirementReturn" value="7" min="0" max="20" step="0.1"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="percentage">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="volatility" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                RETURN_VOLATILITY:
+                                <span class="terminal-help" title="Standard deviation of returns (%)">?</span>
+                            </label>
+                            <input type="number" id="volatility" value="15" min="0" max="50" step="1"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="percentage">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="monteCarloRuns" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                MONTE_CARLO_RUNS:
+                                <span class="terminal-help" title="Number of simulations to run">?</span>
+                            </label>
+                            <select id="monteCarloRuns" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                                <option value="100">100</option>
+                                <option value="500">500</option>
+                                <option value="1000" selected>1000</option>
+                                <option value="5000">5000</option>
+                                <option value="10000">10000</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tax and Social Security Parameters -->
+                <div class="mb-4">
+                    <h4 class="text-terminal-green text-sm font-bold mb-3 uppercase">Tax & Benefits</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                        <div class="terminal-input-group">
+                            <label for="accountType" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                ACCOUNT_TYPE:
+                                <span class="terminal-help" title="Primary retirement account type">?</span>
+                            </label>
+                            <select id="accountType" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                                <option value="Traditional 401k/IRA" selected>Traditional 401k/IRA</option>
+                                <option value="Roth">Roth</option>
+                                <option value="Taxable">Taxable</option>
+                            </select>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="state" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                STATE:
+                                <span class="terminal-help" title="State for tax calculations">?</span>
+                            </label>
+                            <select id="state" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                                <option value="California" selected>California</option>
+                                <option value="Texas">Texas</option>
+                                <option value="Florida">Florida</option>
+                                <option value="New York">New York</option>
+                                <option value="Washington">Washington</option>
+                                <option value="Nevada">Nevada</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="socialSecurityAge" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                SS_START_AGE:
+                                <span class="terminal-help" title="Age to start Social Security (62-70)">?</span>
+                            </label>
+                            <input type="number" id="socialSecurityAge" value="67" min="62" max="70"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="age">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="socialSecurityBenefit" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                SS_MONTHLY_BENEFIT:
+                                <span class="terminal-help" title="Expected monthly Social Security benefit">?</span>
+                            </label>
+                            <input type="text" id="socialSecurityBenefit" value="2000"
+                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                                   data-validation="currency" data-min="0" data-max="10000">
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="healthcareMultiplier" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                HEALTHCARE_MULTIPLIER:
+                                <span class="terminal-help" title="Healthcare cost multiplier">?</span>
+                            </label>
+                            <select id="healthcareMultiplier" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                                <option value="1.0" selected>1.0x (Average)</option>
+                                <option value="1.5">1.5x (Above Average)</option>
+                                <option value="2.0">2.0x (High)</option>
+                                <option value="2.5">2.5x (Very High)</option>
+                                <option value="3.0">3.0x (Maximum)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -64,16 +263,16 @@
             <h3 class="text-terminal-green text-lg font-bold mb-0">SCENARIO_ANALYSIS</h3>
         </div>
         
-        <div class="overflow-x-auto">
-            <table class="terminal-table w-full font-mono text-sm">
+        <div class="overflow-x-auto -mx-6 px-6 lg:mx-0 lg:px-0">
+            <table class="terminal-table w-full font-mono text-sm lg:text-base">
                 <thead>
                     <tr class="border-b border-terminal-green">
-                        <th class="text-left py-2 px-3 text-terminal-green">SCENARIO</th>
-                        <th class="text-left py-2 px-3 text-terminal-green">RETIRE_AGE</th>
-                        <th class="text-left py-2 px-3 text-terminal-green">YEARS_LEFT</th>
-                        <th class="text-left py-2 px-3 text-terminal-green">FIRST_YR_INCOME</th>
-                        <th class="text-left py-2 px-3 text-terminal-green">PORTFOLIO_REQ</th>
-                        <th class="text-left py-2 px-3 text-terminal-green">MONTHLY_SAVE</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SCENARIO</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">RETIRE_AGE</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">YEARS_LEFT</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">FIRST_YR_INCOME</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">PORTFOLIO_REQ</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">MONTHLY_SAVE</th>
                     </tr>
                 </thead>
                 <tbody id="summaryTableBody">
@@ -87,20 +286,42 @@
     <div class="charts-section mb-8">
         <div class="border-b border-terminal-green mb-4 pb-2">
             <h3 class="text-terminal-green text-lg font-bold mb-0">VISUALIZATIONS</h3>
+            <div class="text-terminal-green text-sm opacity-75">Monte Carlo analysis with confidence bands</div>
         </div>
         
-        <div class="grid grid-cols-1 gap-6">
+        <!-- Success Probability Chart (Full Width) -->
+        <div class="mb-6">
             <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">ANNUAL_WITHDRAWALS</h4>
-                <div class="chart-container bg-black border border-terminal-green p-4 h-96 relative">
-                    <canvas id="withdrawalsChart"></canvas>
+                <h4 class="text-terminal-green text-sm font-bold mb-3">MONTE_CARLO_SUCCESS_PROBABILITY</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-64 sm:h-80 relative flex">
+                    <canvas id="successProbabilityChart" style="height: 100%; width: 100%;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Portfolio Distribution Chart (Full Width) -->
+        <div class="mb-6">
+            <div class="terminal-chart">
+                <h4 class="text-terminal-green text-sm font-bold mb-3">PORTFOLIO_DISTRIBUTION_AT_RETIREMENT</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 relative flex">
+                    <canvas id="portfolioDistributionChart" style="height: 100%; width: 100%;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Original Charts Grid -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+            <div class="terminal-chart">
+                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH_PROGRESSION_WITH_CONFIDENCE</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
+                    <canvas id="netWorthChart" style="height: 100%; width: 100%;"></canvas>
                 </div>
             </div>
             
             <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH_PROGRESSION</h4>
-                <div class="chart-container bg-black border border-terminal-green p-4 h-96 relative">
-                    <canvas id="netWorthChart"></canvas>
+                <h4 class="text-terminal-green text-sm font-bold mb-3">ANNUAL_WITHDRAWAL_REQUIREMENTS</h4>
+                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
+                    <canvas id="withdrawalsChart" style="height: 100%; width: 100%;"></canvas>
                 </div>
             </div>
         </div>
@@ -112,7 +333,7 @@
             <h3 class="text-terminal-green text-lg font-bold mb-0">KEY_INSIGHTS</h3>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="insightsContent">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6" id="insightsContent">
             <!-- Insights populated by JavaScript -->
         </div>
     </div>
@@ -123,16 +344,27 @@
             <h3 class="text-terminal-green text-lg font-bold mb-0">EXPORT_DATA</h3>
         </div>
         
-        <div class="flex gap-4">
-            <button id="exportJSON" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 font-mono hover:bg-terminal-green hover:text-black transition-colors">
+        <div class="flex flex-wrap gap-4">
+            <button id="exportJSON" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
                 EXPORT_JSON
             </button>
-            <button id="exportCSV" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 font-mono hover:bg-terminal-green hover:text-black transition-colors">
+            <button id="exportCSV" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
                 EXPORT_CSV
             </button>
-            <button id="shareURL" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 font-mono hover:bg-terminal-green hover:text-black transition-colors">
+            <button id="shareURL" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
                 SHARE_URL
             </button>
         </div>
     </div>
 </div>
+
+<!-- Load Required Libraries -->
+<script src="lib/calculations.js"></script>
+<script src="lib/url-state.js"></script>
+<script src="lib/monte-carlo.js"></script>
+<script src="lib/financial-modeling.js"></script>
+<script src="lib/statistical-analysis.js"></script>
+<script src="lib/insights-engine.js"></script>
+<script src="lib/export.js"></script>
+<script src="lib/chart-configs.js"></script>
+<script src="script.js"></script>
