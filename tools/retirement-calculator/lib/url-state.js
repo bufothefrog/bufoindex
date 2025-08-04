@@ -72,10 +72,10 @@ class URLStateManager {
             retirementAgeA: 40,
             retirementAgeB: 45,
             retirementAgeC: 50,
+            endAge: 85,
             targetIncome: 120000,
             startingBalance: 100000,
             inflationRate: 3,
-            annualReturn: 10,
             // New enhanced parameters
             currentIncome: 80000,
             accumulationReturn: 10,
@@ -114,17 +114,17 @@ class URLStateManager {
         validated.retirementAgeA = Math.max(validated.startingAge + 1, validated.retirementAgeA);
         validated.retirementAgeB = Math.max(validated.startingAge + 1, validated.retirementAgeB);
         validated.retirementAgeC = Math.max(validated.startingAge + 1, validated.retirementAgeC);
+        validated.endAge = Math.max(65, Math.min(110, validated.endAge || 85));
 
         // Financial validations
         validated.targetIncome = Math.max(1000, validated.targetIncome);
         validated.startingBalance = Math.max(0, validated.startingBalance);
         validated.inflationRate = Math.max(0, Math.min(20, validated.inflationRate));
-        validated.annualReturn = Math.max(0, Math.min(30, validated.annualReturn));
 
         // Enhanced parameter validations
         validated.currentIncome = Math.max(1000, validated.currentIncome || 80000);
-        validated.accumulationReturn = Math.max(0, Math.min(30, validated.accumulationReturn || validated.annualReturn));
-        validated.retirementReturn = Math.max(0, Math.min(20, validated.retirementReturn || (validated.annualReturn * 0.7)));
+        validated.accumulationReturn = Math.max(0, Math.min(30, validated.accumulationReturn || 10));
+        validated.retirementReturn = Math.max(0, Math.min(20, validated.retirementReturn || 7));
         validated.volatility = Math.max(0, Math.min(50, validated.volatility || 15));
         validated.monteCarloRuns = Math.max(100, Math.min(10000, validated.monteCarloRuns || 1000));
         validated.socialSecurityAge = Math.max(62, Math.min(70, validated.socialSecurityAge || 67));
@@ -169,10 +169,10 @@ class URLStateManager {
         this.setInputValue('retirementAgeA', validated.retirementAgeA);
         this.setInputValue('retirementAgeB', validated.retirementAgeB);
         this.setInputValue('retirementAgeC', validated.retirementAgeC);
+        this.setInputValue('endAge', validated.endAge);
         this.setInputValue('targetIncome', validated.targetIncome.toLocaleString());
         this.setInputValue('startingBalance', validated.startingBalance.toLocaleString());
         this.setInputValue('inflationRate', validated.inflationRate);
-        this.setInputValue('annualReturn', validated.annualReturn);
 
         // Update enhanced parameters
         this.setInputValue('currentIncome', validated.currentIncome.toLocaleString());
@@ -219,10 +219,10 @@ class URLStateManager {
             retirementAgeA: this.getIntValue('retirementAgeA'),
             retirementAgeB: this.getIntValue('retirementAgeB'),
             retirementAgeC: this.getIntValue('retirementAgeC'),
+            endAge: this.getIntValue('endAge'),
             targetIncome: this.getCurrencyValue('targetIncome'),
             startingBalance: this.getCurrencyValue('startingBalance'),
             inflationRate: this.getFloatValue('inflationRate'),
-            annualReturn: this.getFloatValue('annualReturn'),
             
             // Enhanced parameters
             currentIncome: this.getCurrencyValue('currentIncome'),

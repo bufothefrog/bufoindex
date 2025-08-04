@@ -84,6 +84,18 @@
                            data-validation="age">
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
+                
+                <div class="terminal-input-group">
+                    <label for="startingAge" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        CURRENT_AGE:
+                        <span class="terminal-help" title="Your current age when beginning retirement planning. Earlier start allows compound growth to work longer.">?</span>
+                    </label>
+                    <input type="number" id="startingAge" value="25" min="18" max="100" 
+                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
+                           data-validation="age">
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                </div>
+                
             </div>
         </div>
         
@@ -102,16 +114,6 @@
                 <div class="mb-4">
                     <h4 class="text-terminal-green text-sm font-bold mb-3 uppercase">Market Parameters</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                        <div class="terminal-input-group">
-                            <label for="startingAge" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                STARTING_AGE:
-                                <span class="terminal-help" title="Age when you begin serious retirement savings. Earlier start allows compound growth to work longer.">?</span>
-                            </label>
-                            <input type="number" id="startingAge" value="25" min="18" max="100" 
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="age">
-                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                        </div>
                         
                         <div class="terminal-input-group">
                             <label for="inflationRate" class="block text-terminal-green text-sm mb-1 terminal-label">
@@ -125,15 +127,16 @@
                         </div>
                         
                         <div class="terminal-input-group">
-                            <label for="annualReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                BASE_ANNUAL_RETURN:
-                                <span class="terminal-help" title="Backward compatibility field. Use ACCUMULATION_RETURN and RETIREMENT_RETURN for more precise modeling.">?</span>
+                            <label for="endAge" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                END_AGE:
+                                <span class="terminal-help" title="Life expectancy for retirement planning. Conservative estimates ensure portfolio longevity.">?</span>
                             </label>
-                            <input type="number" id="annualReturn" value="10" min="0" max="30" step="0.1"
+                            <input type="number" id="endAge" value="85" min="65" max="110" 
                                    class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="percentage">
+                                   data-validation="age">
                             <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                         </div>
+                        
                         
                         <div class="terminal-input-group">
                             <label for="accumulationReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
@@ -290,9 +293,9 @@
         </div>
         
         <!-- All Charts Grid -->
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
             <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH_PROGRESSION_WITH_CONFIDENCE</h4>
+                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH</h4>
                 <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
                     <canvas id="netWorthChart" style="height: 100%; width: 100%;"></canvas>
                 </div>
@@ -339,11 +342,8 @@
         </div>
         
         <div class="flex flex-wrap gap-4">
-            <button id="exportJSON" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
-                EXPORT_JSON
-            </button>
-            <button id="exportCSV" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
-                EXPORT_CSV
+            <button id="exportPDF" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
+                EXPORT_PDF
             </button>
             <button id="shareURL" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
                 SHARE_URL
@@ -351,6 +351,66 @@
         </div>
     </div>
 </div>
+
+<!-- Print-specific CSS for PDF export -->
+<style>
+    @media print {
+        body {
+            background: white !important;
+            color: black !important;
+        }
+        
+        .terminal-container {
+            background: white !important;
+            border-color: #ccc !important;
+        }
+        
+        .text-terminal-green,
+        .terminal-label,
+        h1, h2, h3, h4 {
+            color: black !important;
+        }
+        
+        .bg-black {
+            background: white !important;
+            border: 1px solid #ccc !important;
+        }
+        
+        .border-terminal-green {
+            border-color: #ccc !important;
+        }
+        
+        /* Hide export section and other non-essential elements */
+        .mb-6:has(#exportPDF),
+        button,
+        .terminal-button,
+        .terminal-help,
+        #assumptionsToggle {
+            display: none !important;
+        }
+        
+        /* Show assumptions section in print */
+        #assumptionsSection {
+            display: block !important;
+        }
+        
+        /* Ensure charts display properly */
+        .chart-container {
+            page-break-inside: avoid;
+            background: white !important;
+        }
+        
+        /* Keep grids as 2x2 for print */
+        .grid-cols-1 {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+        
+        /* Adjust chart heights for print */
+        .chart-container {
+            height: 300px !important;
+        }
+    }
+</style>
 
 <!-- Load Required Libraries -->
 <script src="lib/calculations.js"></script>

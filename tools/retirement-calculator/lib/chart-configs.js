@@ -18,12 +18,8 @@ class ChartConfigs {
 
         const labels = scenarios.map(s => `SCENARIO_${s.scenario}`);
         const successRates = scenarios.map(s => s.successRate * 100); // Convert to percentage
-        const colors = scenarios.map(s => {
-            const rate = s.successRate;
-            if (rate >= 0.9) return '#00FF41'; // High success - terminal green
-            if (rate >= 0.75) return '#FFB86C'; // Medium success - orange
-            return '#FF5555'; // Low success - red
-        });
+        const scenarioColors = ['#e74c3c', '#f39c12', '#27ae60']; // Match main chart colors
+        const colors = scenarios.map((s, index) => scenarioColors[index % scenarioColors.length]);
 
         return {
             type: 'bar',

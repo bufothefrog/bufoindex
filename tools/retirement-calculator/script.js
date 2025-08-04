@@ -69,8 +69,7 @@ class RetirementCalculator {
         });
 
         // Export button listeners
-        document.getElementById('exportJSON')?.addEventListener('click', () => this.exportJSON());
-        document.getElementById('exportCSV')?.addEventListener('click', () => this.exportCSV());
+        document.getElementById('exportPDF')?.addEventListener('click', () => this.exportPDF());
         document.getElementById('shareURL')?.addEventListener('click', () => this.shareURL());
         
         // Form validation listeners
@@ -94,7 +93,7 @@ class RetirementCalculator {
                 targetIncome: validated.targetIncome,
                 startingBalance: validated.startingBalance,
                 inflationRate: validated.inflationRate / 100,
-                annualReturn: validated.annualReturn / 100
+                annualReturn: validated.accumulationReturn / 100
             });
 
             return {
@@ -254,7 +253,7 @@ class RetirementCalculator {
         });
 
         // Calculate max withdrawal for zoom limits
-        const maxAge = 100;
+        const maxAge = validated.endAge;
         const maxYears = maxAge - earliestRetirementAge;
         const maxWithdrawal = validated.targetIncome * Math.pow(1 + validated.inflationRate/100, maxYears);
 
@@ -309,38 +308,11 @@ class RetirementCalculator {
                             }
                         }
                     },
-                    zoom: {
-                        zoom: {
-                            wheel: {
-                                enabled: true,
-                            },
-                            pinch: {
-                                enabled: true
-                            },
-                            mode: 'xy',
-                        },
-                        pan: {
-                            enabled: true,
-                            mode: 'xy',
-                        },
-                        limits: {
-                            x: {
-                                min: Math.max(30, earliestRetirementAge - 5),
-                                max: 105,
-                                minRange: 10
-                            },
-                            y: {
-                                min: -validated.targetIncome * 0.1, // Small negative buffer (10% of target income)
-                                max: maxWithdrawal * 1.2, // 20% buffer above max
-                                minRange: validated.targetIncome * 0.5 // Minimum range of 50% of target income
-                            }
-                        }
-                    }
                 },
                 scales: {
                     x: {
-                        min: Math.max(30, earliestRetirementAge - 5),
-                        max: 105,
+                        min: validated.startingAge,
+                        max: validated.endAge,
                         grid: {
                             color: '#00FF4120',
                             borderColor: '#00FF41'
@@ -361,8 +333,8 @@ class RetirementCalculator {
                         }
                     },
                     y: {
-                        min: -validated.targetIncome * 0.05, // 5% buffer below zero
-                        max: maxWithdrawal * 1.1, // 10% buffer above max
+                        min: -validated.targetIncome * 0.0475, // 4.75% buffer below zero (5% reduced by 5%)
+                        max: maxWithdrawal * 1.045, // 4.5% buffer above max (10% reduced by 5%)
                         grid: {
                             color: '#00FF4120',
                             borderColor: '#00FF41'
@@ -402,7 +374,7 @@ class RetirementCalculator {
             const progression = FinancialCalculations.generateNetWorthProgression(scenario, {
                 startingAge: validated.startingAge,
                 startingBalance: validated.startingBalance,
-                annualReturn: validated.annualReturn / 100,
+                annualReturn: validated.accumulationReturn / 100,
                 inflationRate: validated.inflationRate / 100
             });
 
@@ -462,33 +434,6 @@ class RetirementCalculator {
                             }
                         }
                     },
-                    zoom: {
-                        zoom: {
-                            wheel: {
-                                enabled: true,
-                            },
-                            pinch: {
-                                enabled: true
-                            },
-                            mode: 'xy',
-                        },
-                        pan: {
-                            enabled: true,
-                            mode: 'xy',
-                        },
-                        limits: {
-                            x: {
-                                min: validated.startingAge - 5,
-                                max: 105,
-                                minRange: 10
-                            },
-                            y: {
-                                min: -50000,
-                                max: 'original',
-                                minRange: 100000
-                            }
-                        }
-                    }
                 },
                 scales: {
                     x: {
@@ -512,7 +457,7 @@ class RetirementCalculator {
                             }
                         },
                         min: validated.startingAge,
-                        max: 100
+                        max: validated.endAge
                     },
                     y: {
                         grid: {
@@ -559,30 +504,9 @@ class RetirementCalculator {
     }
 
     // Export functions
-    exportJSON() {
-        const params = URLStateManager.collectParametersFromForm();
-        const data = ExportUtility.exportComprehensiveData(
-            this.scenarios,
-            this.netWorthData,
-            this.withdrawalData,
-            this.insights,
-            params,
-            this.monteCarloResults,
-            this.financialModelingResults
-        );
-        ExportUtility.exportJSON(data, `retirement_analysis_${new Date().toISOString().split('T')[0]}.json`);
-    }
-
-    exportCSV() {
-        // Use enhanced multi-CSV export if available
-        const exportData = {
-            scenarios: this.scenarios,
-            monteCarloResults: this.monteCarloResults,
-            financialModelingResults: this.financialModelingResults,
-            insights: this.insights
-        };
-        
-        ExportUtility.exportMultipleCSVs(exportData);
+    exportPDF() {
+        // Use browser's print functionality to save as PDF
+        window.print();
     }
 
     async shareURL() {
@@ -704,8 +628,8 @@ class RetirementCalculator {
             startingBalance: validated.startingBalance,
             targetIncome: validated.targetIncome,
             inflationRate: validated.inflationRate,
-            accumulationReturn: validated.accumulationReturn || validated.annualReturn,
-            retirementReturn: validated.retirementReturn || (validated.annualReturn * 0.7),
+            accumulationReturn: validated.accumulationReturn || 10,
+            retirementReturn: validated.retirementReturn || 7,
             volatility: validated.volatility || 15,
             monteCarloRuns: parseInt(validated.monteCarloRuns || 1000)
         };
@@ -840,8 +764,8 @@ class RetirementCalculator {
         const enhanced = {
             ...basic,
             currentIncome: this.getInputValue('currentIncome', 'currency'),
-            accumulationReturn: this.getInputValue('accumulationReturn', 'number') || basic.annualReturn,
-            retirementReturn: this.getInputValue('retirementReturn', 'number') || (basic.annualReturn * 0.7),
+            accumulationReturn: this.getInputValue('accumulationReturn', 'number') || 10,
+            retirementReturn: this.getInputValue('retirementReturn', 'number') || 7,
             volatility: this.getInputValue('volatility', 'number') || 15,
             monteCarloRuns: this.getInputValue('monteCarloRuns', 'number') || 1000,
             accountType: this.getSelectValue('accountType') || 'Traditional 401k/IRA',
@@ -930,7 +854,7 @@ class RetirementCalculator {
             const progression = FinancialCalculations.generateNetWorthProgression(scenario, {
                 startingAge: validated.startingAge,
                 startingBalance: validated.startingBalance,
-                annualReturn: validated.annualReturn / 100,
+                annualReturn: validated.accumulationReturn / 100,
                 inflationRate: validated.inflationRate / 100
             });
 
@@ -1005,7 +929,7 @@ class RetirementCalculator {
                             }
                         },
                         min: validated.startingAge,
-                        max: 100
+                        max: validated.endAge
                     },
                     y: {
                         grid: {

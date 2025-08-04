@@ -70,7 +70,8 @@ class MonteCarloEngine {
             targetIncome,
             startingAge,
             startingBalance,
-            lifeExpectancy = 100
+            lifeExpectancy = 100,
+            endAge = 85
         } = scenario;
 
         const {
@@ -81,7 +82,7 @@ class MonteCarloEngine {
         } = assumptions;
 
         const yearsUntilRetirement = retirementAge - startingAge;
-        const yearsInRetirement = lifeExpectancy - retirementAge;
+        const yearsInRetirement = (endAge || lifeExpectancy) - retirementAge;
         
         if (yearsUntilRetirement <= 0) {
             return {
@@ -163,9 +164,18 @@ class MonteCarloEngine {
             portfolioValue -= currentWithdrawal;
             
             // Check for portfolio failure
-            if (portfolioValue < 0) {
+            if (portfolioValue < 0 && failureAge === null) {
                 failureAge = currentAge;
                 portfolioValue = 0;
+                // Stop simulation immediately when portfolio fails
+                yearlyProgression.push({
+                    age: currentAge,
+                    portfolioValue: 0,
+                    withdrawal: currentWithdrawal,
+                    annualReturn: annualReturn,
+                    phase: 'retirement'
+                });
+                break;
             }
             
             // Apply return to remaining portfolio
@@ -180,12 +190,6 @@ class MonteCarloEngine {
                 annualReturn: annualReturn,
                 phase: 'retirement'
             });
-            
-            // Stop simulation if portfolio is depleted
-            if (portfolioValue <= 0 && failureAge === null) {
-                failureAge = currentAge;
-                break;
-            }
         }
 
         return {

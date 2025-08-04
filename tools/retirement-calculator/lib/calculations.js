@@ -206,6 +206,7 @@ class FinancialCalculations {
             targetIncome,
             startingAge,
             startingBalance,
+            endAge: assumptions.endAge || 85,
             lifeExpectancy: 100
         }));
 
