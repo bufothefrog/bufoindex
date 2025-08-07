@@ -3,8 +3,20 @@
     <!-- Input Section -->
     <div class="mb-8">
         <div class="border-b border-terminal-green mb-4 pb-2">
-            <h2 class="text-terminal-green text-xl font-bold mb-0">> RETIREMENT_CALCULATOR v2.0</h2>
-            <div class="text-terminal-green text-sm opacity-75">// Enter parameters below. Press ENTER to calculate.</div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-terminal-green text-xl font-bold mb-0">> RETIREMENT_CALCULATOR v2.0</h2>
+                    <div class="text-terminal-green text-sm opacity-75">// Enter parameters below. Press ENTER to calculate.</div>
+                </div>
+                <div class="flex gap-2">
+                    <button id="exportPDF" class="terminal-button bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono hover:bg-terminal-green hover:text-black transition-colors text-xs lg:text-sm">
+                        SAVE PDF
+                    </button>
+                    <button id="shareURL" class="terminal-button bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono hover:bg-terminal-green hover:text-black transition-colors text-xs lg:text-sm">
+                        SHARE URL
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- User Decisions Section -->
@@ -18,23 +30,29 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
                 <div class="terminal-input-group">
                     <label for="targetIncome" class="block text-terminal-green text-sm mb-1 terminal-label">
-                        TARGET_INCOME:
+                        TARGET_RETIREMENT_INCOME:
                         <span class="terminal-help" title="Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement.">?</span>
                     </label>
-                    <input type="text" id="targetIncome" value="120000" 
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="currency" data-min="10000" data-max="10000000">
+                    <div class="relative">
+                        <input type="text" id="targetIncome" value="" 
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-32"
+                               data-validation="currency" data-min="10000" data-max="10000000">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono">in today's dollars</span>
+                    </div>
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
                 
                 <div class="terminal-input-group">
                     <label for="startingBalance" class="block text-terminal-green text-sm mb-1 terminal-label">
-                        INITIAL_BALANCE:
+                        CURRENT_RETIREMENT_SAVINGS:
                         <span class="terminal-help" title="Current value of your retirement portfolio. Can be $0 if starting fresh.">?</span>
                     </label>
-                    <input type="text" id="startingBalance" value="100000"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="currency" data-min="0" data-max="50000000">
+                    <div class="relative">
+                        <input type="text" id="startingBalance" value=""
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-16"
+                               data-validation="currency" data-min="0" data-max="50000000">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono">dollars</span>
+                    </div>
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
                 
@@ -43,33 +61,42 @@
                         CURRENT_INCOME:
                         <span class="terminal-help" title="Your current annual income, used for tax planning and savings rate calculations.">?</span>
                     </label>
-                    <input type="text" id="currentIncome" value="80000"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="currency" data-min="10000" data-max="5000000">
+                    <div class="relative">
+                        <input type="text" id="currentIncome" value=""
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-16"
+                               data-validation="currency" data-min="10000" data-max="5000000">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono">dollars</span>
+                    </div>
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-4">
                 <div class="terminal-input-group">
                     <label for="startingAge" class="block text-terminal-green text-sm mb-1 terminal-label">
                         CURRENT_AGE:
                         <span class="terminal-help" title="Your current age when beginning retirement planning. Earlier start allows compound growth to work longer.">?</span>
                     </label>
-                    <input type="number" id="startingAge" value="25" min="18" max="100" 
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="age">
+                    <div class="relative">
+                        <input type="number" id="startingAge" value="" min="18" max="100" 
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-12"
+                               data-validation="age">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">yrs</span>
+                    </div>
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
                 
                 <div class="terminal-input-group">
                     <label for="targetRetirementAge" class="block text-terminal-green text-sm mb-1 terminal-label">
-                        TARGET_RETIRE_AGE:
+                        TARGET_RETIREMENT_AGE:
                         <span class="terminal-help" title="Age at which you want to retire. Calculator will assess if this is realistic with your current situation.">?</span>
                     </label>
-                    <input type="number" id="targetRetirementAge" value="45" min="30" max="100"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="age">
+                    <div class="relative">
+                        <input type="number" id="targetRetirementAge" value="" min="30" max="100"
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-12"
+                               data-validation="age">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">yrs</span>
+                    </div>
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
                 
@@ -78,43 +105,98 @@
                         CURRENT_SAVINGS_RATE:
                         <span class="terminal-help" title="Percentage of gross income you currently save for retirement. Include 401k, IRA, and other retirement savings.">?</span>
                     </label>
-                    <input type="number" id="currentSavingsRate" value="15" min="0" max="80" step="0.5"
-                           class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                           data-validation="percentage">
-                    <span class="text-terminal-green text-xs opacity-75">%</span>
+                    <div class="relative">
+                        <input type="number" id="currentSavingsRate" value="" min="0" max="80" step="0.5"
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-8"
+                               data-validation="percentage">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">%</span>
+                    </div>
                     <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                 </div>
-                
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
                 <div class="terminal-input-group">
                     <label for="state" class="block text-terminal-green text-sm mb-1 terminal-label">
                         STATE:
                         <span class="terminal-help" title="Your state affects cost of living and realistic savings capacity. Used for feasibility calculations.">?</span>
                     </label>
-                    <select id="state" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                        <option value="CA">California (Very High COL)</option>
-                        <option value="NY">New York (Very High COL)</option>
-                        <option value="HI">Hawaii (Very High COL)</option>
-                        <option value="MA">Massachusetts (Very High COL)</option>
-                        <option value="WA">Washington (High COL)</option>
-                        <option value="OR">Oregon (High COL)</option>
-                        <option value="CT">Connecticut (High COL)</option>
-                        <option value="NJ">New Jersey (High COL)</option>
-                        <option value="TX" selected>Texas (Moderate COL)</option>
-                        <option value="FL">Florida (Moderate COL)</option>
-                        <option value="CO">Colorado (Moderate COL)</option>
-                        <option value="AZ">Arizona (Moderate COL)</option>
-                        <option value="NC">North Carolina (Moderate COL)</option>
-                        <option value="GA">Georgia (Moderate COL)</option>
-                        <option value="TN">Tennessee (Moderate COL)</option>
-                        <option value="OH">Ohio (Low COL)</option>
-                        <option value="MI">Michigan (Low COL)</option>
-                        <option value="PA">Pennsylvania (Low COL)</option>
-                        <option value="IN">Indiana (Low COL)</option>
-                        <option value="MO">Missouri (Low COL)</option>
-                        <option value="Other">Other State</option>
-                    </select>
+                    <div class="relative">
+                        <input type="text" id="stateInput" placeholder="" 
+                               class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono" 
+                               autocomplete="off">
+                        <div id="stateDropdown" class="absolute z-10 w-full bg-black border border-terminal-green max-h-48 overflow-y-auto hidden mt-1">
+                            <!-- State options will be populated by JavaScript -->
+                        </div>
+                        <select id="state" class="hidden">
+                            <option value="" selected>Select state...</option>
+                            <option value="AL">Alabama</option>
+                            <option value="AK">Alaska</option>
+                            <option value="AZ">Arizona</option>
+                            <option value="AR">Arkansas</option>
+                            <option value="CA">California</option>
+                            <option value="CO">Colorado</option>
+                            <option value="CT">Connecticut</option>
+                            <option value="DE">Delaware</option>
+                            <option value="DC">District of Columbia</option>
+                            <option value="FL">Florida</option>
+                            <option value="GA">Georgia</option>
+                            <option value="HI">Hawaii</option>
+                            <option value="ID">Idaho</option>
+                            <option value="IL">Illinois</option>
+                            <option value="IN">Indiana</option>
+                            <option value="IA">Iowa</option>
+                            <option value="KS">Kansas</option>
+                            <option value="KY">Kentucky</option>
+                            <option value="LA">Louisiana</option>
+                            <option value="ME">Maine</option>
+                            <option value="MD">Maryland</option>
+                            <option value="MA">Massachusetts</option>
+                            <option value="MI">Michigan</option>
+                            <option value="MN">Minnesota</option>
+                            <option value="MS">Mississippi</option>
+                            <option value="MO">Missouri</option>
+                            <option value="MT">Montana</option>
+                            <option value="NE">Nebraska</option>
+                            <option value="NV">Nevada</option>
+                            <option value="NH">New Hampshire</option>
+                            <option value="NJ">New Jersey</option>
+                            <option value="NY">New York</option>
+                            <option value="NC">North Carolina</option>
+                            <option value="ND">North Dakota</option>
+                            <option value="OH">Ohio</option>
+                            <option value="OK">Oklahoma</option>
+                            <option value="OR">Oregon</option>
+                            <option value="PA">Pennsylvania</option>
+                            <option value="RI">Rhode Island</option>
+                            <option value="SC">South Carolina</option>
+                            <option value="SD">South Dakota</option>
+                            <option value="TN">Tennessee</option>
+                            <option value="TX">Texas</option>
+                            <option value="UT">Utah</option>
+                            <option value="VT">Vermont</option>
+                            <option value="VA">Virginia</option>
+                            <option value="WA">Washington</option>
+                            <option value="WV">West Virginia</option>
+                            <option value="WI">Wisconsin</option>
+                            <option value="WY">Wyoming</option>
+                        </select>
+                    </div>
                 </div>
                 
+                <div class="terminal-input-group">
+                    <label for="riskProfile" class="block text-terminal-green text-sm mb-1 terminal-label">
+                        RISK_PROFILE:
+                        <span class="terminal-help" title="Investment risk level determines expected returns and volatility. Higher risk = higher potential returns but more uncertainty.">?</span>
+                    </label>
+                    <select id="riskProfile" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
+                        <option value="" selected>Select risk profile...</option>
+                        <option value="conservative">Conservative</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="aggressive">Aggressive</option>
+                        <option value="custom" style="display: none;">Custom</option>
+                    </select>
+                </div>
             </div>
         </div>
         
@@ -128,7 +210,7 @@
             </div>
             
             <div id="assumptionsSection" class="hidden">
-                <!-- Market Assumptions -->
+                <!-- Market Parameters -->
                 <div class="mb-4">
                     <h4 class="text-terminal-green text-sm font-bold mb-3 uppercase">Market Parameters</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -138,9 +220,12 @@
                                 INFLATION_RATE:
                                 <span class="terminal-help" title="Expected annual inflation rate. Historical US average is ~3%. Affects purchasing power over time.">?</span>
                             </label>
-                            <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="percentage">
+                            <div class="relative">
+                                <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
+                                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-8"
+                                       data-validation="percentage">
+                                <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">%</span>
+                            </div>
                             <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                         </div>
                         
@@ -149,35 +234,63 @@
                                 END_AGE:
                                 <span class="terminal-help" title="Life expectancy for retirement planning. Conservative estimates ensure portfolio longevity.">?</span>
                             </label>
-                            <input type="number" id="endAge" value="85" min="65" max="110" 
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="age">
+                            <div class="relative">
+                                <input type="number" id="endAge" value="85" min="65" max="110" 
+                                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-12"
+                                       data-validation="age">
+                                <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">yrs</span>
+                            </div>
                             <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                         </div>
                         
                         
+                        <!-- Return rate inputs (auto-populated from risk profile, can be overridden) -->
                         <div class="terminal-input-group">
-                            <label for="riskProfile" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                RISK_PROFILE:
-                                <span class="terminal-help" title="Investment risk level determines expected returns and volatility. Higher risk = higher potential returns but more uncertainty.">?</span>
+                            <label for="accumulationReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                ACCUMULATION_RETURN:
+                                <span class="terminal-help" title="Expected annual return during working years. Auto-populated from risk profile but can be overridden.">?</span>
                             </label>
-                            <select id="riskProfile" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                                <option value="conservative">Conservative (6% / 4%)</option>
-                                <option value="moderate" selected>Moderate (8% / 6%)</option>
-                                <option value="aggressive">Aggressive (10% / 7%)</option>
-                                <option value="high_risk">High Risk 2x (14% / 7%)</option>
-                                <option value="ultra_high_risk">Ultra High Risk 3x (18% / 7%)</option>
-                            </select>
+                            <div class="relative">
+                                <input type="number" id="accumulationReturn" value="8" min="0" max="30" step="0.1"
+                                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-8"
+                                       data-validation="percentage">
+                                <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">%</span>
+                            </div>
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                         </div>
+                        
+                        <div class="terminal-input-group">
+                            <label for="retirementReturn" class="block text-terminal-green text-sm mb-1 terminal-label">
+                                RETIREMENT_RETURN:
+                                <span class="terminal-help" title="Expected annual return during retirement. Auto-populated from risk profile but can be overridden.">?</span>
+                            </label>
+                            <div class="relative">
+                                <input type="number" id="retirementReturn" value="6" min="0" max="20" step="0.1"
+                                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-8"
+                                       data-validation="percentage">
+                                <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">%</span>
+                            </div>
+                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Calculation Parameters -->
+                <div class="mb-4">
+                    <h4 class="text-terminal-green text-sm font-bold mb-3 uppercase">Calculation Parameters</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                         
                         <div class="terminal-input-group">
                             <label for="volatility" class="block text-terminal-green text-sm mb-1 terminal-label">
                                 RETURN_VOLATILITY:
                                 <span class="terminal-help" title="Standard deviation of annual returns. Stock market typically 15-20%. Higher volatility = more uncertainty.">?</span>
                             </label>
-                            <input type="number" id="volatility" value="15" min="0" max="50" step="1"
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="percentage">
+                            <div class="relative">
+                                <input type="number" id="volatility" value="15" min="0" max="50" step="1"
+                                       class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-8"
+                                       data-validation="percentage">
+                                <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm">%</span>
+                            </div>
                             <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                         </div>
                         
@@ -197,75 +310,6 @@
                     </div>
                 </div>
                 
-                <!-- Tax and Social Security Parameters -->
-                <div class="mb-4">
-                    <h4 class="text-terminal-green text-sm font-bold mb-3 uppercase">Tax & Benefits</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                        <div class="terminal-input-group">
-                            <label for="accountType" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                ACCOUNT_TYPE:
-                                <span class="terminal-help" title="Primary retirement account type. Traditional = tax-deferred, Roth = tax-free, Taxable = after-tax investments.">?</span>
-                            </label>
-                            <select id="accountType" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                                <option value="Taxable" selected>Taxable (Early Retirement)</option>
-                                <option value="Traditional 401k/IRA">Traditional 401k/IRA</option>
-                                <option value="Roth">Roth</option>
-                            </select>
-                        </div>
-                        
-                        <div class="terminal-input-group">
-                            <label for="state" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                STATE:
-                                <span class="terminal-help" title="State for tax calculations. Different states have different income tax rates. California has high taxes, Texas/Florida have none.">?</span>
-                            </label>
-                            <select id="state" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                                <option value="California" selected>California</option>
-                                <option value="Texas">Texas</option>
-                                <option value="Florida">Florida</option>
-                                <option value="New York">New York</option>
-                                <option value="Washington">Washington</option>
-                                <option value="Nevada">Nevada</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        
-                        <div class="terminal-input-group">
-                            <label for="socialSecurityAge" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                SS_START_AGE:
-                                <span class="terminal-help" title="Age to claim Social Security benefits. Earlier = reduced benefits, later = increased benefits up to age 70.">?</span>
-                            </label>
-                            <input type="number" id="socialSecurityAge" value="67" min="62" max="70"
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="age">
-                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                        </div>
-                        
-                        <div class="terminal-input-group">
-                            <label for="socialSecurityBenefit" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                SS_MONTHLY_BENEFIT:
-                                <span class="terminal-help" title="Expected monthly Social Security benefit at full retirement age. Check your Social Security statement for estimate.">?</span>
-                            </label>
-                            <input type="text" id="socialSecurityBenefit" value="2000"
-                                   class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono"
-                                   data-validation="currency" data-min="0" data-max="10000">
-                            <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
-                        </div>
-                        
-                        <div class="terminal-input-group">
-                            <label for="healthcareMultiplier" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                HEALTHCARE_MULTIPLIER:
-                                <span class="terminal-help" title="Healthcare cost multiplier. 1.0x = average health, 1.5x = some issues, 2.0x+ = significant health concerns or long-term care.">?</span>
-                            </label>
-                            <select id="healthcareMultiplier" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                                <option value="1.0" selected>1.0x (Average)</option>
-                                <option value="1.5">1.5x (Above Average)</option>
-                                <option value="2.0">2.0x (High)</option>
-                                <option value="2.5">2.5x (Very High)</option>
-                                <option value="3.0">3.0x (Maximum)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -276,7 +320,7 @@
             <h3 class="text-terminal-green text-lg font-bold mb-0">> RETIREMENT_GOAL_ASSESSMENT</h3>
         </div>
         
-        <div id="targetGoalContent" class="terminal-goal-assessment bg-black border border-terminal-green p-4 mb-4">
+        <div id="targetGoalContent" class="terminal-goal-assessment bg-black border border-terminal-green p-4">
             <!-- Target goal assessment populated by JavaScript -->
         </div>
     </div>
@@ -295,9 +339,8 @@
                         <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SCENARIO</th>
                         <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SAVINGS_RATE</th>
                         <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">RETIRE_AGE</th>
-                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">REALISM_RATING</th>
-                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SUCCESS_PROB</th>
-                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">MONTHLY_SAVE</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">SAVINGS_REALISM</th>
+                        <th class="text-left py-2 px-3 lg:px-4 text-terminal-green whitespace-nowrap">PORTFOLIO_SUCCESS</th>
                     </tr>
                 </thead>
                 <tbody id="summaryTableBody">
@@ -311,11 +354,11 @@
     <div class="charts-section mb-8">
         <div class="border-b border-terminal-green mb-4 pb-2">
             <h3 class="text-terminal-green text-lg font-bold mb-0">> VISUALIZATIONS</h3>
-            <div class="text-terminal-green text-sm opacity-75">// Monte Carlo analysis with confidence bands</div>
+            <div class="text-terminal-green text-sm opacity-75">// Financial projections over time</div>
         </div>
         
-        <!-- All Charts Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             <div class="terminal-chart">
                 <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH</h4>
                 <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
@@ -331,18 +374,12 @@
             </div>
             
             <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">MONTE_CARLO_SUCCESS_PROBABILITY</h4>
+                <h4 class="text-terminal-green text-sm font-bold mb-3">SAVINGS_VS_RETIREMENT</h4>
                 <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
-                    <canvas id="successProbabilityChart" style="height: 100%; width: 100%;"></canvas>
+                    <canvas id="savingsVsRetirementChart" style="height: 100%; width: 100%;"></canvas>
                 </div>
             </div>
             
-            <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">PORTFOLIO_DISTRIBUTION_AT_RETIREMENT</h4>
-                <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
-                    <canvas id="portfolioDistributionChart" style="height: 100%; width: 100%;"></canvas>
-                </div>
-            </div>
         </div>
     </div>
     
@@ -354,22 +391,6 @@
         
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6" id="insightsContent">
             <!-- Insights populated by JavaScript -->
-        </div>
-    </div>
-    
-    <!-- Export Section -->
-    <div class="export-section">
-        <div class="border-b border-terminal-green mb-4 pb-2">
-            <h3 class="text-terminal-green text-lg font-bold mb-0">> EXPORT_DATA</h3>
-        </div>
-        
-        <div class="flex flex-wrap gap-4">
-            <button id="exportPDF" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
-                EXPORT_PDF
-            </button>
-            <button id="shareURL" class="terminal-button bg-black border border-terminal-green text-terminal-green px-4 py-2 lg:px-6 lg:py-3 font-mono hover:bg-terminal-green hover:text-black transition-colors text-sm lg:text-base">
-                SHARE_URL
-            </button>
         </div>
     </div>
 </div>
@@ -402,10 +423,9 @@
             border-color: #ccc !important;
         }
         
-        /* Hide export section and other non-essential elements */
-        .mb-6:has(#exportPDF),
-        button,
-        .terminal-button,
+        /* Hide export buttons and other non-essential elements for print */
+        #exportPDF,
+        #shareURL,
         .terminal-help,
         #assumptionsToggle {
             display: none !important;
@@ -432,16 +452,24 @@
             height: 300px !important;
         }
     }
+    
+    /* Placeholder styling for terminal inputs */
+    .terminal-input::placeholder,
+    .terminal-select option[value=""]:first-child {
+        color: #00FF4160;
+        opacity: 0.6;
+    }
+    
+    /* Remove increment buttons from number inputs */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    
+    input[type="number"] {
+        -moz-appearance: textfield;
+    }
 </style>
 
-<!-- Load Required Libraries -->
-<script src="lib/calculations.js"></script>
-<script src="lib/url-state.js"></script>
-<script src="lib/monte-carlo.js"></script>
-<script src="lib/financial-modeling.js"></script>
-<script src="lib/statistical-analysis.js"></script>
-<script src="lib/insights-engine.js"></script>
-<script src="lib/export.js"></script>
-<script src="lib/chart-configs.js"></script>
-<script src="lib/savings-feasibility.js"></script>
-<script src="script.js"></script>
+<!-- Scripts are loaded by Hugo theme layout to avoid duplicates -->

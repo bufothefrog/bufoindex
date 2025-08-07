@@ -68,16 +68,16 @@ class URLStateManager {
      */
     static getDefaultParameters() {
         return {
-            startingAge: 25,
-            targetRetirementAge: 45,
-            currentSavingsRate: 15,
+            startingAge: null,
+            targetRetirementAge: null,
+            currentSavingsRate: null,
             endAge: 85,
-            targetIncome: 120000,
-            startingBalance: 100000,
+            targetIncome: null,
+            startingBalance: null,
             inflationRate: 3,
-            currentIncome: 80000,
-            state: 'TX',
-            riskProfile: 'moderate',
+            currentIncome: null,
+            state: '',
+            riskProfile: '',
             // Legacy parameters for compatibility
             retirementAgeA: 40,
             retirementAgeB: 45,
@@ -185,7 +185,18 @@ class URLStateManager {
         this.setInputValue('targetIncome', validated.targetIncome.toLocaleString());
         this.setInputValue('startingBalance', validated.startingBalance.toLocaleString());
         this.setInputValue('currentIncome', validated.currentIncome.toLocaleString());
+        // Handle state with custom dropdown
         this.setSelectValue('state', validated.state);
+        const stateInput = document.getElementById('stateInput');
+        if (stateInput && validated.state) {
+            // Find the state name from the hidden select
+            const stateSelect = document.getElementById('state');
+            const stateOption = stateSelect?.querySelector(`option[value="${validated.state}"]`);
+            if (stateOption) {
+                stateInput.value = stateOption.textContent;
+            }
+        }
+        
         this.setSelectValue('riskProfile', validated.riskProfile);
         this.setInputValue('inflationRate', validated.inflationRate);
         this.setInputValue('endAge', validated.endAge);

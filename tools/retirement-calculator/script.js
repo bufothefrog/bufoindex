@@ -38,11 +38,17 @@ class RetirementCalculator {
         // Set up event listeners
         this.setupEventListeners();
         
+        // Initialize state dropdown
+        this.initializeStateDropdown();
+        
         // Set up automatic state saving
         URLStateManager.setupAutoSave();
         
         // Set up popstate listener for browser navigation
         URLStateManager.setupPopstateListener(() => this.updateAll());
+        
+        // Initialize risk profile returns
+        this.updateRiskProfileReturns();
         
         // Initial calculation
         this.updateAll();
@@ -77,6 +83,20 @@ class RetirementCalculator {
             input.addEventListener('change', () => this.updateAll());
         });
 
+        // Risk profile change listener for auto-population
+        const riskProfileSelect = document.getElementById('riskProfile');
+        if (riskProfileSelect) {
+            riskProfileSelect.addEventListener('change', () => this.updateRiskProfileReturns());
+        }
+        
+        // Add listeners to return rate inputs to detect manual overrides
+        const accumulationInput = document.getElementById('accumulationReturn');
+        const retirementInput = document.getElementById('retirementReturn');
+        if (accumulationInput && retirementInput) {
+            accumulationInput.addEventListener('input', () => this.handleManualReturnOverride());
+            retirementInput.addEventListener('input', () => this.handleManualReturnOverride());
+        }
+
         // Export button listeners
         document.getElementById('exportPDF')?.addEventListener('click', () => this.exportPDF());
         document.getElementById('shareURL')?.addEventListener('click', () => this.shareURL());
@@ -85,11 +105,200 @@ class RetirementCalculator {
         this.setupFormValidation();
     }
 
+    initializeStateDropdown() {
+        const stateInput = document.getElementById('stateInput');
+        const stateDropdown = document.getElementById('stateDropdown');
+        const hiddenSelect = document.getElementById('state');
+        
+        if (!stateInput || !stateDropdown || !hiddenSelect) return;
+        
+        // State data with abbreviations
+        const states = [
+            { abbr: 'AL', name: 'Alabama' },
+            { abbr: 'AK', name: 'Alaska' },
+            { abbr: 'AZ', name: 'Arizona' },
+            { abbr: 'AR', name: 'Arkansas' },
+            { abbr: 'CA', name: 'California' },
+            { abbr: 'CO', name: 'Colorado' },
+            { abbr: 'CT', name: 'Connecticut' },
+            { abbr: 'DE', name: 'Delaware' },
+            { abbr: 'DC', name: 'District of Columbia' },
+            { abbr: 'FL', name: 'Florida' },
+            { abbr: 'GA', name: 'Georgia' },
+            { abbr: 'HI', name: 'Hawaii' },
+            { abbr: 'ID', name: 'Idaho' },
+            { abbr: 'IL', name: 'Illinois' },
+            { abbr: 'IN', name: 'Indiana' },
+            { abbr: 'IA', name: 'Iowa' },
+            { abbr: 'KS', name: 'Kansas' },
+            { abbr: 'KY', name: 'Kentucky' },
+            { abbr: 'LA', name: 'Louisiana' },
+            { abbr: 'ME', name: 'Maine' },
+            { abbr: 'MD', name: 'Maryland' },
+            { abbr: 'MA', name: 'Massachusetts' },
+            { abbr: 'MI', name: 'Michigan' },
+            { abbr: 'MN', name: 'Minnesota' },
+            { abbr: 'MS', name: 'Mississippi' },
+            { abbr: 'MO', name: 'Missouri' },
+            { abbr: 'MT', name: 'Montana' },
+            { abbr: 'NE', name: 'Nebraska' },
+            { abbr: 'NV', name: 'Nevada' },
+            { abbr: 'NH', name: 'New Hampshire' },
+            { abbr: 'NJ', name: 'New Jersey' },
+            { abbr: 'NY', name: 'New York' },
+            { abbr: 'NC', name: 'North Carolina' },
+            { abbr: 'ND', name: 'North Dakota' },
+            { abbr: 'OH', name: 'Ohio' },
+            { abbr: 'OK', name: 'Oklahoma' },
+            { abbr: 'OR', name: 'Oregon' },
+            { abbr: 'PA', name: 'Pennsylvania' },
+            { abbr: 'RI', name: 'Rhode Island' },
+            { abbr: 'SC', name: 'South Carolina' },
+            { abbr: 'SD', name: 'South Dakota' },
+            { abbr: 'TN', name: 'Tennessee' },
+            { abbr: 'TX', name: 'Texas' },
+            { abbr: 'UT', name: 'Utah' },
+            { abbr: 'VT', name: 'Vermont' },
+            { abbr: 'VA', name: 'Virginia' },
+            { abbr: 'WA', name: 'Washington' },
+            { abbr: 'WV', name: 'West Virginia' },
+            { abbr: 'WI', name: 'Wisconsin' },
+            { abbr: 'WY', name: 'Wyoming' }
+        ];
+        
+        let selectedIndex = -1;
+        
+        // Set initial values to empty - user must select
+        stateInput.value = '';
+        hiddenSelect.value = '';
+        
+        // Function to filter states based on input
+        const filterStates = (query) => {
+            if (!query) return states;
+            
+            const lowerQuery = query.toLowerCase();
+            return states.filter(state => 
+                state.name.toLowerCase().includes(lowerQuery) ||
+                state.abbr.toLowerCase().includes(lowerQuery)
+            );
+        };
+        
+        // Function to populate dropdown
+        const populateDropdown = (filteredStates) => {
+            stateDropdown.innerHTML = '';
+            
+            if (filteredStates.length === 0) {
+                stateDropdown.classList.add('hidden');
+                return;
+            }
+            
+            filteredStates.forEach((state, index) => {
+                const div = document.createElement('div');
+                div.className = 'px-2 py-1 cursor-pointer hover:bg-terminal-green hover:text-black transition-colors';
+                div.textContent = `${state.name} (${state.abbr})`;
+                div.dataset.abbr = state.abbr;
+                div.dataset.name = state.name;
+                div.dataset.index = index;
+                
+                div.addEventListener('click', () => {
+                    stateInput.value = state.name;
+                    hiddenSelect.value = state.abbr;
+                    stateDropdown.classList.add('hidden');
+                    selectedIndex = -1;
+                    
+                    // Trigger update
+                    if (typeof this.updateAll === 'function') {
+                        this.updateAll();
+                    }
+                });
+                
+                stateDropdown.appendChild(div);
+            });
+            
+            stateDropdown.classList.remove('hidden');
+        };
+        
+        // Input event listener
+        stateInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            const filteredStates = filterStates(query);
+            populateDropdown(filteredStates);
+            selectedIndex = -1;
+        });
+        
+        // Keyboard navigation
+        stateInput.addEventListener('keydown', (e) => {
+            const items = stateDropdown.querySelectorAll('[data-index]');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    items[selectedIndex].click();
+                }
+            } else if (e.key === 'Escape') {
+                stateDropdown.classList.add('hidden');
+                selectedIndex = -1;
+            }
+        });
+        
+        // Function to update visual selection
+        const updateSelection = (items) => {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('bg-terminal-green', 'text-black');
+                } else {
+                    item.classList.remove('bg-terminal-green', 'text-black');
+                }
+            });
+        };
+        
+        // Focus and blur handlers
+        stateInput.addEventListener('focus', () => {
+            const query = stateInput.value;
+            const filteredStates = filterStates(query);
+            populateDropdown(filteredStates);
+        });
+        
+        stateInput.addEventListener('blur', (e) => {
+            // Delay hiding to allow clicking on dropdown items
+            setTimeout(() => {
+                if (!stateDropdown.contains(document.activeElement)) {
+                    stateDropdown.classList.add('hidden');
+                    selectedIndex = -1;
+                    
+                    // Validate input and correct if needed
+                    const currentValue = stateInput.value.toLowerCase();
+                    const exactMatch = states.find(s => 
+                        s.name.toLowerCase() === currentValue ||
+                        s.abbr.toLowerCase() === currentValue
+                    );
+                    
+                    if (exactMatch) {
+                        stateInput.value = exactMatch.name;
+                        hiddenSelect.value = exactMatch.abbr;
+                    } else {
+                        // Reset to current hidden value if no exact match
+                        const currentState = states.find(s => s.abbr === hiddenSelect.value);
+                        if (currentState) {
+                            stateInput.value = currentState.name;
+                        }
+                    }
+                }
+            }, 150);
+        });
+    }
+
     calculateScenarios() {
         try {
             const params = this.collectEnhancedParameters();
-            console.log('Enhanced parameters:', params);
-            
             // Check if FinancialCalculations is available
             if (typeof FinancialCalculations === 'undefined') {
                 throw new Error('FinancialCalculations not loaded');
@@ -108,11 +317,8 @@ class RetirementCalculator {
                 inflationRate: params.inflationRate / 100
             });
 
-            console.log('Readiness analysis:', readinessAnalysis);
-
             // Store target goal assessment
             this.targetGoalAssessment = readinessAnalysis.targetGoal;
-            console.log('Target goal assessment:', this.targetGoalAssessment);
             
             // Convert scenarios to format expected by rest of app
             this.scenarios = readinessAnalysis.scenarios.map((scenario, index) => {
@@ -135,7 +341,6 @@ class RetirementCalculator {
                 };
             });
 
-            console.log('Generated scenarios:', this.scenarios);
             return this.scenarios;
         } catch (error) {
             console.error('Error in calculateScenarios:', error);
@@ -156,7 +361,7 @@ class RetirementCalculator {
                     <tr class="text-terminal-green opacity-50">
                         <td class="py-2 px-3">SCENARIO_${scenario.label}</td>
                         <td class="py-2 px-3">${Math.round(scenario.savingsRate * 100)}%</td>
-                        <td class="py-2 px-3" colspan="4">INVALID: Unable to retire with this savings rate</td>
+                        <td class="py-2 px-3" colspan="3">INVALID: Unable to retire with this savings rate</td>
                     </tr>
                 `;
             }
@@ -165,15 +370,20 @@ class RetirementCalculator {
             const realismClass = this.getRealismColorClass(scenario.realismRating);
             const confidenceMeter = this.generateConfidenceMeter(scenario.confidenceLevel);
             
-            // Show Monte Carlo success rate if available
-            const successProb = scenario.monteCarloSuccessRate ? 
+            // Format savings rate as "X% ($Y,YYY)"
+            const savingsRatePercent = Math.round(scenario.savingsRate * 100);
+            const monthlyDollarAmount = this.formatCurrency(scenario.monthlyContribution);
+            const savingsRateDisplay = `${savingsRatePercent}% ($${monthlyDollarAmount})`;
+            
+            // Get Monte Carlo success rate if available
+            const portfolioSuccessRate = scenario.monteCarloSuccessRate ? 
                 `${Math.round(scenario.monteCarloSuccessRate * 100)}%` : 
                 'Calculating...';
 
             return `
                 <tr class="text-terminal-green">
                     <td class="py-2 px-3">SCENARIO_${scenario.label}</td>
-                    <td class="py-2 px-3">${Math.round(scenario.savingsRate * 100)}%</td>
+                    <td class="py-2 px-3">${savingsRateDisplay}</td>
                     <td class="py-2 px-3">${scenario.retirementAge}</td>
                     <td class="py-2 px-3 ${realismClass}">
                         <div class="flex items-center gap-2">
@@ -181,8 +391,9 @@ class RetirementCalculator {
                             ${confidenceMeter}
                         </div>
                     </td>
-                    <td class="py-2 px-3">${successProb}</td>
-                    <td class="py-2 px-3">${this.formatCurrency(scenario.monthlyContribution)}</td>
+                    <td class="py-2 px-3">
+                        ${portfolioSuccessRate}
+                    </td>
                 </tr>
             `;
         }).join('');
@@ -315,6 +526,34 @@ class RetirementCalculator {
                 text: `Your ${riskData.name} investment approach assumes ${Math.round(riskData.accumulation.return*100)}% returns during accumulation and ${Math.round(riskData.retirement.return*100)}% during retirement.`
             });
 
+            // Portfolio Success Analysis (if Monte Carlo results available)
+            if (this.scenarios && this.scenarios.length > 0) {
+                const validScenarios = this.scenarios.filter(s => s.valid && s.monteCarloSuccessRate);
+                if (validScenarios.length > 0) {
+                    const lowestSuccess = validScenarios.reduce((min, scenario) => 
+                        scenario.monteCarloSuccessRate < min.monteCarloSuccessRate ? scenario : min
+                    );
+                    
+                    const successRate = Math.round(lowestSuccess.monteCarloSuccessRate * 100);
+                    const failureRate = 100 - successRate;
+                    
+                    insights.push({
+                        title: 'PORTFOLIO_DURABILITY',
+                        value: `${successRate}% success`,
+                        text: `Even if you achieve your savings goals (${Math.round(lowestSuccess.savingsRate*100)}% savings rate), your portfolio has a ${failureRate}% risk of depletion during retirement due to market volatility. This is separate from whether you can actually save that much.`
+                    });
+                    
+                    // Add warning for high-risk scenarios
+                    if (successRate < 80) {
+                        insights.push({
+                            title: 'MARKET_RISK_WARNING',
+                            value: 'High Risk',
+                            text: `Portfolio success rates below 80% indicate significant market risk. Consider working longer, saving more, or choosing a more conservative investment approach to improve portfolio durability.`
+                        });
+                    }
+                }
+            }
+
             // Action Items
             if (!this.targetGoalAssessment.isRealistic) {
                 const minRequiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
@@ -351,48 +590,35 @@ class RetirementCalculator {
     updateCharts() {
         this.updateWithdrawalsChart();
         this.updateNetWorthChart();
-        
-        // Update new Monte Carlo charts if data is available
-        if (this.monteCarloResults) {
-            this.updateSuccessProbabilityChart();
-            this.updatePortfolioDistributionChart();
-        }
+        this.updateSavingsVsRetirementChart();
     }
 
     updateWithdrawalsChart() {
         const params = this.collectEnhancedParameters();
-
-        // Generate withdrawal data
-        const labels = [];
-        const endAge = params.endAge || 85;
-        for (let age = params.startingAge; age <= endAge; age += 5) {
-            labels.push(age);
-        }
-        // Ensure we include the endAge if it's not divisible by 5
-        if (endAge % 5 !== 0 && labels[labels.length - 1] < endAge) {
-            labels.push(endAge);
-        }
 
         // Calculate earliest retirement age for starting point from our scenarios
         const validScenarios = this.scenarios.filter(s => s.valid);
         if (validScenarios.length === 0) return;
         
         const earliestRetirementAge = Math.min(...validScenarios.map(s => s.retirementAge));
+        const endAge = params.endAge || 85;
         
-        // Single dataset showing withdrawals starting from earliest retirement age
-        const data = labels.map(age => {
-            if (age >= earliestRetirementAge) {
-                const yearsFromStart = age - earliestRetirementAge;
-                const withdrawal = params.targetIncome * Math.pow(1 + params.inflationRate/100, yearsFromStart);
-                return withdrawal;
-            }
-            return null;
-        });
+        // Generate withdrawal data points as {x, y} objects
+        const data = [];
+        for (let age = earliestRetirementAge; age <= endAge; age++) {
+            // Calculate years from TODAY (current age) to this age for proper inflation adjustment
+            const yearsFromToday = age - params.startingAge;
+            const withdrawal = params.targetIncome * Math.pow(1 + params.inflationRate/100, yearsFromToday);
+            data.push({
+                x: age,
+                y: withdrawal
+            });
+        }
 
-        // Calculate max withdrawal for zoom limits
+        // Calculate max withdrawal for zoom limits (from current age to end age)
         const maxAge = endAge;
-        const maxYears = maxAge - earliestRetirementAge;
-        const maxWithdrawal = params.targetIncome * Math.pow(1 + params.inflationRate/100, maxYears);
+        const maxYearsFromToday = maxAge - params.startingAge;
+        const maxWithdrawal = params.targetIncome * Math.pow(1 + params.inflationRate/100, maxYearsFromToday);
 
         const datasets = [{
             label: 'Retirement Withdrawals (Inflation Adjusted)',
@@ -415,7 +641,6 @@ class RetirementCalculator {
         this.withdrawalsChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
                 datasets: datasets
             },
             options: {
@@ -448,6 +673,7 @@ class RetirementCalculator {
                 },
                 scales: {
                     x: {
+                        type: 'linear',
                         min: earliestRetirementAge,
                         max: endAge,
                         grid: {
@@ -458,6 +684,10 @@ class RetirementCalculator {
                             color: '#00FF41',
                             font: {
                                 family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            stepSize: 5,
+                            callback: function(value) {
+                                return Math.round(value);
                             }
                         },
                         title: {
@@ -504,9 +734,15 @@ class RetirementCalculator {
         if (validScenarios.length === 0) return;
 
         const params = this.collectEnhancedParameters();
-
+        
+        // Calculate earliest and latest retirement ages for chart range
+        const earliestRetirementAge = Math.min(...validScenarios.map(s => s.retirementAge));
+        const latestRetirementAge = Math.max(...validScenarios.map(s => s.retirementAge));
+        
         // Generate net worth data using enhanced parameters
-        const datasets = validScenarios.map(scenario => {
+        
+        
+        const datasets = validScenarios.map((scenario, index) => {
             // Create a compatible scenario object for the progression calculation
             const compatibleScenario = {
                 retirementAge: scenario.retirementAge,
@@ -515,29 +751,49 @@ class RetirementCalculator {
                 annualContribution: scenario.monthlyContribution * 12
             };
 
-            const progression = FinancialCalculations.generateNetWorthProgression(compatibleScenario, {
-                startingAge: params.startingAge,
-                startingBalance: params.startingBalance,
-                annualReturn: params.accumulationReturn / 100,
-                inflationRate: params.inflationRate / 100
-            });
+            let data = [];
+            try {
+                const progression = FinancialCalculations.generateNetWorthProgression(compatibleScenario, {
+                    startingAge: params.startingAge, // Start from current age
+                    startingBalance: params.startingBalance,
+                    annualReturn: params.accumulationReturn / 100,
+                    retirementReturn: params.retirementReturn / 100,
+                    inflationRate: params.inflationRate / 100,
+                    endAge: params.endAge
+                });
 
-            const data = progression.map(p => ({
-                x: p.age,
-                y: p.netWorth
-            }));
+                if (!progression || progression.length === 0) {
+                    console.error('Empty progression for scenario:', scenario.label);
+                    return null;
+                }
+
+                data = progression.map(p => ({
+                    x: p.age,
+                    y: p.netWorth
+                }));
+
+            } catch (error) {
+                console.error(`Error generating progression for scenario ${scenario.label}:`, error);
+                return null;
+            }
 
             return {
-                label: `${scenario.label} (${Math.round(scenario.savingsRate*100)}% → Retire at ${scenario.retirementAge})`,
+                label: `Scenario ${scenario.label}: ${Math.round(scenario.savingsRate*100)}% savings → Retire at ${scenario.retirementAge}`,
                 data: data,
-                borderColor: scenario.color,
+                borderColor: scenario.color, // Use the color assigned to the scenario
                 backgroundColor: 'transparent',
                 borderWidth: 3,
                 pointRadius: 0,
                 pointHoverRadius: 6,
                 tension: 0.1
             };
-        });
+        }).filter(dataset => dataset !== null); // Remove null datasets
+
+        if (datasets.length === 0) {
+            console.error('No valid datasets for net worth chart');
+            return;
+        }
+
 
         // Destroy existing chart if it exists
         if (this.netWorthChart) {
@@ -784,7 +1040,12 @@ class RetirementCalculator {
     validateInput(input) {
         const validationType = input.dataset.validation;
         const value = input.value;
-        const errorElement = input.parentElement.querySelector('.terminal-error');
+        
+        // Handle different DOM structures - look in parent or grandparent for error element
+        let errorElement = input.parentElement.querySelector('.terminal-error');
+        if (!errorElement) {
+            errorElement = input.parentElement.parentElement?.querySelector('.terminal-error');
+        }
         
         let isValid = true;
         let errorMessage = '';
@@ -823,11 +1084,15 @@ class RetirementCalculator {
 
         if (isValid) {
             input.classList.remove('border-red-400');
-            errorElement.classList.add('hidden');
+            if (errorElement) {
+                errorElement.classList.add('hidden');
+            }
         } else {
             input.classList.add('border-red-400');
-            errorElement.textContent = errorMessage;
-            errorElement.classList.remove('hidden');
+            if (errorElement) {
+                errorElement.textContent = errorMessage;
+                errorElement.classList.remove('hidden');
+            }
         }
 
         return isValid;
@@ -838,8 +1103,16 @@ class RetirementCalculator {
      */
     clearValidationError(input) {
         input.classList.remove('border-red-400');
-        const errorElement = input.parentElement.querySelector('.terminal-error');
-        errorElement.classList.add('hidden');
+        
+        // Handle different DOM structures - look in parent or grandparent for error element
+        let errorElement = input.parentElement.querySelector('.terminal-error');
+        if (!errorElement) {
+            errorElement = input.parentElement.parentElement?.querySelector('.terminal-error');
+        }
+        
+        if (errorElement) {
+            errorElement.classList.add('hidden');
+        }
     }
 
     /**
@@ -1040,9 +1313,18 @@ class RetirementCalculator {
                 healthcareMultiplier: parseFloat(this.getSelectValue('healthcareMultiplier')) || 1.0
             };
 
-            // Get risk profile returns
-            if (typeof SavingsFeasibility !== 'undefined') {
+            // Get return rates - check manual overrides first, then fall back to risk profile
+            const manualAccumReturn = this.getInputValue('accumulationReturn', 'number');
+            const manualRetireReturn = this.getInputValue('retirementReturn', 'number');
+            
+            if (manualAccumReturn && manualRetireReturn) {
+                // Use manual overrides
+                enhanced.accumulationReturn = manualAccumReturn;
+                enhanced.retirementReturn = manualRetireReturn;
+                enhanced.volatility = this.getInputValue('volatility', 'number') || 15;
+            } else if (typeof SavingsFeasibility !== 'undefined') {
                 try {
+                    // Use risk profile defaults
                     const riskData = SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
                     enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
                     enhanced.retirementReturn = riskData.retirement.return * 100;
@@ -1147,11 +1429,52 @@ class RetirementCalculator {
     }
 
     /**
-     * Update Monte Carlo success probability chart
+     * Update return rate inputs when risk profile changes
+     */
+    updateRiskProfileReturns() {
+        const riskProfile = this.getSelectValue('riskProfile');
+        const accumulationInput = document.getElementById('accumulationReturn');
+        const retirementInput = document.getElementById('retirementReturn');
+        
+        // Don't update if "custom" is selected (manual override active)
+        if (riskProfile === 'custom') {
+            return;
+        }
+        
+        if (typeof SavingsFeasibility !== 'undefined' && accumulationInput && retirementInput && riskProfile) {
+            try {
+                const riskData = SavingsFeasibility.getRiskProfile(riskProfile);
+                
+                // Update the values based on risk profile
+                accumulationInput.value = (riskData.accumulation.return * 100).toFixed(1);
+                retirementInput.value = (riskData.retirement.return * 100).toFixed(1);
+                
+                // Trigger recalculation
+                this.updateAll();
+            } catch (error) {
+                console.warn('Error updating risk profile returns:', error);
+            }
+        }
+    }
+    
+    handleManualReturnOverride() {
+        const riskProfileSelect = document.getElementById('riskProfile');
+        const customOption = riskProfileSelect?.querySelector('option[value="custom"]');
+        
+        if (riskProfileSelect && customOption) {
+            // Show the custom option and select it
+            customOption.style.display = 'block';
+            riskProfileSelect.value = 'custom';
+            
+            // Trigger recalculation
+            this.updateAll();
+        }
+    }
+
+    /**
+     * Update success probability chart based on realism scores
      */
     updateSuccessProbabilityChart() {
-        if (!this.monteCarloResults) return;
-
         const ctx = document.getElementById('successProbabilityChart');
         if (!ctx) return;
 
@@ -1160,16 +1483,110 @@ class RetirementCalculator {
             this.successProbabilityChart.destroy();
         }
 
-        const config = ChartConfigs.createMonteCarloSuccessChart(this.monteCarloResults);
-        this.successProbabilityChart = new Chart(ctx, config);
+        // Use scenarios with realism scores instead of Monte Carlo
+        const validScenarios = this.scenarios.filter(s => s.valid);
+        if (validScenarios.length === 0) {
+            return;
+        }
+
+        const labels = validScenarios.map(s => `Scenario ${s.label}`);
+        const realismScores = validScenarios.map(s => s.confidenceLevel || s.realismScore || 0);
+        const scenarioColors = validScenarios.map(s => s.color);
+
+        this.successProbabilityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Realism Score (%)',
+                    data: realismScores,
+                    backgroundColor: scenarioColors.map(color => color + '80'), // Add transparency
+                    borderColor: scenarioColors,
+                    borderWidth: 2,
+                    barThickness: 'flex',
+                    maxBarThickness: 80
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#0A0E1A',
+                        borderColor: '#00FF41',
+                        borderWidth: 1,
+                        titleColor: '#00FF41',
+                        bodyColor: '#00FF41',
+                        titleFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        bodyFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                const scenario = validScenarios[context.dataIndex];
+                                return [
+                                    `Realism Score: ${context.parsed.y.toFixed(0)}%`,
+                                    `Rating: ${scenario.realismRating}`,
+                                    `Savings Rate: ${Math.round(scenario.savingsRate * 100)}%`,
+                                    `Retire at: ${scenario.retirementAge} years`,
+                                    `Monthly Savings: $${Math.round(scenario.monthlyContribution).toLocaleString()}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Realism Score (%)',
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
     /**
      * Update portfolio distribution chart
      */
     updatePortfolioDistributionChart() {
-        if (!this.monteCarloResults) return;
-
         const ctx = document.getElementById('portfolioDistributionChart');
         if (!ctx) return;
 
@@ -1178,8 +1595,115 @@ class RetirementCalculator {
             this.portfolioDistributionChart.destroy();
         }
 
-        const config = ChartConfigs.createPortfolioDistributionChart(this.monteCarloResults);
-        this.portfolioDistributionChart = new Chart(ctx, config);
+        // Use scenarios from main calculator instead of Monte Carlo results
+        const validScenarios = this.scenarios.filter(s => s.valid);
+        if (validScenarios.length === 0) {
+            return;
+        }
+
+        const labels = validScenarios.map(s => `Scenario ${s.label}`);
+        const scenarioColors = validScenarios.map(s => s.color);
+
+        // Create simple bar chart showing target portfolio sizes
+        const portfolioSizes = validScenarios.map(s => s.targetPortfolioSize);
+        
+        this.portfolioDistributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Target Portfolio Size (4% Rule)',
+                    data: portfolioSizes,
+                    backgroundColor: scenarioColors.map(color => color + 'CC'),
+                    borderColor: scenarioColors,
+                    borderWidth: 2,
+                    barThickness: 60
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#0A0E1A',
+                        borderColor: '#00FF41',
+                        borderWidth: 1,
+                        titleColor: '#00FF41',
+                        bodyColor: '#00FF41',
+                        titleFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        bodyFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                const scenario = validScenarios[context.dataIndex];
+                                return [
+                                    `Target Portfolio: $${Math.round(context.parsed.y).toLocaleString()}`,
+                                    `4% Withdrawal: $${Math.round(scenario.inflatedTargetIncome).toLocaleString()}/year`,
+                                    `Savings Rate: ${Math.round(scenario.savingsRate * 100)}%`,
+                                    `Monthly Contribution: $${Math.round(scenario.monthlyContribution).toLocaleString()}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            callback: function(value) {
+                                if (value === 0) return '$0';
+                                if (value >= 1000000) {
+                                    return '$' + (value / 1000000).toFixed(1) + 'M';
+                                } else if (value >= 1000) {
+                                    return '$' + (value / 1000).toFixed(0) + 'k';
+                                }
+                                return '$' + value.toFixed(0);
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Portfolio Value at Retirement',
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -1198,7 +1722,9 @@ class RetirementCalculator {
                 startingAge: validated.startingAge,
                 startingBalance: validated.startingBalance,
                 annualReturn: validated.accumulationReturn / 100,
-                inflationRate: validated.inflationRate / 100
+                retirementReturn: validated.retirementReturn / 100,
+                inflationRate: validated.inflationRate / 100,
+                endAge: validated.endAge
             });
 
             const data = progression.map(p => ({
@@ -1316,6 +1842,162 @@ class RetirementCalculator {
         const ctx = document.getElementById('netWorthChart').getContext('2d');
         this.netWorthChart = new Chart(ctx, enhancedConfig);
     }
+
+    updateSavingsVsRetirementChart() {
+        const params = this.collectEnhancedParameters();
+
+        // Generate data points for savings rate vs retirement age
+        const data = [];
+        
+        // Create points for different retirement ages from current age + 5 to 70
+        const minRetireAge = Math.max(params.startingAge + 5, 30);
+        const maxRetireAge = 70;
+        
+        for (let retireAge = minRetireAge; retireAge <= maxRetireAge; retireAge += 2) {
+            try {
+                // Calculate what savings rate would be needed to retire at this age
+                const scenario = FinancialCalculations.calculateScenario({
+                    startingAge: params.startingAge,
+                    retirementAge: retireAge,
+                    targetIncome: params.targetIncome,
+                    startingBalance: params.startingBalance,
+                    inflationRate: params.inflationRate / 100,
+                    annualReturn: params.accumulationReturn / 100
+                });
+                
+                if (scenario.valid && scenario.annualContribution > 0) {
+                    const savingsRatePercent = (scenario.annualContribution / params.currentIncome) * 100;
+                    const monthlySavings = scenario.monthlyContribution;
+                    
+                    // Only include reasonable savings rates (up to 80%)
+                    if (savingsRatePercent <= 80 && savingsRatePercent >= 0) {
+                        data.push({
+                            x: retireAge,
+                            y: savingsRatePercent,
+                            monthlySavings: monthlySavings
+                        });
+                    }
+                }
+            } catch (error) {
+                console.warn(`Error calculating for retirement age ${retireAge}:`, error);
+            }
+        }
+
+        // Destroy existing chart if it exists
+        if (this.savingsVsRetirementChart) {
+            this.savingsVsRetirementChart.destroy();
+        }
+
+        const ctx = document.getElementById('savingsVsRetirementChart')?.getContext('2d');
+        if (!ctx) return;
+
+        this.savingsVsRetirementChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Required Savings Rate',
+                    data: data,
+                    borderColor: '#FFB86C', // Orange accent color
+                    backgroundColor: 'transparent',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#FFB86C',
+                    tension: 0.1,
+                    spanGaps: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#0A0E1A',
+                        borderColor: '#00FF41',
+                        borderWidth: 1,
+                        titleColor: '#00FF41',
+                        bodyColor: '#00FF41',
+                        titleFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        bodyFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                const point = context.raw;
+                                return [
+                                    `Savings Rate: ${Math.round(context.parsed.y)}%`,
+                                    `Monthly: $${Math.round(point.monthlySavings).toLocaleString()}`,
+                                    `Retire at: ${context.parsed.x} years`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        min: minRetireAge,
+                        max: maxRetireAge,
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            stepSize: 5,
+                            callback: function(value) {
+                                return Math.round(value);
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Retirement Age',
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            stepSize: 5,
+                            callback: function(value) {
+                                return Math.round(value) + '%';
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Required Savings Rate',
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
 
 // Global functions for UI interactions
@@ -1334,25 +2016,120 @@ function toggleAssumptions() {
 
 // Initialize calculator when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Wait for all dependencies to load
+    const logger = window.calculatorErrorLogger;
+    
+    // Define required dependencies
+    const requiredDependencies = [
+        'FinancialCalculations',
+        'SavingsFeasibility', 
+        'URLStateManager',
+        'MonteCarloEngine',
+        'FinancialModeling',
+        'StatisticalAnalysis',
+        'InsightsEngine',
+        'ExportUtility',
+        'ChartConfigs'
+    ];
+    
+    // Optional dependencies
+    const optionalDependencies = [
+        'Chart',
+        'ChartZoom'
+    ];
+    
+    let checkCount = 0;
+    const maxChecks = 50; // 5 seconds timeout
+    
+    // Enhanced dependency checker with logging
     const checkDependencies = () => {
-        if (typeof FinancialCalculations === 'undefined' || 
-            typeof SavingsFeasibility === 'undefined' || 
-            typeof URLStateManager === 'undefined') {
-            console.log('Waiting for dependencies to load...');
+        checkCount++;
+        
+        // Log check attempt
+        if (checkCount === 1) {
+            logger.logSuccess('Starting dependency checks', { 
+                required: requiredDependencies,
+                optional: optionalDependencies 
+            });
+        }
+        
+        // Check required dependencies
+        const dependencyCheck = logger.checkDependencies(requiredDependencies);
+        
+        if (!dependencyCheck.allLoaded) {
+            if (checkCount >= maxChecks) {
+                // Timeout - log error and show in UI
+                logger.logError({
+                    type: 'DEPENDENCY_TIMEOUT',
+                    message: `Failed to load required dependencies after ${maxChecks/10} seconds`,
+                    missing: dependencyCheck.missing,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Show error in calculator UI
+                const calculator = document.querySelector('.retirement-calculator');
+                if (calculator) {
+                    calculator.innerHTML = `
+                        <div class="bg-red-900 border border-red-400 text-red-200 p-6 rounded">
+                            <h3 class="text-xl font-bold mb-2">⚠️ Calculator Failed to Load</h3>
+                            <p class="mb-2">Missing dependencies: ${dependencyCheck.missing.join(', ')}</p>
+                            <p class="text-sm opacity-75">Please refresh the page or check the console for details.</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+            
+            // Log waiting status periodically
+            if (checkCount % 10 === 0) {
+                console.log(`Waiting for dependencies to load... (${checkCount/10}s)`);
+                logger.logWarning({
+                    message: `Still waiting for dependencies after ${checkCount/10}s`,
+                    missing: dependencyCheck.missing
+                });
+            }
+            
             setTimeout(checkDependencies, 100);
             return;
         }
         
-        console.log('All dependencies loaded, initializing calculator');
+        // All required dependencies loaded
+        logger.logSuccess('All required dependencies loaded', {
+            loadTime: `${checkCount/10}s`
+        });
+        
+        // Check optional dependencies
+        optionalDependencies.forEach(dep => {
+            if (window[dep]) {
+                logger.trackDependency(dep, 'loaded');
+            } else {
+                logger.trackDependency(dep, 'missing', { note: 'Optional dependency' });
+            }
+        });
         
         // Register Chart.js zoom plugin if available
         if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
             Chart.register(ChartZoom);
+            logger.logSuccess('Chart.js zoom plugin registered');
         }
         
-        // Initialize calculator
-        new RetirementCalculator();
+        // Initialize calculator with error handling
+        try {
+            logger.trackInitialization('RetirementCalculator', 'starting');
+            const calculator = new RetirementCalculator();
+            logger.trackInitialization('RetirementCalculator', 'initialized');
+            
+            // Expose calculator instance for debugging
+            if (logger.debugMode) {
+                window.retirementCalculatorInstance = calculator;
+            }
+        } catch (error) {
+            logger.logError({
+                type: 'INITIALIZATION_FAILED',
+                message: `Failed to initialize RetirementCalculator: ${error.message}`,
+                stack: error.stack,
+                timestamp: new Date().toISOString()
+            });
+        }
     };
     
     checkDependencies();

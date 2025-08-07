@@ -51,6 +51,16 @@ class FinancialCalculations {
         const denominator = (factor - 1) / rate;
         return numerator / denominator;
     }
+    
+    /**
+     * Calculate required monthly payment with monthly compounding
+     */
+    static calculateRequiredMonthlyPayment(presentValue, futureValue, annualRate, years) {
+        const months = years * 12;
+        const monthlyRate = Math.pow(1 + annualRate, 1/12) - 1;
+        
+        return this.calculateRequiredPayment(presentValue, futureValue, monthlyRate, months);
+    }
 
     /**
      * Calculate inflation-adjusted income
@@ -101,15 +111,15 @@ class FinancialCalculations {
         // Portfolio size needed (using 4% withdrawal rule)
         const targetPortfolioSize = this.portfolioSizeForWithdrawal(inflatedTargetIncome);
         
-        // Calculate required annual contribution
-        const annualContribution = this.calculateRequiredPayment(
+        // Calculate required monthly contribution using monthly compounding
+        const monthlyContribution = this.calculateRequiredMonthlyPayment(
             startingBalance, 
             targetPortfolioSize, 
             annualReturn, 
             yearsUntilRetirement
         );
         
-        const monthlyContribution = annualContribution / 12;
+        const annualContribution = monthlyContribution * 12;
 
         return {
             yearsUntilRetirement,
@@ -122,41 +132,69 @@ class FinancialCalculations {
     }
 
     /**
-     * Generate net worth progression over time
+     * Generate net worth progression over time with monthly compounding
      */
     static generateNetWorthProgression(scenario, params) {
-        const { startingAge, startingBalance, annualReturn, inflationRate } = params;
+        const { startingAge, startingBalance, annualReturn, retirementReturn, inflationRate, endAge } = params;
         const { retirementAge, targetPortfolioSize, inflatedTargetIncome, annualContribution } = scenario;
         
         const progression = [];
+        let netWorth = startingBalance;
         
-        // Generate data from starting age to 100
-        for (let age = startingAge; age <= 100; age++) {
-            let netWorth = 0;
-            
+        // Calculate for each age from starting age to end age (not hardcoded to 100)
+        const finalAge = endAge || 100;
+        
+        // Convert to monthly rates
+        const monthlyAccumulationReturn = Math.pow(1 + annualReturn, 1/12) - 1;
+        const monthlyRetirementReturn = Math.pow(1 + (retirementReturn || annualReturn), 1/12) - 1;
+        const monthlyInflation = Math.pow(1 + inflationRate, 1/12) - 1;
+        const monthlyContribution = annualContribution / 12;
+        const monthlyWithdrawal = inflatedTargetIncome / 12;
+        
+        
+        for (let age = startingAge; age <= finalAge; age++) {
             if (age < retirementAge) {
-                // Accumulation phase
-                const yearsFromStart = age - startingAge;
-                netWorth = startingBalance;
-                
-                // Apply compound growth and annual contributions
-                for (let year = 0; year < yearsFromStart; year++) {
-                    netWorth = netWorth * (1 + annualReturn) + annualContribution;
+                // Accumulation phase - monthly compounding
+                for (let month = 0; month < 12; month++) {
+                    if (age > startingAge || month > 0) {
+                        // Add monthly contribution at the beginning of each month
+                        netWorth = netWorth + monthlyContribution;
+                        // Apply monthly growth during accumulation phase
+                        netWorth = netWorth * (1 + monthlyAccumulationReturn);
+                    }
+                }
+            } else if (age === retirementAge) {
+                // First year of retirement - transition year
+                // Continue growth without withdrawals for this year, use retirement return rate
+                for (let month = 0; month < 12; month++) {
+                    netWorth = netWorth * (1 + monthlyRetirementReturn);
                 }
             } else {
-                // Retirement phase - start with target portfolio size
-                netWorth = targetPortfolioSize;
+                // Retirement phase - monthly withdrawals with inflation adjustment
+                const yearsInRetirement = age - retirementAge - 1; // -1 because first year has no withdrawals
+                const inflationAdjustedWithdrawal = monthlyWithdrawal * Math.pow(1 + monthlyInflation, yearsInRetirement * 12);
                 
-                // Apply withdrawals and growth for each year since retirement
-                const yearsInRetirement = age - retirementAge;
-                for (let year = 0; year < yearsInRetirement; year++) {
-                    const thisYearWithdrawal = inflatedTargetIncome * Math.pow(1 + inflationRate, year);
-                    netWorth = (netWorth - thisYearWithdrawal) * (1 + annualReturn);
+                for (let month = 0; month < 12; month++) {
+                    // Withdraw at beginning of month
+                    netWorth = netWorth - inflationAdjustedWithdrawal;
+                    // Apply growth to remaining balance using retirement return rate
+                    netWorth = netWorth * (1 + monthlyRetirementReturn);
+                    // Floor at zero
                     netWorth = Math.max(0, netWorth);
+                    
+                    // If balance hits zero, stop calculating
+                    if (netWorth === 0) {
+                        progression.push({ age, netWorth: 0 });
+                        // Fill remaining ages with zero
+                        for (let remainingAge = age + 1; remainingAge <= finalAge; remainingAge++) {
+                            progression.push({ age: remainingAge, netWorth: 0 });
+                        }
+                        return progression;
+                    }
                 }
             }
             
-            progression.push({ age, netWorth });
+            progression.push({ age, netWorth: Math.round(netWorth) });
         }
         
         return progression;
@@ -802,7 +840,6 @@ class FinancialCalculations {
             confidenceLevel: scenario.confidenceLevel
         }));
     }
-}
 
     /**
      * NEW METHOD: Calculate minimum required savings rate to achieve goal

@@ -31,9 +31,23 @@
     {{ end }}
 {{ end }}
 
-<!-- Load tool scripts -->
+<!-- Load tool scripts in correct order -->
+<!-- Error logging first -->
+<script src="{{ printf "%slib/error-logger.js" $toolDir | relURL }}"></script>
+
+<!-- Core dependencies -->
 <script src="{{ printf "%slib/calculations.js" $toolDir | relURL }}"></script>
-<script src="{{ printf "%slib/export.js" $toolDir | relURL }}"></script>
 <script src="{{ printf "%slib/url-state.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/export.js" $toolDir | relURL }}"></script>
+
+<!-- Advanced features -->
+<script src="{{ printf "%slib/savings-feasibility.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/statistical-analysis.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/monte-carlo.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/financial-modeling.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/insights-engine.js" $toolDir | relURL }}"></script>
+<script src="{{ printf "%slib/chart-configs.js" $toolDir | relURL }}"></script>
+
+<!-- Main script last -->
 <script src="{{ printf "%sscript.js" $toolDir | relURL }}"></script>
 {{ end }}

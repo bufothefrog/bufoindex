@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Personal finance education platform built with Hugo",
   "scripts": {
-    "dev": "hugo server -D --watch",
-    "build": "npm run build:css && hugo --gc --minify",
+    "dev": "npm run build:css && hugo server -D --watch",
+    "build": "npm run validate && npm run build:css && hugo --gc --minify",
     "build:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --minify",
-    "watch:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --watch"
+    "watch:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --watch",
+    "validate": "node tools/validate-calculators.js",
+    "test:calculator": "echo 'Open tools/retirement-calculator/test-retirement-calculator.html in browser to run tests'",
+    "debug:calculator": "echo 'Add ?debug=true to calculator URL for debug mode'"
   },
   "keywords": [
     "finance",

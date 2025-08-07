@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retirement Calculator Test Suite</title>
+    
+    <!-- Include Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Include Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+    
+    <!-- Include calculator styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <style>
+        .test-pass { background-color: #4caf50; }
+        .test-fail { background-color: #f44336; }
+        .test-pending { background-color: #ff9800; }
+        .test-result {
+            padding: 8px;
+            margin: 4px 0;
+            color: white;
+            font-family: monospace;
+            border-radius: 4px;
+        }
+        #test-console {
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            font-family: monospace;
+            height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            border: 2px solid #0f0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Retirement Calculator Test Suite</h1>
+        
+        <!-- Test Controls -->
+        <div class="bg-white p-6 rounded-lg shadow mb-8">
+            <h2 class="text-xl font-bold mb-4">Test Controls</h2>
+            <button onclick="runAllTests()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Run All Tests
+            </button>
+            <button onclick="clearConsole()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 ml-2">
+                Clear Console
+            </button>
+            <label class="ml-4">
+                <input type="checkbox" id="verbose-mode" checked> Verbose Mode
+            </label>
+        </div>
+        
+        <!-- Test Console -->
+        <div id="test-console"></div>
+        
+        <!-- Test Results -->
+        <div class="bg-white p-6 rounded-lg shadow mb-8">
+            <h2 class="text-xl font-bold mb-4">Test Results</h2>
+            <div id="test-results"></div>
+            <div id="test-summary" class="mt-4 font-bold"></div>
+        </div>
+        
+        <!-- Calculator Container for Testing -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-bold mb-4">Calculator Test Instance</h2>
+            <div id="calculator-container">
+                <!-- Calculator HTML will be loaded here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load all calculator dependencies -->
+    <script src="lib/error-logger.js"></script>
+    <script src="lib/calculations.js"></script>
+    <script src="lib/url-state.js"></script>
+    <script src="lib/export.js"></script>
+    <script src="lib/savings-feasibility.js"></script>
+    <script src="lib/statistical-analysis.js"></script>
+    <script src="lib/monte-carlo.js"></script>
+    <script src="lib/financial-modeling.js"></script>
+    <script src="lib/insights-engine.js"></script>
+    <script src="lib/chart-configs.js"></script>
+    
+    <script>
+        // Test framework
+        const testResults = [];
+        let testConsole = document.getElementById('test-console');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString().substr(11, 8);
+            const color = {
+                'info': '#0f0',
+                'error': '#f00',
+                'warning': '#fa0',
+                'success': '#0f0'
+            }[type] || '#0f0';
+            
+            testConsole.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            testConsole.scrollTop = testConsole.scrollHeight;
+        }
+        
+        function clearConsole() {
+            testConsole.innerHTML = '';
+        }
+        
+        async function test(name, fn) {
+            const result = {
+                name,
+                passed: false,
+                error: null,
+                duration: 0
+            };
+            
+            const startTime = performance.now();
+            
+            try {
+                log(`Running test: ${name}`);
+                await fn();
+                result.passed = true;
+                log(`✓ ${name}`, 'success');
+            } catch (error) {
+                result.error = error.message;
+                log(`✗ ${name}: ${error.message}`, 'error');
+            }
+            
+            result.duration = performance.now() - startTime;
+            testResults.push(result);
+            updateTestResults();
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        function updateTestResults() {
+            const resultsContainer = document.getElementById('test-results');
+            const summaryContainer = document.getElementById('test-summary');
+            
+            resultsContainer.innerHTML = testResults.map(result => `
+                <div class="test-result ${result.passed ? 'test-pass' : 'test-fail'}">
+                    ${result.passed ? '✓' : '✗'} ${result.name} (${result.duration.toFixed(2)}ms)
+                    ${result.error ? `<div class="text-sm mt-1">${result.error}</div>` : ''}
+                </div>
+            `).join('');
+            
+            const passed = testResults.filter(r => r.passed).length;
+            const failed = testResults.filter(r => !r.passed).length;
+            const total = testResults.length;
+            
+            summaryContainer.innerHTML = `
+                Tests: ${total} | Passed: ${passed} | Failed: ${failed}
+            `;
+        }
+        
+        // Test suite
+        async function runAllTests() {
+            testResults.length = 0;
+            clearConsole();
+            log('Starting test suite...');
+            
+            // 1. Test dependency loading
+            await test('All required dependencies should be loaded', () => {
+                assert(typeof FinancialCalculations !== 'undefined', 'FinancialCalculations not loaded');
+                assert(typeof URLStateManager !== 'undefined', 'URLStateManager not loaded');
+                assert(typeof ExportUtility !== 'undefined', 'ExportUtility not loaded');
+                assert(typeof SavingsFeasibility !== 'undefined', 'SavingsFeasibility not loaded');
+                assert(typeof MonteCarloEngine !== 'undefined', 'MonteCarloEngine not loaded');
+                assert(typeof FinancialModeling !== 'undefined', 'FinancialModeling not loaded');
+                assert(typeof StatisticalAnalysis !== 'undefined', 'StatisticalAnalysis not loaded');
+                assert(typeof InsightsEngine !== 'undefined', 'InsightsEngine not loaded');
+                assert(typeof ChartConfigs !== 'undefined', 'ChartConfigs not loaded');
+            });
+            
+            // 2. Test error logger
+            await test('Error logger should be initialized', () => {
+                assert(window.calculatorErrorLogger !== undefined, 'Error logger not initialized');
+                assert(typeof window.calculatorErrorLogger.logError === 'function', 'logError method missing');
+            });
+            
+            // 3. Test calculations
+            await test('FinancialCalculations should calculate correctly', () => {
+                const result = FinancialCalculations.calculateScenarios({
+                    targetIncome: 100000,
+                    currentAge: 30,
+                    retirementAgeA: 45,
+                    retirementAgeB: 50,
+                    retirementAgeC: 55,
+                    startingBalance: 50000,
+                    inflationRate: 0.03,
+                    accumulationReturn: 0.08,
+                    retirementReturn: 0.06
+                });
+                
+                assert(Array.isArray(result), 'Should return array of scenarios');
+                assert(result.length === 3, 'Should return 3 scenarios');
+                assert(result[0].label === 'A', 'First scenario should be labeled A');
+            });
+            
+            // 4. Test URL state management
+            await test('URLStateManager should handle parameters', () => {
+                const testParams = {
+                    targetIncome: 120000,
+                    startingAge: 25,
+                    currentSavingsRate: 20
+                };
+                
+                const validated = URLStateManager.validateParameters(testParams);
+                assert(validated.targetIncome === 120000, 'Target income should be preserved');
+                assert(validated.startingAge === 25, 'Starting age should be preserved');
+            });
+            
+            // 5. Test Monte Carlo engine
+            await test('MonteCarloEngine should run simulations', () => {
+                const scenarios = [
+                    { retirementAge: 50, label: 'Test', savingsRate: 0.2 }
+                ];
+                
+                const assumptions = {
+                    inflationRate: 0.03,
+                    accumulationReturn: 0.08,
+                    retirementReturn: 0.06,
+                    volatility: 0.15,
+                    monteCarloRuns: 100
+                };
+                
+                const results = MonteCarloEngine.runSimulations(scenarios, assumptions);
+                assert(results !== null, 'Should return results');
+                assert(results.scenarios !== undefined, 'Should have scenarios property');
+            });
+            
+            // 6. Load calculator HTML
+            await test('Calculator HTML should load', async () => {
+                const response = await fetch('tool.html');
+                const html = await response.text();
+                document.getElementById('calculator-container').innerHTML = html;
+                
+                // Check key elements exist
+                assert(document.getElementById('targetIncome') !== null, 'Target income input missing');
+                assert(document.getElementById('summaryTableBody') !== null, 'Summary table missing');
+                assert(document.getElementById('netWorthChart') !== null, 'Net worth chart canvas missing');
+            });
+            
+            // 7. Test calculator initialization
+            await test('Calculator should initialize without errors', () => {
+                // Load script.js content
+                const script = document.createElement('script');
+                script.src = 'script.js';
+                document.body.appendChild(script);
+                
+                // Give it time to load
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        const errors = window.calculatorErrorLogger.errors;
+                        if (errors.length > 0) {
+                            reject(new Error(`Calculator initialization failed: ${errors[0].message}`));
+                        } else {
+                            resolve();
+                        }
+                    }, 2000);
+                });
+            });
+            
+            // 8. Test UI population
+            await test('Calculator UI should populate correctly', async () => {
+                // Wait for calculator to fully initialize
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Check if UI elements are populated
+                const summaryTable = document.getElementById('summaryTableBody');
+                assert(summaryTable.children.length > 0, 'Summary table should have rows');
+                
+                const targetGoalContent = document.getElementById('targetGoalContent');
+                assert(targetGoalContent.innerHTML.trim() !== '', 'Target goal content should be populated');
+                
+                const insightsContent = document.getElementById('insightsContent');
+                assert(insightsContent.children.length > 0, 'Insights should be populated');
+            });
+            
+            // 9. Test chart rendering
+            await test('Charts should render without errors', () => {
+                const chartIds = ['netWorthChart', 'withdrawalsChart', 'successProbabilityChart', 'portfolioDistributionChart'];
+                
+                chartIds.forEach(id => {
+                    const canvas = document.getElementById(id);
+                    if (canvas) {
+                        const chart = Chart.getChart(canvas);
+                        assert(chart !== undefined, `${id} should have a Chart instance`);
+                    }
+                });
+            });
+            
+            // 10. Test error handling
+            await test('Error logger should catch and display errors', () => {
+                // Trigger an error
+                window.calculatorErrorLogger.logError({
+                    type: 'TEST_ERROR',
+                    message: 'This is a test error',
+                    timestamp: new Date().toISOString()
+                });
+                
+                const errors = window.calculatorErrorLogger.errors;
+                assert(errors.length > 0, 'Error should be logged');
+                assert(errors[errors.length - 1].type === 'TEST_ERROR', 'Test error should be recorded');
+            });
+            
+            log(`\nTest suite completed. ${testResults.filter(r => r.passed).length}/${testResults.length} tests passed.`, 
+                testResults.every(r => r.passed) ? 'success' : 'warning');
+        }
+        
+        // Auto-run tests on load if requested
+        if (window.location.search.includes('autorun=true')) {
+            window.addEventListener('load', runAllTests);
+        }
+    </script>
+</body>
+</html>

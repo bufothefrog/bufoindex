@@ -43,16 +43,6 @@ class SavingsFeasibility {
             name: 'Aggressive',
             accumulation: { return: 0.10, volatility: 0.15 },
             retirement: { return: 0.07, volatility: 0.12 }
-        },
-        'high_risk': {
-            name: 'High Risk (2x Leverage)',
-            accumulation: { return: 0.14, volatility: 0.25 },
-            retirement: { return: 0.07, volatility: 0.12 } // No leverage in retirement
-        },
-        'ultra_high_risk': {
-            name: 'Ultra High Risk (3x Leverage)',
-            accumulation: { return: 0.18, volatility: 0.35 },
-            retirement: { return: 0.07, volatility: 0.12 } // No leverage in retirement
         }
     };
 
