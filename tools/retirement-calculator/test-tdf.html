@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDF Test - Retirement Calculator</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #00ff41; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border: 1px solid #00ff41; }
+        .pass { border-color: #00ff41; }
+        .fail { border-color: #ff4141; color: #ff4141; }
+    </style>
+</head>
+<body>
+    <h1>Target Date Fund (TDF) Functionality Test</h1>
+    <div id="test-results"></div>
+
+    <script src="lib/savings-feasibility.js"></script>
+    <script>
+        // Test TDF allocation calculations
+        function runTDFTests() {
+            const results = [];
+            
+            // Test 1: Young investor (age 25)
+            const young = SavingsFeasibility.calculateTDFAllocation(25);
+            results.push({
+                name: "Young Investor (Age 25)",
+                expected: "~90% stocks",
+                actual: `${Math.round(young.stocks * 100)}% stocks, ${Math.round(young.bonds * 100)}% bonds`,
+                pass: young.stocks >= 0.88 && young.stocks <= 0.92
+            });
+            
+            // Test 2: Mid-career (age 45)
+            const midCareer = SavingsFeasibility.calculateTDFAllocation(45);
+            results.push({
+                name: "Mid-Career (Age 45)",
+                expected: "~65% stocks",
+                actual: `${Math.round(midCareer.stocks * 100)}% stocks, ${Math.round(midCareer.bonds * 100)}% bonds`,
+                pass: midCareer.stocks >= 0.63 && midCareer.stocks <= 0.67
+            });
+            
+            // Test 3: Near retirement (age 65)
+            const nearRetirement = SavingsFeasibility.calculateTDFAllocation(65);
+            results.push({
+                name: "Near Retirement (Age 65)",
+                expected: "~40% stocks",
+                actual: `${Math.round(nearRetirement.stocks * 100)}% stocks, ${Math.round(nearRetirement.bonds * 100)}% bonds`,
+                pass: nearRetirement.stocks >= 0.38 && nearRetirement.stocks <= 0.42
+            });
+            
+            // Test 4: TDF Risk Profile calculation
+            const tdfProfile = SavingsFeasibility.getRiskProfile('tdf', 35);
+            results.push({
+                name: "TDF Risk Profile (Age 35)",
+                expected: "Dynamic returns based on allocation",
+                actual: `${(tdfProfile.accumulation.return * 100).toFixed(1)}% accumulation return`,
+                pass: tdfProfile.accumulation.return > 0.06 && tdfProfile.accumulation.return < 0.12
+            });
+            
+            // Test 5: Age change affects returns
+            const age30 = SavingsFeasibility.getRiskProfile('tdf', 30);
+            const age60 = SavingsFeasibility.getRiskProfile('tdf', 60);
+            results.push({
+                name: "Age Impact on Returns",
+                expected: "Younger age should have higher returns",
+                actual: `Age 30: ${(age30.accumulation.return * 100).toFixed(1)}% vs Age 60: ${(age60.accumulation.return * 100).toFixed(1)}%`,
+                pass: age30.accumulation.return > age60.accumulation.return
+            });
+            
+            return results;
+        }
+        
+        // Display test results
+        function displayResults(results) {
+            const container = document.getElementById('test-results');
+            results.forEach(test => {
+                const div = document.createElement('div');
+                div.className = `test-result ${test.pass ? 'pass' : 'fail'}`;
+                div.innerHTML = `
+                    <strong>${test.name}</strong><br>
+                    Expected: ${test.expected}<br>
+                    Actual: ${test.actual}<br>
+                    Result: ${test.pass ? 'PASS ✓' : 'FAIL ✗'}
+                `;
+                container.appendChild(div);
+            });
+            
+            const passCount = results.filter(r => r.pass).length;
+            const summary = document.createElement('div');
+            summary.className = 'test-result';
+            summary.style.marginTop = '20px';
+            summary.style.fontWeight = 'bold';
+            summary.innerHTML = `
+                <h2>Test Summary</h2>
+                Passed: ${passCount}/${results.length} tests<br>
+                Overall Result: ${passCount === results.length ? 'ALL TESTS PASSED ✓' : 'SOME TESTS FAILED ✗'}
+            `;
+            container.appendChild(summary);
+        }
+        
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            const results = runTDFTests();
+            displayResults(results);
+        });
+    </script>
+</body>
+</html>

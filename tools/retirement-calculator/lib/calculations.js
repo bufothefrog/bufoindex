@@ -70,36 +70,75 @@ class FinancialCalculations {
     }
 
     /**
-     * Calculate portfolio size needed for 4% withdrawal rule
+     * Calculate portfolio size needed for withdrawal rule
      */
-    static portfolioSizeForWithdrawal(annualIncome, withdrawalRate = 0.04) {
-        return annualIncome / withdrawalRate;
+    static portfolioSizeForWithdrawal(annualIncome, withdrawalRate = null) {
+        const rate = withdrawalRate || (window.FinancialConstants?.WITHDRAWAL_RATE || 0.04);
+        return annualIncome / rate;
     }
 
     /**
      * Calculate a single retirement scenario
      */
     static calculateScenario(params) {
-        const {
-            startingAge,
-            retirementAge,
-            targetIncome,
-            startingBalance,
-            inflationRate,
-            annualReturn
-        } = params;
+        try {
+            // Validate input parameters
+            if (!params || typeof params !== 'object') {
+                throw new Error('Invalid parameters object');
+            }
 
-        const yearsUntilRetirement = retirementAge - startingAge;
-        
-        if (yearsUntilRetirement <= 0) {
-            return {
-                yearsUntilRetirement: 0,
-                targetPortfolioSize: 0,
-                monthlyContribution: 0,
-                inflatedTargetIncome: targetIncome,
-                valid: false
-            };
-        }
+            const {
+                startingAge,
+                retirementAge,
+                targetIncome,
+                startingBalance,
+                inflationRate,
+                annualReturn
+            } = params;
+
+            // Get constants (with fallbacks for safety)
+            const constants = window.FinancialConstants || {};
+            const MIN_STARTING_AGE = constants.MIN_STARTING_AGE || 18;
+            const MAX_RETIREMENT_AGE = constants.MAX_RETIREMENT_AGE || 100;
+            const MIN_RETIREMENT_AGE = constants.MIN_RETIREMENT_AGE || 30;
+            const MIN_INCOME = constants.MIN_INCOME || 1000;
+            const MIN_STARTING_BALANCE = constants.MIN_STARTING_BALANCE || 0;
+            const MAX_INFLATION_RATE = constants.MAX_INFLATION_RATE || 0.2;
+            const MIN_RETURN_RATE = constants.MIN_RETURN_RATE || -0.5;
+            const MAX_RETURN_RATE = constants.MAX_RETURN_RATE || 0.3;
+
+            // Validate required parameters using constants
+            if (typeof startingAge !== 'number' || startingAge < MIN_STARTING_AGE || startingAge > MAX_RETIREMENT_AGE) {
+                throw new Error(`Invalid startingAge: ${startingAge}`);
+            }
+            if (typeof retirementAge !== 'number' || retirementAge < MIN_RETIREMENT_AGE || retirementAge > MAX_RETIREMENT_AGE) {
+                throw new Error(`Invalid retirementAge: ${retirementAge}`);
+            }
+            if (typeof targetIncome !== 'number' || targetIncome < MIN_INCOME) {
+                throw new Error(`Invalid targetIncome: ${targetIncome}`);
+            }
+            if (typeof startingBalance !== 'number' || startingBalance < MIN_STARTING_BALANCE) {
+                throw new Error(`Invalid startingBalance: ${startingBalance}`);
+            }
+            if (typeof inflationRate !== 'number' || inflationRate < 0 || inflationRate > MAX_INFLATION_RATE) {
+                throw new Error(`Invalid inflationRate: ${inflationRate}`);
+            }
+            if (typeof annualReturn !== 'number' || annualReturn < MIN_RETURN_RATE || annualReturn > MAX_RETURN_RATE) {
+                throw new Error(`Invalid annualReturn: ${annualReturn}`);
+            }
+
+            const yearsUntilRetirement = retirementAge - startingAge;
+            
+            if (yearsUntilRetirement <= 0) {
+                return {
+                    yearsUntilRetirement: 0,
+                    targetPortfolioSize: 0,
+                    monthlyContribution: 0,
+                    inflatedTargetIncome: targetIncome,
+                    valid: false,
+                    error: 'Retirement age must be greater than starting age'
+                };
+            }
         
         // Calculate inflation-adjusted target income at retirement
         const inflatedTargetIncome = this.inflationAdjustedIncome(
@@ -121,22 +160,54 @@ class FinancialCalculations {
         
         const annualContribution = monthlyContribution * 12;
 
-        return {
-            yearsUntilRetirement,
-            targetPortfolioSize,
-            monthlyContribution: Math.max(0, monthlyContribution),
-            inflatedTargetIncome,
-            annualContribution: Math.max(0, annualContribution),
-            valid: true
-        };
+            return {
+                yearsUntilRetirement,
+                targetPortfolioSize,
+                monthlyContribution: Math.max(0, monthlyContribution),
+                inflatedTargetIncome,
+                annualContribution: Math.max(0, annualContribution),
+                valid: true
+            };
+        } catch (error) {
+            console.error('Error in calculateScenario:', error.message, params);
+            return {
+                yearsUntilRetirement: 0,
+                targetPortfolioSize: 0,
+                monthlyContribution: 0,
+                inflatedTargetIncome: params?.targetIncome || 0,
+                annualContribution: 0,
+                valid: false,
+                error: error.message
+            };
+        }
     }
 
     /**
      * Generate net worth progression over time with monthly compounding
      */
     static generateNetWorthProgression(scenario, params) {
-        const { startingAge, startingBalance, annualReturn, retirementReturn, inflationRate, endAge } = params;
-        const { retirementAge, targetPortfolioSize, inflatedTargetIncome, annualContribution } = scenario;
+        try {
+            // Validate input parameters
+            if (!scenario || !params) {
+                throw new Error('Missing scenario or params');
+            }
+
+            const { startingAge, startingBalance, annualReturn, retirementReturn, inflationRate, endAge } = params;
+            const { retirementAge, targetPortfolioSize, inflatedTargetIncome, annualContribution } = scenario;
+
+            // Validate critical parameters
+            if (typeof startingAge !== 'number' || startingAge < 18 || startingAge > 100) {
+                throw new Error(`Invalid startingAge: ${startingAge}`);
+            }
+            if (typeof retirementAge !== 'number' || retirementAge <= startingAge) {
+                throw new Error(`Invalid retirementAge: ${retirementAge}`);
+            }
+            if (typeof startingBalance !== 'number' || startingBalance < 0) {
+                throw new Error(`Invalid startingBalance: ${startingBalance}`);
+            }
+            if (typeof annualReturn !== 'number' || annualReturn < -0.5 || annualReturn > 0.5) {
+                throw new Error(`Invalid annualReturn: ${annualReturn}`);
+            }
         
         const progression = [];
         let netWorth = startingBalance;
@@ -156,12 +227,10 @@ class FinancialCalculations {
             if (age < retirementAge) {
                 // Accumulation phase - monthly compounding
                 for (let month = 0; month < 12; month++) {
-                    if (age > startingAge || month > 0) {
-                        // Add monthly contribution at the beginning of each month
-                        netWorth = netWorth + monthlyContribution;
-                        // Apply monthly growth during accumulation phase
-                        netWorth = netWorth * (1 + monthlyAccumulationReturn);
-                    }
+                    // Add monthly contribution at the beginning of each month (including first month)
+                    netWorth = netWorth + monthlyContribution;
+                    // Apply monthly growth during accumulation phase
+                    netWorth = netWorth * (1 + monthlyAccumulationReturn);
                 }
             } else if (age === retirementAge) {
                 // First year of retirement - transition year
@@ -171,8 +240,8 @@ class FinancialCalculations {
                 }
             } else {
                 // Retirement phase - monthly withdrawals with inflation adjustment
-                const yearsInRetirement = age - retirementAge - 1; // -1 because first year has no withdrawals
-                const inflationAdjustedWithdrawal = monthlyWithdrawal * Math.pow(1 + monthlyInflation, yearsInRetirement * 12);
+                const yearsFromStart = age - startingAge; // Calculate inflation from starting age for consistency
+                const inflationAdjustedWithdrawal = monthlyWithdrawal * Math.pow(1 + monthlyInflation, yearsFromStart * 12);
                 
                 for (let month = 0; month < 12; month++) {
                     // Withdraw at beginning of month
@@ -197,7 +266,11 @@ class FinancialCalculations {
             progression.push({ age, netWorth: Math.round(netWorth) });
         }
         
-        return progression;
+            return progression;
+        } catch (error) {
+            console.error('Error in generateNetWorthProgression:', error.message, { scenario, params });
+            return []; // Return empty array on error
+        }
     }
 
     /**
@@ -681,12 +754,12 @@ class FinancialCalculations {
             currentSavingsRate, // decimal (e.g., 0.15 for 15%)
             startingBalance,
             state = 'TX',
-            riskProfile = 'moderate',
+            riskProfile = 'tdf',
             inflationRate = 0.03
         } = params;
 
         // Get risk profile data
-        const riskData = window.SavingsFeasibility.getRiskProfile(riskProfile);
+        const riskData = window.SavingsFeasibility.getRiskProfile(riskProfile, currentAge);
         const accumulationReturn = riskData.accumulation.return;
         const retirementReturn = riskData.retirement.return;
         const volatility = riskData.accumulation.volatility;
@@ -738,12 +811,12 @@ class FinancialCalculations {
                 savingsRate: scenario.rate,
                 description: scenario.description,
                 achievableRetirementAge: achievableAge,
-                yearsUntilRetirement: Math.max(0, achievableAge - currentAge),
+                yearsUntilRetirement: achievableAge ? Math.max(0, achievableAge - currentAge) : 0,
                 monthlyContribution: (scenario.rate * currentIncome) / 12,
                 realismScore: realism.score,
                 realismRating: realism.rating,
                 confidenceLevel: window.SavingsFeasibility.getConfidenceLevel(realism.score),
-                valid: achievableAge <= 100 && achievableAge > currentAge
+                valid: achievableAge !== null && achievableAge <= 100 && achievableAge > currentAge
             };
         });
 
@@ -772,51 +845,90 @@ class FinancialCalculations {
      * @returns {number} - Achievable retirement age
      */
     static calculateAchievableRetirementAge(params) {
-        const {
-            currentAge,
-            targetIncome,
-            currentIncome,
-            savingsRate,
-            startingBalance,
-            inflationRate,
-            annualReturn
-        } = params;
+        try {
+            const {
+                currentAge,
+                targetIncome,
+                currentIncome,
+                savingsRate,
+                startingBalance,
+                inflationRate,
+                annualReturn
+            } = params;
 
-        const annualContribution = currentIncome * savingsRate;
-        
-        // Binary search to find retirement age
-        let minAge = currentAge + 1;
-        let maxAge = 100;
-        let bestAge = maxAge;
+            // Get constants (with fallbacks)
+            const constants = window.FinancialConstants || {};
+            const MAX_RETIREMENT_AGE = constants.MAX_RETIREMENT_AGE || 100;
+            const MIN_SAVINGS_RATE = constants.MIN_SAVINGS_RATE || 0.01;
+            const MIN_INCOME = constants.MIN_INCOME || 1000;
+            const WITHDRAWAL_RATE = constants.WITHDRAWAL_RATE || 0.04;
 
-        while (minAge <= maxAge) {
-            const testAge = Math.floor((minAge + maxAge) / 2);
-            const yearsToSave = testAge - currentAge;
+            // Validate inputs using constants
+            if (currentAge >= MAX_RETIREMENT_AGE || savingsRate <= MIN_SAVINGS_RATE || 
+                currentIncome <= MIN_INCOME || targetIncome <= MIN_INCOME) {
+                return null; // Invalid inputs
+            }
+
+            const annualContribution = currentIncome * savingsRate;
             
-            if (yearsToSave <= 0) {
-                minAge = testAge + 1;
-                continue;
+            // Feasibility check: even with maximum savings at max age, is goal achievable?
+            const maxYearsToSave = MAX_RETIREMENT_AGE - currentAge;
+            let maxPortfolioValue = startingBalance;
+            for (let year = 0; year < maxYearsToSave; year++) {
+                maxPortfolioValue = maxPortfolioValue * (1 + annualReturn) + annualContribution;
+            }
+            
+            const maxInflatedIncome = targetIncome * Math.pow(1 + inflationRate, maxYearsToSave);
+            const maxRequiredPortfolio = maxInflatedIncome / WITHDRAWAL_RATE;
+            
+            if (maxPortfolioValue < maxRequiredPortfolio) {
+                console.warn('Retirement goal impossible even at age 100', {
+                    maxPortfolio: maxPortfolioValue,
+                    required: maxRequiredPortfolio,
+                    savingsRate: savingsRate * 100 + '%'
+                });
+                return null; // Impossible scenario
+            }
+            
+            // Binary search to find retirement age
+            let minAge = currentAge + 1;
+            let maxAge = MAX_RETIREMENT_AGE;
+            let bestAge = null;
+
+            while (minAge <= maxAge) {
+                const testAge = Math.floor((minAge + maxAge) / 2);
+                const yearsToSave = testAge - currentAge;
+                
+                if (yearsToSave <= 0) {
+                    minAge = testAge + 1;
+                    continue;
+                }
+
+                // Calculate portfolio value at test retirement age
+                let portfolioValue = startingBalance;
+                for (let year = 0; year < yearsToSave; year++) {
+                    portfolioValue = portfolioValue * (1 + annualReturn) + annualContribution;
+                }
+
+                // Calculate required portfolio for target income (inflation-adjusted)
+                const inflatedTargetIncome = targetIncome * Math.pow(1 + inflationRate, yearsToSave);
+                const requiredPortfolio = inflatedTargetIncome / WITHDRAWAL_RATE;
+
+                if (portfolioValue >= requiredPortfolio) {
+                    bestAge = testAge;
+                    maxAge = testAge - 1; // Try for earlier retirement
+                } else {
+                    minAge = testAge + 1; // Need to work longer
+                }
             }
 
-            // Calculate portfolio value at test retirement age
-            let portfolioValue = startingBalance;
-            for (let year = 0; year < yearsToSave; year++) {
-                portfolioValue = portfolioValue * (1 + annualReturn) + annualContribution;
-            }
-
-            // Calculate required portfolio for target income (inflation-adjusted)
-            const inflatedTargetIncome = targetIncome * Math.pow(1 + inflationRate, yearsToSave);
-            const requiredPortfolio = inflatedTargetIncome / 0.04; // 4% rule
-
-            if (portfolioValue >= requiredPortfolio) {
-                bestAge = testAge;
-                maxAge = testAge - 1; // Try for earlier retirement
-            } else {
-                minAge = testAge + 1; // Need to work longer
-            }
+            // Return null if no achievable age found (shouldn't happen after feasibility check)
+            return bestAge;
+            
+        } catch (error) {
+            console.error('Error in calculateAchievableRetirementAge:', error.message, params);
+            return null;
         }
-
-        return bestAge;
     }
 
     /**

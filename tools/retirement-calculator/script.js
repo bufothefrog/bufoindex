@@ -7,16 +7,19 @@ class RetirementCalculator {
     constructor() {
         this.scenarios = [];
         this.insights = [];
-        this.netWorthData = [];
         this.withdrawalData = [];
         this.monteCarloResults = null;
         this.financialModelingResults = null;
         
         // Chart instances
         this.withdrawalsChart = null;
-        this.netWorthChart = null;
         this.successProbabilityChart = null;
         this.portfolioDistributionChart = null;
+        this.netWorthChart = null;
+        
+        // Chart data cache for performance
+        this.chartDataCache = new Map();
+        this.lastParametersHash = null;
         
         this.init();
     }
@@ -28,6 +31,68 @@ class RetirementCalculator {
         }
         // Fallback formatting
         return Math.round(amount).toLocaleString();
+    }
+
+    /**
+     * Generate hash of parameters for cache key
+     */
+    generateParametersHash(params) {
+        const keyParams = {
+            startingAge: params.startingAge,
+            targetIncome: params.targetIncome,
+            startingBalance: params.startingBalance,
+            currentIncome: params.currentIncome,
+            accumulationReturn: params.accumulationReturn,
+            inflationRate: params.inflationRate
+        };
+        return JSON.stringify(keyParams);
+    }
+
+    /**
+     * Get cached chart data or generate new data
+     */
+    getCachedChartData(cacheKey, generatorFunction) {
+        const currentHash = this.generateParametersHash(this.collectEnhancedParameters());
+        
+        // Clear cache if parameters changed
+        if (this.lastParametersHash !== currentHash) {
+            this.chartDataCache.clear();
+            this.lastParametersHash = currentHash;
+        }
+        
+        const fullCacheKey = `${currentHash}_${cacheKey}`;
+        
+        if (!this.chartDataCache.has(fullCacheKey)) {
+            console.log(`Generating chart data for: ${cacheKey}`);
+            this.chartDataCache.set(fullCacheKey, generatorFunction());
+        } else {
+            console.log(`Using cached chart data for: ${cacheKey}`);
+        }
+        
+        return this.chartDataCache.get(fullCacheKey);
+    }
+
+    /**
+     * Clear chart cache manually
+     */
+    clearChartCache() {
+        this.chartDataCache.clear();
+        this.lastParametersHash = null;
+    }
+
+    /**
+     * Debounce function to limit rapid updates
+     */
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        }.bind(this);
     }
 
     init() {
@@ -55,6 +120,10 @@ class RetirementCalculator {
     }
 
     setupEventListeners() {
+        // Create debounced update function using constant
+        const debounceDelay = window.FinancialConstants?.DEBOUNCE_DELAY_MS || 300;
+        const debouncedUpdate = this.debounce(this.updateAll.bind(this), debounceDelay);
+        
         // Input change listeners
         const inputs = document.querySelectorAll('.retirement-calculator input, .retirement-calculator select');
         inputs.forEach(input => {
@@ -74,12 +143,13 @@ class RetirementCalculator {
                         e.target.setSelectionRange(cursorPosition + lengthDiff, cursorPosition + lengthDiff);
                     }
                     
-                    this.updateAll();
+                    debouncedUpdate();
                 });
             } else {
-                input.addEventListener('input', () => this.updateAll());
+                input.addEventListener('input', debouncedUpdate);
             }
             
+            // Immediate updates on blur/change for better UX
             input.addEventListener('change', () => this.updateAll());
         });
 
@@ -87,6 +157,17 @@ class RetirementCalculator {
         const riskProfileSelect = document.getElementById('riskProfile');
         if (riskProfileSelect) {
             riskProfileSelect.addEventListener('change', () => this.updateRiskProfileReturns());
+        }
+        
+        // Age change listener for TDF recalculation
+        const ageInput = document.getElementById('startingAge');
+        if (ageInput) {
+            ageInput.addEventListener('input', () => {
+                const riskProfile = this.getSelectValue('riskProfile');
+                if (riskProfile === 'tdf') {
+                    this.updateRiskProfileReturns();
+                }
+            });
         }
         
         // Add listeners to return rate inputs to detect manual overrides
@@ -519,7 +600,7 @@ class RetirementCalculator {
             });
 
             // Risk Profile Impact
-            const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile);
+            const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile, params.startingAge);
             insights.push({
                 title: 'RISK_PROFILE',
                 value: riskData.name,
@@ -588,9 +669,244 @@ class RetirementCalculator {
     }
 
     updateCharts() {
-        this.updateWithdrawalsChart();
-        this.updateNetWorthChart();
-        this.updateSavingsVsRetirementChart();
+        try {
+            this.updateNetWorthChart();
+        } catch (error) {
+            console.error('Error updating net worth chart:', error);
+        }
+        
+        try {
+            this.updateWithdrawalsChart();
+        } catch (error) {
+            console.error('Error updating withdrawals chart:', error);
+        }
+        
+        try {
+            this.updateSavingsVsRetirementChart();
+        } catch (error) {
+            console.error('Error updating savings vs retirement chart:', error);
+        }
+    }
+
+    updateNetWorthChart() {
+        const params = this.collectEnhancedParameters();
+        
+        // Get valid scenarios for analysis
+        const validScenarios = this.scenarios.filter(s => s.valid);
+        if (validScenarios.length === 0) return;
+        
+        // Calculate net worth data for each scenario
+        const datasets = validScenarios.map(scenario => {
+            const data = [];
+            const startAge = params.startingAge;
+            const retirementAge = scenario.retirementAge;
+            const endAge = params.endAge || 85;
+            
+            // Calculate monthly contribution for this scenario
+            const annualContribution = scenario.monthlyContribution * 12;
+            
+            // Calculate net worth progression
+            for (let age = startAge; age <= endAge; age++) {
+                let netWorth = 0;
+                
+                if (age <= retirementAge) {
+                    // Accumulation phase
+                    const yearsInvesting = age - startAge;
+                    
+                    // Future value of starting balance
+                    const startingBalanceFV = params.startingBalance * Math.pow(1 + params.accumulationReturn/100, yearsInvesting);
+                    
+                    // Future value of annual contributions (annuity)
+                    let contributionsFV = 0;
+                    if (yearsInvesting > 0 && annualContribution > 0) {
+                        const r = params.accumulationReturn / 100;
+                        contributionsFV = annualContribution * ((Math.pow(1 + r, yearsInvesting) - 1) / r);
+                    }
+                    
+                    netWorth = startingBalanceFV + contributionsFV;
+                } else {
+                    // Retirement phase - calculate withdrawals
+                    const yearsInAccumulation = retirementAge - startAge;
+                    const yearsInRetirement = age - retirementAge;
+                    
+                    // Portfolio value at retirement
+                    const startingBalanceFV = params.startingBalance * Math.pow(1 + params.accumulationReturn/100, yearsInAccumulation);
+                    let contributionsFV = 0;
+                    if (yearsInAccumulation > 0 && annualContribution > 0) {
+                        const r = params.accumulationReturn / 100;
+                        contributionsFV = annualContribution * ((Math.pow(1 + r, yearsInAccumulation) - 1) / r);
+                    }
+                    const portfolioAtRetirement = startingBalanceFV + contributionsFV;
+                    
+                    // Calculate annual withdrawal (inflation-adjusted)
+                    const yearsFromNow = retirementAge - startAge;
+                    const inflationAdjustedIncome = params.targetIncome * Math.pow(1 + params.inflationRate/100, yearsFromNow);
+                    
+                    // Apply withdrawals over retirement years
+                    let currentPortfolio = portfolioAtRetirement;
+                    for (let retYear = 1; retYear <= yearsInRetirement; retYear++) {
+                        // Withdraw at beginning of year
+                        const withdrawalAmount = inflationAdjustedIncome * Math.pow(1 + params.inflationRate/100, retYear - 1);
+                        currentPortfolio -= withdrawalAmount;
+                        
+                        // Apply investment return for remaining year
+                        if (currentPortfolio > 0) {
+                            currentPortfolio *= (1 + params.retirementReturn/100);
+                        } else {
+                            currentPortfolio = 0;
+                            break;
+                        }
+                    }
+                    
+                    netWorth = Math.max(0, currentPortfolio);
+                }
+                
+                data.push({
+                    x: age,
+                    y: netWorth
+                });
+            }
+            
+            return {
+                label: `Scenario ${scenario.label}`,
+                data: data,
+                borderColor: scenario.color,
+                backgroundColor: scenario.color + '20',
+                borderWidth: 3,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                tension: 0.1,
+                fill: false
+            };
+        });
+        
+        // Destroy existing chart
+        if (this.netWorthChart) {
+            this.netWorthChart.destroy();
+        }
+        
+        // Create new chart
+        const ctx = document.getElementById('netWorthChart');
+        if (!ctx) return;
+        
+        this.netWorthChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#0A0E1A',
+                        borderColor: '#00FF41',
+                        borderWidth: 1,
+                        titleColor: '#00FF41',
+                        bodyColor: '#00FF41',
+                        titleFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        bodyFont: {
+                            family: 'IBM Plex Mono, Fira Code, monospace'
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                const netWorth = context.parsed.y;
+                                if (netWorth >= 1000000) {
+                                    return `${context.dataset.label}: $${(netWorth / 1000000).toFixed(1)}M`;
+                                } else if (netWorth >= 1000) {
+                                    return `${context.dataset.label}: $${(netWorth / 1000).toFixed(0)}k`;
+                                } else {
+                                    return `${context.dataset.label}: $${Math.round(netWorth).toLocaleString()}`;
+                                }
+                            },
+                            afterBody: function(context) {
+                                const age = context[0].parsed.x;
+                                const scenario = validScenarios.find(s => `Scenario ${s.label}` === context[0].dataset.label);
+                                if (scenario && age <= scenario.retirementAge) {
+                                    return [`Accumulation Phase`, `Retirement at age ${scenario.retirementAge}`];
+                                } else if (scenario && age > scenario.retirementAge) {
+                                    return [`Retirement Phase`, `Withdrawing for ${age - scenario.retirementAge} years`];
+                                }
+                                return [];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        min: params.startingAge,
+                        max: params.endAge || 85,
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            stepSize: 5,
+                            callback: function(value) {
+                                return Math.round(value);
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Age',
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#00FF4120',
+                            borderColor: '#00FF41'
+                        },
+                        ticks: {
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            },
+                            callback: function(value) {
+                                if (value === 0) return '$0';
+                                if (value >= 1000000) {
+                                    return '$' + (value / 1000000).toFixed(1) + 'M';
+                                } else if (value >= 1000) {
+                                    return '$' + (value / 1000).toFixed(0) + 'k';
+                                }
+                                return '$' + Math.round(value).toLocaleString();
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Net Worth',
+                            color: '#00FF41',
+                            font: {
+                                family: 'IBM Plex Mono, Fira Code, monospace'
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
     updateWithdrawalsChart() {
@@ -729,163 +1045,6 @@ class RetirementCalculator {
         });
     }
 
-    updateNetWorthChart() {
-        const validScenarios = this.scenarios.filter(s => s.valid);
-        if (validScenarios.length === 0) return;
-
-        const params = this.collectEnhancedParameters();
-        
-        // Calculate earliest and latest retirement ages for chart range
-        const earliestRetirementAge = Math.min(...validScenarios.map(s => s.retirementAge));
-        const latestRetirementAge = Math.max(...validScenarios.map(s => s.retirementAge));
-        
-        // Generate net worth data using enhanced parameters
-        
-        
-        const datasets = validScenarios.map((scenario, index) => {
-            // Create a compatible scenario object for the progression calculation
-            const compatibleScenario = {
-                retirementAge: scenario.retirementAge,
-                targetPortfolioSize: scenario.targetPortfolioSize,
-                inflatedTargetIncome: scenario.inflatedTargetIncome,
-                annualContribution: scenario.monthlyContribution * 12
-            };
-
-            let data = [];
-            try {
-                const progression = FinancialCalculations.generateNetWorthProgression(compatibleScenario, {
-                    startingAge: params.startingAge, // Start from current age
-                    startingBalance: params.startingBalance,
-                    annualReturn: params.accumulationReturn / 100,
-                    retirementReturn: params.retirementReturn / 100,
-                    inflationRate: params.inflationRate / 100,
-                    endAge: params.endAge
-                });
-
-                if (!progression || progression.length === 0) {
-                    console.error('Empty progression for scenario:', scenario.label);
-                    return null;
-                }
-
-                data = progression.map(p => ({
-                    x: p.age,
-                    y: p.netWorth
-                }));
-
-            } catch (error) {
-                console.error(`Error generating progression for scenario ${scenario.label}:`, error);
-                return null;
-            }
-
-            return {
-                label: `Scenario ${scenario.label}: ${Math.round(scenario.savingsRate*100)}% savings → Retire at ${scenario.retirementAge}`,
-                data: data,
-                borderColor: scenario.color, // Use the color assigned to the scenario
-                backgroundColor: 'transparent',
-                borderWidth: 3,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-                tension: 0.1
-            };
-        }).filter(dataset => dataset !== null); // Remove null datasets
-
-        if (datasets.length === 0) {
-            console.error('No valid datasets for net worth chart');
-            return;
-        }
-
-
-        // Destroy existing chart if it exists
-        if (this.netWorthChart) {
-            this.netWorthChart.destroy();
-        }
-
-        // Create new chart
-        const ctx = document.getElementById('netWorthChart').getContext('2d');
-        this.netWorthChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                datasets: datasets
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
-                        borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
-                        font: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
-                        },
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': $' + (Math.round(context.parsed.y).toLocaleString());
-                            }
-                        }
-                    },
-                },
-                scales: {
-                    x: {
-                        type: 'linear',
-                        grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
-                        },
-                        ticks: {
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Age',
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        },
-                        min: params.startingAge,
-                        max: params.endAge || 85
-                    },
-                    y: {
-                        grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
-                        },
-                        ticks: {
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            },
-                            callback: function(value) {
-                                return '$' + (Math.round(value).toLocaleString());
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Net Worth',
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
 
     async updateAll() {
         // Calculate basic scenarios first
@@ -1324,8 +1483,8 @@ class RetirementCalculator {
                 enhanced.volatility = this.getInputValue('volatility', 'number') || 15;
             } else if (typeof SavingsFeasibility !== 'undefined') {
                 try {
-                    // Use risk profile defaults
-                    const riskData = SavingsFeasibility.getRiskProfile(enhanced.riskProfile);
+                    // Use risk profile defaults with age for TDF calculations
+                    const riskData = SavingsFeasibility.getRiskProfile(enhanced.riskProfile, enhanced.startingAge);
                     enhanced.accumulationReturn = riskData.accumulation.return * 100; // Convert to percentage
                     enhanced.retirementReturn = riskData.retirement.return * 100;
                     enhanced.volatility = riskData.accumulation.volatility * 100;
@@ -1355,7 +1514,7 @@ class RetirementCalculator {
                 startingBalance: 100000,
                 currentIncome: 80000,
                 state: 'TX',
-                riskProfile: 'moderate',
+                riskProfile: 'tdf',
                 inflationRate: 3,
                 endAge: 85,
                 accumulationReturn: 8,
@@ -1382,6 +1541,8 @@ class RetirementCalculator {
                 'targetIncome': 120000,
                 'startingBalance': 100000,
                 'startingAge': 25,
+                'socialSecurityAge': 67,
+                'socialSecurityBenefit': 2000,
                 'inflationRate': 3,
                 'endAge': 85
             };
@@ -1420,8 +1581,9 @@ class RetirementCalculator {
             // Return default values for missing selects
             const defaults = {
                 'state': 'TX',
-                'riskProfile': 'moderate',
-                'accountType': 'Taxable'
+                'riskProfile': 'tdf',
+                'accountType': 'Taxable',
+                'healthcareMultiplier': '1.0'
             };
             return defaults[id] || '';
         }
@@ -1435,6 +1597,7 @@ class RetirementCalculator {
         const riskProfile = this.getSelectValue('riskProfile');
         const accumulationInput = document.getElementById('accumulationReturn');
         const retirementInput = document.getElementById('retirementReturn');
+        const volatilityInput = document.getElementById('volatility');
         
         // Don't update if "custom" is selected (manual override active)
         if (riskProfile === 'custom') {
@@ -1443,17 +1606,48 @@ class RetirementCalculator {
         
         if (typeof SavingsFeasibility !== 'undefined' && accumulationInput && retirementInput && riskProfile) {
             try {
-                const riskData = SavingsFeasibility.getRiskProfile(riskProfile);
+                // Get current age for TDF calculations
+                const currentAge = this.getInputValue('startingAge', 'number') || 30;
+                const riskData = SavingsFeasibility.getRiskProfile(riskProfile, currentAge);
                 
                 // Update the values based on risk profile
                 accumulationInput.value = (riskData.accumulation.return * 100).toFixed(1);
                 retirementInput.value = (riskData.retirement.return * 100).toFixed(1);
+                
+                // Update volatility if available
+                if (volatilityInput) {
+                    volatilityInput.value = (riskData.accumulation.volatility * 100).toFixed(1);
+                }
+                
+                // Show TDF allocation details if TDF is selected
+                this.updateTDFDisplay(riskProfile, riskData);
                 
                 // Trigger recalculation
                 this.updateAll();
             } catch (error) {
                 console.warn('Error updating risk profile returns:', error);
             }
+        }
+    }
+
+    /**
+     * Update TDF display information
+     */
+    updateTDFDisplay(riskProfile, riskData) {
+        // Remove any existing TDF display
+        const existingDisplay = document.getElementById('tdfAllocationDisplay');
+        if (existingDisplay) {
+            existingDisplay.remove();
+        }
+        
+        // Add TDF allocation display if TDF is selected
+        if (riskProfile === 'tdf' && riskData.details) {
+            const riskProfileContainer = document.getElementById('riskProfile').parentElement;
+            const tdfDisplay = document.createElement('div');
+            tdfDisplay.id = 'tdfAllocationDisplay';
+            tdfDisplay.className = 'text-terminal-green text-xs mt-2 p-2 bg-black border border-terminal-green rounded';
+            tdfDisplay.remove();
+            riskProfileContainer.appendChild(tdfDisplay);
         }
     }
     
@@ -1706,181 +1900,69 @@ class RetirementCalculator {
         });
     }
 
-    /**
-     * Enhanced net worth chart with confidence bands
-     */
-    updateNetWorthChart() {
-        const validScenarios = this.scenarios.filter(s => s.valid);
-        if (validScenarios.length === 0) return;
-
-        const params = URLStateManager.collectParametersFromForm();
-        const validated = URLStateManager.validateParameters(params);
-
-        // Generate basic net worth data
-        const datasets = validScenarios.map(scenario => {
-            const progression = FinancialCalculations.generateNetWorthProgression(scenario, {
-                startingAge: validated.startingAge,
-                startingBalance: validated.startingBalance,
-                annualReturn: validated.accumulationReturn / 100,
-                retirementReturn: validated.retirementReturn / 100,
-                inflationRate: validated.inflationRate / 100,
-                endAge: validated.endAge
-            });
-
-            const data = progression.map(p => ({
-                x: p.age,
-                y: p.netWorth
-            }));
-
-            return {
-                label: `Scenario ${scenario.label} (Retire at ${scenario.retirementAge})`,
-                data: data,
-                borderColor: scenario.label === 'A' ? '#e74c3c' : scenario.label === 'B' ? '#f39c12' : '#27ae60',
-                backgroundColor: 'transparent',
-                borderWidth: 3,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-                tension: 0.1
-            };
-        });
-
-        // Basic chart configuration
-        const basicConfig = {
-            type: 'line',
-            data: { datasets: datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
-                        borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
-                        font: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
-                        },
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': $' + (Math.round(context.parsed.y).toLocaleString());
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        type: 'linear',
-                        grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
-                        },
-                        ticks: {
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Age',
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        },
-                        min: validated.startingAge,
-                        max: validated.endAge
-                    },
-                    y: {
-                        grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
-                        },
-                        ticks: {
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            },
-                            callback: function(value) {
-                                return '$' + (Math.round(value).toLocaleString());
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Net Worth',
-                            color: '#00FF41',
-                            font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
-                            }
-                        }
-                    }
-                }
-            }
-        };
-
-        // Enhance with confidence bands if Monte Carlo data is available
-        let enhancedConfig = basicConfig;
-        if (this.monteCarloResults) {
-            enhancedConfig = ChartConfigs.enhanceNetWorthChart(basicConfig, this.monteCarloResults);
-        }
-
-        // Destroy existing chart
-        if (this.netWorthChart) {
-            this.netWorthChart.destroy();
-        }
-
-        // Create new chart
-        const ctx = document.getElementById('netWorthChart').getContext('2d');
-        this.netWorthChart = new Chart(ctx, enhancedConfig);
-    }
 
     updateSavingsVsRetirementChart() {
         const params = this.collectEnhancedParameters();
 
-        // Generate data points for savings rate vs retirement age
-        const data = [];
-        
-        // Create points for different retirement ages from current age + 5 to 70
+        // Calculate age ranges outside cache function for chart configuration
         const minRetireAge = Math.max(params.startingAge + 5, 30);
         const maxRetireAge = 70;
-        
-        for (let retireAge = minRetireAge; retireAge <= maxRetireAge; retireAge += 2) {
-            try {
-                // Calculate what savings rate would be needed to retire at this age
-                const scenario = FinancialCalculations.calculateScenario({
-                    startingAge: params.startingAge,
-                    retirementAge: retireAge,
-                    targetIncome: params.targetIncome,
-                    startingBalance: params.startingBalance,
-                    inflationRate: params.inflationRate / 100,
-                    annualReturn: params.accumulationReturn / 100
-                });
-                
-                if (scenario.valid && scenario.annualContribution > 0) {
-                    const savingsRatePercent = (scenario.annualContribution / params.currentIncome) * 100;
-                    const monthlySavings = scenario.monthlyContribution;
+
+        // Use cached data for expensive calculation
+        const data = this.getCachedChartData('savingsVsRetirement', () => {
+            console.log('Generating savings vs retirement chart data...');
+            const chartData = [];
+            
+            for (let retireAge = minRetireAge; retireAge <= maxRetireAge; retireAge += 2) {
+                try {
+                    // Calculate what savings rate would be needed to retire at this age
+                    const scenario = FinancialCalculations.calculateScenario({
+                        startingAge: params.startingAge,
+                        retirementAge: retireAge,
+                        targetIncome: params.targetIncome,
+                        startingBalance: params.startingBalance,
+                        inflationRate: params.inflationRate / 100,
+                        annualReturn: params.accumulationReturn / 100
+                    });
                     
-                    // Only include reasonable savings rates (up to 80%)
-                    if (savingsRatePercent <= 80 && savingsRatePercent >= 0) {
-                        data.push({
-                            x: retireAge,
-                            y: savingsRatePercent,
-                            monthlySavings: monthlySavings
-                        });
+                    if (scenario.valid && scenario.annualContribution > 0) {
+                        const savingsRatePercent = (scenario.annualContribution / params.currentIncome) * 100;
+                        const monthlySavings = scenario.monthlyContribution;
+                        
+                        // Only include reasonable savings rates (up to 80%)
+                        if (savingsRatePercent <= 80 && savingsRatePercent >= 0) {
+                            chartData.push({
+                                x: retireAge,
+                                y: savingsRatePercent,
+                                monthlySavings: monthlySavings
+                            });
+                        }
                     }
+                } catch (error) {
+                    console.warn(`Error calculating for retirement age ${retireAge}:`, error);
                 }
-            } catch (error) {
-                console.warn(`Error calculating for retirement age ${retireAge}:`, error);
             }
+            
+            return chartData;
+        });
+
+        // Calculate actual data range for dynamic x-axis
+        let dataMinAge = Infinity;
+        let dataMaxAge = -Infinity;
+        
+        if (data.length > 0) {
+            data.forEach(point => {
+                dataMinAge = Math.min(dataMinAge, point.x);
+                dataMaxAge = Math.max(dataMaxAge, point.x);
+            });
+            
+            // Add small padding (2 years on each side)
+            dataMinAge = Math.max(minRetireAge, dataMinAge - 2);
+            dataMaxAge = Math.min(maxRetireAge, dataMaxAge + 2);
+        } else {
+            // Fallback if no data
+            dataMinAge = minRetireAge;
+            dataMaxAge = maxRetireAge;
         }
 
         // Destroy existing chart if it exists
@@ -1945,8 +2027,8 @@ class RetirementCalculator {
                 scales: {
                     x: {
                         type: 'linear',
-                        min: minRetireAge,
-                        max: maxRetireAge,
+                        min: dataMinAge,
+                        max: dataMaxAge,
                         grid: {
                             color: '#00FF4120',
                             borderColor: '#00FF41'

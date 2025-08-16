@@ -102,42 +102,71 @@ class URLStateManager {
     }
 
     /**
-     * Validate and sanitize parameters
+     * Validate individual parameter with type checking
+     */
+    static validateAge(value, min, max, defaultValue) {
+        const parsed = parseInt(value);
+        if (isNaN(parsed) || parsed < min || parsed > max) {
+            return defaultValue;
+        }
+        return parsed;
+    }
+
+    static validateCurrency(value, min, max, defaultValue) {
+        const parsed = parseFloat(value);
+        if (isNaN(parsed) || parsed < min || (max && parsed > max)) {
+            return defaultValue;
+        }
+        return parsed;
+    }
+
+    static validateRate(value, min, max, defaultValue) {
+        const parsed = parseFloat(value);
+        if (isNaN(parsed) || parsed < min || parsed > max) {
+            return defaultValue;
+        }
+        return parsed;
+    }
+
+    /**
+     * Validate and sanitize parameters with dependency order
      */
     static validateParameters(params) {
-        const validated = { ...params };
+        // Create defensive copy
+        const validated = JSON.parse(JSON.stringify(params || {}));
 
-        // NEW: Primary age validations
-        validated.startingAge = Math.max(18, Math.min(100, validated.startingAge || 25));
-        validated.targetRetirementAge = Math.max(30, Math.min(100, validated.targetRetirementAge || 45));
-        validated.targetRetirementAge = Math.max(validated.startingAge + 1, validated.targetRetirementAge);
-        validated.endAge = Math.max(65, Math.min(110, validated.endAge || 85));
+        // Validate in dependency order to prevent race conditions
+        validated.startingAge = this.validateAge(validated.startingAge, 18, 100, 25);
+        validated.targetRetirementAge = this.validateAge(
+            validated.targetRetirementAge, 
+            validated.startingAge + 1, 
+            100, 
+            Math.max(45, validated.startingAge + 10)
+        );
+        validated.endAge = this.validateAge(validated.endAge, 65, 110, 85);
         
-        // NEW: Savings rate validation
-        validated.currentSavingsRate = Math.max(0, Math.min(80, validated.currentSavingsRate || 15));
+        // Savings rate validation
+        validated.currentSavingsRate = this.validateRate(validated.currentSavingsRate, 0, 80, 15);
         
         // Legacy age validations (for backward compatibility)
-        validated.retirementAgeA = Math.max(30, Math.min(100, validated.retirementAgeA || 40));
-        validated.retirementAgeB = Math.max(30, Math.min(100, validated.retirementAgeB || 45));
-        validated.retirementAgeC = Math.max(30, Math.min(100, validated.retirementAgeC || 50));
-        validated.retirementAgeA = Math.max(validated.startingAge + 1, validated.retirementAgeA);
-        validated.retirementAgeB = Math.max(validated.startingAge + 1, validated.retirementAgeB);
-        validated.retirementAgeC = Math.max(validated.startingAge + 1, validated.retirementAgeC);
+        validated.retirementAgeA = this.validateAge(validated.retirementAgeA, validated.startingAge + 1, 100, 40);
+        validated.retirementAgeB = this.validateAge(validated.retirementAgeB, validated.startingAge + 1, 100, 45);
+        validated.retirementAgeC = this.validateAge(validated.retirementAgeC, validated.startingAge + 1, 100, 50);
 
-        // Financial validations
-        validated.targetIncome = Math.max(1000, validated.targetIncome);
-        validated.startingBalance = Math.max(0, validated.startingBalance);
-        validated.inflationRate = Math.max(0, Math.min(20, validated.inflationRate));
+        // Financial validations using helper methods
+        validated.targetIncome = this.validateCurrency(validated.targetIncome, 1000, null, 120000);
+        validated.startingBalance = this.validateCurrency(validated.startingBalance, 0, null, 100000);
+        validated.inflationRate = this.validateRate(validated.inflationRate, 0, 20, 3);
 
-        // Enhanced parameter validations
-        validated.currentIncome = Math.max(1000, validated.currentIncome || 80000);
-        validated.accumulationReturn = Math.max(0, Math.min(30, validated.accumulationReturn || 10));
-        validated.retirementReturn = Math.max(0, Math.min(20, validated.retirementReturn || 7));
-        validated.volatility = Math.max(0, Math.min(50, validated.volatility || 15));
-        validated.monteCarloRuns = Math.max(100, Math.min(10000, validated.monteCarloRuns || 1000));
-        validated.socialSecurityAge = Math.max(62, Math.min(70, validated.socialSecurityAge || 67));
-        validated.socialSecurityBenefit = Math.max(0, Math.min(10000, validated.socialSecurityBenefit || 2000));
-        validated.healthcareMultiplier = Math.max(0.5, Math.min(3.0, validated.healthcareMultiplier || 1.0));
+        // Enhanced parameter validations using helper methods
+        validated.currentIncome = this.validateCurrency(validated.currentIncome, 1000, null, 80000);
+        validated.accumulationReturn = this.validateRate(validated.accumulationReturn, 0, 30, 10);
+        validated.retirementReturn = this.validateRate(validated.retirementReturn, 0, 20, 7);
+        validated.volatility = this.validateRate(validated.volatility, 0, 50, 15);
+        validated.monteCarloRuns = this.validateAge(validated.monteCarloRuns, 100, 10000, 1000);
+        validated.socialSecurityAge = this.validateAge(validated.socialSecurityAge, 62, 70, 67);
+        validated.socialSecurityBenefit = this.validateCurrency(validated.socialSecurityBenefit, 0, 10000, 2000);
+        validated.healthcareMultiplier = this.validateRate(validated.healthcareMultiplier, 0.5, 3.0, 1.0);
         
         // Legacy parameter validations (for backwards compatibility)
         validated.expectedSsBenefit = Math.max(0, Math.min(5000, validated.expectedSsBenefit || validated.socialSecurityBenefit));
@@ -148,9 +177,9 @@ class URLStateManager {
         validated.healthcareInflation = Math.max(0, Math.min(20, validated.healthcareInflation || 5));
 
         // NEW: Risk profile validation
-        const validRiskProfiles = ['conservative', 'moderate', 'aggressive', 'high_risk', 'ultra_high_risk'];
+        const validRiskProfiles = ['conservative', 'moderate', 'aggressive', 'high_risk', 'ultra_high_risk', 'tdf'];
         if (!validRiskProfiles.includes(validated.riskProfile)) {
-            validated.riskProfile = 'moderate';
+            validated.riskProfile = 'tdf';
         }
         
         // String validations with defaults

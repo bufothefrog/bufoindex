@@ -43,6 +43,11 @@ class SavingsFeasibility {
             name: 'Aggressive',
             accumulation: { return: 0.10, volatility: 0.15 },
             retirement: { return: 0.07, volatility: 0.12 }
+        },
+        'tdf': {
+            name: 'Target Date Fund (TDF)',
+            accumulation: { return: 0.085, volatility: 0.13 }, // Default values, will be calculated dynamically
+            retirement: { return: 0.055, volatility: 0.10 }
         }
     };
 
@@ -248,10 +253,100 @@ class SavingsFeasibility {
     /**
      * Get risk profile data
      * @param {string} profileName - Name of risk profile
+     * @param {number} age - Current age (required for TDF calculations)
      * @returns {Object} - Risk profile data
      */
-    static getRiskProfile(profileName = 'moderate') {
+    static getRiskProfile(profileName = 'moderate', age = null) {
+        if (profileName === 'tdf' && age !== null) {
+            return this.calculateTDFProfile(age);
+        }
         return this.RISK_PROFILES[profileName] || this.RISK_PROFILES.moderate;
+    }
+
+    /**
+     * Calculate Target Date Fund asset allocation based on age
+     * Uses modern glide path: aggressive when young, gradually becoming conservative
+     * @param {number} age - Current age
+     * @returns {Object} - Asset allocation percentages
+     */
+    static calculateTDFAllocation(age) {
+        // Clamp age to reasonable bounds
+        const clampedAge = Math.max(18, Math.min(100, age));
+        
+        // Modern TDF glide path: starts aggressive and gradually becomes conservative
+        // At age 25: ~90% stocks, 10% bonds
+        // At age 65: ~40% stocks, 60% bonds  
+        // At age 85: ~30% stocks, 70% bonds
+        
+        let stockAllocation;
+        if (clampedAge <= 25) {
+            stockAllocation = 0.90;
+        } else if (clampedAge <= 65) {
+            // Linear decrease from 90% to 40% between ages 25-65
+            stockAllocation = 0.90 - ((clampedAge - 25) / 40) * 0.50;
+        } else {
+            // Slower decrease from 40% to 30% between ages 65-85
+            const ageAfter65 = Math.min(20, clampedAge - 65);
+            stockAllocation = 0.40 - (ageAfter65 / 20) * 0.10;
+        }
+        
+        const bondAllocation = 1 - stockAllocation;
+        
+        return {
+            stocks: stockAllocation,
+            bonds: bondAllocation,
+            age: clampedAge
+        };
+    }
+
+    /**
+     * Calculate TDF risk profile based on current age
+     * @param {number} age - Current age
+     * @returns {Object} - Risk profile with age-adjusted returns and volatility
+     */
+    static calculateTDFProfile(age) {
+        const allocation = this.calculateTDFAllocation(age);
+        
+        // Expected returns: Stocks ~10%, Bonds ~4%
+        const stockReturn = 0.10;
+        const bondReturn = 0.04;
+        
+        // Volatility: Stocks ~18%, Bonds ~6%
+        const stockVolatility = 0.18;
+        const bondVolatility = 0.06;
+        
+        // Calculate blended returns and volatility
+        const blendedReturn = (allocation.stocks * stockReturn) + (allocation.bonds * bondReturn);
+        const blendedVolatility = Math.sqrt(
+            Math.pow(allocation.stocks * stockVolatility, 2) + 
+            Math.pow(allocation.bonds * bondVolatility, 2)
+        );
+        
+        // For retirement phase, use slightly more conservative allocation
+        const retirementAge = Math.min(100, age + 30); // Project 30 years ahead
+        const retirementAllocation = this.calculateTDFAllocation(retirementAge);
+        const retirementReturn = (retirementAllocation.stocks * stockReturn) + (retirementAllocation.bonds * bondReturn);
+        const retirementVolatility = Math.sqrt(
+            Math.pow(retirementAllocation.stocks * stockVolatility, 2) + 
+            Math.pow(retirementAllocation.bonds * bondVolatility, 2)
+        );
+        
+        return {
+            name: `Target Date Fund (Age ${age})`,
+            accumulation: { 
+                return: blendedReturn, 
+                volatility: blendedVolatility 
+            },
+            retirement: { 
+                return: retirementReturn, 
+                volatility: retirementVolatility 
+            },
+            allocation: allocation,
+            details: {
+                currentAllocation: `${Math.round(allocation.stocks * 100)}% stocks, ${Math.round(allocation.bonds * 100)}% bonds`,
+                projectedRetirementAllocation: `${Math.round(retirementAllocation.stocks * 100)}% stocks, ${Math.round(retirementAllocation.bonds * 100)}% bonds`
+            }
+        };
     }
 
     /**

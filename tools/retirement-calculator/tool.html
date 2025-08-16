@@ -187,13 +187,14 @@
                 <div class="terminal-input-group">
                     <label for="riskProfile" class="block text-terminal-green text-sm mb-1 terminal-label">
                         RISK_PROFILE:
-                        <span class="terminal-help" title="Investment risk level determines expected returns and volatility. Higher risk = higher potential returns but more uncertainty.">?</span>
+                        <span class="terminal-help" title="Investment risk level determines expected returns and volatility. TDF automatically adjusts from aggressive (young) to conservative (near retirement) based on your age.">?</span>
                     </label>
                     <select id="riskProfile" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                        <option value="" selected>Select risk profile...</option>
+                        <option value="">Select risk profile...</option>
                         <option value="conservative">Conservative</option>
                         <option value="moderate">Moderate</option>
                         <option value="aggressive">Aggressive</option>
+                        <option value="tdf" selected>Target Date Fund (TDF)</option>
                         <option value="custom" style="display: none;">Custom</option>
                     </select>
                 </div>
@@ -358,9 +359,9 @@
         </div>
         
         <!-- Charts Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
             <div class="terminal-chart">
-                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH</h4>
+                <h4 class="text-terminal-green text-sm font-bold mb-3">NET_WORTH_PROGRESSION</h4>
                 <div class="chart-container bg-black border border-terminal-green p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
                     <canvas id="netWorthChart" style="height: 100%; width: 100%;"></canvas>
                 </div>
@@ -442,9 +443,22 @@
             background: white !important;
         }
         
-        /* Keep grids as 2x2 for print */
+        /* Keep grids as appropriate for print */
         .grid-cols-1 {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+        
+        /* Ensure all charts fit on print pages */
+        @media print {
+            .charts-section .grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+            
+            .terminal-chart:nth-child(3) {
+                grid-column: 1 / -1;
+                margin: 0 auto;
+                max-width: 50%;
+            }
         }
         
         /* Adjust chart heights for print */

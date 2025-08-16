@@ -245,7 +245,6 @@
                 // Check key elements exist
                 assert(document.getElementById('targetIncome') !== null, 'Target income input missing');
                 assert(document.getElementById('summaryTableBody') !== null, 'Summary table missing');
-                assert(document.getElementById('netWorthChart') !== null, 'Net worth chart canvas missing');
             });
             
             // 7. Test calculator initialization
@@ -286,7 +285,7 @@
             
             // 9. Test chart rendering
             await test('Charts should render without errors', () => {
-                const chartIds = ['netWorthChart', 'withdrawalsChart', 'successProbabilityChart', 'portfolioDistributionChart'];
+                const chartIds = ['withdrawalsChart', 'successProbabilityChart', 'portfolioDistributionChart'];
                 
                 chartIds.forEach(id => {
                     const canvas = document.getElementById(id);
