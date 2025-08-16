@@ -1,11 +1,14 @@
+<!-- Skip link for accessibility -->
+<a href="#calculator-main" class="skip-link">Skip to main calculator</a>
+
 <!-- Calculator Interface -->
-<div class="retirement-calculator bg-terminal-dark text-terminal-green font-mono border border-terminal-green rounded-lg p-6 lg:p-8 xl:p-10 mb-8">
+<div class="retirement-calculator bg-terminal-dark text-terminal-green font-mono border border-terminal-green rounded-lg p-6 lg:p-8 xl:p-10 mb-8" role="main" id="calculator-main">
     <!-- Input Section -->
-    <div class="mb-8">
+    <section class="mb-8" aria-labelledby="inputs-heading">
         <div class="border-b border-terminal-green mb-4 pb-2">
             <div class="flex items-center justify-between">
                 <div>
-                    <h2 class="text-terminal-green text-xl font-bold mb-0">> RETIREMENT_CALCULATOR v2.0</h2>
+                    <h2 class="text-terminal-green text-xl font-bold mb-0" id="inputs-heading">> RETIREMENT_CALCULATOR v2.0</h2>
                     <div class="text-terminal-green text-sm opacity-75">// Enter parameters below. Press ENTER to calculate.</div>
                 </div>
                 <div class="flex gap-2">
@@ -31,29 +34,41 @@
                 <div class="terminal-input-group">
                     <label for="targetIncome" class="block text-terminal-green text-sm mb-1 terminal-label">
                         TARGET_RETIREMENT_INCOME:
-                        <span class="terminal-help" title="Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement.">?</span>
+                        <span class="terminal-help" 
+                              title="Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
+                              aria-label="Help: Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
+                              role="button" 
+                              tabindex="0">?</span>
                     </label>
                     <div class="relative">
                         <input type="text" id="targetIncome" value="" 
                                class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-32"
-                               data-validation="currency" data-min="10000" data-max="10000000">
-                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono">in today's dollars</span>
+                               data-validation="currency" data-min="10000" data-max="10000000"
+                               aria-label="Target retirement income in today's dollars, between $10,000 and $10,000,000"
+                               aria-describedby="targetIncome-help targetIncome-error">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono" id="targetIncome-help">in today's dollars</span>
                     </div>
-                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1" id="targetIncome-error" role="alert" aria-live="polite"></div>
                 </div>
                 
                 <div class="terminal-input-group">
                     <label for="startingBalance" class="block text-terminal-green text-sm mb-1 terminal-label">
                         CURRENT_RETIREMENT_SAVINGS:
-                        <span class="terminal-help" title="Current value of your retirement portfolio. Can be $0 if starting fresh.">?</span>
+                        <span class="terminal-help" 
+                              title="Current value of your retirement portfolio. Can be $0 if starting fresh."
+                              aria-label="Help: Current value of your retirement portfolio. Can be $0 if starting fresh."
+                              role="button" 
+                              tabindex="0">?</span>
                     </label>
                     <div class="relative">
                         <input type="text" id="startingBalance" value=""
                                class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono pr-16"
-                               data-validation="currency" data-min="0" data-max="50000000">
-                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono">dollars</span>
+                               data-validation="currency" data-min="0" data-max="50000000"
+                               aria-label="Current retirement savings in dollars, between $0 and $50,000,000"
+                               aria-describedby="startingBalance-help startingBalance-error">
+                        <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-terminal-green text-sm font-mono" id="startingBalance-help">dollars</span>
                     </div>
-                    <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+                    <div class="terminal-error hidden text-red-400 text-xs mt-1" id="startingBalance-error" role="alert" aria-live="polite"></div>
                 </div>
                 
                 <div class="terminal-input-group">
@@ -119,15 +134,28 @@
                 <div class="terminal-input-group">
                     <label for="state" class="block text-terminal-green text-sm mb-1 terminal-label">
                         STATE:
-                        <span class="terminal-help" title="Your state affects cost of living and realistic savings capacity. Used for feasibility calculations.">?</span>
+                        <span class="terminal-help" 
+                              title="Your state affects cost of living and realistic savings capacity. Used for feasibility calculations."
+                              aria-label="Help: Your state affects cost of living and realistic savings capacity. Used for feasibility calculations."
+                              role="button" 
+                              tabindex="0">?</span>
                     </label>
                     <div class="relative">
-                        <input type="text" id="stateInput" placeholder="" 
+                        <input type="text" id="stateInput" placeholder="Type to search states..." 
                                class="terminal-input w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono" 
-                               autocomplete="off">
-                        <div id="stateDropdown" class="absolute z-10 w-full bg-black border border-terminal-green max-h-48 overflow-y-auto hidden mt-1">
+                               autocomplete="off"
+                               aria-label="Select your state - type to search"
+                               aria-describedby="state-help"
+                               aria-expanded="false"
+                               aria-haspopup="listbox"
+                               role="combobox">
+                        <div id="stateDropdown" 
+                             class="absolute z-10 w-full bg-black border border-terminal-green max-h-48 overflow-y-auto hidden mt-1"
+                             role="listbox"
+                             aria-label="State options">
                             <!-- State options will be populated by JavaScript -->
                         </div>
+                        <div id="state-help" class="sr-only">Use arrow keys to navigate dropdown options when open</div>
                         <select id="state" class="hidden">
                             <option value="" selected>Select state...</option>
                             <option value="AL">Alabama</option>
@@ -295,19 +323,7 @@
                             <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
                         </div>
                         
-                        <div class="terminal-input-group">
-                            <label for="monteCarloRuns" class="block text-terminal-green text-sm mb-1 terminal-label">
-                                MONTE_CARLO_RUNS:
-                                <span class="terminal-help" title="Number of market scenarios to simulate. More runs = more accuracy but slower calculation. 1000+ recommended.">?</span>
-                            </label>
-                            <select id="monteCarloRuns" class="terminal-select w-full bg-black border border-terminal-green text-terminal-green px-2 py-1 font-mono">
-                                <option value="100">100</option>
-                                <option value="500">500</option>
-                                <option value="1000" selected>1000</option>
-                                <option value="5000">5000</option>
-                                <option value="10000">10000</option>
-                            </select>
-                        </div>
+                        <!-- Monte Carlo runs now automatically optimized based on scenario complexity -->
                     </div>
                 </div>
                 

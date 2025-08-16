@@ -47,10 +47,11 @@ class FinancialConstants {
     static MAX_VOLATILITY = 0.50;                   // 50% maximum volatility
     static DEFAULT_VOLATILITY = 0.15;               // 15% default volatility
     
-    // Monte Carlo Simulation
-    static MIN_MONTE_CARLO_RUNS = 100;              // Minimum simulation runs
-    static MAX_MONTE_CARLO_RUNS = 10000;            // Maximum simulation runs
-    static DEFAULT_MONTE_CARLO_RUNS = 1000;         // Default simulation runs
+    // Monte Carlo Simulation - Smart Defaults
+    static MONTE_CARLO_SIMPLE = 1000;               // Simple scenarios (1-2 retirement ages)
+    static MONTE_CARLO_STANDARD = 2000;             // Standard scenarios (3 retirement ages)
+    static MONTE_CARLO_COMPLEX = 3000;              // Complex scenarios (high volatility/long timeframes)
+    static MONTE_CARLO_MAX_SAFE = 3000;             // Maximum safe runs to prevent browser freezing
     
     // Social Security
     static MIN_SS_AGE = 62;                         // Earliest SS claiming age
