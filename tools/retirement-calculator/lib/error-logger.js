@@ -25,9 +25,7 @@ class ErrorLogger {
      * Check if debug mode is enabled
      */
     isDebugMode() {
-        return window.location.search.includes('debug=true') || 
-               window.location.hostname === 'localhost' ||
-               window.location.hostname === '127.0.0.1';
+        return window.location.search.includes('debug=true');
     }
     
     /**
@@ -256,7 +254,7 @@ class ErrorLogger {
         errorDisplay.innerHTML = `
             <div class="font-bold mb-2">⚠️ CALCULATOR ERROR</div>
             <div>${error.message}</div>
-            ${error.file ? `<div class="text-xs mt-1 opacity-75">${error.file}:${error.line}:${error.column}</div>` : ''}
+            ${error.file ? `<div class="text-xs mt-1 subtitle-text">${error.file}:${error.line}:${error.column}</div>` : ''}
             <div class="text-xs mt-2">Check console for details</div>
         `;
     }

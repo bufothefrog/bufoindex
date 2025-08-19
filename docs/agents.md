@@ -256,7 +256,7 @@ After all agents complete their tasks and you've verified the work:
 1. **Update Feature Backlog Status**
 ```markdown
 # In docs/feature-backlog.md, update each completed feature:
-
+s
 ### BUFO-001: Initialize Hugo Site
 **Priority:** P0  
 **Effort:** Small  

@@ -68,16 +68,16 @@ class URLStateManager {
      */
     static getDefaultParameters() {
         return {
-            startingAge: null,
-            targetRetirementAge: null,
-            currentSavingsRate: null,
+            startingAge: 30,
+            targetRetirementAge: 65,
+            currentSavingsRate: 10,
             endAge: 85,
-            targetIncome: null,
-            startingBalance: null,
+            targetIncome: 80000,
+            startingBalance: 80000,
             inflationRate: 3,
-            currentIncome: null,
-            state: '',
-            riskProfile: '',
+            currentIncome: 80000,
+            state: 'CA',
+            riskProfile: 'tdf',
             // Legacy parameters for compatibility
             retirementAgeA: 40,
             retirementAgeB: 45,

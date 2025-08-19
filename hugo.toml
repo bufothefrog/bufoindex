@@ -1,4 +1,4 @@
-baseURL = 'https://bufothefrog.github.io/'
+baseURL = 'https://bufothefrog.github.io/bufoindex/'
 languageCode = 'en-us'
 title = 'BUFOINDEX'
 theme = 'bufoindex'

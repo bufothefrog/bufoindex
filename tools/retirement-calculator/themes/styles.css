@@ -1,0 +1,845 @@
+/* Theme-Aware Retirement Calculator Styles */
+
+/* CSS Variables - Populated by ThemeConfig.js */
+:root {
+  /* Default modern theme colors - BufoIndex palette */
+  --color-primary: #FAFAF9;
+  --color-secondary: #F8F9FA;
+  --color-accent: #7FB069;
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #6B7280;
+  --color-text-accent: #7FB069;
+  --color-border: #E5E7EB;
+  --color-border-hover: #7FB069;
+  --color-border-focus: #7FB069;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f9fafb;
+  
+  /* Default modern theme fonts */
+  --font-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-secondary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  /* Default modern theme spacing */
+  --border-radius: 0.75rem;
+  --input-radius: 0.5rem;
+  --card-radius: 1rem;
+  --button-radius: 0.5rem;
+  
+  /* Default modern theme effects */
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --focus-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Base Calculator Styling */
+.retirement-calculator {
+  background-color: var(--color-primary) !important;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow) !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Terminal Theme: Show terminal elements */
+.theme-terminal .terminal-prompt,
+.theme-terminal .terminal-comment {
+  display: inline;
+}
+
+/* Modern Theme: Hide terminal elements */
+.theme-modern .terminal-prompt,
+.theme-modern .terminal-comment {
+  display: none !important;
+}
+
+/* Typography - Theme-aware */
+.retirement-calculator h1,
+.retirement-calculator h2,
+.retirement-calculator h3,
+.retirement-calculator h4 {
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* Modern theme: Clean, professional headings */
+.theme-modern h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.theme-modern h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.theme-modern h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-accent);
+  text-transform: none;
+}
+
+/* Terminal theme: Keep terminal styling for headings */
+.theme-terminal h2,
+.theme-terminal h3,
+.theme-terminal h4 {
+  font-family: var(--font-secondary);
+  text-shadow: 0 0 5px var(--color-text-primary);
+}
+
+.theme-terminal h4 {
+  color: var(--color-text-accent);
+  text-shadow: 0 0 3px var(--color-text-accent);
+}
+
+/* Input Styling - Completely different for each theme */
+.terminal-input {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-secondary);
+  transition: all 0.2s ease;
+  padding: 0.75rem 1rem;
+  width: 100%;
+}
+
+/* Modern theme: Standard form inputs */
+.theme-modern .terminal-input {
+  border-radius: var(--input-radius) !important;
+  font-family: var(--font-primary) !important;
+  font-size: 1rem !important;
+  background-color: var(--color-surface) !important;
+  border: 2px solid var(--color-border) !important;
+  padding: 0.875rem 1rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.theme-modern .terminal-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--focus-shadow), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.theme-modern .terminal-input:hover:not(:focus) {
+  border-color: var(--color-border-hover);
+}
+
+/* Terminal theme: Keep terminal styling */
+.theme-terminal .terminal-input {
+  border-radius: 0;
+  font-family: var(--font-secondary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.theme-terminal .terminal-input:focus {
+  box-shadow: 0 0 0 2px var(--color-border), 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+/* Button Styling - Completely different approaches */
+.terminal-button {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+}
+
+/* Modern theme: Standard modern buttons */
+.theme-modern .terminal-button {
+  background-color: var(--color-accent) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: var(--button-radius) !important;
+  font-family: var(--font-primary) !important;
+  font-weight: 600 !important;
+  padding: 0.75rem 1.5rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.025em !important;
+}
+
+.theme-modern .terminal-button:hover {
+  background-color: #6B8E5A;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.theme-modern .terminal-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Terminal theme: Keep terminal button styling */
+.theme-terminal .terminal-button {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-secondary);
+  border-radius: 0;
+}
+
+.theme-terminal .terminal-button:hover {
+  background-color: var(--color-text-primary);
+  color: var(--color-surface);
+}
+
+/* Select Styling */
+.terminal-select {
+  cursor: pointer;
+  appearance: none;
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  width: 100%;
+  min-height: 2.75rem;
+  line-height: 1.5;
+}
+
+/* Modern theme: Standard dropdown */
+.theme-modern .terminal-select {
+  background-color: var(--color-surface) !important;
+  border: 2px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-primary) !important;
+  border-radius: var(--input-radius) !important;
+  padding: 0.875rem 3rem 0.875rem 1rem !important;
+  font-size: 1rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+}
+
+.theme-modern .terminal-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--focus-shadow), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Terminal theme: Keep terminal select styling */
+.theme-terminal .terminal-select {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-secondary);
+  border-radius: 0;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2300FF41' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* Labels - Theme-specific styling */
+.terminal-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+/* Modern theme: Clean, professional labels */
+.theme-modern .terminal-label {
+  font-family: var(--font-primary) !important;
+  font-weight: 600 !important;
+  color: var(--color-text-primary) !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.025em !important;
+}
+
+/* Terminal theme: Keep terminal labels */
+.theme-terminal .terminal-label {
+  font-family: var(--font-secondary);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+}
+
+/* Table Styling */
+.terminal-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.terminal-table th,
+.terminal-table td {
+  text-align: left;
+  padding: 1rem;
+}
+
+/* Modern theme: Clean table styling */
+.theme-modern .terminal-table {
+  border-radius: var(--input-radius);
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--color-border) !important;
+}
+
+.theme-modern .terminal-table th {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text-primary) !important;
+  font-weight: 600 !important;
+  font-family: var(--font-primary) !important;
+  border-bottom: 2px solid var(--color-border) !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+.theme-modern .terminal-table td {
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-primary) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  background-color: var(--color-surface) !important;
+}
+
+.theme-modern .terminal-table tbody tr:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* Terminal theme: Keep terminal table styling */
+.theme-terminal .terminal-table th,
+.theme-terminal .terminal-table td {
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-secondary);
+}
+
+.theme-terminal .terminal-table th {
+  color: var(--color-text-primary);
+  font-weight: bold;
+  background-color: var(--color-secondary);
+}
+
+/* Card/Section Styling */
+.terminal-insight {
+  padding: 1.5rem;
+  border-radius: var(--card-radius);
+  transition: all 0.2s ease;
+}
+
+/* Modern theme: Clean card design */
+.theme-modern .terminal-insight {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--card-shadow);
+}
+
+.theme-modern .terminal-insight:hover {
+  box-shadow: var(--hover-shadow, 0 8px 25px -5px rgba(0, 0, 0, 0.1));
+  transform: translateY(-1px);
+}
+
+.theme-modern .terminal-insight-title {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-family: var(--font-primary);
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.theme-modern .terminal-insight-value {
+  color: var(--color-text-accent);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-primary);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.theme-modern .terminal-insight-text {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-family: var(--font-primary);
+}
+
+/* Terminal theme: Keep terminal card styling */
+.theme-terminal .terminal-insight {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-secondary);
+  border-radius: 0;
+}
+
+.theme-terminal .terminal-insight-title {
+  color: var(--color-text-primary);
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.theme-terminal .terminal-insight-value {
+  color: var(--color-text-accent);
+  font-size: 1.25rem;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.theme-terminal .terminal-insight-text {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Chart Container */
+.chart-container {
+  overflow: hidden;
+  background-color: var(--color-surface);
+  transition: all 0.2s ease;
+}
+
+/* Modern theme: Clean chart containers */
+.theme-modern .chart-container {
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--color-border);
+}
+
+/* Terminal theme: Keep terminal chart styling */
+.theme-terminal .chart-container {
+  font-family: var(--font-secondary);
+  color: var(--color-text-primary);
+  border-radius: 0;
+  border: 1px solid var(--color-border);
+}
+
+/* Help Button */
+.terminal-help {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 18px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+/* Modern theme: Clean help button */
+.theme-modern .terminal-help {
+  background-color: var(--color-text-secondary);
+  color: white;
+  font-family: var(--font-primary);
+}
+
+.theme-modern .terminal-help:hover {
+  background-color: var(--color-text-primary);
+  transform: scale(1.1);
+}
+
+/* Terminal theme: Keep terminal help styling */
+.theme-terminal .terminal-help {
+  background-color: var(--color-text-primary);
+  color: var(--color-surface);
+  font-family: var(--font-secondary);
+}
+
+/* Error Styling */
+.terminal-error {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  color: var(--color-error, #ef4444);
+}
+
+.theme-modern .terminal-error {
+  font-family: var(--font-primary);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.theme-terminal .terminal-error {
+  font-family: var(--font-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Section spacing and layout */
+.theme-modern .mb-8 {
+  margin-bottom: 2.5rem;
+}
+
+.theme-modern .mb-6 {
+  margin-bottom: 2rem;
+}
+
+.theme-modern .mb-4 {
+  margin-bottom: 1.5rem;
+}
+
+/* Modern theme: Remove terminal-style elements */
+.theme-modern .terminal-chart h4::before {
+  display: none;
+}
+
+.theme-modern .terminal-chart h4 {
+  padding-left: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .retirement-calculator {
+    margin: 0.5rem;
+    padding: 1.5rem;
+  }
+  
+  .theme-modern .retirement-calculator {
+    border-radius: var(--input-radius);
+  }
+}
+
+/* Loading states */
+.loading-text {
+  pointer-events: none;
+  z-index: 10;
+  color: var(--color-text-primary);
+}
+
+.theme-modern .loading-text {
+  font-family: var(--font-primary);
+}
+
+.theme-terminal .loading-text {
+  font-family: var(--font-secondary);
+}
+
+/* Skip links for accessibility */
+.skip-link {
+  position: absolute !important;
+  top: -40px !important;
+  left: 6px !important;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 8px 16px;
+  z-index: 1000;
+  text-decoration: none;
+  border: 2px solid var(--color-border);
+  border-radius: var(--input-radius);
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+  height: 1px;
+  width: 1px;
+}
+
+.skip-link:focus {
+  top: 6px !important;
+  clip: auto !important;
+  overflow: visible !important;
+  height: auto !important;
+  width: auto !important;
+}
+
+/* Field hint text styling */
+.terminal-input + span,
+.terminal-select + span {
+  color: var(--color-text-secondary);
+  font-family: var(--font-secondary);
+}
+
+.theme-modern .terminal-input + span,
+.theme-modern .terminal-select + span {
+  font-family: var(--font-primary) !important;
+  color: var(--color-text-primary) !important;
+  font-size: 0.875rem !important;
+}
+
+.theme-terminal .terminal-input + span,
+.theme-terminal .terminal-select + span {
+  font-family: var(--font-secondary);
+  color: var(--color-text-primary);
+}
+
+/* Dividing lines and borders */
+.border-b,
+.border-terminal-green {
+  border-color: var(--color-border) !important;
+}
+
+.theme-modern .border-b,
+.theme-modern .border-terminal-green {
+  border-color: var(--color-border) !important;
+}
+
+.theme-terminal .border-b,
+.theme-terminal .border-terminal-green {
+  border-color: var(--color-border) !important;
+}
+
+/* Text formatting - Modern theme text normalization */
+.theme-modern .terminal-label,
+.theme-modern h1,
+.theme-modern h2,
+.theme-modern h3,
+.theme-modern h4 {
+  text-transform: none !important;
+}
+
+/* Text formatting handled by JavaScript for better control */
+
+/* Section headers for modern theme */
+.theme-modern h2,
+.theme-modern h3 {
+  color: var(--color-text-primary) !important;
+}
+
+.theme-modern h4 {
+  color: var(--color-text-accent) !important;
+  font-size: 1rem !important;
+}
+
+/* Retirement goal assessment styling */
+.terminal-goal-assessment {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-secondary);
+}
+
+.theme-modern .terminal-goal-assessment {
+  font-family: var(--font-primary);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: 1.5rem;
+}
+
+.theme-modern .terminal-goal-assessment * {
+  font-family: var(--font-primary) !important;
+}
+
+.theme-terminal .terminal-goal-assessment {
+  font-family: var(--font-secondary);
+  border-radius: 0;
+}
+
+/* Chart title styling */
+.chart-title,
+.widget-title,
+.section-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--color-text-primary);
+}
+
+.theme-modern .chart-title,
+.theme-modern .widget-title,
+.theme-modern .section-title {
+  font-family: var(--font-primary);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-transform: none;
+  letter-spacing: -0.025em;
+  font-size: 1.125rem;
+}
+
+.theme-terminal .chart-title,
+.theme-terminal .widget-title,
+.theme-terminal .section-title {
+  font-family: var(--font-secondary);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 3px var(--color-text-primary);
+}
+
+/* Terminal withdrawal chart specific styling fix */
+.theme-modern .terminal-chart h4,
+.theme-modern .chart-title.retirement-withdrawals,
+.theme-modern .widget-title.retirement-withdrawals {
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-primary) !important;
+  text-transform: none !important;
+  font-weight: 700 !important;
+  text-shadow: none !important;
+}
+
+.theme-terminal .terminal-chart h4,
+.theme-terminal .chart-title.retirement-withdrawals,
+.theme-terminal .widget-title.retirement-withdrawals {
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-secondary) !important;
+  text-transform: uppercase !important;
+  font-weight: bold !important;
+  text-shadow: 0 0 3px var(--color-text-primary) !important;
+}
+
+/* BufoIndex modern theme - Professional sage green palette */
+.theme-modern {
+  --color-text-primary: #1F2937 !important;
+  --color-text-secondary: #6B7280 !important;
+  --color-text-accent: #7FB069 !important;
+  --color-border: #E5E7EB !important;
+  --color-border-hover: #7FB069 !important;
+  --color-border-focus: #7FB069 !important;
+  --color-surface: #ffffff !important;
+  --color-surface-hover: #F9FAFB !important;
+  --color-surface-alt: #F3F4F6 !important;
+}
+
+/* Ensure all chart elements use consistent theming */
+.theme-modern .chart-container,
+.theme-modern .chart-container *,
+.theme-modern canvas {
+  font-family: var(--font-primary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.theme-terminal .chart-container,
+.theme-terminal .chart-container *,
+.theme-terminal canvas {
+  font-family: var(--font-secondary) !important;
+}
+
+/* Chart container specific styling */
+.theme-modern .chart-container h4,
+.theme-modern .chart-container .chart-title {
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-primary) !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  text-shadow: none !important;
+}
+
+.theme-terminal .chart-container h4,
+.theme-terminal .chart-container .chart-title {
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-secondary) !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  text-shadow: 0 0 3px var(--color-text-primary) !important;
+}
+
+/* Modern theme opacity overrides - use solid colors instead */
+.theme-modern .opacity-75 {
+  opacity: 1 !important;
+  color: var(--color-text-primary) !important;
+}
+
+.theme-modern .opacity-50 {
+  opacity: 1 !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Exception: Allow opacity for toggle buttons */
+.theme-modern .terminal-toggle.opacity-60 {
+  opacity: 0.6 !important;
+  color: var(--color-text-secondary) !important;
+  font-size: 0.875rem !important;
+}
+
+/* Subtitle text styling */
+.subtitle-text {
+  color: var(--color-text-secondary);
+}
+
+.theme-modern .subtitle-text {
+  color: var(--color-text-primary) !important;
+  opacity: 1 !important;
+}
+
+.theme-terminal .subtitle-text {
+  color: var(--color-text-primary);
+  opacity: 0.75;
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* State dropdown container styling */
+#stateDropdown {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  font-family: var(--font-secondary);
+}
+
+/* Modern theme: Clean dropdown styling */
+.theme-modern #stateDropdown {
+  background-color: var(--color-surface) !important;
+  border: 2px solid var(--color-border) !important;
+  border-radius: var(--input-radius) !important;
+  box-shadow: var(--card-shadow) !important;
+  font-family: var(--font-primary) !important;
+}
+
+/* Terminal theme: Keep terminal dropdown styling */
+.theme-terminal #stateDropdown {
+  background-color: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 0 !important;
+  font-family: var(--font-secondary) !important;
+}
+
+/* Dropdown option styling */
+#stateDropdown [role="option"] {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+#stateDropdown [role="option"]:last-child {
+  border-bottom: none;
+}
+
+#stateDropdown [role="option"]:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* Modern theme: Clean dropdown options */
+.theme-modern #stateDropdown [role="option"] {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-primary) !important;
+  padding: 0.875rem 1rem !important;
+}
+
+.theme-modern #stateDropdown [role="option"]:hover {
+  background-color: var(--color-surface-hover) !important;
+}
+
+.theme-modern #stateDropdown [role="option"]:focus,
+.theme-modern #stateDropdown [role="option"][aria-selected="true"] {
+  background-color: var(--color-accent) !important;
+  color: white !important;
+  outline: none;
+}
+
+/* Terminal theme: Keep terminal option styling */
+.theme-terminal #stateDropdown [role="option"] {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-secondary) !important;
+}
+
+.theme-terminal #stateDropdown [role="option"]:hover {
+  background-color: var(--color-text-primary) !important;
+  color: var(--color-surface) !important;
+}

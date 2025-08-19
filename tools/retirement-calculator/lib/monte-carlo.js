@@ -221,8 +221,7 @@ class MonteCarloEngine {
         const startTime = performance.now();
 
         scenarios.forEach((scenario, scenarioIndex) => {
-            console.log(`Running ${monteCarloRuns} simulations for Scenario ${String.fromCharCode(65 + scenarioIndex)}...`);
-            
+                
             const scenarioResults = {
                 scenario: String.fromCharCode(65 + scenarioIndex), // A, B, C, etc.
                 retirementAge: scenario.retirementAge,
@@ -343,8 +342,6 @@ class MonteCarloEngine {
         // Generate cross-scenario comparisons
         results.aggregatedStats = this.generateAggregatedStats(results.scenarios);
 
-        console.log(`Monte Carlo simulation completed in ${Math.round(results.executionTime)}ms`);
-        console.log(`Total simulations: ${results.totalSimulations}`);
         
         return results;
     }

@@ -33,6 +33,28 @@ class RetirementCalculator {
         return Math.round(amount).toLocaleString();
     }
 
+    // Helper function to get theme-appropriate text
+    getThemeText(terminalText) {
+        const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
+        
+        if (currentTheme === 'modern') {
+            const textMappings = {
+                'YOUR RETIREMENT GOAL': 'Your Retirement Goal',
+                'ASSESSMENT': 'Assessment',
+                'RETIREMENT_GOAL_ASSESSMENT': 'Retirement Goal Assessment',
+                'VISUALIZATIONS': 'Visualizations',
+                'KEY_INSIGHTS': 'Key Insights',
+                '[EXPAND]': 'Expand',
+                '[COLLAPSE]': 'Collapse',
+                'EXPAND': 'Expand',
+                'COLLAPSE': 'Collapse'
+            };
+            return textMappings[terminalText] || terminalText;
+        }
+        
+        return terminalText;
+    }
+
     /**
      * Generate hash of parameters for cache key
      */
@@ -85,10 +107,7 @@ class RetirementCalculator {
         const fullCacheKey = `${currentHash}_${cacheKey}`;
         
         if (!this.chartDataCache.has(fullCacheKey)) {
-            console.log(`Generating chart data for: ${cacheKey}`);
             this.chartDataCache.set(fullCacheKey, generatorFunction());
-        } else {
-            console.log(`Using cached chart data for: ${cacheKey}`);
         }
         
         return this.chartDataCache.get(fullCacheKey);
@@ -100,6 +119,162 @@ class RetirementCalculator {
     clearChartCache() {
         this.chartDataCache.clear();
         this.lastParametersHash = null;
+    }
+
+    /**
+     * Initialize theme system
+     */
+    initializeTheme() {
+        // Check for saved theme preference or use default from ThemeConfig
+        this.currentTheme = ThemeConfig.getCurrentTheme();
+        this.applyTheme(this.currentTheme);
+        
+        // Set up theme toggle button
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            this.updateThemeToggleButton(themeToggle);
+            themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
+    }
+
+    /**
+     * Toggle between available themes
+     */
+    toggleTheme() {
+        const themeNames = ThemeConfig.getThemeNames();
+        const currentIndex = themeNames.indexOf(this.currentTheme);
+        const nextIndex = (currentIndex + 1) % themeNames.length;
+        this.currentTheme = themeNames[nextIndex];
+        
+        this.applyTheme(this.currentTheme);
+        
+        // Save preference
+        ThemeConfig.saveTheme(this.currentTheme);
+        
+        // Update button text
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            this.updateThemeToggleButton(themeToggle);
+        }
+        
+        // Force destroy and recreate all charts with new theme colors
+        this.destroyAllCharts();
+        this.updateAllCharts();
+        
+        // Apply text transformations after a brief delay to ensure DOM is updated
+        setTimeout(() => {
+            if (typeof ThemeConfig !== 'undefined') {
+                ThemeConfig.applyTextTransformations(this.currentTheme);
+            }
+        }, 100);
+    }
+
+    /**
+     * Apply the specified theme using ThemeConfig
+     */
+    applyTheme(theme) {
+        if (typeof ThemeConfig !== 'undefined') {
+            ThemeConfig.applyTheme(theme);
+            
+            // Refresh charts with new theme if calculation data exists
+            if (this.scenarios && this.scenarios.length > 0) {
+                this.refreshChartsWithTheme();
+            }
+        }
+    }
+    
+    /**
+     * Refresh all charts with current theme
+     */
+    refreshChartsWithTheme() {
+        // Destroy existing charts
+        this.destroyAllCharts();
+        
+        // Recreate charts with current data and theme
+        if (this.scenarios && this.scenarios.length > 0) {
+            this.createNetWorthChart(this.scenarios);
+            
+            // Recreate withdrawals chart if we have retirement data
+            const retirementScenario = this.scenarios.find(s => s.retirementData && s.retirementData.length > 0);
+            if (retirementScenario) {
+                // Format data structure properly for theme-aware chart
+                const chartData = {
+                    scenarios: [{
+                        scenario: 1,
+                        retirementData: retirementScenario.retirementData
+                    }]
+                };
+                
+                // Recreate the withdrawals chart using the same method as initial creation
+                if (this.withdrawalsChart) {
+                    this.withdrawalsChart.destroy();
+                    this.withdrawalsChart = null;
+                }
+                
+                const ctx = document.getElementById('withdrawalsChart').getContext('2d');
+                if (typeof ChartThemes !== 'undefined') {
+                    try {
+                        const config = ChartThemes.createWithdrawalsChart(chartData, this.getCurrentThemeName());
+                        this.withdrawalsChart = new Chart(ctx, config);
+                    } catch (error) {
+                        console.warn('Failed to use theme-aware withdrawals chart during refresh:', error);
+                    }
+                }
+            }
+            
+            // Recreate savings vs retirement chart if we have the data
+            const savingsData = this.getSavingsVsRetirementData();
+            if (savingsData && savingsData.length > 0) {
+                this.createSavingsVsRetirementChart(savingsData);
+            }
+        }
+    }
+
+    /**
+     * Update theme toggle button text
+     */
+    updateThemeToggleButton(button) {
+        const themeNames = ThemeConfig.getThemeNames();
+        const currentIndex = themeNames.indexOf(this.currentTheme);
+        const nextIndex = (currentIndex + 1) % themeNames.length;
+        const nextTheme = themeNames[nextIndex];
+        
+        button.textContent = ThemeConfig.getTheme(nextTheme).name.toUpperCase();
+        button.title = `Switch to ${ThemeConfig.getTheme(nextTheme).name.toLowerCase()} theme`;
+    }
+
+    /**
+     * Destroy all existing charts
+     */
+    destroyAllCharts() {
+        if (this.netWorthChart) {
+            this.netWorthChart.destroy();
+            this.netWorthChart = null;
+        }
+        if (this.withdrawalsChart) {
+            this.withdrawalsChart.destroy();
+            this.withdrawalsChart = null;
+        }
+        if (this.savingsVsRetirementChart) {
+            this.savingsVsRetirementChart.destroy();
+            this.savingsVsRetirementChart = null;
+        }
+    }
+
+    /**
+     * Update all charts with current theme
+     */
+    updateAllCharts() {
+        if (this.scenarios && this.scenarios.length > 0) {
+            this.updateCharts();
+        }
+    }
+
+    /**
+     * Get current theme name for chart configurations
+     */
+    getCurrentThemeName() {
+        return this.currentTheme || ThemeConfig.getCurrentTheme();
     }
 
     /**
@@ -117,108 +292,6 @@ class RetirementCalculator {
         }.bind(this);
     }
 
-    /**
-     * Show loading state for calculations
-     */
-    showLoadingState(message = 'Calculating...') {
-        const calculator = document.querySelector('.retirement-calculator');
-        if (!calculator) return;
-
-        // Remove existing loading overlay
-        const existingOverlay = document.getElementById('loading-overlay');
-        if (existingOverlay) {
-            existingOverlay.remove();
-        }
-
-        // Create loading overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'loading-overlay';
-        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        overlay.innerHTML = `
-            <div class="bg-terminal-dark border border-terminal-green p-6 rounded-lg text-center max-w-md mx-4">
-                <div class="text-terminal-green mb-4">
-                    <div class="terminal-spinner mx-auto mb-3"></div>
-                    <div class="font-mono text-lg">${message}</div>
-                </div>
-                <div class="text-terminal-green text-sm opacity-75">
-                    Please wait while we process your financial scenarios...
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-    }
-
-    /**
-     * Hide loading state
-     */
-    hideLoadingState() {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) {
-            overlay.remove();
-        }
-    }
-
-    /**
-     * Show chart loading state
-     */
-    showChartLoading(chartId) {
-        const container = document.getElementById(chartId)?.parentElement;
-        if (!container) return;
-
-        container.classList.add('loading');
-        const canvas = document.getElementById(chartId);
-        if (canvas) {
-            canvas.style.opacity = '0.3';
-        }
-
-        // Add loading text if not present
-        let loadingText = container.querySelector('.loading-text');
-        if (!loadingText) {
-            loadingText = document.createElement('div');
-            loadingText.className = 'loading-text absolute inset-0 flex items-center justify-center text-terminal-green font-mono text-sm';
-            loadingText.innerHTML = `
-                <div class="text-center">
-                    <div class="terminal-spinner-small mb-2"></div>
-                    <div>Generating chart...</div>
-                </div>
-            `;
-            container.style.position = 'relative';
-            container.appendChild(loadingText);
-        }
-    }
-
-    /**
-     * Hide chart loading state
-     */
-    hideChartLoading(chartId) {
-        const container = document.getElementById(chartId)?.parentElement;
-        if (!container) return;
-
-        container.classList.remove('loading');
-        const canvas = document.getElementById(chartId);
-        if (canvas) {
-            canvas.style.opacity = '1';
-        }
-
-        const loadingText = container.querySelector('.loading-text');
-        if (loadingText) {
-            loadingText.remove();
-        }
-    }
-
-    /**
-     * Update loading overlay message
-     */
-    updateLoadingMessage(message) {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) {
-            const messageElement = overlay.querySelector('.font-mono');
-            if (messageElement) {
-                messageElement.textContent = message;
-            }
-        }
-    }
 
     /**
      * Disable/enable form inputs during calculations
@@ -238,6 +311,9 @@ class RetirementCalculator {
     }
 
     init() {
+        // Initialize theme
+        this.initializeTheme();
+        
         // Load state from URL or use defaults
         const params = URLStateManager.loadState();
         URLStateManager.applyParametersToForm(params);
@@ -259,6 +335,13 @@ class RetirementCalculator {
         
         // Initial calculation
         this.updateAll();
+        
+        // Apply initial text transformations after page load
+        setTimeout(() => {
+            if (typeof ThemeConfig !== 'undefined') {
+                ThemeConfig.applyTextTransformations(this.currentTheme);
+            }
+        }, 500);
     }
 
     setupEventListeners() {
@@ -584,8 +667,8 @@ class RetirementCalculator {
         tbody.innerHTML = this.scenarios.map(scenario => {
             if (!scenario.valid) {
                 return `
-                    <tr class="text-terminal-green opacity-50">
-                        <td class="py-2 px-3">SCENARIO_${scenario.label}</td>
+                    <tr class="subtitle-text">
+                        <td class="py-2 px-3">${this.getThemeText(`SCENARIO_${scenario.label}`)}</td>
                         <td class="py-2 px-3">${Math.round(scenario.savingsRate * 100)}%</td>
                         <td class="py-2 px-3" colspan="3">INVALID: Unable to retire with this savings rate</td>
                     </tr>
@@ -608,7 +691,7 @@ class RetirementCalculator {
 
             return `
                 <tr class="text-terminal-green">
-                    <td class="py-2 px-3">SCENARIO_${scenario.label}</td>
+                    <td class="py-2 px-3">${this.getThemeText(`SCENARIO_${scenario.label}`)}</td>
                     <td class="py-2 px-3">${savingsRateDisplay}</td>
                     <td class="py-2 px-3">${scenario.retirementAge}</td>
                     <td class="py-2 px-3 ${realismClass}">
@@ -727,7 +810,7 @@ class RetirementCalculator {
             if (currentScenario && aggressiveScenario && currentScenario.valid && aggressiveScenario.valid) {
                 const yearsSaved = currentScenario.retirementAge - aggressiveScenario.retirementAge;
                 insights.push({
-                    title: 'SAVINGS_RATE_IMPACT',
+                    title: this.getThemeText('Savings Rate Impact'),
                     value: `${yearsSaved} years`,
                     text: `Increasing your savings rate by 20% (from ${Math.round(currentScenario.savingsRate*100)}% to ${Math.round(aggressiveScenario.savingsRate*100)}%) allows you to retire ${yearsSaved} years earlier.`
                 });
@@ -739,7 +822,7 @@ class RetirementCalculator {
             const maxSavings = Math.round(window.SavingsFeasibility.calculateMaxRealisticSavings(params.currentIncome, params.state) * 100);
             
             insights.push({
-                title: 'LOCATION_IMPACT',
+                title: this.getThemeText('Location Impact'),
                 value: `${maxSavings}% max`,
                 text: `Living in ${params.state} (${colNames[colTier]} cost of living) limits realistic savings to approximately ${maxSavings}% of income at your income level.`
             });
@@ -764,7 +847,7 @@ class RetirementCalculator {
                     const failureRate = 100 - successRate;
                     
                     insights.push({
-                        title: 'PORTFOLIO_DURABILITY',
+                        title: this.getThemeText('Portfolio Durability'),
                         value: `${successRate}% success`,
                         text: `Even if you achieve your savings goals (${Math.round(lowestSuccess.savingsRate*100)}% savings rate), your portfolio has a ${failureRate}% risk of depletion during retirement due to market volatility. This is separate from whether you can actually save that much.`
                     });
@@ -930,10 +1013,44 @@ class RetirementCalculator {
             this.netWorthChart.destroy();
         }
         
-        // Create new chart
+        // Create new chart with theme-aware configuration
         const ctx = document.getElementById('netWorthChart');
         if (!ctx) return;
         
+        // Prepare data in format expected by ChartThemes
+        const chartData = {
+            scenarios: validScenarios.map((scenario, index) => {
+                const ageData = [];
+                const startAge = params.startingAge;
+                const endAge = params.endAge || 85;
+                
+                // Extract age and net worth data from the scenario
+                for (let age = startAge; age <= endAge; age++) {
+                    const dataPoint = datasets[index]?.data?.find(d => d.x === age);
+                    if (dataPoint) {
+                        ageData.push({ age: age, netWorth: dataPoint.y });
+                    }
+                }
+                
+                return {
+                    scenario: index + 1,
+                    projections: ageData
+                };
+            })
+        };
+        
+        // Use theme-aware chart configuration if available
+        if (typeof ChartThemes !== 'undefined') {
+            try {
+                const config = ChartThemes.createNetWorthChart(chartData, this.getCurrentThemeName());
+                this.netWorthChart = new Chart(ctx, config);
+                return;
+            } catch (error) {
+                console.warn('Failed to use theme-aware chart, falling back to default:', error);
+            }
+        }
+        
+        // Fallback to original configuration
         this.netWorthChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -1097,8 +1214,53 @@ class RetirementCalculator {
             this.withdrawalsChart.destroy();
         }
 
-        // Create new chart
+        // Create new chart with theme-aware configuration
         const ctx = document.getElementById('withdrawalsChart').getContext('2d');
+        
+        // Prepare data for theme-aware chart
+        const retirementData = [];
+        
+        // Create proper retirement data from withdrawal data and calculate hypothetical balances
+        if (datasets && datasets.length > 0) {
+            const withdrawalDataset = datasets[0]; // The withdrawal dataset
+            
+            if (withdrawalDataset && withdrawalDataset.data) {
+                // Calculate a hypothetical portfolio balance that could support these withdrawals
+                // Using a simplified calculation: assume 4% withdrawal rate
+                withdrawalDataset.data.forEach((point, index) => {
+                    const withdrawal = point.y;
+                    const age = point.x;
+                    // Rough estimate: balance = withdrawal / 0.04 (4% rule)
+                    const estimatedBalance = withdrawal / 0.04;
+                    
+                    retirementData.push({
+                        age: age,
+                        balance: estimatedBalance,
+                        withdrawal: withdrawal
+                    });
+                });
+            }
+        }
+        
+        const chartData = {
+            scenarios: [{
+                scenario: 1,
+                retirementData: retirementData
+            }]
+        };
+        
+        // Use theme-aware chart configuration if available and has data
+        if (typeof ChartThemes !== 'undefined' && retirementData.length > 0) {
+            try {
+                const config = ChartThemes.createWithdrawalsChart(chartData, this.getCurrentThemeName());
+                this.withdrawalsChart = new Chart(ctx, config);
+                return;
+            } catch (error) {
+                console.warn('Failed to use theme-aware withdrawals chart, falling back to default:', error);
+            }
+        }
+        
+        // Fallback to original configuration
         this.withdrawalsChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -1195,22 +1357,10 @@ class RetirementCalculator {
         const startTime = Date.now();
         
         try {
-            // Show loading for complex calculations (if they'll take more than 500ms)
-            const isComplexCalculation = this.shouldShowLoading();
-            
-            if (isComplexCalculation) {
-                this.showLoadingState('Analyzing retirement scenarios...');
-                this.setInputsDisabled(true);
-            }
-            
             // Calculate basic scenarios first
             this.calculateScenarios();
             this.updateTargetGoalAssessment();
             this.updateSummaryTable();
-            
-            if (isComplexCalculation) {
-                this.updateLoadingMessage('Running advanced simulations...');
-            }
             
             // Run Monte Carlo simulation and financial modeling asynchronously
             await this.runMonteCarloAnalysis();
@@ -1222,68 +1372,16 @@ class RetirementCalculator {
             // Generate insights after all data is available
             this.updateInsights();
             
-            if (isComplexCalculation) {
-                this.updateLoadingMessage('Generating visualizations...');
-            }
-            
-            // Update all charts with loading states
-            await this.updateChartsWithProgress();
+            // Update all charts directly without loading states
+            this.updateCharts();
             
         } catch (error) {
             console.error('Error in updateAll:', error);
         } finally {
-            // Always hide loading and re-enable inputs
-            this.hideLoadingState();
-            this.setInputsDisabled(false);
-            
             const duration = Date.now() - startTime;
-            console.log(`Update completed in ${duration}ms`);
         }
     }
 
-    /**
-     * Determine if we should show loading state based on complexity
-     */
-    shouldShowLoading() {
-        const params = this.collectEnhancedParameters();
-        const monteCarloRuns = this.getOptimalMonteCarloRuns(params);
-        
-        // Show loading for complex scenarios
-        return monteCarloRuns > 1000 || 
-               (params.volatility > 20) || 
-               (typeof MonteCarloEngine !== 'undefined' && typeof FinancialModeling !== 'undefined');
-    }
-
-    /**
-     * Update charts with individual loading states
-     */
-    async updateChartsWithProgress() {
-        const chartUpdates = [
-            { id: 'netWorthChart', method: 'updateNetWorthChart' },
-            { id: 'withdrawalsChart', method: 'updateWithdrawalsChart' },
-            { id: 'savingsVsRetirementChart', method: 'updateSavingsVsRetirementChart' }
-        ];
-
-        // Update charts with individual loading states
-        for (const chart of chartUpdates) {
-            this.showChartLoading(chart.id);
-            
-            await new Promise(resolve => {
-                setTimeout(() => {
-                    try {
-                        if (typeof this[chart.method] === 'function') {
-                            this[chart.method]();
-                        }
-                    } catch (error) {
-                        console.error(`Error updating ${chart.id}:`, error);
-                    } finally {
-                        this.hideChartLoading(chart.id);
-                        resolve();
-                    }
-                }, 50); // Small delay between chart updates
-            });
-        }
-    }
 
     updateTargetGoalAssessment() {
         const container = document.getElementById('targetGoalContent');
@@ -1295,7 +1393,7 @@ class RetirementCalculator {
         if (!this.targetGoalAssessment) {
             console.warn('Target goal assessment not available');
             container.innerHTML = `
-                <div class="text-terminal-green opacity-75 text-center py-4">
+                <div class="subtitle-text text-center py-4">
                     CALCULATING RETIREMENT GOAL ASSESSMENT...
                 </div>
             `;
@@ -1335,17 +1433,17 @@ class RetirementCalculator {
             container.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <h4 class="text-terminal-green font-bold mb-3">YOUR RETIREMENT GOAL</h4>
+                        <h4 class="text-terminal-green font-bold mb-3">${this.getThemeText('YOUR RETIREMENT GOAL')}</h4>
                         <div class="space-y-2 text-sm">
-                            <div><span class="opacity-75">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
-                            <div><span class="opacity-75">Target Annual Income:</span> $${this.formatCurrency(params.targetIncome)}</div>
-                            <div><span class="opacity-75">Current Savings Rate:</span> ${currentRate}%</div>
-                            <div><span class="opacity-75">Required Savings Rate:</span> <span class="${rateDifference > 0 ? 'text-orange-400' : 'text-green-400'}">${requiredRate}%</span></div>
+                            <div><span class="subtitle-text">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
+                            <div><span class="subtitle-text">Target Annual Income:</span> $${this.formatCurrency(params.targetIncome)}</div>
+                            <div><span class="subtitle-text">Current Savings Rate:</span> ${currentRate}%</div>
+                            <div><span class="subtitle-text">Required Savings Rate:</span> <span class="${rateDifference > 0 ? 'text-orange-400' : 'text-green-400'}">${requiredRate}%</span></div>
                         </div>
                     </div>
                     
                     <div>
-                        <h4 class="text-terminal-green font-bold mb-3">ASSESSMENT</h4>
+                        <h4 class="text-terminal-green font-bold mb-3">${this.getThemeText('ASSESSMENT')}</h4>
                         <div class="space-y-3">
                             <div class="flex items-center gap-3">
                                 <span class="${realismClass} font-bold">${assessment.realismAssessment.rating}</span>
@@ -1894,7 +1992,7 @@ class RetirementCalculator {
                 ...basic,
                 
                 // Smart Monte Carlo runs based on scenario complexity
-                monteCarloRuns: this.getOptimalMonteCarloRuns(this.collectEnhancedParameters()),
+                monteCarloRuns: this.getOptimalMonteCarloRuns(basic),
                 accountType: this.getSelectValue('accountType'),
                 socialSecurityAge: this.getInputValue('socialSecurityAge', 'number') || 67,
                 socialSecurityBenefit: this.getInputValue('socialSecurityBenefit', 'currency') || 2000,
@@ -1930,7 +2028,6 @@ class RetirementCalculator {
                 enhanced.volatility = 12;
             }
 
-            console.log('Collected enhanced parameters:', enhanced);
             return enhanced;
         } catch (error) {
             console.error('Error collecting enhanced parameters:', error);
@@ -1961,8 +2058,7 @@ class RetirementCalculator {
     getInputValue(id, type = 'number') {
         const element = document.getElementById(id);
         if (!element) {
-            console.warn(`Element with id '${id}' not found`);
-            // Return default values for missing elements
+            // Silently handle missing elements with defaults (enhanced parameters are optional)
             const defaults = {
                 'targetRetirementAge': 45,
                 'currentSavingsRate': 15,
@@ -2006,8 +2102,7 @@ class RetirementCalculator {
     getSelectValue(id) {
         const element = document.getElementById(id);
         if (!element) {
-            console.warn(`Select element with id '${id}' not found`);
-            // Return default values for missing selects
+            // Silently handle missing elements with defaults (enhanced parameters are optional)
             const defaults = {
                 'state': 'TX',
                 'riskProfile': 'tdf',
@@ -2331,8 +2426,7 @@ class RetirementCalculator {
 
         // Use cached data for expensive calculation
         const data = this.getCachedChartData('savingsVsRetirement', () => {
-            console.log('Generating savings vs retirement chart data...');
-            const chartData = [];
+                const chartData = [];
             
             for (let retireAge = minRetireAge; retireAge <= maxRetireAge; retireAge += 2) {
                 try {
@@ -2394,6 +2488,25 @@ class RetirementCalculator {
         const ctx = document.getElementById('savingsVsRetirementChart')?.getContext('2d');
         if (!ctx) return;
 
+        // Use theme-aware chart configuration if available
+        if (typeof ChartThemes !== 'undefined') {
+            try {
+                const chartData = {
+                    scenarios: data.map((point, index) => ({
+                        scenario: index + 1,
+                        savingsRate: point.y,
+                        retirementAge: point.x
+                    }))
+                };
+                const config = ChartThemes.createSavingsVsRetirementChart(chartData, this.getCurrentThemeName());
+                this.savingsVsRetirementChart = new Chart(ctx, config);
+                return;
+            } catch (error) {
+                console.warn('Failed to use theme-aware savings chart, falling back to default:', error);
+            }
+        }
+        
+        // Fallback to original configuration
         this.savingsVsRetirementChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -2510,12 +2623,42 @@ function toggleAssumptions() {
     
     if (section.classList.contains('hidden')) {
         section.classList.remove('hidden');
-        toggle.textContent = '[COLLAPSE]';
+        // Set collapse text based on current theme
+        const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
+        toggle.textContent = currentTheme === 'modern' ? '(Collapse)' : '([COLLAPSE])';
     } else {
         section.classList.add('hidden');
-        toggle.textContent = '[EXPAND]';
+        // Set expand text based on current theme
+        const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
+        toggle.textContent = currentTheme === 'modern' ? '(Expand)' : '([EXPAND])';
     }
 }
+
+// Global theme text helper function
+window.getThemeText = function(inputText) {
+    const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
+    
+    if (currentTheme === 'modern') {
+        // Modern theme: return as-is (normal case)
+        return inputText;
+    } else {
+        // Terminal theme: convert to CAPS_WITH_UNDERSCORES
+        const textToTerminalMappings = {
+            '[EXPAND]': '[EXPAND]',
+            '[COLLAPSE]': '[COLLAPSE]',
+            'Expand': '[EXPAND]',
+            'Collapse': '[COLLAPSE]',
+            'YOUR RETIREMENT GOAL': 'YOUR RETIREMENT GOAL',
+            'Your Retirement Goal': 'YOUR RETIREMENT_GOAL',
+            'ASSESSMENT': 'ASSESSMENT',
+            'Assessment': 'ASSESSMENT',
+            'Savings Rate Impact': 'SAVINGS_RATE_IMPACT',
+            'Location Impact': 'LOCATION_IMPACT',
+            'Portfolio Durability': 'PORTFOLIO_DURABILITY'
+        };
+        return textToTerminalMappings[inputText] || inputText;
+    }
+};
 
 // Initialize calculator when page loads
 document.addEventListener('DOMContentLoaded', () => {
@@ -2575,7 +2718,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Log waiting status periodically
             if (checkCount % 10 === 0) {
-                console.log(`Waiting for dependencies to load... (${checkCount/10}s)`);
                 logger.logWarning({
                     message: `Still waiting for dependencies after ${checkCount/10}s`,
                     missing: dependencyCheck.missing
@@ -2673,7 +2815,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="bg-red-900 border border-red-400 text-red-200 p-6 rounded text-center">
                         <h3 class="text-xl font-bold mb-2">⚠️ Calculator Unavailable</h3>
                         <p class="mb-4">The retirement calculator cannot load properly.</p>
-                        <p class="text-sm opacity-75">Please refresh the page or try again later.</p>
+                        <p class="text-sm subtitle-text">Please refresh the page or try again later.</p>
                         <button onclick="location.reload()" class="mt-4 bg-red-700 hover:bg-red-600 px-4 py-2 rounded text-sm">
                             Refresh Page
                         </button>
@@ -2714,7 +2856,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const chartContainers = document.querySelectorAll('.chart-container');
                 chartContainers.forEach(container => {
                     container.innerHTML = `
-                        <div class="flex items-center justify-center h-full text-terminal-green opacity-50">
+                        <div class="flex items-center justify-center h-full subtitle-text">
                             <div class="text-center">
                                 <div class="text-lg mb-2">📊</div>
                                 <div class="text-sm">Chart unavailable in basic mode</div>
