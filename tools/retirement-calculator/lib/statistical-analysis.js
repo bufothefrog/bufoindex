@@ -325,7 +325,7 @@ class StatisticalAnalysis {
     }
 
     /**
-     * Format currency for display (without symbol for terminal aesthetics)
+     * Format currency for display (without symbol for clean formatting)
      * @param {number} amount - Dollar amount
      * @returns {string} - Formatted currency string
      */

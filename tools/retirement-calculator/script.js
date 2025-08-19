@@ -1,6 +1,6 @@
 /**
  * Retirement Calculator Main Script v2.0
- * Orchestrates the terminal-style retirement planning calculator with Monte Carlo analysis
+ * Orchestrates the modern retirement planning calculator with Monte Carlo analysis
  */
 
 class RetirementCalculator {
@@ -33,26 +33,46 @@ class RetirementCalculator {
         return Math.round(amount).toLocaleString();
     }
 
-    // Helper function to get theme-appropriate text
-    getThemeText(terminalText) {
-        const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
-        
-        if (currentTheme === 'modern') {
-            const textMappings = {
-                'YOUR RETIREMENT GOAL': 'Your Retirement Goal',
-                'ASSESSMENT': 'Assessment',
-                'RETIREMENT_GOAL_ASSESSMENT': 'Retirement Goal Assessment',
-                'VISUALIZATIONS': 'Visualizations',
-                'KEY_INSIGHTS': 'Key Insights',
-                '[EXPAND]': 'Expand',
-                '[COLLAPSE]': 'Collapse',
-                'EXPAND': 'Expand',
-                'COLLAPSE': 'Collapse'
-            };
-            return textMappings[terminalText] || terminalText;
+    // Helper function for modern text formatting
+    getThemeText(rawText) {
+        const textMappings = {
+            'YOUR RETIREMENT GOAL': 'Your Retirement Goal',
+            'ASSESSMENT': 'Assessment',
+            'RETIREMENT_GOAL_ASSESSMENT': 'Retirement Goal Assessment',
+            'VISUALIZATIONS': 'Visualizations',
+            'KEY_INSIGHTS': 'Key Insights',
+            '[EXPAND]': 'Expand',
+            '[COLLAPSE]': 'Collapse',
+            'EXPAND': 'Expand',
+            'COLLAPSE': 'Collapse'
+        };
+        return textMappings[rawText] || rawText;
+    }
+
+    // Helper function to get theme colors for chart fallbacks
+    getThemeColors() {
+        if (typeof ThemeConfig !== 'undefined' && ThemeConfig.getChartColors) {
+            return ThemeConfig.getChartColors();
         }
-        
-        return terminalText;
+        // Ultimate fallback if theme system is not available
+        return {
+            primary: '#7FB069',
+            secondary: '#FFB86C',
+            text: '#1F2937',
+            background: '#FFFFFF',
+            grid: '#E5E7EB'
+        };
+    }
+
+    // Helper function to get theme fonts for chart fallbacks
+    getThemeFonts() {
+        if (typeof ThemeConfig !== 'undefined' && ThemeConfig.fonts) {
+            return ThemeConfig.fonts;
+        }
+        // Ultimate fallback
+        return {
+            primary: '-apple-system, BlinkMacSystemFont, sans-serif'
+        };
     }
 
     /**
@@ -124,124 +144,22 @@ class RetirementCalculator {
     /**
      * Initialize theme system
      */
-    initializeTheme() {
-        // Check for saved theme preference or use default from ThemeConfig
-        this.currentTheme = ThemeConfig.getCurrentTheme();
-        this.applyTheme(this.currentTheme);
-        
-        // Set up theme toggle button
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            this.updateThemeToggleButton(themeToggle);
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
-    }
 
     /**
      * Toggle between available themes
      */
-    toggleTheme() {
-        const themeNames = ThemeConfig.getThemeNames();
-        const currentIndex = themeNames.indexOf(this.currentTheme);
-        const nextIndex = (currentIndex + 1) % themeNames.length;
-        this.currentTheme = themeNames[nextIndex];
-        
-        this.applyTheme(this.currentTheme);
-        
-        // Save preference
-        ThemeConfig.saveTheme(this.currentTheme);
-        
-        // Update button text
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            this.updateThemeToggleButton(themeToggle);
-        }
-        
-        // Force destroy and recreate all charts with new theme colors
-        this.destroyAllCharts();
-        this.updateAllCharts();
-        
-        // Apply text transformations after a brief delay to ensure DOM is updated
-        setTimeout(() => {
-            if (typeof ThemeConfig !== 'undefined') {
-                ThemeConfig.applyTextTransformations(this.currentTheme);
-            }
-        }, 100);
-    }
 
     /**
      * Apply the specified theme using ThemeConfig
      */
-    applyTheme(theme) {
-        if (typeof ThemeConfig !== 'undefined') {
-            ThemeConfig.applyTheme(theme);
-            
-            // Refresh charts with new theme if calculation data exists
-            if (this.scenarios && this.scenarios.length > 0) {
-                this.refreshChartsWithTheme();
-            }
-        }
-    }
     
     /**
      * Refresh all charts with current theme
      */
-    refreshChartsWithTheme() {
-        // Destroy existing charts
-        this.destroyAllCharts();
-        
-        // Recreate charts with current data and theme
-        if (this.scenarios && this.scenarios.length > 0) {
-            this.createNetWorthChart(this.scenarios);
-            
-            // Recreate withdrawals chart if we have retirement data
-            const retirementScenario = this.scenarios.find(s => s.retirementData && s.retirementData.length > 0);
-            if (retirementScenario) {
-                // Format data structure properly for theme-aware chart
-                const chartData = {
-                    scenarios: [{
-                        scenario: 1,
-                        retirementData: retirementScenario.retirementData
-                    }]
-                };
-                
-                // Recreate the withdrawals chart using the same method as initial creation
-                if (this.withdrawalsChart) {
-                    this.withdrawalsChart.destroy();
-                    this.withdrawalsChart = null;
-                }
-                
-                const ctx = document.getElementById('withdrawalsChart').getContext('2d');
-                if (typeof ChartThemes !== 'undefined') {
-                    try {
-                        const config = ChartThemes.createWithdrawalsChart(chartData, this.getCurrentThemeName());
-                        this.withdrawalsChart = new Chart(ctx, config);
-                    } catch (error) {
-                        console.warn('Failed to use theme-aware withdrawals chart during refresh:', error);
-                    }
-                }
-            }
-            
-            // Recreate savings vs retirement chart if we have the data
-            const savingsData = this.getSavingsVsRetirementData();
-            if (savingsData && savingsData.length > 0) {
-                this.createSavingsVsRetirementChart(savingsData);
-            }
-        }
-    }
 
     /**
      * Update theme toggle button text
      */
-    updateThemeToggleButton(button) {
-        const themeNames = ThemeConfig.getThemeNames();
-        const currentIndex = themeNames.indexOf(this.currentTheme);
-        const nextIndex = (currentIndex + 1) % themeNames.length;
-        const nextTheme = themeNames[nextIndex];
-        
-        button.textContent = ThemeConfig.getTheme(nextTheme).name.toUpperCase();
-        button.title = `Switch to ${ThemeConfig.getTheme(nextTheme).name.toLowerCase()} theme`;
-    }
 
     /**
      * Destroy all existing charts
@@ -270,12 +188,6 @@ class RetirementCalculator {
         }
     }
 
-    /**
-     * Get current theme name for chart configurations
-     */
-    getCurrentThemeName() {
-        return this.currentTheme || ThemeConfig.getCurrentTheme();
-    }
 
     /**
      * Debounce function to limit rapid updates
@@ -311,8 +223,6 @@ class RetirementCalculator {
     }
 
     init() {
-        // Initialize theme
-        this.initializeTheme();
         
         // Load state from URL or use defaults
         const params = URLStateManager.loadState();
@@ -338,9 +248,6 @@ class RetirementCalculator {
         
         // Apply initial text transformations after page load
         setTimeout(() => {
-            if (typeof ThemeConfig !== 'undefined') {
-                ThemeConfig.applyTextTransformations(this.currentTheme);
-            }
         }, 500);
     }
 
@@ -503,7 +410,7 @@ class RetirementCalculator {
             
             filteredStates.forEach((state, index) => {
                 const div = document.createElement('div');
-                div.className = 'px-2 py-1 cursor-pointer hover:bg-terminal-green hover:text-black transition-colors';
+                div.className = 'px-2 py-1 cursor-pointer hover:bg-sage-green hover:text-white transition-colors';
                 div.textContent = `${state.name} (${state.abbr})`;
                 div.dataset.abbr = state.abbr;
                 div.dataset.name = state.name;
@@ -562,9 +469,9 @@ class RetirementCalculator {
         const updateSelection = (items) => {
             items.forEach((item, index) => {
                 if (index === selectedIndex) {
-                    item.classList.add('bg-terminal-green', 'text-black');
+                    item.classList.add('bg-sage-green', 'text-black');
                 } else {
-                    item.classList.remove('bg-terminal-green', 'text-black');
+                    item.classList.remove('bg-sage-green', 'text-black');
                 }
             });
         };
@@ -613,7 +520,7 @@ class RetirementCalculator {
                 throw new Error('FinancialCalculations not loaded');
             }
             
-            // Calculate retirement readiness using new method
+            // Calculate retirement readiness using new method with custom return rates
             const readinessAnalysis = FinancialCalculations.calculateRetirementReadiness({
                 currentAge: params.startingAge,
                 targetRetirementAge: params.targetRetirementAge,
@@ -623,7 +530,11 @@ class RetirementCalculator {
                 startingBalance: params.startingBalance,
                 state: params.state,
                 riskProfile: params.riskProfile,
-                inflationRate: params.inflationRate / 100
+                inflationRate: params.inflationRate / 100,
+                // Pass custom return rates if available
+                accumulationReturn: params.accumulationReturn ? params.accumulationReturn / 100 : undefined,
+                retirementReturn: params.retirementReturn ? params.retirementReturn / 100 : undefined,
+                volatility: params.volatility ? params.volatility / 100 : undefined
             });
 
             // Store target goal assessment
@@ -690,7 +601,7 @@ class RetirementCalculator {
                 'Calculating...';
 
             return `
-                <tr class="text-terminal-green">
+                <tr class="text-sage-green">
                     <td class="py-2 px-3">${this.getThemeText(`SCENARIO_${scenario.label}`)}</td>
                     <td class="py-2 px-3">${savingsRateDisplay}</td>
                     <td class="py-2 px-3">${scenario.retirementAge}</td>
@@ -714,19 +625,19 @@ class RetirementCalculator {
             case 'Challenging but Achievable': return 'text-yellow-400';
             case 'Unlikely': return 'text-orange-400';
             case 'Unrealistic': return 'text-red-400';
-            default: return 'text-terminal-green';
+            default: return 'text-sage-green';
         }
     }
 
     generateConfidenceMeter(confidenceLevel) {
         const width = Math.max(10, confidenceLevel); // Minimum 10% width for visibility
-        const color = confidenceLevel >= 80 ? '#00FF41' : 
+        const color = confidenceLevel >= 80 ? '#7FB069' : 
                       confidenceLevel >= 60 ? '#FFB86C' : 
                       confidenceLevel >= 40 ? '#FF8C42' : '#FF6B6B';
         
         return `
             <div class="inline-flex items-center gap-1">
-                <div class="w-16 h-2 bg-gray-800 border border-terminal-green">
+                <div class="w-16 h-2 bg-gray-800 border border-sage-green">
                     <div class="h-full" style="width: ${width}%; background-color: ${color};"></div>
                 </div>
                 <span class="text-xs">${confidenceLevel}%</span>
@@ -888,10 +799,10 @@ class RetirementCalculator {
         const insights = this.targetGoalAssessment ? this.generateNewStyleInsights() : this.generateInsights();
 
         insightsContainer.innerHTML = insights.map(insight => `
-            <div class="terminal-insight">
-                <div class="terminal-insight-title">${insight.title}</div>
-                <span class="terminal-insight-value">${insight.value}</span>
-                <div class="terminal-insight-text">${insight.text}</div>
+            <div class="modern-insight">
+                <div class="modern-insight-title">${insight.title}</div>
+                <span class="modern-insight-value">${insight.value}</span>
+                <div class="modern-insight-text">${insight.text}</div>
             </div>
         `).join('');
     }
@@ -1042,7 +953,7 @@ class RetirementCalculator {
         // Use theme-aware chart configuration if available
         if (typeof ChartThemes !== 'undefined') {
             try {
-                const config = ChartThemes.createNetWorthChart(chartData, this.getCurrentThemeName());
+                const config = ChartThemes.createNetWorthChart(chartData, );
                 this.netWorthChart = new Chart(ctx, config);
                 return;
             } catch (error) {
@@ -1050,7 +961,10 @@ class RetirementCalculator {
             }
         }
         
-        // Fallback to original configuration
+        // Fallback to theme-aware configuration
+        const colors = this.getThemeColors();
+        const fonts = this.getThemeFonts();
+        
         this.netWorthChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -1066,23 +980,23 @@ class RetirementCalculator {
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#00FF41',
+                            color: colors.text,
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
+                        backgroundColor: colors.background,
+                        borderColor: colors.primary,
                         borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
+                        titleColor: colors.text,
+                        bodyColor: colors.text,
                         titleFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         bodyFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         callbacks: {
                             label: function(context) {
@@ -1114,13 +1028,13 @@ class RetirementCalculator {
                         min: params.startingAge,
                         max: params.endAge || 85,
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             stepSize: 5,
                             callback: function(value) {
@@ -1130,22 +1044,22 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Age',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     y: {
                         beginAtZero: true,
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             callback: function(value) {
                                 if (value === 0) return '$0';
@@ -1160,9 +1074,9 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Net Worth',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     }
@@ -1201,7 +1115,7 @@ class RetirementCalculator {
         const datasets = [{
             label: 'Retirement Withdrawals (Inflation Adjusted)',
             data: data,
-            borderColor: '#00FF41',
+            borderColor: '#7FB069',
             backgroundColor: 'transparent',
             borderWidth: 3,
             pointRadius: 4,
@@ -1252,7 +1166,7 @@ class RetirementCalculator {
         // Use theme-aware chart configuration if available and has data
         if (typeof ChartThemes !== 'undefined' && retirementData.length > 0) {
             try {
-                const config = ChartThemes.createWithdrawalsChart(chartData, this.getCurrentThemeName());
+                const config = ChartThemes.createWithdrawalsChart(chartData, );
                 this.withdrawalsChart = new Chart(ctx, config);
                 return;
             } catch (error) {
@@ -1272,20 +1186,20 @@ class RetirementCalculator {
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#7FB069',
                         borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
+                        titleColor: '#7FB069',
+                        bodyColor: '#7FB069',
                         font: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         callbacks: {
                             label: function(context) {
@@ -1300,13 +1214,13 @@ class RetirementCalculator {
                         min: earliestRetirementAge,
                         max: endAge,
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             stepSize: 5,
                             callback: function(value) {
@@ -1316,9 +1230,9 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Age',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
@@ -1326,13 +1240,13 @@ class RetirementCalculator {
                         min: -params.targetIncome * 0.0475, // 4.75% buffer below zero (5% reduced by 5%)
                         max: maxWithdrawal * 1.045, // 4.5% buffer above max (10% reduced by 5%)
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             callback: function(value) {
                                 return '$' + (Math.round(value).toLocaleString());
@@ -1341,9 +1255,9 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Retirement Withdrawals',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     }
@@ -1433,7 +1347,7 @@ class RetirementCalculator {
             container.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <h4 class="text-terminal-green font-bold mb-3">${this.getThemeText('YOUR RETIREMENT GOAL')}</h4>
+                        <h4 class="text-sage-green font-bold mb-3">${this.getThemeText('YOUR RETIREMENT GOAL')}</h4>
                         <div class="space-y-2 text-sm">
                             <div><span class="subtitle-text">Target Retirement Age:</span> ${params.targetRetirementAge} years old</div>
                             <div><span class="subtitle-text">Target Annual Income:</span> $${this.formatCurrency(params.targetIncome)}</div>
@@ -1443,7 +1357,7 @@ class RetirementCalculator {
                     </div>
                     
                     <div>
-                        <h4 class="text-terminal-green font-bold mb-3">${this.getThemeText('ASSESSMENT')}</h4>
+                        <h4 class="text-sage-green font-bold mb-3">${this.getThemeText('ASSESSMENT')}</h4>
                         <div class="space-y-3">
                             <div class="flex items-center gap-3">
                                 <span class="${realismClass} font-bold">${assessment.realismAssessment.rating}</span>
@@ -1482,7 +1396,7 @@ class RetirementCalculator {
                 const button = document.getElementById('shareURL');
                 const originalText = button.textContent;
                 button.textContent = 'URL_COPIED!';
-                button.style.backgroundColor = '#00FF41';
+                button.style.backgroundColor = '#7FB069';
                 button.style.color = '#000000';
                 
                 setTimeout(() => {
@@ -1521,9 +1435,9 @@ class RetirementCalculator {
         const id = input.id;
         
         // Handle different DOM structures - look in parent or grandparent for error element
-        let errorElement = input.parentElement.querySelector('.terminal-error');
+        let errorElement = input.parentElement.querySelector('.modern-error');
         if (!errorElement) {
-            errorElement = input.parentElement.parentElement?.querySelector('.terminal-error');
+            errorElement = input.parentElement.parentElement?.querySelector('.modern-error');
         }
         
         let isValid = true;
@@ -1664,9 +1578,9 @@ class RetirementCalculator {
         input.classList.remove('border-red-400');
         
         // Handle different DOM structures - look in parent or grandparent for error element
-        let errorElement = input.parentElement.querySelector('.terminal-error');
+        let errorElement = input.parentElement.querySelector('.modern-error');
         if (!errorElement) {
-            errorElement = input.parentElement.parentElement?.querySelector('.terminal-error');
+            errorElement = input.parentElement.parentElement?.querySelector('.modern-error');
         }
         
         if (errorElement) {
@@ -1679,7 +1593,7 @@ class RetirementCalculator {
      */
     setupAccessibilityFeatures() {
         // Make help tooltips keyboard accessible
-        const helpButtons = document.querySelectorAll('.terminal-help');
+        const helpButtons = document.querySelectorAll('.modern-help');
         helpButtons.forEach(button => {
             button.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -1747,7 +1661,7 @@ class RetirementCalculator {
         let tooltip = button.nextElementSibling;
         if (!tooltip || !tooltip.classList.contains('tooltip-popup')) {
             tooltip = document.createElement('div');
-            tooltip.className = 'tooltip-popup absolute z-20 bg-terminal-dark border border-terminal-green text-terminal-green p-2 text-xs rounded max-w-xs mt-1';
+            tooltip.className = 'tooltip-popup absolute z-20 bg-white border border-sage-green text-sage-green p-2 text-xs rounded max-w-xs mt-1';
             tooltip.innerHTML = title || ariaLabel || '';
             tooltip.style.bottom = '100%';
             tooltip.style.left = '50%';
@@ -2003,11 +1917,45 @@ class RetirementCalculator {
             const manualAccumReturn = this.getInputValue('accumulationReturn', 'number');
             const manualRetireReturn = this.getInputValue('retirementReturn', 'number');
             
-            if (manualAccumReturn && manualRetireReturn) {
-                // Use manual overrides
-                enhanced.accumulationReturn = manualAccumReturn;
-                enhanced.retirementReturn = manualRetireReturn;
+            // Check if risk profile is set to custom (indicating manual override)
+            // Check if inputs have values (including 0%) by looking at element values directly
+            const accumulationElement = document.getElementById('accumulationReturn');
+            const retirementElement = document.getElementById('retirementReturn');
+            const hasManualAccumReturn = accumulationElement && accumulationElement.value !== '';
+            const hasManualRetireReturn = retirementElement && retirementElement.value !== '';
+            
+            if (enhanced.riskProfile === 'custom' || hasManualAccumReturn || hasManualRetireReturn) {
+                // Use manual overrides, fall back to risk profile for missing values
+                if (hasManualAccumReturn) {
+                    enhanced.accumulationReturn = manualAccumReturn;
+                    console.log('Using manual accumulation return:', manualAccumReturn);
+                }
+                if (hasManualRetireReturn) {
+                    enhanced.retirementReturn = manualRetireReturn;
+                    console.log('Using manual retirement return:', manualRetireReturn);
+                }
                 enhanced.volatility = this.getInputValue('volatility', 'number') || 15;
+                
+                // For any missing manual values when in custom mode, get from risk profile or use defaults
+                if (!hasManualAccumReturn || !hasManualRetireReturn) {
+                    if (typeof SavingsFeasibility !== 'undefined') {
+                        try {
+                            const riskData = SavingsFeasibility.getRiskProfile('moderate', enhanced.startingAge);
+                            if (!hasManualAccumReturn) {
+                                enhanced.accumulationReturn = riskData.accumulation.return * 100;
+                            }
+                            if (!hasManualRetireReturn) {
+                                enhanced.retirementReturn = riskData.retirement.return * 100;
+                            }
+                        } catch (error) {
+                            if (!hasManualAccumReturn) enhanced.accumulationReturn = 8;
+                            if (!hasManualRetireReturn) enhanced.retirementReturn = 6;
+                        }
+                    } else {
+                        if (!hasManualAccumReturn) enhanced.accumulationReturn = 8;
+                        if (!hasManualRetireReturn) enhanced.retirementReturn = 6;
+                    }
+                }
             } else if (typeof SavingsFeasibility !== 'undefined') {
                 try {
                     // Use risk profile defaults with age for TDF calculations
@@ -2027,6 +1975,14 @@ class RetirementCalculator {
                 enhanced.retirementReturn = 6;
                 enhanced.volatility = 12;
             }
+
+            // Debug: Log final parameters for troubleshooting
+            console.log('Final enhanced parameters:', {
+                accumulationReturn: enhanced.accumulationReturn,
+                retirementReturn: enhanced.retirementReturn,
+                riskProfile: enhanced.riskProfile,
+                volatility: enhanced.volatility
+            });
 
             return enhanced;
         } catch (error) {
@@ -2225,16 +2181,16 @@ class RetirementCalculator {
                         display: false
                     },
                     tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#7FB069',
                         borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
+                        titleColor: '#7FB069',
+                        bodyColor: '#7FB069',
                         titleFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         bodyFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         callbacks: {
                             label: function(context) {
@@ -2253,13 +2209,13 @@ class RetirementCalculator {
                 scales: {
                     x: {
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
@@ -2267,13 +2223,13 @@ class RetirementCalculator {
                         min: 0,
                         max: 100,
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             callback: function(value) {
                                 return value + '%';
@@ -2282,9 +2238,9 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Realism Score (%)',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     }
@@ -2337,23 +2293,23 @@ class RetirementCalculator {
                     legend: {
                         display: true,
                         labels: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#7FB069',
                         borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
+                        titleColor: '#7FB069',
+                        bodyColor: '#7FB069',
                         titleFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         bodyFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         callbacks: {
                             label: function(context) {
@@ -2371,26 +2327,26 @@ class RetirementCalculator {
                 scales: {
                     x: {
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     y: {
                         beginAtZero: false,
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             callback: function(value) {
                                 if (value === 0) return '$0';
@@ -2405,9 +2361,9 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Portfolio Value at Retirement',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     }
@@ -2498,7 +2454,7 @@ class RetirementCalculator {
                         retirementAge: point.x
                     }))
                 };
-                const config = ChartThemes.createSavingsVsRetirementChart(chartData, this.getCurrentThemeName());
+                const config = ChartThemes.createSavingsVsRetirementChart(chartData, );
                 this.savingsVsRetirementChart = new Chart(ctx, config);
                 return;
             } catch (error) {
@@ -2528,23 +2484,23 @@ class RetirementCalculator {
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     tooltip: {
-                        backgroundColor: '#0A0E1A',
-                        borderColor: '#00FF41',
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#7FB069',
                         borderWidth: 1,
-                        titleColor: '#00FF41',
-                        bodyColor: '#00FF41',
+                        titleColor: '#7FB069',
+                        bodyColor: '#7FB069',
                         titleFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         bodyFont: {
-                            family: 'IBM Plex Mono, Fira Code, monospace'
+                            family: fonts.primary
                         },
                         callbacks: {
                             label: function(context) {
@@ -2564,13 +2520,13 @@ class RetirementCalculator {
                         min: dataMinAge,
                         max: dataMaxAge,
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             stepSize: 5,
                             callback: function(value) {
@@ -2580,21 +2536,21 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Retirement Age',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     },
                     y: {
                         grid: {
-                            color: '#00FF4120',
-                            borderColor: '#00FF41'
+                            color: '#7FB06920',
+                            borderColor: '#7FB069'
                         },
                         ticks: {
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             },
                             stepSize: 5,
                             callback: function(value) {
@@ -2604,9 +2560,9 @@ class RetirementCalculator {
                         title: {
                             display: true,
                             text: 'Required Savings Rate',
-                            color: '#00FF41',
+                            color: '#7FB069',
                             font: {
-                                family: 'IBM Plex Mono, Fira Code, monospace'
+                                family: fonts.primary
                             }
                         }
                     }
@@ -2623,42 +2579,15 @@ function toggleAssumptions() {
     
     if (section.classList.contains('hidden')) {
         section.classList.remove('hidden');
-        // Set collapse text based on current theme
-        const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
-        toggle.textContent = currentTheme === 'modern' ? '(Collapse)' : '([COLLAPSE])';
+        // Set collapse text
+        toggle.textContent = '(Collapse)';
     } else {
         section.classList.add('hidden');
-        // Set expand text based on current theme
-        const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
-        toggle.textContent = currentTheme === 'modern' ? '(Expand)' : '([EXPAND])';
+        // Set expand text
+        toggle.textContent = '(Expand)';
     }
 }
 
-// Global theme text helper function
-window.getThemeText = function(inputText) {
-    const currentTheme = typeof ThemeConfig !== 'undefined' ? ThemeConfig.getCurrentTheme() : 'terminal';
-    
-    if (currentTheme === 'modern') {
-        // Modern theme: return as-is (normal case)
-        return inputText;
-    } else {
-        // Terminal theme: convert to CAPS_WITH_UNDERSCORES
-        const textToTerminalMappings = {
-            '[EXPAND]': '[EXPAND]',
-            '[COLLAPSE]': '[COLLAPSE]',
-            'Expand': '[EXPAND]',
-            'Collapse': '[COLLAPSE]',
-            'YOUR RETIREMENT GOAL': 'YOUR RETIREMENT GOAL',
-            'Your Retirement Goal': 'YOUR RETIREMENT_GOAL',
-            'ASSESSMENT': 'ASSESSMENT',
-            'Assessment': 'ASSESSMENT',
-            'Savings Rate Impact': 'SAVINGS_RATE_IMPACT',
-            'Location Impact': 'LOCATION_IMPACT',
-            'Portfolio Durability': 'PORTFOLIO_DURABILITY'
-        };
-        return textToTerminalMappings[inputText] || inputText;
-    }
-};
 
 // Initialize calculator when page loads
 document.addEventListener('DOMContentLoaded', () => {
@@ -2674,7 +2603,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'StatisticalAnalysis',
         'InsightsEngine',
         'ExportUtility',
-        'ChartConfigs'
+        'ChartThemes',
+        'ThemeConfig'
     ];
     
     // Optional dependencies
@@ -2871,9 +2801,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const insights = document.getElementById('insightsContent');
                 if (insights) {
                     insights.innerHTML = `
-                        <div class="terminal-insight col-span-full">
-                            <div class="terminal-insight-title">BASIC_MODE_ACTIVE</div>
-                            <div class="terminal-insight-text">Advanced Monte Carlo analysis unavailable. Showing simplified calculations only.</div>
+                        <div class="modern-insight col-span-full">
+                            <div class="modern-insight-title">BASIC_MODE_ACTIVE</div>
+                            <div class="modern-insight-text">Advanced Monte Carlo analysis unavailable. Showing simplified calculations only.</div>
                         </div>
                     `;
                 }
@@ -2945,7 +2875,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!tbody) return;
             
             tbody.innerHTML = this.scenarios.map(scenario => `
-                <tr class="border-b border-terminal-green">
+                <tr class="border-b border-sage-green">
                     <td class="py-2 px-3 lg:px-4">${scenario.label}</td>
                     <td class="py-2 px-3 lg:px-4">${Math.round(scenario.savingsRate * 100)}%</td>
                     <td class="py-2 px-3 lg:px-4">${scenario.retirementAge}</td>
@@ -2965,20 +2895,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const earliest = validScenarios[validScenarios.length - 1]; // Most aggressive
             
             container.innerHTML = `
-                <div class="terminal-insight">
-                    <div class="terminal-insight-title">EARLIEST_RETIREMENT</div>
-                    <div class="terminal-insight-value">${earliest.retirementAge} years</div>
-                    <div class="terminal-insight-text">Earliest possible retirement with ${Math.round(earliest.savingsRate * 100)}% savings rate</div>
+                <div class="modern-insight">
+                    <div class="modern-insight-title">EARLIEST_RETIREMENT</div>
+                    <div class="modern-insight-value">${earliest.retirementAge} years</div>
+                    <div class="modern-insight-text">Earliest possible retirement with ${Math.round(earliest.savingsRate * 100)}% savings rate</div>
                 </div>
-                <div class="terminal-insight">
-                    <div class="terminal-insight-title">MONTHLY_SAVINGS</div>
-                    <div class="terminal-insight-value">$${Math.round(earliest.monthlyContribution).toLocaleString()}</div>
-                    <div class="terminal-insight-text">Required monthly contribution for earliest retirement</div>
+                <div class="modern-insight">
+                    <div class="modern-insight-title">MONTHLY_SAVINGS</div>
+                    <div class="modern-insight-value">$${Math.round(earliest.monthlyContribution).toLocaleString()}</div>
+                    <div class="modern-insight-text">Required monthly contribution for earliest retirement</div>
                 </div>
-                <div class="terminal-insight">
-                    <div class="terminal-insight-title">BASIC_MODE</div>
-                    <div class="terminal-insight-value">Simplified</div>
-                    <div class="terminal-insight-text">Advanced Monte Carlo analysis unavailable. Results are estimates.</div>
+                <div class="modern-insight">
+                    <div class="modern-insight-title">BASIC_MODE</div>
+                    <div class="modern-insight-value">Simplified</div>
+                    <div class="modern-insight-text">Advanced Monte Carlo analysis unavailable. Results are estimates.</div>
                 </div>
             `;
         }

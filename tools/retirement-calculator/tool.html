@@ -8,19 +8,15 @@
     <div class="border-b mb-4 pb-2">
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-xl font-bold mb-0" id="inputs-heading"><span class="terminal-prompt">> </span>RETIREMENT CALCULATOR v2.0</h2>
-          <div class="text-sm subtitle-text"><span class="terminal-comment">// </span>Enter parameters below. Press ENTER to calculate.</div>
+          <h2 class="text-xl font-bold mb-0" id="inputs-heading">Retirement Calculator v2.0</h2>
+          <div class="text-sm subtitle-text">Enter parameters below. Press ENTER to calculate.</div>
         </div>
         <div class="flex gap-2">
-          <button id="themeToggle" class="terminal-button border px-2 py-1 font-mono transition-colors text-xs lg:text-sm" 
-              title="Switch between terminal and modern theme">
-            MODERN
+          <button id="exportPDF" class="modern-button border px-2 py-1 font-mono transition-colors text-xs lg:text-sm">
+            Save PDF
           </button>
-          <button id="exportPDF" class="terminal-button border px-2 py-1 font-mono transition-colors text-xs lg:text-sm">
-            SAVE PDF
-          </button>
-          <button id="shareURL" class="terminal-button border px-2 py-1 font-mono transition-colors text-xs lg:text-sm">
-            SHARE URL
+          <button id="shareURL" class="modern-button border px-2 py-1 font-mono transition-colors text-xs lg:text-sm">
+            Share URL
           </button>
         </div>
       </div>
@@ -30,15 +26,15 @@
     <div class="mb-6">
       <div class="border-b mb-4 pb-2">
         <h3 class="text-lg font-bold mb-0 flex items-center">
-          <span class="mr-2"><span class="terminal-prompt">> </span>USER_DECISIONS</span>
+          <span class="mr-2">User Decisions</span>
         </h3>
       </div>
       
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
-        <div class="terminal-input-group">
-          <label for="targetIncome" class="block text-sm mb-1 terminal-label">
-            TARGET_RETIREMENT_INCOME:
-            <span class="terminal-help" 
+        <div class="modern-input-group">
+          <label for="targetIncome" class="block text-sm mb-1 modern-label">
+            Target Retirement Income:
+            <span class="modern-help" 
                title="Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
                aria-label="Help: Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
                role="button" 
@@ -46,19 +42,19 @@
           </label>
           <div class="relative">
             <input type="text" id="targetIncome" value="" 
-                class="terminal-input w-full border px-2 py-1 font-mono pr-32"
+                class="modern-input w-full border px-2 py-1 font-mono pr-32"
                 data-validation="currency" data-min="10000" data-max="10000000"
                 aria-label="Target retirement income in today's dollars, between $10,000 and $10,000,000"
                 aria-describedby="targetIncome-help targetIncome-error">
             <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono" id="targetIncome-help">in today's dollars</span>
           </div>
-          <div class="terminal-error hidden text-red-400 text-xs mt-1" id="targetIncome-error" role="alert" aria-live="polite"></div>
+          <div class="modern-error hidden text-red-400 text-xs mt-1" id="targetIncome-error" role="alert" aria-live="polite"></div>
         </div>
         
-        <div class="terminal-input-group">
-          <label for="startingBalance" class="block text-sm mb-1 terminal-label">
-            CURRENT_RETIREMENT_SAVINGS:
-            <span class="terminal-help" 
+        <div class="modern-input-group">
+          <label for="startingBalance" class="block text-sm mb-1 modern-label">
+            Current Retirement Savings:
+            <span class="modern-help" 
                title="Current value of your retirement portfolio. Can be $0 if starting fresh."
                aria-label="Help: Current value of your retirement portfolio. Can be $0 if starting fresh."
                role="button" 
@@ -66,79 +62,79 @@
           </label>
           <div class="relative">
             <input type="text" id="startingBalance" value=""
-                class="terminal-input w-full border px-2 py-1 font-mono pr-16"
+                class="modern-input w-full border px-2 py-1 font-mono pr-16"
                 data-validation="currency" data-min="0" data-max="50000000"
                 aria-label="Current retirement savings in dollars, between $0 and $50,000,000"
                 aria-describedby="startingBalance-help startingBalance-error">
             <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono" id="startingBalance-help">dollars</span>
           </div>
-          <div class="terminal-error hidden text-red-400 text-xs mt-1" id="startingBalance-error" role="alert" aria-live="polite"></div>
+          <div class="modern-error hidden text-red-400 text-xs mt-1" id="startingBalance-error" role="alert" aria-live="polite"></div>
         </div>
         
-        <div class="terminal-input-group">
-          <label for="currentIncome" class="block text-sm mb-1 terminal-label">
-            CURRENT_INCOME:
-            <span class="terminal-help" title="Your current annual income, used for tax planning and savings rate calculations.">?</span>
+        <div class="modern-input-group">
+          <label for="currentIncome" class="block text-sm mb-1 modern-label">
+            Current Income:
+            <span class="modern-help" title="Your current annual income, used for tax planning and savings rate calculations.">?</span>
           </label>
           <div class="relative">
             <input type="text" id="currentIncome" value=""
-                class="terminal-input w-full border px-2 py-1 font-mono pr-16"
+                class="modern-input w-full border px-2 py-1 font-mono pr-16"
                 data-validation="currency" data-min="10000" data-max="5000000">
             <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono">dollars</span>
           </div>
-          <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+          <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
         </div>
       </div>
       
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-4">
-        <div class="terminal-input-group">
-          <label for="startingAge" class="block text-sm mb-1 terminal-label">
-            CURRENT_AGE:
-            <span class="terminal-help" title="Your current age when beginning retirement planning. Earlier start allows compound growth to work longer.">?</span>
+        <div class="modern-input-group">
+          <label for="startingAge" class="block text-sm mb-1 modern-label">
+            Current Age:
+            <span class="modern-help" title="Your current age when beginning retirement planning. Earlier start allows compound growth to work longer.">?</span>
           </label>
           <div class="relative">
             <input type="number" id="startingAge" value="" min="18" max="100" 
-                class="terminal-input w-full border px-2 py-1 font-mono pr-12"
+                class="modern-input w-full border px-2 py-1 font-mono pr-12"
                 data-validation="age">
             <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">yrs</span>
           </div>
-          <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+          <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
         </div>
         
-        <div class="terminal-input-group">
-          <label for="targetRetirementAge" class="block text-sm mb-1 terminal-label">
-            TARGET_RETIREMENT_AGE:
-            <span class="terminal-help" title="Age at which you want to retire. Calculator will assess if this is realistic with your current situation.">?</span>
+        <div class="modern-input-group">
+          <label for="targetRetirementAge" class="block text-sm mb-1 modern-label">
+            Target Retirement Age:
+            <span class="modern-help" title="Age at which you want to retire. Calculator will assess if this is realistic with your current situation.">?</span>
           </label>
           <div class="relative">
             <input type="number" id="targetRetirementAge" value="" min="30" max="100"
-                class="terminal-input w-full border px-2 py-1 font-mono pr-12"
+                class="modern-input w-full border px-2 py-1 font-mono pr-12"
                 data-validation="age">
             <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">yrs</span>
           </div>
-          <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+          <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
         </div>
         
-        <div class="terminal-input-group">
-          <label for="currentSavingsRate" class="block text-sm mb-1 terminal-label">
-            CURRENT_SAVINGS_RATE:
-            <span class="terminal-help" title="Percentage of gross income you currently save for retirement. Include 401k, IRA, and other retirement savings.">?</span>
+        <div class="modern-input-group">
+          <label for="currentSavingsRate" class="block text-sm mb-1 modern-label">
+            Current Savings Rate:
+            <span class="modern-help" title="Percentage of gross income you currently save for retirement. Include 401k, IRA, and other retirement savings.">?</span>
           </label>
           <div class="relative">
             <input type="number" id="currentSavingsRate" value="" min="0" max="80" step="0.5"
-                class="terminal-input w-full border px-2 py-1 font-mono pr-8"
+                class="modern-input w-full border px-2 py-1 font-mono pr-8"
                 data-validation="percentage">
             <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">%</span>
           </div>
-          <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+          <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
         </div>
       </div>
       
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
-        <div class="terminal-input-group">
-          <label for="state" class="block text-sm mb-1 terminal-label">
-            STATE:
-            <span class="terminal-help" 
+        <div class="modern-input-group">
+          <label for="state" class="block text-sm mb-1 modern-label">
+            State:
+            <span class="modern-help" 
                title="Your state affects cost of living and realistic savings capacity. Used for feasibility calculations."
                aria-label="Help: Your state affects cost of living and realistic savings capacity. Used for feasibility calculations."
                role="button" 
@@ -146,7 +142,7 @@
           </label>
           <div class="relative">
             <input type="text" id="stateInput" placeholder="Type to search states..." 
-                class="terminal-input w-full border px-2 py-1 font-mono" 
+                class="modern-input w-full border px-2 py-1 font-mono" 
                 autocomplete="off"
                 aria-label="Select your state - type to search"
                 aria-describedby="state-help"
@@ -216,12 +212,12 @@
           </div>
         </div>
         
-        <div class="terminal-input-group">
-          <label for="riskProfile" class="block text-sm mb-1 terminal-label">
-            RISK_PROFILE:
-            <span class="terminal-help" title="Investment risk level determines expected returns and volatility. TDF automatically adjusts from aggressive (young) to conservative (near retirement) based on your age.">?</span>
+        <div class="modern-input-group">
+          <label for="riskProfile" class="block text-sm mb-1 modern-label">
+            Risk Profile:
+            <span class="modern-help" title="Investment risk level determines expected returns and volatility. TDF automatically adjusts from aggressive (young) to conservative (near retirement) based on your age.">?</span>
           </label>
-          <select id="riskProfile" class="terminal-select w-full border px-2 py-1 font-mono">
+          <select id="riskProfile" class="modern-select w-full border px-2 py-1 font-mono">
             <option value="">Select risk profile...</option>
             <option value="conservative">Conservative</option>
             <option value="moderate">Moderate</option>
@@ -237,8 +233,8 @@
     <div class="mb-6">
       <div class="border-b mb-4 pb-2">
         <h3 class="text-lg font-bold mb-0 flex items-center cursor-pointer" onclick="toggleAssumptions()">
-          <span class="mr-2"><span class="terminal-prompt">> </span><span class="assumptions-text">ASSUMPTIONS</span></span>
-          <span id="assumptionsToggle" class="terminal-toggle text-sm opacity-60">([EXPAND])</span>
+          <span class="mr-2"><span class="assumptions-text">Assumptions</span></span>
+          <span id="assumptionsToggle" class="modern-toggle text-sm opacity-60">(Expand)</span>
         </h3>
       </div>
       
@@ -248,62 +244,62 @@
           <h4 class="text-sm font-bold mb-3 uppercase">Market Parameters</h4>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             
-            <div class="terminal-input-group">
-              <label for="inflationRate" class="block text-sm mb-1 terminal-label">
-                INFLATION_RATE:
-                <span class="terminal-help" title="Expected annual inflation rate. Historical US average is ~3%. Affects purchasing power over time.">?</span>
+            <div class="modern-input-group">
+              <label for="inflationRate" class="block text-sm mb-1 modern-label">
+                Inflation Rate:
+                <span class="modern-help" title="Expected annual inflation rate. Historical US average is ~3%. Affects purchasing power over time.">?</span>
               </label>
               <div class="relative">
                 <input type="number" id="inflationRate" value="3" min="0" max="20" step="0.1"
-                    class="terminal-input w-full border px-2 py-1 font-mono pr-8"
+                    class="modern-input w-full border px-2 py-1 font-mono pr-8"
                     data-validation="percentage">
                 <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">%</span>
               </div>
-              <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+              <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
             </div>
             
-            <div class="terminal-input-group">
-              <label for="endAge" class="block text-sm mb-1 terminal-label">
-                END_AGE:
-                <span class="terminal-help" title="Life expectancy for retirement planning. Conservative estimates ensure portfolio longevity.">?</span>
+            <div class="modern-input-group">
+              <label for="endAge" class="block text-sm mb-1 modern-label">
+                End Age:
+                <span class="modern-help" title="Life expectancy for retirement planning. Conservative estimates ensure portfolio longevity.">?</span>
               </label>
               <div class="relative">
                 <input type="number" id="endAge" value="85" min="65" max="110" 
-                    class="terminal-input w-full border px-2 py-1 font-mono pr-12"
+                    class="modern-input w-full border px-2 py-1 font-mono pr-12"
                     data-validation="age">
                 <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">yrs</span>
               </div>
-              <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+              <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
             </div>
             
             
             <!-- Return rate inputs (auto-populated from risk profile, can be overridden) -->
-            <div class="terminal-input-group">
-              <label for="accumulationReturn" class="block text-sm mb-1 terminal-label">
-                ACCUMULATION_RETURN:
-                <span class="terminal-help" title="Expected annual return during working years. Auto-populated from risk profile but can be overridden.">?</span>
+            <div class="modern-input-group">
+              <label for="accumulationReturn" class="block text-sm mb-1 modern-label">
+                Accumulation Return:
+                <span class="modern-help" title="Expected annual return during working years. Auto-populated from risk profile but can be overridden.">?</span>
               </label>
               <div class="relative">
                 <input type="number" id="accumulationReturn" value="8" min="0" max="30" step="0.1"
-                    class="terminal-input w-full border px-2 py-1 font-mono pr-8"
+                    class="modern-input w-full border px-2 py-1 font-mono pr-8"
                     data-validation="percentage">
                 <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">%</span>
               </div>
-              <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+              <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
             </div>
             
-            <div class="terminal-input-group">
-              <label for="retirementReturn" class="block text-sm mb-1 terminal-label">
-                RETIREMENT_RETURN:
-                <span class="terminal-help" title="Expected annual return during retirement. Auto-populated from risk profile but can be overridden.">?</span>
+            <div class="modern-input-group">
+              <label for="retirementReturn" class="block text-sm mb-1 modern-label">
+                Retirement Return:
+                <span class="modern-help" title="Expected annual return during retirement. Auto-populated from risk profile but can be overridden.">?</span>
               </label>
               <div class="relative">
                 <input type="number" id="retirementReturn" value="6" min="0" max="20" step="0.1"
-                    class="terminal-input w-full border px-2 py-1 font-mono pr-8"
+                    class="modern-input w-full border px-2 py-1 font-mono pr-8"
                     data-validation="percentage">
                 <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">%</span>
               </div>
-              <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+              <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
             </div>
           </div>
         </div>
@@ -313,18 +309,18 @@
           <h4 class="text-sm font-bold mb-3 uppercase">Calculation Parameters</h4>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
             
-            <div class="terminal-input-group">
-              <label for="volatility" class="block text-sm mb-1 terminal-label">
-                RETURN_VOLATILITY:
-                <span class="terminal-help" title="Standard deviation of annual returns. Stock market typically 15-20%. Higher volatility = more uncertainty.">?</span>
+            <div class="modern-input-group">
+              <label for="volatility" class="block text-sm mb-1 modern-label">
+                Return Volatility:
+                <span class="modern-help" title="Standard deviation of annual returns. Stock market typically 15-20%. Higher volatility = more uncertainty.">?</span>
               </label>
               <div class="relative">
                 <input type="number" id="volatility" value="15" min="0" max="50" step="1"
-                    class="terminal-input w-full border px-2 py-1 font-mono pr-8"
+                    class="modern-input w-full border px-2 py-1 font-mono pr-8"
                     data-validation="percentage">
                 <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">%</span>
               </div>
-              <div class="terminal-error hidden text-red-400 text-xs mt-1"></div>
+              <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
             </div>
             
             <!-- Monte Carlo runs now automatically optimized based on scenario complexity -->
@@ -337,10 +333,10 @@
     <!-- Target Goal Assessment Section -->
     <div class="target-goal-section mb-8">
     <div class="border-b mb-4 pb-2">
-      <h3 class="text-lg font-bold mb-0"><span class="terminal-prompt">> </span>RETIREMENT_GOAL_ASSESSMENT</h3>
+      <h3 class="text-lg font-bold mb-0">Retirement Goal Assessment</h3>
     </div>
     
-    <div id="targetGoalContent" class="terminal-goal-assessment border p-4">
+    <div id="targetGoalContent" class="modern-goal-assessment border p-4">
       <!-- Target goal assessment populated by JavaScript -->
     </div>
     </div>
@@ -348,19 +344,19 @@
     <!-- Results Section -->
     <div class="results-section mb-8">
     <div class="border-b mb-4 pb-2">
-      <h3 class="text-lg font-bold mb-0"><span class="terminal-prompt">> </span>SAVINGS_RATE_SCENARIOS</h3>
-      <div class="text-sm subtitle-text"><span class="terminal-comment">// </span>Compare retirement ages achievable with different savings rates</div>
+      <h3 class="text-lg font-bold mb-0">Savings Rate Scenarios</h3>
+      <div class="text-sm subtitle-text">Compare retirement ages achievable with different savings rates</div>
     </div>
     
     <div class="overflow-x-auto -mx-6 px-6 lg:mx-0 lg:px-0">
-      <table class="terminal-table w-full font-mono text-sm lg:text-base">
+      <table class="modern-table w-full font-mono text-sm lg:text-base">
         <thead>
           <tr class="border-b ">
-            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">SCENARIO</th>
-            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">SAVINGS_RATE</th>
-            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">RETIRE_AGE</th>
-            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">SAVINGS_REALISM</th>
-            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">PORTFOLIO_SUCCESS</th>
+            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">Scenario</th>
+            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">Savings Rate</th>
+            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">Retire Age</th>
+            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">Savings Realism</th>
+            <th class="text-left py-2 px-3 lg:px-4 whitespace-nowrap">Portfolio Success</th>
           </tr>
         </thead>
         <tbody id="summaryTableBody">
@@ -373,28 +369,28 @@
     <!-- Charts Section -->
     <div class="charts-section mb-8">
     <div class="border-b mb-4 pb-2">
-      <h3 class="text-lg font-bold mb-0"><span class="terminal-prompt">> </span>VISUALIZATIONS</h3>
-      <div class="text-sm subtitle-text"><span class="terminal-comment">// </span>Financial projections over time</div>
+      <h3 class="text-lg font-bold mb-0">Visualizations</h3>
+      <div class="text-sm subtitle-text">Financial projections over time</div>
     </div>
     
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
-      <div class="terminal-chart">
-        <h4 class="text-sm font-bold mb-3">NET_WORTH_PROGRESSION</h4>
+      <div class="modern-chart">
+        <h4 class="text-sm font-bold mb-3">Net Worth Progression</h4>
         <div class="chart-container border p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
           <canvas id="netWorthChart" style="height: 100%; width: 100%;"></canvas>
         </div>
       </div>
       
-      <div class="terminal-chart">
-        <h4 class="text-sm font-bold mb-3">RETIREMENT_WITHDRAWALS</h4>
+      <div class="modern-chart">
+        <h4 class="text-sm font-bold mb-3">Retirement Withdrawals</h4>
         <div class="chart-container border p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
           <canvas id="withdrawalsChart" style="height: 100%; width: 100%;"></canvas>
         </div>
       </div>
       
-      <div class="terminal-chart">
-        <h4 class="text-sm font-bold mb-3">SAVINGS_VS_RETIREMENT</h4>
+      <div class="modern-chart">
+        <h4 class="text-sm font-bold mb-3">Savings vs Retirement</h4>
         <div class="chart-container border p-4 lg:p-6 h-80 sm:h-96 lg:h-[28rem] xl:h-[32rem] 2xl:h-[36rem] relative flex">
           <canvas id="savingsVsRetirementChart" style="height: 100%; width: 100%;"></canvas>
         </div>
@@ -406,7 +402,7 @@
     <!-- Insights Section -->
     <div class="insights-section mb-8">
     <div class="border-b mb-4 pb-2">
-      <h3 class="text-lg font-bold mb-0"><span class="terminal-prompt">> </span>KEY_INSIGHTS</h3>
+      <h3 class="text-lg font-bold mb-0">Key Insights</h3>
     </div>
     
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6" id="insightsContent">
@@ -423,30 +419,30 @@
       color: black !important;
     }
     
-    .terminal-container {
+    .modern-container {
       background: white !important;
-      border-color: #ccc !important;
+      border-color: var(--color-border, #E5E7EB) !important;
     }
     
     .,
-    .terminal-label,
+    .modern-label,
     h1, h2, h3, h4 {
       color: black !important;
     }
     
     . {
       background: white !important;
-      border: 1px solid #ccc !important;
+      border: 1px solid var(--color-border, #E5E7EB) !important;
     }
     
     . {
-      border-color: #ccc !important;
+      border-color: var(--color-border, #E5E7EB) !important;
     }
     
     /* Hide export buttons and other non-essential elements for print */
     #exportPDF,
     #shareURL,
-    .terminal-help,
+    .modern-help,
     #assumptionsToggle {
       display: none !important;
     }
@@ -473,7 +469,7 @@
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       }
       
-      .terminal-chart:nth-child(3) {
+      .modern-chart:nth-child(3) {
         grid-column: 1 / -1;
         margin: 0 auto;
         max-width: 50%;
@@ -486,23 +482,9 @@
     }
   }
   
-  /* Placeholder styling for terminal inputs - theme aware */
-  .terminal-input::placeholder,
-  .terminal-select option[value=""]:first-child {
-    color: var(--color-text-secondary);
-    opacity: 0.7;
-  }
-  
-  /* Terminal theme specific placeholder styling */
-  .theme-terminal .terminal-input::placeholder,
-  .theme-terminal .terminal-select option[value=""]:first-child {
-    color: #00FF4160;
-    opacity: 0.6;
-  }
-  
-  /* Modern theme specific placeholder styling */
-  .theme-modern .terminal-input::placeholder,
-  .theme-modern .terminal-select option[value=""]:first-child {
+  /* Placeholder styling for modern inputs */
+  .modern-input::placeholder,
+  .modern-select option[value=""]:first-child {
     color: var(--color-text-secondary);
     opacity: 0.7;
   }

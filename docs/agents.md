@@ -564,16 +564,337 @@ hugo --gc --minify  # Test build
 - [ ] No broken links
 - [ ] Documentation complete
 
+## THEMING SYSTEM (MANDATORY - NO DEVIATIONS)
+
+### Color Palette Standards
+All agents must use these exact Tailwind classes. No custom colors or variations allowed.
+
+**Primary Colors:**
+- Primary Brand: `bg-sage-500` (#7FB069) - Bufo brand color only for accents
+- Terminal Black: `bg-terminal-black` (#0A0E1A) - All tool backgrounds and dark containers
+- Terminal Green: `text-terminal-green` (#00FF41) - Success states, positive values, terminal text
+- Accent Orange: `text-accent` (#FFB86C) - Highlighted data, warnings, important metrics
+- Article Background: `bg-stone-50` (#FAFAF9) - Content page backgrounds
+- Text Primary: `text-slate-900` (light mode), `text-slate-100` (dark mode)
+
+**Secondary Colors:**
+- Input Backgrounds: `bg-slate-100` - Form controls
+- Borders: `border-slate-300` - Standard borders
+- Muted Text: `text-slate-600` - Descriptions, labels
+- Error States: `text-red-500` - Validation errors
+- Disabled States: `text-slate-400` - Inactive elements
+
+### Typography Hierarchy (EXACT CLASSES)
+
+**Articles & Content:**
+- Main Headings: `font-serif text-3xl font-bold text-slate-900 mb-4`
+- Section Headings: `font-serif text-2xl font-semibold text-slate-900 mb-3`
+- Subheadings: `font-serif text-xl font-medium text-slate-900 mb-2`
+- Body Text: `font-serif text-slate-700 leading-relaxed`
+- Math Formulas: KaTeX with `text-slate-900` override
+
+**Tools & Data Display:**
+- Tool Headers: `font-serif text-3xl font-bold text-slate-900 mb-4`
+- Interface Labels: `font-mono text-slate-400 uppercase text-xs tracking-wide mb-2`
+- Data Values: `font-mono text-terminal-green text-lg`
+- Input Fields: `font-mono text-sm`
+- Terminal Output: `font-mono text-terminal-green bg-terminal-black p-4`
+
+### Component Class Patterns (REQUIRED TEMPLATES)
+
+**Terminal Display Boxes:**
+```html
+<div class="bg-terminal-black border border-slate-700 rounded-lg p-4 font-mono text-sm">
+  <div class="text-terminal-green">[terminal content here]</div>
+</div>
+```
+
+**Form Input Controls:**
+```html
+<div class="mb-4">
+  <label class="font-mono text-slate-400 uppercase text-xs tracking-wide mb-2 block">Label</label>
+  <input class="w-full bg-slate-100 border border-slate-300 rounded px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-sage-500 focus:border-sage-500" type="text">
+</div>
+```
+
+**Data Tables:**
+```html
+<table class="w-full font-mono text-sm">
+  <thead class="bg-slate-100">
+    <tr class="text-slate-600 uppercase text-xs tracking-wide">
+      <th class="px-4 py-2 text-left">Column</th>
+    </tr>
+  </thead>
+  <tbody class="bg-white">
+    <tr class="border-b border-slate-200">
+      <td class="px-4 py-2 text-slate-900">Data</td>
+    </tr>
+  </tbody>
+</table>
+```
+
+**Buttons:**
+```html
+<!-- Primary Actions -->
+<button class="bg-sage-500 text-white px-6 py-2 rounded font-mono text-sm hover:bg-sage-600 focus:ring-2 focus:ring-sage-500">
+  Calculate
+</button>
+
+<!-- Secondary Actions -->
+<button class="bg-slate-200 text-slate-700 px-6 py-2 rounded font-mono text-sm hover:bg-slate-300 border border-slate-300">
+  Export PDF
+</button>
+```
+
+## CODE ARCHITECTURE STANDARDS (MANDATORY PATTERNS)
+
+### JavaScript Module Organization
+All tools must follow this exact file structure and module pattern. No variations allowed.
+
+**Required File Structure:**
+```
+static/js/[tool-name]/
+├── app.js              # Main application entry point
+├── calculations.js     # Pure calculation functions only
+├── ui-components.js    # DOM manipulation utilities
+└── state-management.js # URL hash persistence only
+
+static/js/shared/       # Reusable across tools
+├── terminal-ui.js      # Terminal display components
+└── validation.js       # Input validation utilities
+```
+
+**Exact Module Pattern (COPY THIS EXACTLY):**
+```javascript
+// Main module pattern - every tool must follow this structure
+const ToolName = {
+    // Configuration object
+    config: {
+        selectors: {
+            form: '#tool-form',
+            results: '#results-container',
+            // ... other DOM selectors
+        },
+        defaults: {
+            // Default input values
+        }
+    },
+    
+    // State management
+    state: {
+        data: {},
+        
+        updateFromHash: function() {
+            // Read state from URL hash
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                try {
+                    this.data = JSON.parse(atob(hash));
+                } catch (e) {
+                    this.data = { ...ToolName.config.defaults };
+                }
+            }
+        },
+        
+        saveToHash: function() {
+            // Save state to URL hash
+            const encoded = btoa(JSON.stringify(this.data));
+            window.location.hash = encoded;
+        }
+    },
+    
+    // Pure calculation functions
+    calculate: {
+        mainFunction: function(inputs) {
+            // All calculations here
+            // Must return an object with results
+            return {
+                // calculation results
+            };
+        }
+    },
+    
+    // UI manipulation only
+    ui: {
+        render: function(data) {
+            // Update DOM with results
+        },
+        
+        bindEvents: function() {
+            // Event listeners for form inputs
+            document.querySelector(this.config.selectors.form)
+                .addEventListener('input', () => {
+                    // Update calculations and display
+                });
+        }
+    },
+    
+    // Initialization
+    init: function() {
+        this.ui.bindEvents();
+        this.state.updateFromHash();
+        this.ui.render(this.state.data);
+    }
+};
+
+// Auto-initialize when DOM loads
+document.addEventListener('DOMContentLoaded', () => ToolName.init());
+```
+
+### HTML Template Standards (NO VARIATIONS)
+
+**Complete Tool Page Structure:**
+```html
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <!-- Header Section -->
+  <header class="mb-8">
+    <h1 class="font-serif text-3xl font-bold text-slate-900 mb-4">Tool Name</h1>
+    <p class="text-slate-600 text-lg">Brief tool description and purpose.</p>
+  </header>
+  
+  <!-- Main Tool Interface -->
+  <section class="grid md:grid-cols-2 gap-8 mb-8">
+    <!-- Input Controls -->
+    <div class="space-y-6">
+      <form id="tool-form">
+        <!-- Form inputs using standard patterns above -->
+      </form>
+    </div>
+    
+    <!-- Results Display -->
+    <div class="bg-terminal-black rounded-lg p-6" id="results-container">
+      <div class="text-terminal-green font-mono text-sm">
+        <!-- Results content -->
+      </div>
+    </div>
+  </section>
+  
+  <!-- Export Actions -->
+  <section class="flex justify-center space-x-4">
+    <button id="export-pdf" class="bg-slate-200 text-slate-700 px-6 py-2 rounded font-mono text-sm hover:bg-slate-300 border border-slate-300">
+      Export PDF
+    </button>
+    <button id="share-url" class="bg-sage-500 text-white px-6 py-2 rounded font-mono text-sm hover:bg-sage-600">
+      Share URL
+    </button>
+  </section>
+</div>
+```
+
+### CSS Class Naming Rules (STRICT ENFORCEMENT)
+- **Component Classes**: `[component-name]-[element]` (e.g., `calculator-input`, `terminal-display`)
+- **State Classes**: `is-[state]` (e.g., `is-loading`, `is-error`, `is-active`)
+- **JavaScript Hooks**: `js-[action]` (e.g., `js-calculate`, `js-export`, `js-reset`)
+- **Utility Classes**: Use Tailwind only - no custom utility classes ever
+- **Layout Classes**: Grid and flexbox via Tailwind only
+
+## MANDATORY QUALITY GATES
+
+### Pre-Completion Validation (MUST ALL PASS)
+Every agent must verify these items before marking any task as complete:
+
+1. **Build Verification**: `hugo --gc --minify` completes without errors
+2. **File Existence**: All claimed files exist and are readable with correct content
+3. **Class Audit**: Only approved Tailwind classes used (no custom CSS)
+4. **Module Pattern**: JavaScript follows exact module structure above
+5. **Mobile Responsive**: Design works correctly at 375px viewport width
+6. **Terminal Aesthetic**: All data displays use terminal-style components
+7. **URL State**: Hash persistence working for all tool inputs
+8. **Export Functions**: PDF generation and URL sharing both functional
+
+### Component Validation Checklist
+**Every Tool Must Have (VERIFIABLE):**
+- [ ] Exact module pattern implementation
+- [ ] URL hash state persistence working correctly
+- [ ] Terminal-style results display with exact CSS classes
+- [ ] Mobile-responsive form controls (tested at 375px)
+- [ ] Error handling for all input validations
+- [ ] Export functionality (PDF export + URL sharing only)
+- [ ] Accessibility attributes (ARIA labels on form controls)
+- [ ] Hugo integration (content page exists, navigation updated)
+
+### Performance Requirements (MEASURABLE)
+- [ ] Initial page paint under 1 second on simulated 3G
+- [ ] Calculation response time under 100 milliseconds
+- [ ] Zero JavaScript framework dependencies (vanilla JS only)
+- [ ] Total CSS bundle under 50KB
+- [ ] No external API dependencies (static site requirement)
+- [ ] Font loading optimization (system fonts preferred)
+
+### Integration Requirements (VERIFIABLE)
+- [ ] Links from relevant articles exist and function
+- [ ] Navigation menu updated if tool should be listed
+- [ ] Cross-references in related content articles
+- [ ] Hugo shortcodes work correctly if used
+- [ ] Search indexing enabled (proper meta tags)
+- [ ] Print stylesheets functional for PDF export
+
+## PROCESS IMPROVEMENTS
+
+### Agent Accountability System
+1. **Verification Phase**: After agent claims completion, project manager must independently verify all deliverables exist and function
+2. **Rollback Protocol**: If verification fails, automatically revert feature backlog status changes
+3. **Evidence Requirement**: Agents must provide specific file paths and test results as proof of completion
+4. **Integration Testing**: Each completion must include successful Hugo build and mobile testing
+
+### Scope Boundary Enforcement
+1. **Complexity Limits**: Each agent session limited to maximum 3 files created/modified
+2. **Time Boxing**: Individual agent tasks must complete within 2-hour estimated time frame
+3. **Feature Creep Prevention**: Agents cannot add features beyond specific acceptance criteria
+4. **Template Compliance**: All code must use exact templates provided - no creative interpretation
+
+### Template Library (COPY-PASTE READY)
+All agents must use these exact templates for consistency:
+
+**Article Frontmatter Template:**
+```yaml
+---
+title: "Article Title"
+date: 2025-01-XX
+draft: false
+categories: ["Concepts"|"Strategies"|"Advanced"]
+tags: ["tag1", "tag2", "tag3"]
+math: true
+summary: "Brief description for article listings and SEO"
+weight: 10
+---
+```
+
+**Tool Content Page Template:**
+```markdown
+---
+title: "Tool Name"
+date: 2025-01-XX
+draft: false
+layout: "single"
+summary: "Tool description for SEO and listings"
+---
+
+Brief introduction to the tool and its purpose.
+
+{{< note >}}
+This tool performs calculations locally in your browser. No data is sent to external servers.
+{{< /note >}}
+
+<div id="tool-container">
+<!-- Tool HTML structure goes here -->
+</div>
+
+<script src="/js/[tool-name]/app.js"></script>
+```
+
 ## REMEMBER
 - **Evaluate project state thoroughly before spawning any agents**
 - **Fix broken builds before adding new features**
-- **Complete partial work before starting new work**
+- **Complete partial work before starting new work**  
 - **Document completion in feature-backlog.md after reviewing all agent work**
 - **Parallel execution is the default** - Only go sequential if dependencies require it
+- **Use exact templates provided** - No creative interpretation allowed
+- **Verify all quality gates pass** - Build, test, validate before claiming completion
 - Always check what exists before creating new code
 - Test continuously with `hugo server -D`
 - Every feature must be accessible from navigation
-- Use Tailwind classes for ALL styling
+- Use Tailwind classes for ALL styling (exact classes specified above)
 - Update task status immediately when complete
 - Document in `/agent-communication/` for other agents
 - When in doubt, look at the PRD and feature backlog

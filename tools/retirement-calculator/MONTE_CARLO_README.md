@@ -192,7 +192,7 @@ The Monte Carlo engine integrates seamlessly with the existing retirement calcul
 
 1. **Maintains existing API**: All current functionality continues to work
 2. **Enhanced insights**: Adds risk analysis and confidence intervals
-3. **Terminal aesthetics**: Results formatted for terminal-style display
+3. **Modern aesthetics**: Results formatted for clean modern display
 4. **URL state management**: Volatility parameters included in shareable URLs
 
 ## Risk Modeling Capabilities
@@ -285,4 +285,4 @@ const safeRateAnalysis = FinancialCalculations.calculateSafeWithdrawalRate(
 console.log(`Safe withdrawal rate: ${(safeRateAnalysis.safeWithdrawalRate * 100).toFixed(2)}%`);
 ```
 
-This Monte Carlo implementation provides the BufoIndex retirement calculator with sophisticated risk analysis capabilities while maintaining the terminal-style aesthetics and performance requirements of the existing system.
+This Monte Carlo implementation provides the BufoIndex retirement calculator with sophisticated risk analysis capabilities while maintaining the modern BufoIndex design aesthetics and performance requirements of the existing system.

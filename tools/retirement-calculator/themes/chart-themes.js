@@ -1,16 +1,14 @@
 /**
- * Theme-Aware Chart Configuration Helper
- * Provides theme-responsive chart configurations for all visualizations
+ * Modern Chart Configuration Helper
+ * Provides modern-themed chart configurations for all visualizations
  */
 
 class ChartThemes {
     /**
-     * Get theme-aware base chart configuration
+     * Get modern chart configuration
      */
-    static getBaseConfig(themeName = 'modern') {
-        const colors = ThemeConfig.getChartColors(themeName);
-        const theme = ThemeConfig.getTheme(themeName);
-        const isModern = themeName === 'modern';
+    static getBaseConfig() {
+        const colors = ThemeConfig.getChartColors();
         
         return {
             responsive: true,
@@ -20,31 +18,31 @@ class ChartThemes {
                     labels: {
                         color: colors.text,
                         font: {
-                            family: isModern ? theme.fonts.primary : theme.fonts.secondary,
-                            size: isModern ? 12 : 11
+                            family: ThemeConfig.fonts.primary,
+                            size: 12
                         },
-                        usePointStyle: isModern,
-                        padding: isModern ? 20 : 12
+                        usePointStyle: true,
+                        padding: 20
                     }
                 },
                 tooltip: {
-                    backgroundColor: isModern ? 'rgba(255, 255, 255, 0.95)' : colors.primary,
-                    borderColor: colors.chartPrimary,
-                    borderWidth: isModern ? 1 : 1,
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    borderColor: colors.primary,
+                    borderWidth: 1,
                     titleColor: colors.text,
                     bodyColor: colors.text,
-                    cornerRadius: isModern ? 8 : 0,
+                    cornerRadius: 8,
                     titleFont: {
-                        family: theme.fonts.primary,
-                        weight: isModern ? '600' : 'bold',
-                        size: isModern ? 13 : 12
+                        family: ThemeConfig.fonts.primary,
+                        weight: '600',
+                        size: 13
                     },
                     bodyFont: {
-                        family: theme.fonts.primary,
-                        size: isModern ? 12 : 11
+                        family: ThemeConfig.fonts.primary,
+                        size: 12
                     },
-                    padding: isModern ? 12 : 8,
-                    boxShadow: isModern ? '0 4px 6px -1px rgba(0, 0, 0, 0.1)' : 'none'
+                    padding: 12,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                 }
             },
             scales: {
@@ -52,14 +50,14 @@ class ChartThemes {
                     ticks: {
                         color: colors.text,
                         font: {
-                            family: isModern ? theme.fonts.primary : theme.fonts.secondary,
-                            size: isModern ? 11 : 10
+                            family: ThemeConfig.fonts.primary,
+                            size: 11
                         }
                     },
                     grid: {
-                        color: colors.grid + (isModern ? '30' : '40'),
+                        color: colors.grid + '30',
                         borderColor: colors.grid,
-                        lineWidth: isModern ? 1 : 1,
+                        lineWidth: 1,
                         drawTicks: true
                     },
                     border: {
@@ -70,14 +68,14 @@ class ChartThemes {
                     ticks: {
                         color: colors.text,
                         font: {
-                            family: isModern ? theme.fonts.primary : theme.fonts.secondary,
-                            size: isModern ? 11 : 10
+                            family: ThemeConfig.fonts.primary,
+                            size: 11
                         }
                     },
                     grid: {
-                        color: colors.grid + (isModern ? '30' : '40'),
+                        color: colors.grid + '30',
                         borderColor: colors.grid,
-                        lineWidth: isModern ? 1 : 1,
+                        lineWidth: 1,
                         drawTicks: true
                     },
                     border: {
@@ -89,10 +87,10 @@ class ChartThemes {
     }
 
     /**
-     * Get theme-aware color palette for charts
+     * Get color palette for charts
      */
-    static getColorPalette(themeName = 'modern') {
-        const colors = ThemeConfig.getChartColors(themeName);
+    static getColorPalette() {
+        const colors = ThemeConfig.getChartColors();
         
         return [
             colors.primary,
@@ -107,21 +105,20 @@ class ChartThemes {
     /**
      * Create Monte Carlo success probability bar chart configuration
      */
-    static createMonteCarloSuccessChart(data, themeName = 'modern') {
+    static createMonteCarloSuccessChart(data) {
         const { scenarios } = data;
         
         if (!scenarios || scenarios.length === 0) {
-            return this.createEmptyChartConfig('No Monte Carlo data available', themeName);
+            return this.createEmptyChartConfig('No Monte Carlo data available');
         }
 
-        const baseConfig = this.getBaseConfig(themeName);
-        const colors = this.getColorPalette(themeName);
-        const chartColors = ThemeConfig.getChartColors(themeName);
+        const baseConfig = this.getBaseConfig();
+        const colors = this.getColorPalette();
+        const chartColors = ThemeConfig.getChartColors();
         
-        const isModern = themeName === 'modern';
         const labels = scenarios.map((s, index) => {
             const labelText = s.label || s.scenario || (index + 1);
-            return isModern ? `${labelText}` : `SCENARIO_${s.scenario || (index + 1)}`;
+            return `${labelText}`;
         });
         const successRates = scenarios.map(s => s.successRate * 100);
         const scenarioColors = scenarios.map((s, index) => colors[index % colors.length]);
@@ -168,23 +165,22 @@ class ChartThemes {
     /**
      * Create net worth progression line chart configuration
      */
-    static createNetWorthChart(data, themeName = 'modern') {
+    static createNetWorthChart(data) {
         if (!data || !data.scenarios || data.scenarios.length === 0) {
-            return this.createEmptyChartConfig('No net worth data available', themeName);
+            return this.createEmptyChartConfig('No net worth data available');
         }
 
-        const baseConfig = this.getBaseConfig(themeName);
-        const colors = this.getColorPalette(themeName);
-        const chartColors = ThemeConfig.getChartColors(themeName);
+        const baseConfig = this.getBaseConfig();
+        const colors = this.getColorPalette();
+        const chartColors = ThemeConfig.getChartColors();
 
         // Extract years from first scenario
         const years = data.scenarios[0].projections.map(p => p.age);
         
         const datasets = data.scenarios.map((scenario, index) => {
-            const isModern = themeName === 'modern';
             // Use scenario label or fall back to scenario number
             const labelText = scenario.label || scenario.scenario || (index + 1);
-            const scenarioLabel = isModern ? `${labelText}` : `SCENARIO_${scenario.scenario || (index + 1)}`;
+            const scenarioLabel = `${labelText}`;
             
             return {
             label: scenarioLabel,
@@ -216,11 +212,11 @@ class ChartThemes {
                         ...baseConfig.scales.x,
                         title: {
                             display: true,
-                            text: 'AGE',
+                            text: 'Age',
                             color: chartColors.text,
                             font: {
-                                family: ThemeConfig.getTheme(themeName).fonts.secondary,
-                                weight: 'bold'
+                                family: ThemeConfig.fonts.primary,
+                                weight: '600'
                             }
                         }
                     },
@@ -228,11 +224,11 @@ class ChartThemes {
                         ...baseConfig.scales.y,
                         title: {
                             display: true,
-                            text: 'NET_WORTH ($)',
+                            text: 'Net Worth ($)',
                             color: chartColors.text,
                             font: {
-                                family: ThemeConfig.getTheme(themeName).fonts.secondary,
-                                weight: 'bold'
+                                family: ThemeConfig.fonts.primary,
+                                weight: '600'
                             }
                         },
                         ticks: {
@@ -250,15 +246,14 @@ class ChartThemes {
     /**
      * Create retirement withdrawals chart configuration
      */
-    static createWithdrawalsChart(data, themeName = 'modern') {
+    static createWithdrawalsChart(data) {
         if (!data || !data.scenarios || data.scenarios.length === 0) {
-            return this.createEmptyChartConfig('No withdrawal data available', themeName);
+            return this.createEmptyChartConfig('No withdrawal data available');
         }
 
-        const baseConfig = this.getBaseConfig(themeName);
-        const colors = this.getColorPalette(themeName);
-        const chartColors = ThemeConfig.getChartColors(themeName);
-        const isModern = themeName === 'modern';
+        const baseConfig = this.getBaseConfig();
+        const colors = this.getColorPalette();
+        const chartColors = ThemeConfig.getChartColors();
 
         // Find the scenario with retirement data
         const retirementScenario = data.scenarios.find(s => s.retirementData && s.retirementData.length > 0);
@@ -277,7 +272,7 @@ class ChartThemes {
                 labels: years,
                 datasets: [
                     {
-                        label: isModern ? 'Retirement Withdrawals (Inflation Adjusted)' : 'RETIREMENT_WITHDRAWALS',
+                        label: 'Retirement Withdrawals (Inflation Adjusted)',
                         data: withdrawals,
                         borderColor: colors[0],
                         backgroundColor: colors[0] + '20',
@@ -303,11 +298,11 @@ class ChartThemes {
                         ...baseConfig.scales.x,
                         title: {
                             display: true,
-                            text: isModern ? 'Age' : 'AGE',
+                            text: 'Age',
                             color: chartColors.text,
                             font: {
-                                family: isModern ? ThemeConfig.getTheme(themeName).fonts.primary : ThemeConfig.getTheme(themeName).fonts.secondary,
-                                weight: isModern ? '600' : 'bold'
+                                family: ThemeConfig.fonts.primary,
+                                weight: '600'
                             }
                         }
                     },
@@ -315,11 +310,11 @@ class ChartThemes {
                         ...baseConfig.scales.y,
                         title: {
                             display: true,
-                            text: isModern ? 'Annual Withdrawal ($)' : 'WITHDRAWAL ($)',
+                            text: 'Annual Withdrawal ($)',
                             color: chartColors.text,
                             font: {
-                                family: isModern ? ThemeConfig.getTheme(themeName).fonts.primary : ThemeConfig.getTheme(themeName).fonts.secondary,
-                                weight: isModern ? '600' : 'bold'
+                                family: ThemeConfig.fonts.primary,
+                                weight: '600'
                             }
                         },
                         ticks: {
@@ -337,15 +332,14 @@ class ChartThemes {
     /**
      * Create savings vs retirement age chart configuration (line chart)
      */
-    static createSavingsVsRetirementChart(data, themeName = 'modern') {
+    static createSavingsVsRetirementChart(data) {
         if (!data || !data.scenarios || data.scenarios.length === 0) {
-            return this.createEmptyChartConfig('No savings vs retirement data available', themeName);
+            return this.createEmptyChartConfig('No savings vs retirement data available');
         }
 
-        const baseConfig = this.getBaseConfig(themeName);
-        const colors = this.getColorPalette(themeName);
-        const chartColors = ThemeConfig.getChartColors(themeName);
-        const isModern = themeName === 'modern';
+        const baseConfig = this.getBaseConfig();
+        const colors = this.getColorPalette();
+        const chartColors = ThemeConfig.getChartColors();
 
         // Convert scenarios data to x,y points for line chart
         const chartPoints = data.scenarios.map(s => ({
@@ -357,7 +351,7 @@ class ChartThemes {
             type: 'line',
             data: {
                 datasets: [{
-                    label: isModern ? 'Required Savings Rate' : 'REQUIRED_SAVINGS_RATE',
+                    label: 'Required Savings Rate',
                     data: chartPoints,
                     borderColor: colors[0],
                     backgroundColor: colors[0] + '20',
@@ -391,17 +385,17 @@ class ChartThemes {
                         position: 'bottom',
                         title: {
                             display: true,
-                            text: isModern ? 'Retirement Age' : 'RETIREMENT_AGE',
+                            text: 'Retirement Age',
                             color: chartColors.text,
                             font: {
-                                family: isModern ? ThemeConfig.getTheme(themeName).fonts.primary : ThemeConfig.getTheme(themeName).fonts.secondary,
-                                weight: isModern ? '600' : 'bold'
+                                family: ThemeConfig.fonts.primary,
+                                weight: '600'
                             }
                         },
                         ticks: {
                             ...baseConfig.scales.x.ticks,
                             callback: function(value) {
-                                return Math.round(value) + (isModern ? ' yrs' : 'y');
+                                return Math.round(value) + ' yrs';
                             }
                         }
                     },
@@ -409,11 +403,11 @@ class ChartThemes {
                         ...baseConfig.scales.y,
                         title: {
                             display: true,
-                            text: isModern ? 'Required Savings Rate' : 'SAVINGS_RATE',
+                            text: 'Required Savings Rate',
                             color: chartColors.text,
                             font: {
-                                family: isModern ? ThemeConfig.getTheme(themeName).fonts.primary : ThemeConfig.getTheme(themeName).fonts.secondary,
-                                weight: isModern ? '600' : 'bold'
+                                family: ThemeConfig.fonts.primary,
+                                weight: '600'
                             }
                         },
                         ticks: {
@@ -431,8 +425,8 @@ class ChartThemes {
     /**
      * Create empty chart configuration for error states
      */
-    static createEmptyChartConfig(message, themeName = 'modern') {
-        const chartColors = ThemeConfig.getChartColors(themeName);
+    static createEmptyChartConfig(message) {
+        const chartColors = ThemeConfig.getChartColors();
         
         return {
             type: 'line',
@@ -473,7 +467,7 @@ class ChartThemes {
                 afterDraw: function(chart) {
                     const { ctx, width, height } = chart;
                     ctx.restore();
-                    ctx.font = `16px ${ThemeConfig.getTheme(themeName).fonts.secondary}`;
+                    ctx.font = `16px ${ThemeConfig.fonts.primary}`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = chartColors.text;

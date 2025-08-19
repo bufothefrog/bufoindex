@@ -271,21 +271,21 @@ class ErrorLogger {
             right: 20px;
             width: 400px;
             max-height: 500px;
-            background: #000;
-            border: 2px solid #00ff41;
-            color: #00ff41;
-            font-family: monospace;
+            background: var(--color-surface, #FFFFFF);
+            border: 2px solid var(--color-accent, #7FB069);
+            color: var(--color-text-primary, #1F2937);
+            font-family: var(--font-mono, ui-monospace, monospace);
             font-size: 12px;
             padding: 10px;
             overflow-y: auto;
             z-index: 10000;
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+            box-shadow: 0 0 20px rgba(127, 176, 105, 0.5);
         `;
         
         panel.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="font-weight: bold;">DEBUG CONSOLE</div>
-                <button onclick="document.getElementById('debug-panel').remove()" style="background: none; border: none; color: #00ff41; cursor: pointer;">✕</button>
+                <button onclick="document.getElementById('debug-panel').remove()" style="background: none; border: none; color: var(--color-accent, #7FB069); cursor: pointer;">✕</button>
             </div>
             <div id="debug-content"></div>
         `;
@@ -354,7 +354,7 @@ class ErrorLogger {
             'error': '#f44336'
         };
         
-        return colors[status] || '#00ff41';
+        return colors[status] || '#7FB069';
     }
     
     /**

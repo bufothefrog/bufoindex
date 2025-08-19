@@ -5,7 +5,7 @@
 
 class FinancialCalculations {
     /**
-     * Format number as currency without symbol (for terminal display)
+     * Format number as currency without symbol (for clean display)
      */
     static formatCurrency(amount) {
         return Math.round(amount).toLocaleString();
@@ -755,14 +755,31 @@ class FinancialCalculations {
             startingBalance,
             state = 'TX',
             riskProfile = 'tdf',
-            inflationRate = 0.03
+            inflationRate = 0.03,
+            accumulationReturn: customAccumulationReturn,
+            retirementReturn: customRetirementReturn,
+            volatility: customVolatility
         } = params;
 
-        // Get risk profile data
-        const riskData = window.SavingsFeasibility.getRiskProfile(riskProfile, currentAge);
-        const accumulationReturn = riskData.accumulation.return;
-        const retirementReturn = riskData.retirement.return;
-        const volatility = riskData.accumulation.volatility;
+        // Use custom return rates if provided, otherwise get from risk profile
+        let accumulationReturn, retirementReturn, volatility, riskData;
+        
+        // Always get risk profile data (needed for other parts of the function)
+        riskData = window.SavingsFeasibility.getRiskProfile(riskProfile, currentAge);
+        
+        if (customAccumulationReturn !== undefined || customRetirementReturn !== undefined || customVolatility !== undefined) {
+            // Use custom values, with risk profile fallbacks for missing ones
+            accumulationReturn = customAccumulationReturn !== undefined ? customAccumulationReturn : riskData.accumulation.return;
+            retirementReturn = customRetirementReturn !== undefined ? customRetirementReturn : riskData.retirement.return;
+            volatility = customVolatility !== undefined ? customVolatility : riskData.accumulation.volatility;
+            console.log('Using custom returns:', { accumulationReturn, retirementReturn, volatility });
+        } else {
+            // Use risk profile defaults
+            accumulationReturn = riskData.accumulation.return;
+            retirementReturn = riskData.retirement.return;
+            volatility = riskData.accumulation.volatility;
+            console.log('Using risk profile returns:', riskProfile, { accumulationReturn, retirementReturn, volatility });
+        }
 
         // Calculate required savings rate for target goal
         const requiredSavingsRate = window.SavingsFeasibility.calculateRequiredSavingsRate({

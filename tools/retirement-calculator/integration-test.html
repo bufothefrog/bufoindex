@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Integration Test - Retirement Calculator</title>
     <style>
-        body { font-family: monospace; background: #0A0E1A; color: #00FF41; padding: 20px; }
+        body { font-family: system-ui, sans-serif; background: #FAFAF9; color: #1F2937; padding: 20px; }
         .test-result { margin: 10px 0; }
-        .pass { color: #00FF41; }
-        .fail { color: #FF0000; }
+        .pass { color: #7FB069; }
+        .fail { color: #dc2626; }
         .info { color: #FFB86C; }
     </style>
 </head>
@@ -23,7 +23,6 @@
     <script src="lib/statistical-analysis.js"></script>
     <script src="lib/financial-modeling.js"></script>
     <script src="lib/insights-engine.js"></script>
-    <script src="lib/chart-configs.js"></script>
     <script src="lib/export.js"></script>
     <script src="lib/url-state.js"></script>
 
@@ -97,15 +96,6 @@
             logTest(`InsightsEngine error: ${e.message}`, 'fail');
         }
 
-        try {
-            if (typeof ChartConfigs !== 'undefined') {
-                logTest('ChartConfigs class loaded', 'pass');
-            } else {
-                logTest('ChartConfigs class missing', 'fail');
-            }
-        } catch (e) {
-            logTest(`ChartConfigs error: ${e.message}`, 'fail');
-        }
 
         try {
             if (typeof URLStateManager !== 'undefined') {
