@@ -39,6 +39,18 @@ class RetirementCalculator {
             'YOUR RETIREMENT GOAL': 'Your Retirement Goal',
             'ASSESSMENT': 'Assessment',
             'RETIREMENT_GOAL_ASSESSMENT': 'Retirement Goal Assessment',
+            'COAST_FIRE_STATUS': 'Coast FIRE Status',
+            'TIME_VS_MONEY_TRADEOFF': 'Time vs Money Tradeoff',
+            'SAVINGS_RATE': 'Savings Rate',
+            'RISK_PROFILE': 'Risk Profile',
+            'MARKET_RISK_WARNING': 'Market Risk Warning',
+            'ACTION_REQUIRED': 'Action Required',
+            'OPTIMIZATION_OPPORTUNITY': 'Optimization Opportunity',
+            'BASIC_MODE_ACTIVE': 'Basic Mode Active',
+            'EARLIEST_RETIREMENT': 'Earliest Retirement',
+            'MONTHLY_SAVINGS': 'Monthly Savings',
+            'BASIC_MODE': 'Basic Mode',
+            'ANALYSIS_ERROR': 'Analysis Error',
             'VISUALIZATIONS': 'Visualizations',
             'KEY_INSIGHTS': 'Key Insights',
             '[EXPAND]': 'Expand',
@@ -231,7 +243,7 @@ class RetirementCalculator {
         // Set up event listeners
         this.setupEventListeners();
         
-        // Initialize state dropdown
+        // Initialize state dropdown (preserves existing values from URL)
         this.initializeStateDropdown();
         
         // Set up automatic state saving
@@ -240,7 +252,8 @@ class RetirementCalculator {
         // Set up popstate listener for browser navigation
         URLStateManager.setupPopstateListener(() => this.updateAll());
         
-        // Initialize risk profile returns
+        // Initialize risk profile returns (after URL state is applied)
+        // This ensures that if 'custom' was loaded from URL, it won't be overridden
         this.updateRiskProfileReturns();
         
         // Initial calculation
@@ -384,9 +397,13 @@ class RetirementCalculator {
         
         let selectedIndex = -1;
         
-        // Set initial values to empty - user must select
-        stateInput.value = '';
-        hiddenSelect.value = '';
+        // Set initial values to empty only if not already set (preserve URL state)
+        if (!stateInput.value) {
+            stateInput.value = '';
+        }
+        if (!hiddenSelect.value) {
+            hiddenSelect.value = '';
+        }
         
         // Function to filter states based on input
         const filterStates = (query) => {
@@ -579,7 +596,7 @@ class RetirementCalculator {
             if (!scenario.valid) {
                 return `
                     <tr class="subtitle-text">
-                        <td class="py-2 px-3">${this.getThemeText(`SCENARIO_${scenario.label}`)}</td>
+                        <td class="py-2 px-3">${scenario.label}</td>
                         <td class="py-2 px-3">${Math.round(scenario.savingsRate * 100)}%</td>
                         <td class="py-2 px-3" colspan="3">INVALID: Unable to retire with this savings rate</td>
                     </tr>
@@ -602,7 +619,7 @@ class RetirementCalculator {
 
             return `
                 <tr class="text-sage-green">
-                    <td class="py-2 px-3">${this.getThemeText(`SCENARIO_${scenario.label}`)}</td>
+                    <td class="py-2 px-3">${scenario.label}</td>
                     <td class="py-2 px-3">${savingsRateDisplay}</td>
                     <td class="py-2 px-3">${scenario.retirementAge}</td>
                     <td class="py-2 px-3 ${realismClass}">
@@ -674,14 +691,14 @@ class RetirementCalculator {
             const contributionRatio = Math.round((earliest.monthlyContribution / latest.monthlyContribution) * 100 - 100);
 
             insights.push({
-                title: 'TIME_VS_MONEY_TRADEOFF',
+                title: this.getThemeText('TIME_VS_MONEY_TRADEOFF'),
                 value: `${contributionRatio}%`,
                 text: `Retiring ${timeDifference} years earlier requires ${contributionRatio}% higher monthly contributions (${this.formatCurrency(contributionDifference)} more per month).`
             });
         }
 
         insights.push({
-            title: 'SAVINGS_RATE',
+            title: this.getThemeText('SAVINGS_RATE'),
             value: `${Math.round(earliest.monthlyContribution / (validated.targetIncome/12) * 100)}%`,
             text: `Early retirement (Scenario ${earliest.label}) requires saving ${Math.round(earliest.monthlyContribution / (validated.targetIncome/12) * 100)}% of your target monthly retirement income every month during your working years.`
         });
@@ -709,10 +726,28 @@ class RetirementCalculator {
             const currentRate = Math.round(params.currentSavingsRate);
 
             insights.push({
-                title: 'RETIREMENT_GOAL_ASSESSMENT',
+                title: this.getThemeText('RETIREMENT_GOAL_ASSESSMENT'),
                 value: targetRating,
                 text: `Your goal to retire at ${params.targetRetirementAge} with $${this.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
             });
+
+            // Coast FIRE Analysis
+            if (requiredRate <= 0) {
+                // Calculate when they would hit Coast FIRE (current balance grows to target)
+                const targetPortfolioSize = (params.targetIncome * Math.pow(1 + params.inflationRate/100, params.targetRetirementAge - params.startingAge)) / 0.04;
+                const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile, params.startingAge);
+                const annualReturn = riskData.accumulation.return;
+                
+                // Calculate years for current balance to reach target with no additional contributions
+                const yearsToCoastFire = Math.log(targetPortfolioSize / params.startingBalance) / Math.log(1 + annualReturn);
+                const coastFireAge = Math.round(params.startingAge + yearsToCoastFire);
+                
+                insights.push({
+                    title: this.getThemeText('COAST_FIRE_STATUS'),
+                    value: `Age ${coastFireAge}`,
+                    text: `You'll reach Coast FIRE at age ${coastFireAge}, when your current $${this.formatCurrency(params.startingBalance)} grows to $${this.formatCurrency(targetPortfolioSize)} without additional contributions. After that point, you can stop saving and still retire at ${params.targetRetirementAge} with your target income.`
+                });
+            }
 
             // Savings Rate Impact
             const currentScenario = this.scenarios.find(s => s.label === 'Current');
@@ -741,7 +776,7 @@ class RetirementCalculator {
             // Risk Profile Impact
             const riskData = window.SavingsFeasibility.getRiskProfile(params.riskProfile, params.startingAge);
             insights.push({
-                title: 'RISK_PROFILE',
+                title: this.getThemeText('RISK_PROFILE'),
                 value: riskData.name,
                 text: `Your ${riskData.name} investment approach assumes ${Math.round(riskData.accumulation.return*100)}% returns during accumulation and ${Math.round(riskData.retirement.return*100)}% during retirement.`
             });
@@ -766,7 +801,7 @@ class RetirementCalculator {
                     // Add warning for high-risk scenarios
                     if (successRate < 80) {
                         insights.push({
-                            title: 'MARKET_RISK_WARNING',
+                            title: this.getThemeText('MARKET_RISK_WARNING'),
                             value: 'High Risk',
                             text: `Portfolio success rates below 80% indicate significant market risk. Consider working longer, saving more, or choosing a more conservative investment approach to improve portfolio durability.`
                         });
@@ -778,9 +813,26 @@ class RetirementCalculator {
             if (!this.targetGoalAssessment.isRealistic) {
                 const minRequiredRate = Math.round(this.targetGoalAssessment.requiredSavingsRate * 100);
                 insights.push({
-                    title: 'ACTION_REQUIRED',
+                    title: this.getThemeText('ACTION_REQUIRED'),
                     value: `${minRequiredRate}% needed`,
                     text: `To achieve your goal, consider: 1) Increase savings rate to ${minRequiredRate}%, 2) Retire later, 3) Reduce target income, or 4) Move to lower cost area.`
+                });
+            }
+            
+            // Suggest less aggressive savings rate if current scenario is highly realistic
+            if (currentScenario && currentScenario.realismRating === 'Highly Realistic') {
+                // Find a savings rate that would still be highly realistic but lower
+                const currentRatePercent = Math.round(currentScenario.savingsRate * 100);
+                const suggestedRate = Math.max(10, currentRatePercent - 5); // Suggest 5% lower but not below 10%
+                
+                // Calculate retirement age with the lower rate
+                const yearsToRetirement = Math.max(5, Math.round((params.targetRetirementAge - params.startingAge) * 1.15));
+                const suggestedRetirementAge = Math.min(70, params.startingAge + yearsToRetirement);
+                
+                insights.push({
+                    title: this.getThemeText('OPTIMIZATION_OPPORTUNITY'),
+                    value: `${suggestedRate}% rate`,
+                    text: `Since your current ${currentRatePercent}% savings rate is highly realistic, you could potentially reduce it to ${suggestedRate}% and still retire comfortably around age ${suggestedRetirementAge}. This would free up income for current lifestyle while maintaining retirement security.`
                 });
             }
 
@@ -945,6 +997,7 @@ class RetirementCalculator {
                 
                 return {
                     scenario: index + 1,
+                    label: scenario.label,
                     projections: ageData
                 };
             })
@@ -1160,7 +1213,9 @@ class RetirementCalculator {
             scenarios: [{
                 scenario: 1,
                 retirementData: retirementData
-            }]
+            }],
+            targetRetirementAge: params.targetRetirementAge, // Add target retirement age for markers
+            savingsScenarios: this.scenarios // Pass scenario data for colored dots
         };
         
         // Use theme-aware chart configuration if available and has data
@@ -2802,7 +2857,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (insights) {
                     insights.innerHTML = `
                         <div class="modern-insight col-span-full">
-                            <div class="modern-insight-title">BASIC_MODE_ACTIVE</div>
+                            <div class="modern-insight-title">${this.getThemeText('BASIC_MODE_ACTIVE')}</div>
                             <div class="modern-insight-text">Advanced Monte Carlo analysis unavailable. Showing simplified calculations only.</div>
                         </div>
                     `;
@@ -2844,13 +2899,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return {
                 label,
                 retirementAge,
-                monthlyContribution: Math.max(0, monthlyContribution),
-                annualContribution: Math.max(0, annualContribution),
-                savingsRate: Math.max(0, savingsRate),
+                monthlyContribution: monthlyContribution, // Allow negative for Coast FIRE
+                annualContribution: annualContribution, // Allow negative for Coast FIRE
+                savingsRate: savingsRate, // Allow negative for Coast FIRE
                 targetPortfolioSize: inflatedRequired,
-                valid: savingsRate <= 0.8 && savingsRate >= 0 && workingYears >= 5,
-                realismScore: savingsRate <= 0.5 ? 85 : savingsRate <= 0.7 ? 60 : 30,
-                color: label === 'Conservative' ? '#4CAF50' : label === 'Moderate' ? '#FF9800' : '#F44336'
+                valid: savingsRate <= 0.8 && workingYears >= 5, // Remove lower bound for Coast FIRE
+                realismScore: savingsRate <= 0 ? 100 : savingsRate <= 0.5 ? 85 : savingsRate <= 0.7 ? 60 : 30, // Coast FIRE gets 100% score
+                color: label === 'Conservative' ? '#4CAF50' : label === 'Moderate' ? '#FF9800' : '#e74c3c' // Theme-appropriate red
             };
         }
         
@@ -2896,17 +2951,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             container.innerHTML = `
                 <div class="modern-insight">
-                    <div class="modern-insight-title">EARLIEST_RETIREMENT</div>
+                    <div class="modern-insight-title">${this.getThemeText('EARLIEST_RETIREMENT')}</div>
                     <div class="modern-insight-value">${earliest.retirementAge} years</div>
                     <div class="modern-insight-text">Earliest possible retirement with ${Math.round(earliest.savingsRate * 100)}% savings rate</div>
                 </div>
                 <div class="modern-insight">
-                    <div class="modern-insight-title">MONTHLY_SAVINGS</div>
+                    <div class="modern-insight-title">${this.getThemeText('MONTHLY_SAVINGS')}</div>
                     <div class="modern-insight-value">$${Math.round(earliest.monthlyContribution).toLocaleString()}</div>
                     <div class="modern-insight-text">Required monthly contribution for earliest retirement</div>
                 </div>
                 <div class="modern-insight">
-                    <div class="modern-insight-title">BASIC_MODE</div>
+                    <div class="modern-insight-title">${this.getThemeText('BASIC_MODE')}</div>
                     <div class="modern-insight-value">Simplified</div>
                     <div class="modern-insight-text">Advanced Monte Carlo analysis unavailable. Results are estimates.</div>
                 </div>

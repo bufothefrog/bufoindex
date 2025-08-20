@@ -177,7 +177,7 @@ class URLStateManager {
         validated.healthcareInflation = Math.max(0, Math.min(20, validated.healthcareInflation || 5));
 
         // NEW: Risk profile validation
-        const validRiskProfiles = ['conservative', 'moderate', 'aggressive', 'high_risk', 'ultra_high_risk', 'tdf'];
+        const validRiskProfiles = ['conservative', 'moderate', 'aggressive', 'high_risk', 'ultra_high_risk', 'tdf', 'custom'];
         if (!validRiskProfiles.includes(validated.riskProfile)) {
             validated.riskProfile = 'tdf';
         }
@@ -227,6 +227,16 @@ class URLStateManager {
         }
         
         this.setSelectValue('riskProfile', validated.riskProfile);
+        
+        // Handle custom risk profile - show the custom option if it was selected
+        if (validated.riskProfile === 'custom') {
+            const riskProfileSelect = document.getElementById('riskProfile');
+            const customOption = riskProfileSelect?.querySelector('option[value="custom"]');
+            if (customOption) {
+                customOption.style.display = 'block';
+            }
+        }
+        
         this.setInputValue('inflationRate', validated.inflationRate);
         this.setInputValue('endAge', validated.endAge);
 
@@ -242,6 +252,15 @@ class URLStateManager {
         this.setInputValue('socialSecurityAge', validated.socialSecurityAge);
         this.setInputValue('socialSecurityBenefit', validated.socialSecurityBenefit.toLocaleString());
         this.setSelectValue('healthcareMultiplier', validated.healthcareMultiplier);
+
+        // Apply financial modeling parameters (if form elements exist)
+        this.setSelectValue('filingStatus', validated.filingStatus);
+        this.setInputValue('expectedSsBenefit', validated.expectedSsBenefit);
+        this.setInputValue('ssStartAge', validated.ssStartAge);
+        this.setInputValue('lifeExpectancy', validated.lifeExpectancy);
+        this.setInputValue('currentTaxRate', validated.currentTaxRate);
+        this.setInputValue('retirementTaxRate', validated.retirementTaxRate);
+        this.setInputValue('healthcareInflation', validated.healthcareInflation);
 
         return validated;
     }
@@ -294,7 +313,16 @@ class URLStateManager {
             accountType: this.getSelectValue('accountType'),
             socialSecurityAge: this.getIntValue('socialSecurityAge'),
             socialSecurityBenefit: this.getCurrencyValue('socialSecurityBenefit'),
-            healthcareMultiplier: this.getFloatValue('healthcareMultiplier')
+            healthcareMultiplier: this.getFloatValue('healthcareMultiplier'),
+            
+            // Financial modeling parameters for tax and optimization calculations
+            filingStatus: this.getSelectValue('filingStatus'),
+            expectedSsBenefit: this.getCurrencyValue('expectedSsBenefit'),
+            ssStartAge: this.getIntValue('ssStartAge'),
+            lifeExpectancy: this.getIntValue('lifeExpectancy'),
+            currentTaxRate: this.getFloatValue('currentTaxRate'),
+            retirementTaxRate: this.getFloatValue('retirementTaxRate'),
+            healthcareInflation: this.getFloatValue('healthcareInflation')
         };
     }
 

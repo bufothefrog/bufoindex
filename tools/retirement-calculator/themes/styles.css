@@ -586,9 +586,9 @@
  .widget-title.retirement-withdrawals {
   color: var(--color-text-primary) !important;
   font-family: var(--font-secondary) !important;
-  text-transform: uppercase !important;
-  font-weight: bold !important;
-  text-shadow: 0 0 3px var(--color-text-primary) !important;
+  text-transform: none !important;
+  font-weight: normal !important;
+  text-shadow: none !important;
 }
 
 
@@ -621,8 +621,8 @@ canvas {
   color: var(--color-text-primary) !important;
   font-family: var(--font-secondary) !important;
   font-weight: bold !important;
-  text-transform: uppercase !important;
-  text-shadow: 0 0 3px var(--color-text-primary) !important;
+  text-transform: none !important;
+  text-shadow: none !important;
 }
 
 /* Modern theme opacity overrides - use solid colors instead */
@@ -669,6 +669,11 @@ canvas {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Override text transform for scenario labels in tables */
+.modern-table td:first-child {
+  text-transform: none !important;
 }
 
 /* State dropdown container styling */

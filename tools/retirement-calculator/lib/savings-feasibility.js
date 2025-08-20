@@ -183,8 +183,8 @@ class SavingsFeasibility {
             requiredAnnualContribution = numerator / denominator;
         }
 
-        // Convert to savings rate
-        const requiredSavingsRate = Math.max(0, requiredAnnualContribution / currentIncome);
+        // Convert to savings rate (allow negative values for Coast FIRE analysis)
+        const requiredSavingsRate = requiredAnnualContribution / currentIncome;
         
         return requiredSavingsRate;
     }

@@ -163,9 +163,9 @@ class FinancialCalculations {
             return {
                 yearsUntilRetirement,
                 targetPortfolioSize,
-                monthlyContribution: Math.max(0, monthlyContribution),
+                monthlyContribution: monthlyContribution, // Allow negative for Coast FIRE
                 inflatedTargetIncome,
-                annualContribution: Math.max(0, annualContribution),
+                annualContribution: annualContribution, // Allow negative for Coast FIRE
                 valid: true
             };
         } catch (error) {
@@ -957,7 +957,7 @@ class FinancialCalculations {
         const readinessAnalysis = this.calculateRetirementReadiness(params);
         
         return readinessAnalysis.scenarios.map(scenario => ({
-            retirementAge: scenario.achievableRetirementAge,
+            retirementAge: params.targetRetirementAge,
             targetIncome: params.targetIncome,
             startingAge: params.currentAge,
             startingBalance: params.startingBalance,
@@ -966,7 +966,8 @@ class FinancialCalculations {
             savingsRate: scenario.savingsRate,
             label: scenario.label,
             realismRating: scenario.realismRating,
-            confidenceLevel: scenario.confidenceLevel
+            confidenceLevel: scenario.confidenceLevel,
+            achievableRetirementAge: scenario.achievableRetirementAge // Keep for reference
         }));
     }
 

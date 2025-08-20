@@ -174,6 +174,9 @@ class ChartThemes {
         const colors = this.getColorPalette();
         const chartColors = ThemeConfig.getChartColors();
 
+        // Use specific scenario colors for consistency
+        const scenarioColors = ['#27ae60', '#f39c12', '#e74c3c']; // Green, Orange, Red
+
         // Extract years from first scenario
         const years = data.scenarios[0].projections.map(p => p.age);
         
@@ -181,18 +184,19 @@ class ChartThemes {
             // Use scenario label or fall back to scenario number
             const labelText = scenario.label || scenario.scenario || (index + 1);
             const scenarioLabel = `${labelText}`;
+            const color = scenarioColors[index] || colors[index % colors.length]; // Use scenario colors first
             
             return {
             label: scenarioLabel,
             data: scenario.projections.map(p => p.netWorth),
-            borderColor: colors[index % colors.length],
-            backgroundColor: colors[index % colors.length] + '20', // Add transparency
+            borderColor: color,
+            backgroundColor: color + '20', // Add transparency
             borderWidth: 3,
             fill: false,
             tension: 0.1,
             pointRadius: 0,
             pointHoverRadius: 6,
-            pointHoverBackgroundColor: colors[index % colors.length],
+            pointHoverBackgroundColor: color,
             pointHoverBorderColor: chartColors.background,
             pointHoverBorderWidth: 2
             };
@@ -206,6 +210,23 @@ class ChartThemes {
             },
             options: {
                 ...baseConfig,
+                plugins: {
+                    ...baseConfig.plugins,
+                    tooltip: {
+                        ...baseConfig.plugins.tooltip,
+                        callbacks: {
+                            title: function(context) {
+                                const datasetLabel = context[0].dataset.label;
+                                return `${datasetLabel}`;
+                            },
+                            label: function(context) {
+                                const age = context.label;
+                                const value = Math.round(context.parsed.y);
+                                return `Age: ${age}, $${value.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
                 scales: {
                     ...baseConfig.scales,
                     x: {
@@ -265,6 +286,25 @@ class ChartThemes {
         const years = retirementScenario.retirementData.map(d => d.age);
         const balances = retirementScenario.retirementData.map(d => d.balance);
         const withdrawals = retirementScenario.retirementData.map(d => d.withdrawal);
+        
+        // Create point styling array to highlight target retirement age and scenario ages
+        const targetRetirementAge = data.targetRetirementAge;
+        const savingsScenarios = data.savingsScenarios || [];
+        const scenarioColors = ['#27ae60', '#f39c12', '#e74c3c']; // Green, Orange, Red
+        
+        const pointRadii = years.map(age => {
+            if (age === targetRetirementAge) return 8; // Highlighted retirement age
+            const scenarioIndex = savingsScenarios.findIndex(s => s.retirementAge === age);
+            return scenarioIndex >= 0 ? 6 : 4; // Larger dots for scenario ages
+        });
+        
+        const pointBackgroundColors = years.map(age => {
+            if (age === targetRetirementAge) return colors[2]; // Special color for target age
+            const scenarioIndex = savingsScenarios.findIndex(s => s.retirementAge === age);
+            return scenarioIndex >= 0 ? scenarioColors[scenarioIndex] : colors[0]; // Scenario colors or default
+        });
+        
+        const pointBorderColors = years.map(age => chartColors.background);
 
         return {
             type: 'line',
@@ -279,19 +319,49 @@ class ChartThemes {
                         borderWidth: 3,
                         fill: false,
                         tension: 0.1,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBackgroundColor: colors[0],
-                        pointBorderColor: chartColors.background,
+                        pointRadius: pointRadii,
+                        pointHoverRadius: years.map(age => {
+                            if (age === targetRetirementAge) return 10;
+                            const scenarioIndex = savingsScenarios.findIndex(s => s.retirementAge === age);
+                            return scenarioIndex >= 0 ? 8 : 6;
+                        }),
+                        pointBackgroundColor: pointBackgroundColors,
+                        pointBorderColor: pointBorderColors,
                         pointBorderWidth: 2,
-                        pointHoverBackgroundColor: colors[0],
-                        pointHoverBorderColor: chartColors.background,
+                        pointHoverBackgroundColor: pointBackgroundColors,
+                        pointHoverBorderColor: pointBorderColors,
                         pointHoverBorderWidth: 2
                     }
                 ]
             },
             options: {
                 ...baseConfig,
+                plugins: {
+                    ...baseConfig.plugins,
+                    tooltip: {
+                        ...baseConfig.plugins.tooltip,
+                        callbacks: {
+                            title: function(context) {
+                                const age = context[0].label;
+                                const targetRetirementAge = data.targetRetirementAge;
+                                const savingsScenarios = data.savingsScenarios || [];
+                                
+                                // Check if this age corresponds to a scenario
+                                const scenario = savingsScenarios.find(s => s.retirementAge == age);
+                                if (scenario) {
+                                    return `${scenario.label}: Age ${age}`;
+                                } else if (age == targetRetirementAge) {
+                                    return `Target Retirement: Age ${age}`;
+                                }
+                                return `Age ${age}`;
+                            },
+                            label: function(context) {
+                                const value = Math.round(context.parsed.y);
+                                return `Retirement Withdrawals (Inflation Adjusted): $${value.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
                 scales: {
                     ...baseConfig.scales,
                     x: {
@@ -375,6 +445,19 @@ class ChartThemes {
                     legend: {
                         ...baseConfig.plugins.legend,
                         display: true
+                    },
+                    tooltip: {
+                        ...baseConfig.plugins.tooltip,
+                        callbacks: {
+                            title: function(context) {
+                                return 'Required Savings Rate';
+                            },
+                            label: function(context) {
+                                const age = Math.round(context.parsed.x);
+                                const savingsRate = Math.round(context.parsed.y * 100);
+                                return `Age: ${age}, ${savingsRate}%`;
+                            }
+                        }
                     }
                 },
                 scales: {
