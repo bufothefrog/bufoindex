@@ -8,19 +8,31 @@ class URLStateManager {
      * Save current calculator parameters to URL hash
      */
     static saveState(params) {
+        console.log('💾 saveState() called with params:', params);
+        console.log('💰 currentSavings in saveState:', params.currentSavings);
+        
         const urlParams = new URLSearchParams();
         
         // Add all parameters to URL
         Object.keys(params).forEach(key => {
             if (params[key] !== null && params[key] !== undefined) {
                 urlParams.set(key, params[key]);
+                if (key === 'currentSavings') {
+                    console.log(`💰 Adding currentSavings to URL: ${params[key]}`);
+                }
             }
         });
 
         // Update URL hash without triggering page reload
         const newHash = urlParams.toString();
+        console.log('🔗 New URL hash:', newHash);
+        console.log('🔗 currentSavings in hash:', urlParams.get('currentSavings'));
+        
         if (window.location.hash !== '#' + newHash) {
             window.history.replaceState(null, null, '#' + newHash);
+            console.log('✅ URL updated successfully');
+        } else {
+            console.log('ℹ️ URL hash unchanged');
         }
     }
 
@@ -41,6 +53,11 @@ class URLStateManager {
             // Define expected parameters with default values
             const defaults = this.getDefaultParameters();
             
+            // Check for backward compatibility with old annual format
+            const isOldFormat = urlParams.has('currentSavingsRate') || 
+                               (urlParams.has('targetIncome') && parseFloat(urlParams.get('targetIncome')) > 50000) ||
+                               (urlParams.has('currentIncome') && parseFloat(urlParams.get('currentIncome')) > 50000);
+            
             // Load each parameter, falling back to defaults
             Object.keys(defaults).forEach(key => {
                 const value = urlParams.get(key);
@@ -55,6 +72,29 @@ class URLStateManager {
                     params[key] = defaults[key];
                 }
             });
+            
+            // Apply backward compatibility conversions
+            if (isOldFormat) {
+                console.log('Converting old URL format to monthly values');
+                
+                // Convert old currentSavingsRate to currentSavings
+                if (urlParams.has('currentSavingsRate')) {
+                    const oldSavingsRate = parseFloat(urlParams.get('currentSavingsRate')) || 10;
+                    const monthlyIncome = params.currentIncome;
+                    // If currentIncome looks like annual (>50k), convert it to monthly first
+                    const adjustedIncome = monthlyIncome > 50000 ? monthlyIncome / 12 : monthlyIncome;
+                    params.currentSavings = Math.round((oldSavingsRate / 100) * adjustedIncome);
+                    params.currentIncome = adjustedIncome;
+                }
+                
+                // Convert annual income values to monthly
+                if (params.targetIncome > 50000) {
+                    params.targetIncome = Math.round(params.targetIncome / 12);
+                }
+                if (params.currentIncome > 50000) {
+                    params.currentIncome = Math.round(params.currentIncome / 12);
+                }
+            }
 
             return params;
         } catch (error) {
@@ -70,12 +110,12 @@ class URLStateManager {
         return {
             startingAge: 30,
             targetRetirementAge: 65,
-            currentSavingsRate: 10,
+            currentSavings: 667, // Default $667/month (equivalent to 10% of $6667 monthly income)
             endAge: 85,
-            targetIncome: 80000,
+            targetIncome: 6667, // Default $6667/month (was $80k annually)
             startingBalance: 80000,
             inflationRate: 3,
-            currentIncome: 80000,
+            currentIncome: 6667, // Default $6667/month (was $80k annually)
             state: 'CA',
             riskProfile: 'tdf',
             // Legacy parameters for compatibility
@@ -145,8 +185,8 @@ class URLStateManager {
         );
         validated.endAge = this.validateAge(validated.endAge, 65, 110, 85);
         
-        // Savings rate validation
-        validated.currentSavingsRate = this.validateRate(validated.currentSavingsRate, 0, 80, 15);
+        // Monthly savings validation (in dollars)
+        validated.currentSavings = this.validateCurrency(validated.currentSavings, 0, 333333, 667);
         
         // Legacy age validations (for backward compatibility)
         validated.retirementAgeA = this.validateAge(validated.retirementAgeA, validated.startingAge + 1, 100, 40);
@@ -210,7 +250,7 @@ class URLStateManager {
         // Update NEW form inputs
         this.setInputValue('startingAge', validated.startingAge);
         this.setInputValue('targetRetirementAge', validated.targetRetirementAge);
-        this.setInputValue('currentSavingsRate', validated.currentSavingsRate);
+        this.setInputValue('currentSavings', validated.currentSavings.toLocaleString());
         this.setInputValue('targetIncome', validated.targetIncome.toLocaleString());
         this.setInputValue('startingBalance', validated.startingBalance.toLocaleString());
         this.setInputValue('currentIncome', validated.currentIncome.toLocaleString());
@@ -289,18 +329,21 @@ class URLStateManager {
      * Collect current parameters from form
      */
     static collectParametersFromForm() {
-        return {
-            // NEW: Primary parameters for savings-focused approach
-            startingAge: this.getIntValue('startingAge'),
-            targetRetirementAge: this.getIntValue('targetRetirementAge'),
-            currentSavingsRate: this.getFloatValue('currentSavingsRate'),
-            targetIncome: this.getCurrencyValue('targetIncome'),
-            startingBalance: this.getCurrencyValue('startingBalance'),
-            currentIncome: this.getCurrencyValue('currentIncome'),
-            state: this.getSelectValue('state'),
-            riskProfile: this.getSelectValue('riskProfile'),
-            inflationRate: this.getFloatValue('inflationRate'),
-            endAge: this.getIntValue('endAge'),
+        console.log('📋 collectParametersFromForm() called');
+        
+        try {
+            const params = {
+                // NEW: Primary parameters for savings-focused approach
+                startingAge: this.getIntValue('startingAge'),
+                targetRetirementAge: this.getIntValue('targetRetirementAge'),
+                currentSavings: this.getCurrencyValue('currentSavings'),
+                targetIncome: this.getCurrencyValue('targetIncome'),
+                startingBalance: this.getCurrencyValue('startingBalance'),
+                currentIncome: this.getCurrencyValue('currentIncome'),
+                state: this.getSelectValue('state'),
+                riskProfile: this.getSelectValue('riskProfile'),
+                inflationRate: this.getFloatValue('inflationRate'),
+                endAge: this.getIntValue('endAge'),
             
             // Legacy parameters for backward compatibility
             retirementAgeA: this.getIntValue('retirementAgeA') || 40,
@@ -323,7 +366,15 @@ class URLStateManager {
             currentTaxRate: this.getFloatValue('currentTaxRate'),
             retirementTaxRate: this.getFloatValue('retirementTaxRate'),
             healthcareInflation: this.getFloatValue('healthcareInflation')
-        };
+            };
+            
+            console.log('📊 Collected parameters:', params);
+            console.log('💰 currentSavings value:', params.currentSavings);
+            return params;
+        } catch (error) {
+            console.error('❌ Error in collectParametersFromForm:', error);
+            return this.getDefaultParameters();
+        }
     }
 
     /**
@@ -341,7 +392,25 @@ class URLStateManager {
 
     static getCurrencyValue(id) {
         const element = document.getElementById(id);
-        return element ? FinancialCalculations.parseCurrency(element.value) : 0;
+        console.log(`💱 getCurrencyValue('${id}'):`, {
+            elementFound: !!element,
+            elementValue: element?.value,
+            elementType: element?.type
+        });
+        
+        if (!element) {
+            console.warn(`⚠️ Element '${id}' not found`);
+            return 0;
+        }
+        
+        try {
+            const parsed = FinancialCalculations.parseCurrency(element.value);
+            console.log(`💰 Parsed '${id}' value:`, element.value, '→', parsed);
+            return parsed;
+        } catch (error) {
+            console.error(`❌ Error parsing currency for '${id}':`, error);
+            return 0;
+        }
     }
 
     static getSelectValue(id) {
@@ -353,15 +422,31 @@ class URLStateManager {
      * Set up automatic state saving on form changes
      */
     static setupAutoSave() {
+        console.log('🔧 URLStateManager.setupAutoSave() called');
+        
         const inputs = document.querySelectorAll('.retirement-calculator input');
+        console.log(`📋 Found ${inputs.length} input elements:`, Array.from(inputs).map(input => input.id));
+        
+        // Check specifically for currentSavings element
+        const currentSavingsElement = document.getElementById('currentSavings');
+        console.log('💰 currentSavings element found:', !!currentSavingsElement, currentSavingsElement);
         
         // Debounce function to limit URL updates
         let timeout;
         const debouncedSave = () => {
+            console.log('⏱️ debouncedSave triggered');
             clearTimeout(timeout);
             timeout = setTimeout(() => {
-                const params = this.collectParametersFromForm();
-                this.saveState(params);
+                try {
+                    console.log('🔄 Collecting parameters from form...');
+                    const params = this.collectParametersFromForm();
+                    console.log('📊 Collected parameters:', params);
+                    console.log('💰 currentSavings in params:', params.currentSavings);
+                    this.saveState(params);
+                    console.log('✅ State saved to URL');
+                } catch (error) {
+                    console.error('❌ Error in debouncedSave:', error);
+                }
             }, 500); // Save state 500ms after user stops typing
         };
 
@@ -369,7 +454,10 @@ class URLStateManager {
         inputs.forEach(input => {
             input.addEventListener('input', debouncedSave);
             input.addEventListener('change', debouncedSave);
+            console.log(`🎧 Added listeners to ${input.id}`);
         });
+        
+        console.log('✅ setupAutoSave completed');
     }
 
     /**

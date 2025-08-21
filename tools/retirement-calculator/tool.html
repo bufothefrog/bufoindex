@@ -33,20 +33,20 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
         <div class="modern-input-group">
           <label for="targetIncome" class="block text-sm mb-1 modern-label">
-            Target Retirement Income:
+            Target Monthly Retirement Income:
             <span class="modern-help" 
-               title="Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
-               aria-label="Help: Annual income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
+               title="Monthly income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
+               aria-label="Help: Monthly income needed in retirement, in today's purchasing power. This will be adjusted for inflation at retirement."
                role="button" 
                tabindex="0">?</span>
           </label>
           <div class="relative">
             <input type="text" id="targetIncome" value="" 
                 class="modern-input w-full border px-2 py-1 font-mono pr-32"
-                data-validation="currency" data-min="10000" data-max="10000000"
-                aria-label="Target retirement income in today's dollars, between $10,000 and $10,000,000"
+                data-validation="currency" data-min="833" data-max="833333"
+                aria-label="Target monthly retirement income in today's dollars, between $833 and $833,333"
                 aria-describedby="targetIncome-help targetIncome-error">
-            <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono" id="targetIncome-help">in today's dollars</span>
+            <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono" id="targetIncome-help">per month</span>
           </div>
           <div class="modern-error hidden text-red-400 text-xs mt-1" id="targetIncome-error" role="alert" aria-live="polite"></div>
         </div>
@@ -73,14 +73,14 @@
         
         <div class="modern-input-group">
           <label for="currentIncome" class="block text-sm mb-1 modern-label">
-            Current Income:
-            <span class="modern-help" title="Your current annual income, used for tax planning and savings rate calculations.">?</span>
+            Current Monthly Income:
+            <span class="modern-help" title="Your current monthly income, used for tax planning and savings calculations.">?</span>
           </label>
           <div class="relative">
             <input type="text" id="currentIncome" value=""
                 class="modern-input w-full border px-2 py-1 font-mono pr-16"
-                data-validation="currency" data-min="10000" data-max="5000000">
-            <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono">dollars</span>
+                data-validation="currency" data-min="833" data-max="416667">
+            <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono">per month</span>
           </div>
           <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
         </div>
@@ -116,15 +116,15 @@
         </div>
         
         <div class="modern-input-group">
-          <label for="currentSavingsRate" class="block text-sm mb-1 modern-label">
-            Current Savings Rate:
-            <span class="modern-help" title="Percentage of gross income you currently save for retirement. Include 401k, IRA, and other retirement savings.">?</span>
+          <label for="currentSavings" class="block text-sm mb-1 modern-label">
+            Current Monthly Savings:
+            <span class="modern-help" title="Amount you currently save each month for retirement. Include 401k, IRA, and other retirement savings.">?</span>
           </label>
           <div class="relative">
-            <input type="number" id="currentSavingsRate" value="" min="0" max="80" step="0.5"
-                class="modern-input w-full border px-2 py-1 font-mono pr-8"
-                data-validation="percentage">
-            <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm">%</span>
+            <input type="text" id="currentSavings" value="" 
+                class="modern-input w-full border px-2 py-1 font-mono pr-16"
+                data-validation="currency" data-min="0" data-max="333333">
+            <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm font-mono">per month</span>
           </div>
           <div class="modern-error hidden text-red-400 text-xs mt-1"></div>
         </div>

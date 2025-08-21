@@ -800,8 +800,9 @@ class FinancialCalculations {
             state
         );
 
-        // Generate three savings rate scenarios
-        const savingsScenarios = window.SavingsFeasibility.generateSavingsRateScenarios(currentSavingsRate);
+        // Generate three savings rate scenarios (pass monthly income for dollar-based increases)
+        const monthlyIncome = currentIncome / 12;
+        const savingsScenarios = window.SavingsFeasibility.generateSavingsRateScenarios(currentSavingsRate, monthlyIncome);
         
         // Calculate what retirement age is achievable with each savings rate
         const scenarioResults = savingsScenarios.map((scenario, index) => {

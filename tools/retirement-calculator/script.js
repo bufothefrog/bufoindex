@@ -33,6 +33,21 @@ class RetirementCalculator {
         return Math.round(amount).toLocaleString();
     }
 
+    // Monthly to Annual conversion functions
+    monthlyToAnnual(monthlyAmount) {
+        return monthlyAmount * 12;
+    }
+
+    annualToMonthly(annualAmount) {
+        return annualAmount / 12;
+    }
+
+    // Calculate savings rate from monthly savings and monthly income
+    calculateSavingsRate(monthlySavings, monthlyIncome) {
+        if (monthlyIncome <= 0) return 0;
+        return (monthlySavings / monthlyIncome) * 100; // Return as percentage
+    }
+
     // Helper function for modern text formatting
     getThemeText(rawText) {
         const textMappings = {
@@ -246,8 +261,17 @@ class RetirementCalculator {
         // Initialize state dropdown (preserves existing values from URL)
         this.initializeStateDropdown();
         
-        // Set up automatic state saving
-        URLStateManager.setupAutoSave();
+        // Set up automatic state saving (with DOM ready check)
+        if (document.readyState === 'loading') {
+            console.log('⏳ DOM not ready, waiting for DOMContentLoaded...');
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('✅ DOM ready, setting up URL state auto-save');
+                URLStateManager.setupAutoSave();
+            });
+        } else {
+            console.log('✅ DOM already ready, setting up URL state auto-save');
+            URLStateManager.setupAutoSave();
+        }
         
         // Set up popstate listener for browser navigation
         URLStateManager.setupPopstateListener(() => this.updateAll());
@@ -272,7 +296,7 @@ class RetirementCalculator {
         // Input change listeners
         const inputs = document.querySelectorAll('.retirement-calculator input, .retirement-calculator select');
         inputs.forEach(input => {
-            if (input.id === 'targetIncome' || input.id === 'startingBalance' || input.id === 'currentIncome' || input.id === 'socialSecurityBenefit') {
+            if (input.id === 'targetIncome' || input.id === 'startingBalance' || input.id === 'currentIncome' || input.id === 'currentSavings' || input.id === 'socialSecurityBenefit') {
                 // Format currency inputs with commas
                 input.addEventListener('input', (e) => {
                     const cursorPosition = e.target.selectionStart;
@@ -702,8 +726,8 @@ class RetirementCalculator {
 
         insights.push({
             title: this.getThemeText('SAVINGS_RATE'),
-            value: `${Math.round(earliest.monthlyContribution / (validated.targetIncome/12) * 100)}%`,
-            text: `Early retirement (Scenario ${earliest.label}) requires saving ${Math.round(earliest.monthlyContribution / (validated.targetIncome/12) * 100)}% of your target monthly retirement income every month during your working years.`
+            value: `${Math.round(earliest.monthlyContribution / (validated.monthlyTargetIncome) * 100)}%`,
+            text: `Early retirement (Scenario ${earliest.label}) requires saving ${Math.round(earliest.monthlyContribution / (validated.monthlyTargetIncome) * 100)}% of your target monthly retirement income every month during your working years.`
         });
 
         this.insights = insights;
@@ -731,7 +755,14 @@ class RetirementCalculator {
             insights.push({
                 title: this.getThemeText('RETIREMENT_GOAL_ASSESSMENT'),
                 value: targetRating,
-                text: `Your goal to retire at ${params.targetRetirementAge} with $${this.formatCurrency(params.targetIncome)} is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
+                text: `Your goal to retire at ${params.targetRetirementAge} with $${this.formatCurrency(params.monthlyTargetIncome)}/month is rated as "${targetRating}". You would need to save ${requiredRate}% of income vs your current ${currentRate}%.`
+            });
+
+            // Current Savings Rate
+            insights.push({
+                title: 'Current Savings Rate',
+                value: `${currentRate}%`,
+                text: `You currently save $${this.formatCurrency(params.monthlySavings)}/month, which is ${currentRate}% of your $${this.formatCurrency(params.monthlyCurrentIncome)}/month income.`
             });
 
             // Coast FIRE Analysis
@@ -748,7 +779,7 @@ class RetirementCalculator {
                 insights.push({
                     title: this.getThemeText('COAST_FIRE_STATUS'),
                     value: `Age ${coastFireAge}`,
-                    text: `You'll reach Coast FIRE at age ${coastFireAge}, when your current $${this.formatCurrency(params.startingBalance)} grows to $${this.formatCurrency(targetPortfolioSize)} without additional contributions. After that point, you can stop saving and still retire at ${params.targetRetirementAge} with your target income.`
+                    text: `You'll reach Coast FIRE at age ${coastFireAge}, when your current $${this.formatCurrency(params.startingBalance)} grows to $${this.formatCurrency(targetPortfolioSize)} without additional contributions. After that point, you can stop saving and still retire at ${params.targetRetirementAge} with $${this.formatCurrency(params.monthlyTargetIncome)}/month.`
                 });
             }
 
@@ -1973,21 +2004,36 @@ class RetirementCalculator {
             }
             
             // Collect parameters directly from form elements with fallbacks
+            // Get monthly inputs first (prioritize URL state if available)
+            const monthlyTargetIncome = basic.targetIncome || this.getInputValue('targetIncome', 'currency');
+            const monthlyCurrentIncome = basic.currentIncome || this.getInputValue('currentIncome', 'currency');
+            const monthlySavings = basic.currentSavings || this.getInputValue('currentSavings', 'currency');
+            
+            // Convert monthly inputs to annual for calculations
+            const annualTargetIncome = this.monthlyToAnnual(monthlyTargetIncome);
+            const annualCurrentIncome = this.monthlyToAnnual(monthlyCurrentIncome);
+            
+            const currentSavingsRate = this.calculateSavingsRate(monthlySavings, monthlyCurrentIncome);
+            
             const enhanced = {
-                // NEW: Primary parameters
+                // Start with basic parameters from URL state
+                ...basic,
+                
+                // Override with calculated values (these take precedence)
                 startingAge: this.getInputValue('startingAge', 'number'),
                 targetRetirementAge: this.getInputValue('targetRetirementAge', 'number'),
-                currentSavingsRate: this.getInputValue('currentSavingsRate', 'number'),
-                targetIncome: this.getInputValue('targetIncome', 'currency'),
+                currentSavingsRate: currentSavingsRate,
+                targetIncome: annualTargetIncome,
                 startingBalance: this.getInputValue('startingBalance', 'currency'),
-                currentIncome: this.getInputValue('currentIncome', 'currency'),
+                currentIncome: annualCurrentIncome,
+                // Store monthly values for display purposes
+                monthlyTargetIncome: monthlyTargetIncome,
+                monthlyCurrentIncome: monthlyCurrentIncome,
+                monthlySavings: monthlySavings,
                 state: this.getSelectValue('state'),
                 riskProfile: this.getSelectValue('riskProfile'),
                 inflationRate: this.getInputValue('inflationRate', 'number'),
                 endAge: this.getInputValue('endAge', 'number'),
-                
-                // Merge any successfully collected basic parameters
-                ...basic,
                 
                 // Smart Monte Carlo runs based on scenario complexity
                 monteCarloRuns: this.getOptimalMonteCarloRuns(basic),
@@ -2075,7 +2121,7 @@ class RetirementCalculator {
             return {
                 startingAge: 25,
                 targetRetirementAge: 45,
-                currentSavingsRate: 15,
+                currentSavings: 1000, // Default $1000/month savings
                 targetIncome: 120000,
                 startingBalance: 100000,
                 currentIncome: 80000,
@@ -2101,9 +2147,9 @@ class RetirementCalculator {
             // Silently handle missing elements with defaults (enhanced parameters are optional)
             const defaults = {
                 'targetRetirementAge': 45,
-                'currentSavingsRate': 15,
-                'currentIncome': 80000,
-                'targetIncome': 120000,
+                'currentSavings': 1000, // Default $1000/month savings
+                'currentIncome': 6667, // Default $6667/month (was $80k annually)
+                'targetIncome': 10000, // Default $10k/month (was $120k annually)
                 'startingBalance': 100000,
                 'startingAge': 25,
                 'socialSecurityAge': 67,
@@ -2122,17 +2168,36 @@ class RetirementCalculator {
             }
         }
         
+        // Get default value for this field
+        const defaults = {
+            'targetRetirementAge': 45,
+            'currentSavings': 1000, // Default $1000/month savings
+            'currentIncome': 6667, // Default $6667/month (was $80k annually)
+            'targetIncome': 10000, // Default $10k/month (was $120k annually)
+            'startingBalance': 100000,
+            'startingAge': 25,
+            'socialSecurityAge': 67,
+            'socialSecurityBenefit': 2000,
+            'inflationRate': 3,
+            'endAge': 85
+        };
+        const defaultValue = defaults[id] || 0;
+        
         switch (type) {
             case 'currency':
                 // Use built-in currency parsing instead of FinancialCalculations
                 if (typeof element.value === 'string') {
-                    return parseFloat(element.value.replace(/[$,]/g, '')) || 0;
+                    if (element.value.trim() === '') return defaultValue; // Empty string uses default
+                    const parsedValue = parseFloat(element.value.replace(/[$,]/g, ''));
+                    return !isNaN(parsedValue) ? parsedValue : defaultValue;
                 }
-                return parseFloat(element.value) || 0;
+                const numValue = parseFloat(element.value);
+                return !isNaN(numValue) ? numValue : defaultValue;
             case 'number':
-                return parseFloat(element.value) || 0;
+                const numberValue = parseFloat(element.value);
+                return !isNaN(numberValue) ? numberValue : defaultValue;
             default:
-                return element.value || '';
+                return element.value || defaultValue.toString();
         }
     }
 
@@ -2941,9 +3006,9 @@ document.addEventListener('DOMContentLoaded', () => {
         collectBasicParameters() {
             return {
                 startingAge: parseInt(document.getElementById('startingAge')?.value) || 25,
-                targetIncome: this.parseCurrency(document.getElementById('targetIncome')?.value) || 120000,
+                targetIncome: this.parseCurrency(document.getElementById('targetIncome')?.value) || 10000, // Monthly default
                 startingBalance: this.parseCurrency(document.getElementById('startingBalance')?.value) || 100000,
-                currentIncome: this.parseCurrency(document.getElementById('currentIncome')?.value) || 80000,
+                currentIncome: this.parseCurrency(document.getElementById('currentIncome')?.value) || 6667, // Monthly default
                 returnRate: parseFloat(document.getElementById('accumulationReturn')?.value) || 8,
                 inflationRate: parseFloat(document.getElementById('inflationRate')?.value) || 3
             };

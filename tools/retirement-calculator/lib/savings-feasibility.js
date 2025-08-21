@@ -190,26 +190,37 @@ class SavingsFeasibility {
     }
 
     /**
-     * Generate three savings rate scenarios for analysis
+     * Generate three savings rate scenarios for analysis based on dollar amounts
      * @param {number} currentSavingsRate - Current savings rate (decimal)
+     * @param {number} monthlyIncome - Monthly income for calculating dollar increases
      * @returns {Array} - Array of three scenarios
      */
-    static generateSavingsRateScenarios(currentSavingsRate) {
+    static generateSavingsRateScenarios(currentSavingsRate, monthlyIncome = 6667) {
+        // Calculate current monthly savings
+        const currentMonthlySavings = currentSavingsRate * monthlyIncome;
+        
+        // Calculate new savings rates with $500 and $1000 monthly increases
+        const moderateRate = (currentMonthlySavings + 500) / monthlyIncome;
+        const aggressiveRate = (currentMonthlySavings + 1000) / monthlyIncome;
+        
         return [
             {
                 label: 'Current',
                 rate: currentSavingsRate,
-                description: 'Your current savings rate'
+                description: 'Your current savings rate',
+                monthlyAmount: currentMonthlySavings
             },
             {
                 label: 'Moderate',
-                rate: currentSavingsRate + 0.10,
-                description: 'Current rate + 10% increase'
+                rate: moderateRate,
+                description: 'Current savings + $500/month',
+                monthlyAmount: currentMonthlySavings + 500
             },
             {
                 label: 'Aggressive',
-                rate: currentSavingsRate + 0.20,
-                description: 'Current rate + 20% increase'
+                rate: aggressiveRate,
+                description: 'Current savings + $1000/month',
+                monthlyAmount: currentMonthlySavings + 1000
             }
         ];
     }
