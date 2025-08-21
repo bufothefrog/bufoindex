@@ -4,6 +4,7 @@ description: "Advanced retirement planning calculator with multiple scenario ana
 layout: "tools/single"
 tool_dependencies: ["chartjs", "chartjs-plugin-zoom"]
 draft: false
+date: 2025-08-21
 ---
 
 Plan your financial independence with precision. Model multiple retirement scenarios, analyze compound growth, and understand the trade-offs between time and money.
