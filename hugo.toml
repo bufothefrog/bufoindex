@@ -1,10 +1,10 @@
-baseURL = 'https://bufothefrog.github.io/bufoindex/'
+baseURL = 'https://bufoindex.com/'
 languageCode = 'en-us'
 title = 'BUFOINDEX'
 theme = 'bufoindex'
 
 [params]
-  description = "Personal finance education platform bridging basic advice and sophisticated wealth strategies"
+  description = "Democratizing wealth-building knowledge through interactive financial tools and clear explanations"
   author = "Bufo"
   
 [markup]

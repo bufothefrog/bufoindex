@@ -233,10 +233,9 @@ function checkMissingFiles() {
         'retirement-calculator/lib/financial-modeling.js',
         'retirement-calculator/lib/statistical-analysis.js',
         'retirement-calculator/lib/insights-engine.js',
-        'retirement-calculator/lib/chart-configs.js',
         'retirement-calculator/script.js',
         'retirement-calculator/tool.html',
-        'retirement-calculator/styles.css'
+        'retirement-calculator/themes/styles.css'
     ];
     
     requiredFiles.forEach(file => {
@@ -290,7 +289,6 @@ function validate() {
         'retirement-calculator/lib/financial-modeling.js',
         'retirement-calculator/lib/statistical-analysis.js',
         'retirement-calculator/lib/insights-engine.js',
-        'retirement-calculator/lib/chart-configs.js',
         'retirement-calculator/script.js'
     ];
     
