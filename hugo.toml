@@ -1,4 +1,4 @@
-baseURL = 'https://bufoindex.com/'
+baseURL = 'https://next.bufoindex.com/'
 languageCode = 'en-us'
 title = 'BUFOINDEX'
 theme = 'bufoindex'
