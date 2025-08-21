@@ -1,0 +1,30 @@
+{
+  "name": "bufoindex",
+  "version": "1.0.0",
+  "description": "Personal finance education platform built with Hugo",
+  "scripts": {
+    "dev": "npm run build:css && hugo server -D --watch",
+    "build": "npm run validate && npm run build:css && hugo --gc --minify",
+    "build:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --minify",
+    "watch:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --watch",
+    "validate": "node tools/validate-calculators.js",
+    "test:calculator": "echo 'Open tools/retirement-calculator/test-retirement-calculator.html in browser to run tests'",
+    "debug:calculator": "echo 'Add ?debug=true to calculator URL for debug mode'"
+  },
+  "keywords": [
+    "finance",
+    "education",
+    "hugo",
+    "static-site"
+  ],
+  "author": "Bufo",
+  "license": "MIT",
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.81"
+  }
+}

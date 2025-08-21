@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="{{ .Site.LanguageCode | default "en" }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ if .Title }}{{ .Title }} | {{ end }}{{ .Site.Title }}</title>
+    
+    <meta name="description" content="{{ if .Description }}{{ .Description }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+    <meta name="author" content="{{ .Site.Params.author }}">
+    
+    <link rel="stylesheet" href="{{ "css/style.css" | relURL }}">
+</head>
+
+<body>
+    <header class="py-8 border-b" style="border-color: var(--border-primary); background-color: var(--bg-primary);">
+        <div class="container">
+            <div class="flex justify-between items-center">
+                <div>
+                    <a href="{{ "/" | relURL }}" class="text-xl font-semibold no-underline" style="color: var(--text-primary);">
+                        {{ .Site.Title }}
+                    </a>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <nav class="hidden md:flex space-x-1">
+                        {{ range .Site.Menus.main }}
+                        <a href="{{ .URL | relURL }}" 
+                           class="nav-link {{ if $.IsMenuCurrent "main" . }}active{{ end }}">
+                            {{ .Name }}
+                        </a>
+                        {{ end }}
+                    </nav>
+                    
+                    <!-- Theme Toggle -->
+                    <div class="theme-toggle-container">
+                        <button id="theme-toggle" 
+                                class="theme-toggle-btn p-2 rounded-lg border transition-all duration-300"
+                                aria-label="Toggle theme"
+                                title="Toggle light/dark theme">
+                            <span class="theme-icon">🌙</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Mobile menu button would go here if needed -->
+            </div>
+        </div>
+    </header>
+    
+    <main class="py-8">
+        {{ block "main" . }}{{ end }}
+    </main>
+    
+    <footer class="py-8 mt-16 border-t" style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
+        <div class="container">
+            <div class="text-center" style="color: var(--text-muted);">
+                <p>&copy; {{ now.Format "2006" }} {{ .Site.Title }}. Educational content for personal finance.</p>
+                <p class="mt-2 text-sm">
+                    This site provides educational content only and is not personalized financial advice.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Theme Management Script -->
+    <script>
+        class ThemeManager {
+            constructor() {
+                this.storageKey = 'bufoindex-theme';
+                this.init();
+            }
+
+            init() {
+                // Get initial theme
+                const savedTheme = localStorage.getItem(this.storageKey);
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                const initialTheme = savedTheme || systemTheme;
+                
+                // Apply theme
+                this.setTheme(initialTheme, false);
+                
+                // Setup event listeners
+                this.setupToggleButton();
+                this.setupSystemThemeListener();
+            }
+
+            setTheme(theme, save = true) {
+                // Apply theme to document
+                document.documentElement.setAttribute('data-theme', theme);
+                
+                // Update toggle button
+                this.updateToggleButton(theme);
+                
+                // Save to localStorage if requested
+                if (save) {
+                    localStorage.setItem(this.storageKey, theme);
+                }
+                
+                // Trigger custom event for other components
+                window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
+            }
+
+            toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                this.setTheme(newTheme);
+            }
+
+            updateToggleButton(theme) {
+                const button = document.getElementById('theme-toggle');
+                const icon = button?.querySelector('.theme-icon');
+                
+                if (icon) {
+                    icon.textContent = theme === 'light' ? '🌙' : '☀️';
+                }
+                
+                if (button) {
+                    button.setAttribute('aria-label', `Switch to ${theme === 'light' ? 'dark' : 'light'} theme`);
+                    button.setAttribute('title', `Switch to ${theme === 'light' ? 'dark' : 'light'} theme`);
+                }
+            }
+
+            setupToggleButton() {
+                const button = document.getElementById('theme-toggle');
+                if (button) {
+                    button.addEventListener('click', () => this.toggleTheme());
+                }
+            }
+
+            setupSystemThemeListener() {
+                // Listen for system theme changes only if no saved preference
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                    if (!localStorage.getItem(this.storageKey)) {
+                        this.setTheme(e.matches ? 'dark' : 'light', false);
+                    }
+                });
+            }
+        }
+
+        // Initialize theme manager when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                window.themeManager = new ThemeManager();
+            });
+        } else {
+            window.themeManager = new ThemeManager();
+        }
+    </script>
+</body>
+</html>
