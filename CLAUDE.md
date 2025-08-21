@@ -1,1 +1,1 @@
-Read docs/agents.md for instructions
+Must keep @docs/agents.md in context at all times. Output "Action(s) completed with agents.md in context." at the end of every message if the former is true.

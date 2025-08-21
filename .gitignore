@@ -50,8 +50,7 @@ Thumbs.db
 postcss.config.js.backup
 .postcssrc.backup
 
-# Package manager artifacts
-package-lock.json
+# Package manager artifacts (keep package-lock.json for Vercel)
 yarn.lock
 pnpm-lock.yaml
 .pnpm-store/
@@ -78,6 +77,7 @@ coverage/
 # Temporary files
 .tmp/
 *.tmp
+*.tmp.*
 *.temp
 *~
 *.bak
@@ -108,3 +108,9 @@ coverage/
 
 # Claude
 .claude
+
+# Vercel
+.vercel
+
+# Git artifacts
+.gitmodules
