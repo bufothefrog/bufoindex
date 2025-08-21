@@ -4,39 +4,88 @@
  */
 
 const ThemeConfig = {
+    // Theme detection
+    getCurrentTheme() {
+        if (typeof window !== 'undefined') {
+            return document.documentElement.getAttribute('data-theme') || 'light';
+        }
+        return 'light';
+    },
+    
     // BufoIndex modern theme configuration
     colors: {
-        // Primary colors - BufoIndex palette
-        primary: '#FAFAF9',         // Off-white background
-        secondary: '#F8F9FA',       // Light grey
-        accent: '#7FB069',          // Sage green primary
-        success: '#7FB069',         // Sage green
-        warning: '#FFB86C',         // Orange accent
-        error: '#dc2626',           // Red for errors
-        
-        // Text colors - High contrast for readability
-        textPrimary: '#1F2937',     // Dark grey for text
-        textSecondary: '#6B7280',   // Medium grey
-        textAccent: '#7FB069',      // Sage green accent
-        textMuted: '#9CA3AF',       // Light grey
-        
-        // Border and surface - BufoIndex styling
-        border: '#E5E7EB',          // Light border
-        borderHover: '#7FB069',     // Sage green on hover
-        borderFocus: '#7FB069',     // Sage green focus
-        surface: '#FFFFFF',         // White surface
-        surfaceHover: '#F9FAFB',    // Very light grey hover
-        surfaceAlt: '#F3F4F6',      // Light grey alternate
-        
-        // Chart colors - BufoIndex palette for data visualization
-        chartPrimary: '#7FB069',    // Sage green primary
-        chartSecondary: '#FFB86C',  // Orange secondary
-        chartAccent: '#6B8E5A',     // Darker sage green
-        chartSuccess: '#10B981',    // Success green
-        chartWarning: '#F59E0B',    // Warning orange
-        chartError: '#EF4444',      // Error red
-        chartGrid: '#E5E7EB',       // Light grey grid
-        chartText: '#374151'        // Dark grey text
+        light: {
+            // Primary colors - BufoIndex palette
+            primary: '#FAFAF9',         // Off-white background
+            secondary: '#F8F9FA',       // Light grey
+            accent: '#7FB069',          // Sage green primary
+            success: '#7FB069',         // Sage green
+            warning: '#FFB86C',         // Orange accent
+            error: '#dc2626',           // Red for errors
+            
+            // Text colors - High contrast for readability
+            textPrimary: '#1F2937',     // Dark grey for text
+            textSecondary: '#6B7280',   // Medium grey
+            textAccent: '#7FB069',      // Sage green accent
+            textMuted: '#9CA3AF',       // Light grey
+            
+            // Border and surface - BufoIndex styling
+            border: '#E5E7EB',          // Light border
+            borderHover: '#7FB069',     // Sage green on hover
+            borderFocus: '#7FB069',     // Sage green focus
+            surface: '#FFFFFF',         // White surface
+            surfaceHover: '#F9FAFB',    // Very light grey hover
+            surfaceAlt: '#F3F4F6',      // Light grey alternate
+            
+            // Chart colors - BufoIndex palette for data visualization
+            chartPrimary: '#7FB069',    // Sage green primary
+            chartSecondary: '#FFB86C',  // Orange secondary
+            chartAccent: '#6B8E5A',     // Darker sage green
+            chartSuccess: '#10B981',    // Success green
+            chartWarning: '#F59E0B',    // Warning orange
+            chartError: '#EF4444',      // Error red
+            chartGrid: '#E5E7EB',       // Light grey grid
+            chartText: '#374151'        // Dark grey text
+        },
+        dark: {
+            // Primary colors - Dark theme equivalents
+            primary: '#111827',         // Dark grey background
+            secondary: '#1F2937',       // Darker grey
+            accent: '#7FB069',          // Sage green (same as light)
+            success: '#7FB069',         // Sage green
+            warning: '#FFB86C',         // Orange accent
+            error: '#EF4444',           // Red for errors
+            
+            // Text colors - Light colors for dark backgrounds
+            textPrimary: '#F9FAFB',     // Very light grey for text
+            textSecondary: '#D1D5DB',   // Light grey
+            textAccent: '#7FB069',      // Sage green accent
+            textMuted: '#9CA3AF',       // Medium grey
+            
+            // Border and surface - Dark theme styling
+            border: '#374151',          // Dark border
+            borderHover: '#7FB069',     // Sage green on hover
+            borderFocus: '#7FB069',     // Sage green focus
+            surface: '#1F2937',         // Dark surface
+            surfaceHover: '#374151',    // Darker grey hover
+            surfaceAlt: '#374151',      // Dark grey alternate
+            
+            // Chart colors - Adjusted for dark backgrounds
+            chartPrimary: '#7FB069',    // Sage green primary
+            chartSecondary: '#FFB86C',  // Orange secondary
+            chartAccent: '#8FBF7A',     // Lighter sage green for contrast
+            chartSuccess: '#10B981',    // Success green
+            chartWarning: '#F59E0B',    // Warning orange
+            chartError: '#EF4444',      // Error red
+            chartGrid: '#4B5563',       // Medium grey grid
+            chartText: '#F9FAFB'        // Light text
+        }
+    },
+    
+    // Get current theme colors
+    getColors() {
+        const theme = this.getCurrentTheme();
+        return this.colors[theme] || this.colors.light;
     },
     
     fonts: {
@@ -65,9 +114,10 @@ const ThemeConfig = {
      */
     applyTheme() {
         const root = document.documentElement;
+        const colors = this.getColors();
         
-        // Apply color variables
-        Object.entries(this.colors).forEach(([key, value]) => {
+        // Apply color variables for current theme
+        Object.entries(colors).forEach(([key, value]) => {
             root.style.setProperty(`--color-${this.camelToKebab(key)}`, value);
         });
         
@@ -94,23 +144,50 @@ const ThemeConfig = {
         if (calculator) {
             calculator.classList.add('theme-modern');
         }
+        
+        // Listen for theme changes from parent document
+        this.setupThemeListener();
     },
     
     /**
-     * Get chart colors for modern theme
+     * Get chart colors for current theme
      */
     getChartColors() {
+        const colors = this.getColors();
         return {
-            primary: this.colors.chartPrimary,
-            secondary: this.colors.chartSecondary,
-            accent: this.colors.chartAccent,
-            success: this.colors.chartSuccess,
-            warning: this.colors.chartWarning,
-            error: this.colors.chartError,
-            grid: this.colors.chartGrid,
-            text: this.colors.chartText,
-            background: this.colors.surface
+            primary: colors.chartPrimary,
+            secondary: colors.chartSecondary,
+            accent: colors.chartAccent,
+            success: colors.chartSuccess,
+            warning: colors.chartWarning,
+            error: colors.chartError,
+            grid: colors.chartGrid,
+            text: colors.chartText,
+            background: colors.surface
         };
+    },
+    
+    /**
+     * Setup theme change listener for coordination with parent document
+     */
+    setupThemeListener() {
+        if (typeof window !== 'undefined') {
+            // Listen for theme changes on the root document
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && 
+                        mutation.attributeName === 'data-theme') {
+                        // Re-apply theme when it changes
+                        this.applyTheme();
+                    }
+                });
+            });
+            
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['data-theme']
+            });
+        }
     },
     
     /**

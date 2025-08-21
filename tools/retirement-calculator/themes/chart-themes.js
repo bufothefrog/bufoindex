@@ -26,7 +26,7 @@ class ChartThemes {
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backgroundColor: colors.background + 'F0', // 94% opacity
                     borderColor: colors.primary,
                     borderWidth: 1,
                     titleColor: colors.text,
@@ -186,6 +186,20 @@ class ChartThemes {
             const scenarioLabel = `${labelText}`;
             const color = scenarioColors[index] || colors[index % colors.length]; // Use scenario colors first
             
+            // Create point styling to show dots only at retirement age for this scenario
+            const retirementAge = scenario.retirementAge || data.targetRetirementAge;
+            
+            // Find the closest age in our data to the retirement age
+            const closestAgeIndex = years.reduce((closestIndex, currentAge, index) => {
+                const currentDiff = Math.abs(currentAge - retirementAge);
+                const closestDiff = Math.abs(years[closestIndex] - retirementAge);
+                return currentDiff < closestDiff ? index : closestIndex;
+            }, 0);
+            
+            const pointRadii = years.map((age, index) => index === closestAgeIndex ? 4 : 0);
+            const pointBackgroundColors = years.map((age, index) => index === closestAgeIndex ? chartColors.background : 'transparent');
+            const pointBorderColors = years.map((age, index) => index === closestAgeIndex ? color : 'transparent');
+            
             return {
             label: scenarioLabel,
             data: scenario.projections.map(p => p.netWorth),
@@ -194,11 +208,14 @@ class ChartThemes {
             borderWidth: 3,
             fill: false,
             tension: 0.1,
-            pointRadius: 0,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: color,
-            pointHoverBorderColor: chartColors.background,
-            pointHoverBorderWidth: 2
+            pointRadius: pointRadii,
+            pointBackgroundColor: pointBackgroundColors,
+            pointBorderColor: pointBorderColors,
+            pointBorderWidth: 3,
+            pointHoverRadius: years.map((age, index) => index === closestAgeIndex ? 6 : 0),
+            pointHoverBackgroundColor: chartColors.background,
+            pointHoverBorderColor: color,
+            pointHoverBorderWidth: 3
             };
         });
 
@@ -212,6 +229,9 @@ class ChartThemes {
                 ...baseConfig,
                 plugins: {
                     ...baseConfig.plugins,
+                    legend: {
+                        display: false
+                    },
                     tooltip: {
                         ...baseConfig.plugins.tooltip,
                         callbacks: {
@@ -287,24 +307,24 @@ class ChartThemes {
         const balances = retirementScenario.retirementData.map(d => d.balance);
         const withdrawals = retirementScenario.retirementData.map(d => d.withdrawal);
         
-        // Create point styling array to highlight target retirement age and scenario ages
+        // Create point styling array to show ONLY key points: target + 3 scenarios
         const targetRetirementAge = data.targetRetirementAge;
         const savingsScenarios = data.savingsScenarios || [];
         const scenarioColors = ['#27ae60', '#f39c12', '#e74c3c']; // Green, Orange, Red
         
         const pointRadii = years.map(age => {
-            if (age === targetRetirementAge) return 8; // Highlighted retirement age
+            if (age === targetRetirementAge) return 4; // Target retirement age - same size as savings chart
             const scenarioIndex = savingsScenarios.findIndex(s => s.retirementAge === age);
-            return scenarioIndex >= 0 ? 6 : 4; // Larger dots for scenario ages
+            return scenarioIndex >= 0 ? 4 : 0; // Only show dots for scenarios and target, hide others
         });
         
-        const pointBackgroundColors = years.map(age => {
+        const pointBackgroundColors = years.map(age => 'transparent'); // Hollow dots
+        
+        const pointBorderColors = years.map(age => {
             if (age === targetRetirementAge) return colors[2]; // Special color for target age
             const scenarioIndex = savingsScenarios.findIndex(s => s.retirementAge === age);
-            return scenarioIndex >= 0 ? scenarioColors[scenarioIndex] : colors[0]; // Scenario colors or default
+            return scenarioIndex >= 0 ? scenarioColors[scenarioIndex] : 'transparent'; // Only color key points
         });
-        
-        const pointBorderColors = years.map(age => chartColors.background);
 
         return {
             type: 'line',
@@ -321,16 +341,16 @@ class ChartThemes {
                         tension: 0.1,
                         pointRadius: pointRadii,
                         pointHoverRadius: years.map(age => {
-                            if (age === targetRetirementAge) return 10;
+                            if (age === targetRetirementAge) return 6;
                             const scenarioIndex = savingsScenarios.findIndex(s => s.retirementAge === age);
-                            return scenarioIndex >= 0 ? 8 : 6;
+                            return scenarioIndex >= 0 ? 6 : 0;
                         }),
-                        pointBackgroundColor: pointBackgroundColors,
+                        pointBackgroundColor: chartColors.background, // White/theme background for hollow center
                         pointBorderColor: pointBorderColors,
-                        pointBorderWidth: 2,
-                        pointHoverBackgroundColor: pointBackgroundColors,
+                        pointBorderWidth: 3, // Match line thickness
+                        pointHoverBackgroundColor: chartColors.background, // White/theme background for hover too
                         pointHoverBorderColor: pointBorderColors,
-                        pointHoverBorderWidth: 2
+                        pointHoverBorderWidth: 3
                     }
                 ]
             },
@@ -338,6 +358,9 @@ class ChartThemes {
                 ...baseConfig,
                 plugins: {
                     ...baseConfig.plugins,
+                    legend: {
+                        display: false
+                    },
                     tooltip: {
                         ...baseConfig.plugins.tooltip,
                         callbacks: {
@@ -430,12 +453,12 @@ class ChartThemes {
                     tension: 0.1,
                     pointRadius: 4,
                     pointHoverRadius: 6,
-                    pointBackgroundColor: colors[0],
-                    pointBorderColor: chartColors.background,
-                    pointBorderWidth: 2,
-                    pointHoverBackgroundColor: colors[0],
-                    pointHoverBorderColor: chartColors.background,
-                    pointHoverBorderWidth: 2
+                    pointBackgroundColor: chartColors.background, // White/theme background for hollow center
+                    pointBorderColor: colors[0],
+                    pointBorderWidth: 3, // Match line thickness
+                    pointHoverBackgroundColor: chartColors.background, // White/theme background for hover too
+                    pointHoverBorderColor: colors[0],
+                    pointHoverBorderWidth: 3
                 }]
             },
             options: {
@@ -443,8 +466,7 @@ class ChartThemes {
                 plugins: {
                     ...baseConfig.plugins,
                     legend: {
-                        ...baseConfig.plugins.legend,
-                        display: true
+                        display: false
                     },
                     tooltip: {
                         ...baseConfig.plugins.tooltip,
@@ -454,7 +476,7 @@ class ChartThemes {
                             },
                             label: function(context) {
                                 const age = Math.round(context.parsed.x);
-                                const savingsRate = Math.round(context.parsed.y * 100);
+                                const savingsRate = Math.round(context.parsed.y);
                                 return `Age: ${age}, ${savingsRate}%`;
                             }
                         }

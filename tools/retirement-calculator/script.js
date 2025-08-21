@@ -330,6 +330,9 @@ class RetirementCalculator {
         // Form validation listeners
         this.setupFormValidation();
         
+        // Theme change listener for chart updates
+        this.setupThemeChangeListener();
+        
         // Accessibility enhancements
         this.setupAccessibilityFeatures();
     }
@@ -998,6 +1001,7 @@ class RetirementCalculator {
                 return {
                     scenario: index + 1,
                     label: scenario.label,
+                    retirementAge: scenario.retirementAge,
                     projections: ageData
                 };
             })
@@ -1466,6 +1470,31 @@ class RetirementCalculator {
     }
 
     // NEW METHODS FOR ENHANCED FUNCTIONALITY
+
+    /**
+     * Set up theme change listener to refresh charts when theme switches
+     */
+    setupThemeChangeListener() {
+        // Listen for theme changes from the parent document
+        window.addEventListener('themechange', () => {
+            // Force chart refresh by destroying and recreating them
+            this.destroyAllCharts();
+            // Small delay to ensure theme CSS variables are updated
+            setTimeout(() => {
+                this.updateCharts();
+            }, 50);
+        });
+        
+        // Also listen for storage events in case theme changes in another tab
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'bufoindex-theme') {
+                this.destroyAllCharts();
+                setTimeout(() => {
+                    this.updateCharts();
+                }, 50);
+            }
+        });
+    }
 
     /**
      * Set up form validation with real-time feedback

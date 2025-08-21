@@ -2,7 +2,7 @@
 
 /* CSS Variables - Populated by ThemeConfig.js */
 :root {
-  /* BufoIndex color palette */
+  /* BufoIndex color palette - Light theme */
   --color-primary: #FAFAF9;
   --color-secondary: #F8F9FA;
   --color-accent: #7FB069;
@@ -14,6 +14,22 @@
   --color-border-focus: #7FB069;
   --color-surface: #ffffff;
   --color-surface-hover: #f9fafb;
+}
+
+/* Dark theme override */
+[data-theme="dark"] {
+  /* BufoIndex color palette - Dark theme */
+  --color-primary: #111827;
+  --color-secondary: #1F2937;
+  --color-accent: #7FB069;
+  --color-text-primary: #F9FAFB;
+  --color-text-secondary: #D1D5DB;
+  --color-text-accent: #7FB069;
+  --color-border: #374151;
+  --color-border-hover: #7FB069;
+  --color-border-focus: #7FB069;
+  --color-surface: #1F2937;
+  --color-surface-hover: #374151;
   
   /* Default modern theme fonts */
   --font-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
