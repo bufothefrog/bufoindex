@@ -9,7 +9,8 @@
     "watch:css": "tailwindcss -i themes/bufoindex/assets/css/main.css -o themes/bufoindex/static/css/style.css --watch",
     "validate": "node tools/validate-calculators.js",
     "test:calculator": "echo 'Open tools/retirement-calculator/test-retirement-calculator.html in browser to run tests'",
-    "debug:calculator": "echo 'Add ?debug=true to calculator URL for debug mode'"
+    "debug:calculator": "echo 'Add ?debug=true to calculator URL for debug mode'",
+    "vercel-build": "npm run build"
   },
   "keywords": [
     "finance",
