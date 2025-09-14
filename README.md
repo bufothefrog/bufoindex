@@ -1,233 +1,122 @@
-# BufoIndex Developer Guide
+# BufoIndex - Personal Finance Optimization Platform
 
-Personal finance education platform with terminal aesthetics and academic rigor.
+**For Those Who Want Financial Control, Not Financial Comfort**
 
-## Quick Start
+A modern Next.js application providing interactive financial calculators that challenge conventional wisdom with math-driven strategies for aggressive wealth accumulation.
 
+## 🚀 Features
+
+### **Paycheck Allocator**
+- Smart monthly allocation optimization
+- Tax bracket optimization
+- Account prioritization algorithm  
+- Contrarian recommendations (emergency fund, debt strategy)
+- Real-time calculation with instant results
+- URL sharing via compressed hash state
+
+### **Retirement Calculator**  
+- Comprehensive retirement planning
+- Monte Carlo simulations for success probability
+- Multiple retirement age scenarios
+- Social Security benefit calculations
+- Healthcare cost modeling
+- Interactive visualizations
+- URL sharing for scenario planning
+
+## 🛠 Technology Stack
+
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript for type safety
+- **Styling**: Tailwind CSS with shadcn/ui components
+- **State Management**: Zustand
+- **Charts**: Chart.js with react-chartjs-2
+- **Deployment**: Vercel
+
+## 🏗 Architecture
+
+```
+site-rework/
+├── app/                          # Next.js App Router
+│   ├── globals.css
+│   ├── layout.tsx               # Root layout
+│   ├── page.tsx                 # Homepage
+│   └── tools/
+│       ├── paycheck-allocator/
+│       └── retirement-calculator/
+├── components/
+│   ├── calculator/              # Paycheck allocator components
+│   ├── retirement/              # Retirement calculator components
+│   ├── shared/                  # Reusable components
+│   └── ui/                      # shadcn/ui components
+├── lib/
+│   ├── calculations/            # Calculation engines
+│   ├── constants/               # Financial constants
+│   ├── types/                   # TypeScript definitions
+│   └── utils/                   # Helper functions
+└── hooks/                       # Custom React hooks
+```
+
+## 🎯 Key Principles
+
+1. **Transparency** - Show actual strategies being used
+2. **Sophistication** - Go beyond basic financial advice  
+3. **Accessibility** - Explain complex concepts clearly
+4. **Practicality** - Focus on actionable strategies
+5. **Optimization** - Mathematical over emotional decisions
+
+## 💻 Development
+
+### Prerequisites
+- Node.js 18+ 
+- npm
+
+### Setup
 ```bash
-# Development server with live reload
+npm install
 npm run dev
+```
 
-# Build CSS only
-npm run build:css
+Visit `http://localhost:3000` to see the application.
 
-# Production build
+### Build
+```bash
 npm run build
+npm start
 ```
 
-## Architecture
+## 📱 Features
 
-### Stack
-- **Static Site**: Hugo v0.142.0+extended
-- **CSS**: Tailwind CSS with custom design system
-- **JS**: Vanilla JavaScript (no frameworks)
-- **Hosting**: GitHub Pages via Actions
+### **URL State Sharing**
+Both calculators support sharing scenarios via compressed URL hashes:
+- Automatic URL updates as you change inputs
+- Share button copies shareable link
+- Bookmarkable scenarios
+- No data transmission - complete client-side privacy
 
-### Key Directories
-```
-/
-├── content/          # Markdown articles
-│   ├── articles/     # Main content (concepts/strategies/advanced)
-│   └── tools/        # Interactive calculator pages
-├── themes/bufoindex/ # Custom theme
-│   ├── assets/css/   # Tailwind source
-│   ├── layouts/      # Hugo templates
-│   └── static/       # Compiled assets
-├── static/js/        # Calculator scripts
-└── docs/             # Project documentation
-```
+### **Mobile Optimized**
+- Touch-friendly interfaces
+- Responsive design
+- Progressive enhancement
+- Works without JavaScript frameworks
 
-## Common Tasks
+### **Contrarian Insights**
+- Challenge conventional "safe" financial advice
+- Show opportunity costs of conservative strategies
+- Mathematical optimization over emotional comfort
+- Educational explanations for non-traditional recommendations
 
-### Writing Articles
-```bash
-# Create new article
-hugo new content/articles/concepts/my-article.md
+## 🚀 Deployment
 
-# Article frontmatter
----
-title: "Understanding X"
-date: 2025-08-01
-description: "Brief description"
-categories: ["concepts"]
-tags: ["investing", "strategy"]
-math: true  # Enable KaTeX
----
-```
+Optimized for Vercel deployment with:
+- Static generation for performance
+- CDN delivery
+- Automatic HTTPS
+- Custom domain support
 
-### Using Shortcodes
-```markdown
-# Terminal-style callout
-{{< terminal title="KEY CONCEPT" desc="Important takeaway" >}}
-Your content here
-{{< /terminal >}}
+## 📄 License
 
-# Mathematical formula
-{{< formula >}}
-FV = PV \times (1 + r)^n
-{{< /formula >}}
-
-# Calculation display
-{{< calculation >}}
-Monthly Investment: $500
-Annual Return: 8%
-30 Year Value: $679,699
-{{< /calculation >}}
-
-# Note box
-{{< note type="info" >}}
-Additional context
-{{< /note >}}
-```
-
-### Building Tools
-1. Create tool page: `content/tools/my-tool/index.md`
-2. Add calculator script: `static/js/my-tool.js`
-3. Use terminal styling classes from Tailwind config
-4. Implement URL hash persistence for sharing
-
-### Design System
-
-#### Colors
-- Primary: `#7FB069` (sage green)
-- Terminal Black: `#0A0E1A`
-- Terminal Green: `#00FF41`
-- Accent Orange: `#FFB86C`
-
-#### Typography
-- Articles: `font-article` (Charter, Crimson Pro)
-- Tools/Data: `font-mono` (IBM Plex Mono, Fira Code)
-- UI: `font-sans` (Inter)
-
-#### Terminal Components
-```html
-<!-- Terminal box -->
-<div class="bg-terminal-black text-terminal-green p-6 rounded-lg font-mono">
-  <h3 class="terminal-title">CALCULATOR</h3>
-  <p class="terminal-desc">Description</p>
-</div>
-
-<!-- Data table -->
-<div class="terminal-table">
-  <!-- Use ASCII-style borders -->
-</div>
-```
-
-## Testing & Deployment
-
-### Local Testing
-```bash
-# Full build test
-npm run build && hugo server -D
-
-# Check for broken links
-hugo --gc --minify --logLevel debug
-
-# Mobile testing
-# Use browser dev tools responsive mode
-```
-
-### Deployment
-- Push to `main` branch triggers GitHub Actions
-- Automatic build and deploy to GitHub Pages
-- Check Actions tab for build status
-
-## Performance Guidelines
-
-### Articles
-- Use `{{ .Content | truncate 160 }}` for descriptions
-- Optimize images before adding (WebP preferred)
-- Lazy load images with `loading="lazy"`
-
-### Tools
-- Keep calculations under 50ms
-- Use `requestAnimationFrame` for smooth updates
-- Implement debouncing for input handlers
-- Cache expensive calculations
-
-## Development Commands
-
-```bash
-# Start fresh
-rm -rf public/ resources/ && npm run dev
-
-# Update dependencies
-npm update
-
-# Hugo commands
-hugo new content/articles/category/title.md
-hugo list all
-hugo list drafts
-
-# Git workflow
-git add .
-git commit -m "Add feature X"
-git push origin main
-```
-
-## Project Documentation
-
-- `/docs/prd.md` - Product requirements and vision
-- `/docs/design-system.md` - Complete design specifications
-- `/docs/feature-backlog.md` - Task tracking and status
-- `/CLAUDE.md` - AI assistant instructions
-
-## Common Patterns
-
-### URL Hash State
-```javascript
-// Save state
-const state = { param1: value1, param2: value2 };
-window.location.hash = btoa(JSON.stringify(state));
-
-// Load state
-const hash = window.location.hash.slice(1);
-const state = hash ? JSON.parse(atob(hash)) : {};
-```
-
-### Terminal Styling
-```javascript
-// Format currency
-const fmt = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0
-});
-
-// Terminal output
-element.innerHTML = `
-  <span class="text-terminal-green">></span> Result: ${fmt.format(value)}
-`;
-```
-
-## Debugging
-
-### Build Issues
-```bash
-# Verbose build
-hugo --gc --minify --verbose
-
-# Check config
-hugo config
-
-# List all content
-hugo list all
-```
-
-### CSS Not Updating
-```bash
-# Rebuild CSS
-npm run build:css
-
-# Clear cache
-rm -rf resources/_gen/
-```
-
-### Common Fixes
-- Math not rendering: Ensure `math: true` in frontmatter
-- Broken links: Use `{{< ref "/path/to/page" >}}`
-- CSS changes not showing: Restart dev server
+Educational use only. Not financial advice.
 
 ---
 
-**Remember**: This is a static site - no backend, no databases, no user tracking. Keep it fast, accessible, and focused on education.
+*Built for financial optimizers who want control, not comfort.*

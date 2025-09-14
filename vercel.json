@@ -1,11 +1,17 @@
 {
-  "build": {
-    "env": {
-      "HUGO_VERSION": "0.131.0"
-    }
-  },
   "buildCommand": "npm run build",
-  "outputDirectory": "public",
-  "installCommand": "npm install",
-  "framework": null
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "redirects": [
+    {
+      "source": "/paycheck-allocator",
+      "destination": "/tools/paycheck-allocator",
+      "permanent": true
+    },
+    {
+      "source": "/retirement-calculator", 
+      "destination": "/tools/retirement-calculator",
+      "permanent": true
+    }
+  ]
 }

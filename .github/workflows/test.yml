@@ -1,0 +1,163 @@
+name: Quality Gates and CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality-gates:
+    name: Quality Gates (Sprint 08 Prevention)
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Make quality gates executable
+      run: chmod +x scripts/quality-gates.sh
+
+    - name: Run TypeScript Quality Gate
+      run: ./scripts/quality-gates.sh typescript
+
+    - name: Run Test Quality Gate  
+      run: ./scripts/quality-gates.sh test
+
+    - name: Run Linting Quality Gate
+      run: ./scripts/quality-gates.sh lint
+
+    - name: Run Philosophy Compliance Gate
+      run: ./scripts/quality-gates.sh philosophy
+
+    - name: Run Performance Quality Gate
+      if: matrix.node-version == '20.x'
+      run: ./scripts/quality-gates.sh performance
+
+    - name: Run tests with coverage
+      run: npm run test:coverage
+
+    - name: Verify Coverage Thresholds
+      if: matrix.node-version == '20.x'
+      run: |
+        echo "🎯 Verifying coverage thresholds..."
+        # Check coverage for calculations (should be 100%)
+        CALC_COVERAGE=$(grep -A 1 "lib/calculations" coverage/lcov.info | grep "LF:" | cut -d: -f2 | head -1)
+        CALC_COVERED=$(grep -A 2 "lib/calculations" coverage/lcov.info | grep "LH:" | cut -d: -f2 | head -1)
+        if [ "$CALC_COVERAGE" -gt 0 ]; then
+          CALC_PERCENT=$(echo "scale=2; $CALC_COVERED * 100 / $CALC_COVERAGE" | bc)
+          echo "📊 Calculations coverage: $CALC_PERCENT%"
+          if (( $(echo "$CALC_PERCENT < 100" | bc -l) )); then
+            echo "❌ FAIL: Calculations must have 100% coverage (found $CALC_PERCENT%)"
+            exit 1
+          fi
+        fi
+        echo "✅ Coverage thresholds met"
+
+    - name: Upload coverage to Codecov
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: true
+
+    - name: Performance Regression Check
+      if: matrix.node-version == '20.x'
+      run: |
+        echo "⚡ Running performance regression check..."
+        npm run benchmark
+        echo "✅ Performance benchmarks completed"
+
+  build:
+    name: Production Build Verification
+    runs-on: ubuntu-latest
+    needs: quality-gates
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Make quality gates executable
+      run: chmod +x scripts/quality-gates.sh
+
+    - name: Run Build Quality Gate
+      run: ./scripts/quality-gates.sh build
+
+    - name: Verify build artifacts
+      run: |
+        echo "📦 Verifying build artifacts..."
+        if [ ! -d ".next" ]; then
+          echo "❌ FAIL: .next directory not found"
+          exit 1
+        fi
+        if [ ! -f ".next/BUILD_ID" ]; then
+          echo "❌ FAIL: BUILD_ID not found"
+          exit 1
+        fi
+        echo "✅ Build artifacts verified"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-files
+        path: .next/
+
+  security-scan:
+    name: Security and Dependency Scan
+    runs-on: ubuntu-latest
+    needs: quality-gates
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run security audit
+      run: |
+        echo "🔒 Running security audit..."
+        npm audit --audit-level moderate
+        echo "✅ Security audit completed"
+
+    - name: Check for vulnerable dependencies
+      run: |
+        echo "🔍 Checking for vulnerable dependencies..."
+        AUDIT_RESULT=$(npm audit --json 2>/dev/null || echo '{"vulnerabilities":{}}')
+        HIGH_VULN=$(echo "$AUDIT_RESULT" | grep -o '"high":[0-9]*' | cut -d':' -f2 | head -1)
+        CRITICAL_VULN=$(echo "$AUDIT_RESULT" | grep -o '"critical":[0-9]*' | cut -d':' -f2 | head -1)
+        
+        if [ "${HIGH_VULN:-0}" -gt 0 ] || [ "${CRITICAL_VULN:-0}" -gt 0 ]; then
+          echo "❌ FAIL: High or critical vulnerabilities found"
+          echo "High: ${HIGH_VULN:-0}, Critical: ${CRITICAL_VULN:-0}"
+          exit 1
+        fi
+        echo "✅ No high or critical vulnerabilities found"
