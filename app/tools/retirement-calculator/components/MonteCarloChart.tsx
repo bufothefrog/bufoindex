@@ -1,208 +1,183 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Line } from 'react-chartjs-2';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  ComposedChart,
+  Line,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   Legend,
-  Filler
-} from 'chart.js';
+  ResponsiveContainer
+} from 'recharts';
 import { formatCurrency } from '@/lib/utils';
-import { getChartTheme, getChartThemeWithOpacity, subscribeToThemeChanges } from '@/lib/chart-theme';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 
 interface MonteCarloChartProps {
   netWorthByAge: { [age: number]: number };
   withdrawalsByAge: { [age: number]: number };
 }
 
+
 export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloChartProps) {
-  const [theme, setTheme] = useState(getChartTheme());
-  const [themeWithOpacity, setThemeWithOpacity] = useState(getChartThemeWithOpacity(0.1));
-  
+  const [chartTheme, setChartTheme] = useState(() => getChartTheme());
+
   // Update theme when it changes
   useEffect(() => {
-    const updateTheme = () => {
-      setTheme(getChartTheme());
-      setThemeWithOpacity(getChartThemeWithOpacity(0.1));
-    };
-
-    const unsubscribe = subscribeToThemeChanges(updateTheme);
+    const unsubscribe = subscribeToThemeChanges(() => {
+      setChartTheme(getChartTheme());
+    });
     return unsubscribe;
   }, []);
 
-  const ages = Object.keys(netWorthByAge).map(Number).sort((a, b) => a - b);
-  const netWorthData = ages.map(age => netWorthByAge[age]);
-  
-  // Only show withdrawals from retirement age onward (when withdrawals actually start)
-  const withdrawalData = ages.map(age => {
-    // If no withdrawal data exists for this age, it means we're still in accumulation phase
-    return withdrawalsByAge[age] !== undefined ? withdrawalsByAge[age] : null;
-  });
-
-  const data = {
-    labels: ages,
-    datasets: [
-      {
-        label: 'Net Worth',
-        data: netWorthData,
-        borderColor: theme.primary,
-        backgroundColor: themeWithOpacity.primaryOpacity,
-        fill: true,
-        tension: 0.4,
-        yAxisID: 'y'
-      },
-      {
-        label: 'Annual Withdrawals',
-        data: withdrawalData,
-        borderColor: theme.success,
-        backgroundColor: themeWithOpacity.successOpacity,
-        fill: false,
-        tension: 0.4,
-        yAxisID: 'y1',
-        spanGaps: false  // Don't connect null values with lines
-      }
-    ]
+  // Format currency values for axis labels (K/M notation)
+  const formatAxisCurrency = (value: number): string => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(0)}k`;
+    } else {
+      return `$${value.toFixed(0)}`;
+    }
   };
 
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: true,
-        text: 'Portfolio Projection Over Time',
-        color: theme.text,
-        font: {
-          size: 16,
-          weight: 'bold' as const,
-          family: 'Inter, system-ui, sans-serif'
-        }
-      },
-      legend: {
-        position: 'top' as const,
-        labels: {
-          color: theme.text,
-          font: {
-            family: 'Inter, system-ui, sans-serif'
-          }
-        }
-      },
-      tooltip: {
-        backgroundColor: theme.background,
-        titleColor: theme.text,
-        bodyColor: theme.text,
-        borderColor: theme.grid,
-        borderWidth: 1,
-        callbacks: {
-          label: function(context: { dataset: { label?: string }; parsed: { y: number } }) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
-            return `${label}: ${formatCurrency(value)}`;
-          }
-        }
-      }
-    },
-    scales: {
-      x: {
-        display: true,
-        title: {
-          display: true,
-          text: 'Age',
-          color: theme.text,
-          font: {
-            weight: 'bold' as const,
-            family: 'IBM Plex Mono, monospace'
-          }
-        },
-        ticks: {
-          color: theme.muted,
-          font: {
-            family: 'IBM Plex Mono, monospace'
-          }
-        },
-        grid: {
-          color: theme.grid
-        }
-      },
-      y: {
-        type: 'linear' as const,
-        display: true,
-        position: 'left' as const,
-        title: {
-          display: true,
-          text: 'Net Worth',
-          color: theme.text,
-          font: {
-            weight: 'bold' as const,
-            family: 'IBM Plex Mono, monospace'
-          }
-        },
-        grid: {
-          color: theme.grid
-        },
-        ticks: {
-          color: theme.muted,
-          font: {
-            family: 'IBM Plex Mono, monospace'
-          },
-          callback: function(value: number | string) {
-            return formatCurrency(Number(value));
-          }
-        }
-      },
-      y1: {
-        type: 'linear' as const,
-        display: true,
-        position: 'right' as const,
-        title: {
-          display: true,
-          text: 'Annual Withdrawals',
-          color: theme.text,
-          font: {
-            weight: 'bold' as const,
-            family: 'IBM Plex Mono, monospace'
-          }
-        },
-        grid: {
-          drawOnChartArea: false,
-        },
-        ticks: {
-          color: theme.muted,
-          font: {
-            family: 'IBM Plex Mono, monospace'
-          },
-          callback: function(value: number | string) {
-            return formatCurrency(Number(value));
-          }
-        }
-      },
-    },
+  // Convert data to Recharts format
+  const chartData = useMemo(() => {
+    const ages = Object.keys(netWorthByAge).map(Number).sort((a, b) => a - b);
+
+    return ages.map(age => ({
+      age,
+      netWorth: netWorthByAge[age],
+      // Only show withdrawals when they actually start (not null/undefined)
+      withdrawals: withdrawalsByAge[age] !== undefined ? withdrawalsByAge[age] : null
+    }));
+  }, [netWorthByAge, withdrawalsByAge]);
+
+  // Custom tooltip component
+  interface TooltipProps {
+    active?: boolean;
+    payload?: Array<{
+      dataKey: string;
+      value: number;
+      color: string;
+      name: string;
+    }>;
+    label?: number;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
+          <p className="text-foreground font-mono text-sm mb-2">
+            Age {label}
+          </p>
+          <div className="space-y-1 text-xs">
+            {payload.map((entry, index) => (
+              <p key={index} className="text-muted-foreground">
+                <span style={{ color: entry.color }}>{entry.name}:</span>{' '}
+                {entry.value !== null ? formatCurrency(entry.value) : 'N/A'}
+              </p>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
     <div className="h-96">
-      <Line data={data} options={options} />
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart
+          data={chartData}
+          margin={{
+            top: 20,
+            right: 30,
+            left: 20,
+            bottom: 60,
+          }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.3} />
+          <XAxis
+            dataKey="age"
+            stroke={chartTheme.muted}
+            fontSize={12}
+            fontFamily="IBM Plex Mono, monospace"
+            tick={{ fill: chartTheme.muted }}
+            label={{
+              value: 'Age',
+              position: 'insideBottom',
+              offset: -10,
+              style: { textAnchor: 'middle', fill: chartTheme.muted }
+            }}
+          />
+          <YAxis
+            yAxisId="left"
+            stroke={chartTheme.muted}
+            fontSize={12}
+            fontFamily="IBM Plex Mono, monospace"
+            tick={{ fill: chartTheme.muted }}
+            tickFormatter={formatAxisCurrency}
+            label={{
+              value: 'Net Worth',
+              angle: -90,
+              position: 'insideLeft',
+              style: { textAnchor: 'middle', fill: chartTheme.muted }
+            }}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            stroke={chartTheme.success}
+            fontSize={12}
+            fontFamily="IBM Plex Mono, monospace"
+            tick={{ fill: chartTheme.success }}
+            tickFormatter={formatAxisCurrency}
+            label={{
+              value: 'Annual Withdrawals',
+              angle: 90,
+              position: 'insideRight',
+              style: { textAnchor: 'middle', fill: chartTheme.success }
+            }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend
+            wrapperStyle={{
+              paddingTop: '20px',
+              fontSize: '12px',
+              fontFamily: 'IBM Plex Mono, monospace',
+              color: chartTheme.text
+            }}
+          />
+
+          {/* Net Worth area with fill */}
+          <Area
+            yAxisId="left"
+            type="monotone"
+            dataKey="netWorth"
+            stroke={chartTheme.primary}
+            fill={chartTheme.primary}
+            fillOpacity={0.1}
+            strokeWidth={2}
+            name="Net Worth"
+          />
+
+          {/* Annual Withdrawals line */}
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="withdrawals"
+            stroke={chartTheme.success}
+            strokeWidth={2}
+            dot={{ fill: chartTheme.success, strokeWidth: 2, r: 3 }}
+            connectNulls={false}
+            name="Annual Withdrawals"
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   );
 }
