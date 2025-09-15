@@ -199,9 +199,9 @@ export function PercentInput({
       className={className}
       testId={testId}
     >
-      <>
+      <div className="relative w-full">
         <span className={cn(
-          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none",
+          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
           iconPositions[size]
         )}>
           <Percent className={iconSizes[size]} />
@@ -224,12 +224,12 @@ export function PercentInput({
           )}
         />
         <span className={cn(
-          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none text-xs",
+          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none text-xs z-10",
           suffixPositions[size]
         )}>
           %
         </span>
-      </>
+      </div>
     </BaseInput>
   );
 }

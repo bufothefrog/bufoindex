@@ -173,9 +173,9 @@ export function EnhancedMoneyInput({
       className={className}
       testId={testId}
     >
-      <>
+      <div className="relative w-full">
         <span className={cn(
-          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none",
+          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
           iconSizes[size]
         )}>
           {currency === '$' ? <DollarSign className="w-full h-full" /> : currency}
@@ -194,7 +194,7 @@ export function EnhancedMoneyInput({
             "focus:outline-none" // Remove default focus styles since BaseInput handles them
           )}
         />
-      </>
+      </div>
     </BaseInput>
   );
 }

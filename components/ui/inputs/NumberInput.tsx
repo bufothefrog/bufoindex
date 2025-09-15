@@ -200,16 +200,16 @@ export function NumberInput({
       className={className}
       testId={testId}
     >
-      <>
+      <div className="relative w-full">
         {prefix && (
           <span className={cn(
-            "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none",
+            "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
             size === 'lg' ? 'left-3 text-base' : size === 'sm' ? 'left-2.5 text-xs' : 'left-3 text-sm'
           )}>
             {prefix}
           </span>
         )}
-        
+
         <input
           type="text"
           inputMode={allowDecimals ? 'decimal' : 'numeric'}
@@ -232,16 +232,16 @@ export function NumberInput({
             "focus:outline-none" // BaseInput handles focus styles
           )}
         />
-        
+
         {suffix && (
           <span className={cn(
-            "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none",
+            "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
             size === 'lg' ? 'right-3 text-base' : size === 'sm' ? 'right-2.5 text-xs' : 'right-3 text-sm'
           )}>
             {suffix}
           </span>
         )}
-      </>
+      </div>
     </BaseInput>
   );
 }

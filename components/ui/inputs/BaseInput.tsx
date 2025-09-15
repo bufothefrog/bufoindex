@@ -49,22 +49,31 @@ export function BaseInput({
       {/* Input Container */}
       <div className="relative">
         {React.cloneElement(children as React.ReactElement, {
-          id: inputId,
-          name,
-          disabled,
-          required,
-          'aria-describedby': [helpId, errorId].filter(Boolean).join(' ') || undefined,
-          'aria-invalid': hasError,
-          className: cn(
-            "w-full border bg-background rounded-md text-sm transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-400",
-            hasError 
-              ? "border-red-300 focus:border-red-500 focus:ring-red-200" 
-              : "border-input hover:border-sage-300",
-            disabled && "opacity-50 cursor-not-allowed",
-            (children as React.ReactElement).props.className
-          ),
-          ...ariaProps
+          children: React.Children.map((children as React.ReactElement).props.children, (child, index) => {
+            // If it's an input element, apply the props and styling
+            if (React.isValidElement(child) && child.type === 'input') {
+              return React.cloneElement(child as React.ReactElement, {
+                id: inputId,
+                name,
+                disabled,
+                required,
+                'aria-describedby': [helpId, errorId].filter(Boolean).join(' ') || undefined,
+                'aria-invalid': hasError,
+                className: cn(
+                  "w-full border bg-background rounded-md text-sm transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-400",
+                  hasError
+                    ? "border-red-300 focus:border-red-500 focus:ring-red-200"
+                    : "border-input hover:border-sage-300",
+                  disabled && "opacity-50 cursor-not-allowed",
+                  (child as React.ReactElement).props.className
+                ),
+                ...ariaProps
+              });
+            }
+            // Return other children (like prefix/suffix spans) unchanged
+            return child;
+          })
         })}
       </div>
       
