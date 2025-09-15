@@ -21,12 +21,12 @@ import {
   SimpleCalculatorLayout, 
   AdvancedCalculatorLayout 
 } from '@/components/ui/layouts/CalculatorLayout';
-import { 
+import {
   Palette,
-  Type, 
+  Type,
   Sliders,
-  Calculator, 
-  DollarSign, 
+  Calculator,
+  DollarSign,
   Settings,
   User,
   Moon,
@@ -36,9 +36,49 @@ import {
   Star,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
+  BarChart3,
+  TrendingUp,
+  PieChart
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+
+// Chart components
+import {
+  ComposedChart,
+  Line,
+  Area,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  ReferenceLine
+} from 'recharts';
+import { getChartTheme } from '@/lib/chart-theme';
+
+// Mock data
+import {
+  generatePortfolioGrowth,
+  generateIncomeExpenses,
+  generateAssetAllocation,
+  generateScenarioComparison,
+  AssetAllocationData,
+  PortfolioGrowthData,
+  IncomeExpenseData,
+  ScenarioComparisonData
+} from '@/lib/demo/mockChartData';
+
+// Additional input components
+import { StateSelector } from '@/components/shared/inputs/StateSelector';
+import { SelectInput } from '@/components/shared/inputs/SelectInput';
+import { Tooltip as HelpTooltip, HELP_TOOLTIPS } from '@/components/shared/Tooltip';
+import { CalculatorTabs } from '@/components/calculators/shared/CalculatorTabs';
 
 interface DemoState {
   basicInputs: {
@@ -53,6 +93,11 @@ interface DemoState {
     expenses: number;
     age: number;
     savingsRate: number;
+  };
+  specializedInputs: {
+    selectedState: string;
+    riskTolerance: string;
+    filingStatus: string;
   };
 }
 
@@ -71,11 +116,37 @@ export default function ComprehensiveDemo() {
       expenses: 45000,
       age: 30,
       savingsRate: 20
+    },
+    specializedInputs: {
+      selectedState: 'CA',
+      riskTolerance: 'moderate',
+      filingStatus: 'single'
     }
   });
 
   const [showSideBySide, setShowSideBySide] = React.useState(true);
-  const [activeSection, setActiveSection] = React.useState<'widgets' | 'colors' | 'typography' | 'layouts'>('widgets');
+  const [activeSection, setActiveSection] = React.useState<'widgets' | 'colors' | 'typography' | 'layouts' | 'charts'>('widgets');
+
+  // Chart theme state (moved here to follow Rules of Hooks)
+  const [chartTheme, setChartTheme] = React.useState(() => getChartTheme());
+
+  // Update chart theme when it changes
+  React.useEffect(() => {
+    const updateTheme = () => setChartTheme(getChartTheme());
+    // Listen for theme changes
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  // Chart data generation (moved here to follow Rules of Hooks)
+  const portfolioData = React.useMemo(() => generatePortfolioGrowth(25, 65, 10000, 1500), []);
+  const incomeExpenseData = React.useMemo(() => generateIncomeExpenses(12), []);
+  const assetAllocationData = React.useMemo(() => generateAssetAllocation(), []);
+  const scenarioData = React.useMemo(() => generateScenarioComparison(30, 65), []);
 
   // Prevent access in true production (allow in staging/dev)
   if (process.env.VERCEL_ENV === 'production' ||
@@ -123,12 +194,22 @@ export default function ComprehensiveDemo() {
   };
 
   const updateCalculatorDemo = <K extends keyof DemoState['calculatorDemo']>(
-    key: K, 
+    key: K,
     value: DemoState['calculatorDemo'][K]
   ) => {
     setDemoState(prev => ({
       ...prev,
       calculatorDemo: { ...prev.calculatorDemo, [key]: value }
+    }));
+  };
+
+  const updateSpecializedInputs = <K extends keyof DemoState['specializedInputs']>(
+    key: K,
+    value: DemoState['specializedInputs'][K]
+  ) => {
+    setDemoState(prev => ({
+      ...prev,
+      specializedInputs: { ...prev.specializedInputs, [key]: value }
     }));
   };
 
@@ -273,6 +354,186 @@ export default function ComprehensiveDemo() {
                 <Button>
                   <Star className="mr-2 h-4 w-4" />
                   With Icon
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Specialized Input Components */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sliders className="w-5 h-5" />
+            Specialized Input Components
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* State Selector */}
+            <div className="space-y-2">
+              <StateSelector
+                name="demo-state"
+                label="State Selector"
+                value={demoState.specializedInputs.selectedState}
+                onChange={(value) => updateSpecializedInputs('selectedState', value)}
+                help="Intelligent state selector with tax rates and search"
+              />
+            </div>
+
+            {/* Risk Tolerance Selector */}
+            <div className="space-y-2">
+              <SelectInput
+                name="risk-tolerance"
+                label="Risk Tolerance"
+                value={demoState.specializedInputs.riskTolerance}
+                onChange={(value) => updateSpecializedInputs('riskTolerance', value)}
+                options={[
+                  { value: 'conservative', label: 'Conservative' },
+                  { value: 'moderate', label: 'Moderate' },
+                  { value: 'optimizer', label: 'Optimizer' }
+                ]}
+                help="Choose your financial approach"
+              />
+            </div>
+
+            {/* Filing Status Selector */}
+            <div className="space-y-2">
+              <SelectInput
+                name="filing-status"
+                label="Filing Status"
+                value={demoState.specializedInputs.filingStatus}
+                onChange={(value) => updateSpecializedInputs('filingStatus', value)}
+                options={[
+                  { value: 'single', label: 'Single' },
+                  { value: 'married-joint', label: 'Married Filing Jointly' },
+                  { value: 'married-separate', label: 'Married Filing Separately' },
+                  { value: 'head-household', label: 'Head of Household' }
+                ]}
+                required
+              />
+            </div>
+
+            {/* Tooltip Component Demo */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Interactive Tooltips</label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Risk Tolerance</span>
+                  <HelpTooltip content={HELP_TOOLTIPS.riskTolerance} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Employer Match</span>
+                  <HelpTooltip content={HELP_TOOLTIPS.employerMatch} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Hover over help icons for contextual information</p>
+            </div>
+
+            {/* Input with Error State */}
+            <div className="space-y-2">
+              <EnhancedMoneyInput
+                name="demo-error"
+                label="Input with Error"
+                value={0}
+                onChange={() => {}}
+                error="Amount must be greater than $0"
+                required
+              />
+            </div>
+
+            {/* Input with Success State */}
+            <div className="space-y-2">
+              <NumberInput
+                name="demo-success"
+                label="Valid Input"
+                value={25}
+                onChange={() => {}}
+                min={18}
+                max={100}
+                help="✓ Valid age range"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Interactive Components Showcase */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Interactive Components
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Tab System Demo */}
+            <div>
+              <h4 className="text-sm font-medium mb-3">Calculator Tab System</h4>
+              <CalculatorTabs
+                tabs={[
+                  {
+                    id: 'calculator',
+                    label: 'Calculator',
+                    icon: <Calculator className="w-4 h-4" />,
+                    component: () => (
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <p className="text-sm text-muted-foreground">Calculator interface would go here</p>
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'methodology',
+                    label: 'Methodology',
+                    icon: <Info className="w-4 h-4" />,
+                    component: () => (
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <p className="text-sm text-muted-foreground">Mathematical formulas and explanations</p>
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'analysis',
+                    label: 'Analysis',
+                    icon: <BarChart3 className="w-4 h-4" />,
+                    component: () => (
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <p className="text-sm text-muted-foreground">Charts and visualizations</p>
+                      </div>
+                    )
+                  }
+                ]}
+                defaultTab="calculator"
+                preserveState={true}
+              />
+            </div>
+
+            {/* Loading States */}
+            <div>
+              <h4 className="text-sm font-medium mb-3">Loading States</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="p-4">
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-4 bg-muted rounded"></div>
+                    <div className="h-3 bg-muted rounded w-3/4"></div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Loading...</span>
+                  </div>
+                </Card>
+                <SummaryCard
+                  title="Calculating..."
+                  value="..."
+                  label="Please wait"
+                />
+                <Button disabled>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing
                 </Button>
               </div>
             </div>
@@ -717,6 +978,326 @@ export default function ComprehensiveDemo() {
     </div>
   );
 
+  const renderChartShowcase = (
+    portfolioData: PortfolioGrowthData[],
+    incomeExpenseData: IncomeExpenseData[],
+    assetAllocationData: AssetAllocationData[],
+    scenarioData: ScenarioComparisonData[]
+  ) => {
+    // Custom tooltip component
+    interface TooltipPayload {
+      dataKey: string;
+      value: number | string;
+      color: string;
+    }
+
+    const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: TooltipPayload[]; label?: string }) => {
+      if (active && payload && payload.length) {
+        return (
+          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+            <p className="text-sm font-medium">{`${label}`}</p>
+            {payload.map((entry: TooltipPayload, index: number) => (
+              <p key={index} className="text-sm" style={{ color: entry.color }}>
+                {`${entry.dataKey}: ${typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}`}
+              </p>
+            ))}
+          </div>
+        );
+      }
+      return null;
+    };
+
+    return (
+      <div className="space-y-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold mb-4">Charts & Data Visualizations</h2>
+          <p className="text-muted-foreground">
+            Theme-aware charts using Recharts with realistic financial data
+          </p>
+        </div>
+
+        {/* Line Chart - Portfolio Growth */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Portfolio Growth Over Time
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={portfolioData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis
+                    dataKey="age"
+                    stroke={chartTheme.text}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    stroke={chartTheme.text}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="portfolioValue"
+                    fill={chartTheme.primary}
+                    fillOpacity={0.3}
+                    stroke={chartTheme.primary}
+                    strokeWidth={2}
+                    name="Total Portfolio"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="contributions"
+                    stroke={chartTheme.secondary}
+                    strokeWidth={2}
+                    name="Total Contributions"
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="realValue"
+                    stroke={chartTheme.accent}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Inflation-Adjusted Value"
+                    dot={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Demonstrates compound growth with monthly contributions of $1,500 over 40 years
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Bar Chart - Income vs Expenses */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Monthly Cash Flow Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={incomeExpenseData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis
+                    dataKey="month"
+                    stroke={chartTheme.text}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    stroke={chartTheme.text}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar
+                    dataKey="income"
+                    fill={chartTheme.success}
+                    name="Income"
+                  />
+                  <Bar
+                    dataKey="necessaryExpenses"
+                    fill={chartTheme.warning}
+                    name="Necessary Expenses"
+                  />
+                  <Bar
+                    dataKey="discretionaryExpenses"
+                    fill={chartTheme.danger}
+                    name="Discretionary Expenses"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="savings"
+                    stroke={chartTheme.primary}
+                    strokeWidth={3}
+                    name="Net Savings"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Monthly breakdown showing income, expenses, and resulting savings
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Pie Chart - Asset Allocation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="w-5 h-5" />
+              Asset Allocation Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={assetAllocationData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                  >
+                    {assetAllocationData.map((entry: AssetAllocationData, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      `$${value.toLocaleString()}`,
+                      name
+                    ]}
+                  />
+                  <Legend />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              {assetAllocationData.map((item: AssetAllocationData, index: number) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-sm">
+                    {item.name}: {item.percentage}%
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Diversified portfolio allocation following BufoIndex principles
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Scenario Comparison */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Scenario Comparison Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={scenarioData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis
+                    dataKey="age"
+                    stroke={chartTheme.text}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    stroke={chartTheme.text}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="currentScenario"
+                    stroke={chartTheme.warning}
+                    strokeWidth={2}
+                    name="Current Approach"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="optimizedScenario"
+                    stroke={chartTheme.primary}
+                    strokeWidth={3}
+                    name="Optimized Strategy"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="aggressiveScenario"
+                    stroke={chartTheme.success}
+                    strokeWidth={2}
+                    name="Aggressive Savings"
+                  />
+                  <ReferenceLine
+                    y={1000000}
+                    stroke={chartTheme.accent}
+                    strokeDasharray="5 5"
+                    label="$1M Goal"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Comparison of different savings strategies over time with $1M retirement goal
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Chart Features Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Chart System Features</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Theme Integration</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Automatic light/dark mode switching</li>
+                  <li>• Uses semantic color variables</li>
+                  <li>• Consistent with design system</li>
+                  <li>• Accessible color contrasts</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Interactive Features</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Hover tooltips with formatted data</li>
+                  <li>• Legend toggle functionality</li>
+                  <li>• Responsive container sizing</li>
+                  <li>• Mobile-friendly touch events</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Chart Types Available</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Line charts for trends</li>
+                  <li>• Area charts for accumulation</li>
+                  <li>• Bar charts for comparisons</li>
+                  <li>• Pie charts for allocations</li>
+                  <li>• Composed charts for multiple metrics</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Data Formatting</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Currency formatting ($XXX,XXX)</li>
+                  <li>• Percentage formatting (XX.X%)</li>
+                  <li>• Abbreviated large numbers (XXXk)</li>
+                  <li>• Reference lines for goals</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderThemeComparison = () => {
     if (!showSideBySide) {
       return renderCurrentSection();
@@ -756,6 +1337,7 @@ export default function ComprehensiveDemo() {
           <div className="flex flex-wrap justify-center gap-2 mb-8">
             {[
               { key: 'widgets', label: 'Widgets & Components', icon: Sliders },
+              { key: 'charts', label: 'Charts & Visualizations', icon: BarChart3 },
               { key: 'colors', label: 'Color Palette', icon: Palette },
               { key: 'typography', label: 'Typography', icon: Type },
               { key: 'layouts', label: 'Layouts', icon: Calculator }
@@ -764,7 +1346,7 @@ export default function ComprehensiveDemo() {
                 key={key}
                 variant={activeSection === key ? "default" : "outline"}
                 size="sm"
-                onClick={() => setActiveSection(key as 'widgets' | 'colors' | 'typography' | 'layouts')}
+                onClick={() => setActiveSection(key as 'widgets' | 'colors' | 'typography' | 'layouts' | 'charts')}
                 className="flex items-center gap-2"
               >
                 <Icon className="w-4 h-4" />
@@ -818,6 +1400,8 @@ export default function ComprehensiveDemo() {
     switch (activeSection) {
       case 'widgets':
         return renderWidgetShowcase();
+      case 'charts':
+        return renderChartShowcase(portfolioData, incomeExpenseData, assetAllocationData, scenarioData);
       case 'colors':
         return renderColorPalette();
       case 'typography':
@@ -865,6 +1449,7 @@ export default function ComprehensiveDemo() {
             <div className="flex flex-wrap justify-center gap-2 mb-8">
               {[
                 { key: 'widgets', label: 'Widgets & Components', icon: Sliders },
+                { key: 'charts', label: 'Charts & Visualizations', icon: BarChart3 },
                 { key: 'colors', label: 'Color Palette', icon: Palette },
                 { key: 'typography', label: 'Typography', icon: Type },
                 { key: 'layouts', label: 'Layouts', icon: Calculator }
@@ -873,7 +1458,7 @@ export default function ComprehensiveDemo() {
                   key={key}
                   variant={activeSection === key ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setActiveSection(key as 'widgets' | 'colors' | 'typography' | 'layouts')}
+                  onClick={() => setActiveSection(key as 'widgets' | 'colors' | 'typography' | 'layouts' | 'charts')}
                   className="flex items-center gap-2"
                 >
                   <Icon className="w-4 h-4" />
