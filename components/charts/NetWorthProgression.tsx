@@ -70,9 +70,9 @@ export function NetWorthProgression({
       const yearsFromStart = age - inputs.startingAge;
       const year = currentYear + yearsFromStart;
       let netWorth = 0;
-      const phase: 'accumulation' | 'withdrawal' = age <= inputs.retirementAge ? 'accumulation' : 'withdrawal';
-      
-      if (age <= inputs.retirementAge) {
+      const phase: 'accumulation' | 'withdrawal' = age < inputs.retirementAge ? 'accumulation' : 'withdrawal';
+
+      if (age < inputs.retirementAge) {
         // Accumulation phase - use data from results or calculate
         if (results.netWorthByAge[age]) {
           netWorth = results.netWorthByAge[age];
@@ -81,30 +81,30 @@ export function NetWorthProgression({
           const testInputs = { ...inputs, retirementAge: age };
           netWorth = calculateProjectedBalance(testInputs);
         }
-        
+
         // Update cumulative contributions
         if (age > inputs.startingAge) {
           cumulativeContributions += inputs.monthlySavings * 12;
         }
-        
-        // Store retirement balance for withdrawal phase calculations
-        if (age === inputs.retirementAge) {
-          retirementBalance = netWorth;
-        }
       } else {
-        // Withdrawal phase - simulate portfolio decline
+        // Withdrawal phase - starts at retirementAge
         const yearsInRetirement = age - inputs.retirementAge;
         const annualWithdrawal = inputs.targetIncome;
-        
+
+        // Compute pre-withdrawal retirement balance on first withdrawal year
+        if (age === inputs.retirementAge) {
+          retirementBalance = calculateProjectedBalance(inputs);
+        }
+
         // Start with retirement balance and apply growth/withdrawals year by year
         netWorth = retirementBalance;
-        for (let retireYear = 1; retireYear <= yearsInRetirement; retireYear++) {
+        for (let retireYear = 0; retireYear < yearsInRetirement; retireYear++) {
+          // Subtract inflation-adjusted withdrawal
+          const inflatedWithdrawal = annualWithdrawal * Math.pow(1 + inputs.inflationRate, retireYear);
+          netWorth = Math.max(0, netWorth - inflatedWithdrawal);
+
           // Apply investment growth
           netWorth = netWorth * (1 + inputs.retirementReturn);
-          
-          // Subtract inflation-adjusted withdrawal
-          const inflatedWithdrawal = annualWithdrawal * Math.pow(1 + inputs.inflationRate, retireYear - 1);
-          netWorth = Math.max(0, netWorth - inflatedWithdrawal);
         }
       }
       

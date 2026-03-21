@@ -12,7 +12,7 @@ import { PrimarySecondaryRow, EqualRow } from '@/components/shared/layout/InputR
 import { TwoColumnFields, SingleColumnFields, ThreeColumnFields } from '@/components/shared/layout/FieldGroup';
 import { PercentageInput } from '@/components/calculators/shared/PercentageInput';
 import { RiskProfileSelector } from '@/components/retirement/RiskProfileSelector';
-import { formatPercent } from '@/lib/utils';
+import { formatPercent, formatCurrency } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { 
   User, 
@@ -35,6 +35,7 @@ export function InputSection() {
   };
 
   const savingsRate = (inputs.monthlySavings * 12) / inputs.currentIncome;
+  const showAnnualizedHelp = inputs.incomePeriod !== 'yearly';
 
   return (
     <Card>
@@ -45,16 +46,43 @@ export function InputSection() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Row 1: Current Annual Income | Current Age */}
+        {/* Row 1: Current Income (amount + period) | Current Age */}
         <PrimarySecondaryRow
           primary={
-            <MoneyInput
-              name="currentIncome"
-              label="Current Annual Income"
-              value={inputs.currentIncome}
-              onChange={(value) => handleInputChange('currentIncome', value)}
-              placeholder="100,000"
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">Current Income</label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <MoneyInput
+                    name="incomeAmount"
+                    label=""
+                    value={inputs.incomeAmount}
+                    onChange={(value) => handleInputChange('incomeAmount', value)}
+                    placeholder="100,000"
+                  />
+                </div>
+                <div className="w-[140px]">
+                  <SelectInput
+                    name="incomePeriod"
+                    label=""
+                    value={inputs.incomePeriod}
+                    onChange={(value) => handleInputChange('incomePeriod', value)}
+                    options={[
+                      { value: 'hourly', label: 'Hourly' },
+                      { value: 'biweekly', label: 'Bi-weekly' },
+                      { value: 'semimonthly', label: 'Semi-monthly' },
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'yearly', label: 'Yearly' },
+                    ]}
+                  />
+                </div>
+              </div>
+              {showAnnualizedHelp && (
+                <p className="text-xs text-muted-foreground">
+                  ≈ {formatCurrency(inputs.currentIncome)}/year
+                </p>
+              )}
+            </div>
           }
           secondary={
             <NumberInput

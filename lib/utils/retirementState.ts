@@ -14,7 +14,9 @@ interface CompressedRetirementData {
   le?: number; // lifeExpectancy
   ti?: number; // targetIncome
   sb?: number; // startingBalance
-  ci?: number; // currentIncome
+  ci?: number; // currentIncome (annual, derived)
+  ia?: number; // incomeAmount (raw entered value)
+  ip?: string; // incomePeriod
   st?: string; // state
   rp?: string; // riskProfile
   [key: string]: unknown; // other compressed fields
@@ -92,6 +94,8 @@ function compressRetirementData(inputs: RetirementInputs): CompressedRetirementD
   if (inputs.targetIncome !== 80000) compressed.ti = inputs.targetIncome;
   if (inputs.startingBalance !== 10000) compressed.sb = inputs.startingBalance;
   if (inputs.currentIncome !== 100000) compressed.ci = inputs.currentIncome;
+  if (inputs.incomeAmount !== 100000) compressed.ia = inputs.incomeAmount;
+  if (inputs.incomePeriod !== 'yearly') compressed.ip = inputs.incomePeriod;
   if (inputs.monthlySavings !== 2000) compressed.ms = inputs.monthlySavings;
   if (inputs.accumulationReturn !== RetirementConstants.DEFAULT_ACCUMULATION_RETURN) {
     compressed.ar = inputs.accumulationReturn;
@@ -133,6 +137,8 @@ function decompressRetirementData(compressed: any): RetirementInputs {
     targetIncome: compressed.ti || 80000,
     startingBalance: compressed.sb || 10000,
     currentIncome: compressed.ci || 100000,
+    incomeAmount: compressed.ia || 100000,
+    incomePeriod: compressed.ip || 'yearly',
     monthlySavings: compressed.ms || 2000,
     accumulationReturn: compressed.ar || RetirementConstants.DEFAULT_ACCUMULATION_RETURN,
     retirementReturn: compressed.rr || RetirementConstants.DEFAULT_RETIREMENT_RETURN,

@@ -23,6 +23,8 @@ export function RetirementCalculator() {
     targetIncome: 80000,
     startingBalance: 10000,
     currentIncome: 100000,
+    incomeAmount: 100000,
+    incomePeriod: 'yearly',
     monthlySavings: 2000,
     necessaryMonthlyExpenses: 4000,
     accumulationReturn: RetirementConstants.DEFAULT_ACCUMULATION_RETURN,

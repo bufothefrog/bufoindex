@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { RetirementInputs, RetirementResults } from '../calculations/retirement';
+import { RetirementInputs, RetirementResults, annualizeIncome } from '../calculations/retirement';
 import { calculateRetirementAnalysis } from '../calculations/retirement';
 import { RetirementConstants } from '../constants/retirement';
 import { encodeRetirementToUrlHash, decodeRetirementFromUrlHash } from '../utils/retirementState';
@@ -36,6 +36,8 @@ const getDefaultInputs = (): RetirementInputs => ({
   targetIncome: 80000,
   startingBalance: 10000,
   currentIncome: 100000,
+  incomeAmount: 100000,
+  incomePeriod: 'yearly' as const,
   monthlySavings: 2000,
   necessaryMonthlyExpenses: 4000,
   accumulationReturn: RetirementConstants.DEFAULT_ACCUMULATION_RETURN,
@@ -65,10 +67,14 @@ export const useRetirementStore = create<RetirementState>()(
 
         // Actions
         updateInputs: (updates) => {
-          set((state) => ({
-            inputs: { ...state.inputs, ...updates },
-            errors: {} // Clear errors when inputs change
-          }));
+          set((state) => {
+            const merged = { ...state.inputs, ...updates };
+            // Auto-derive currentIncome when incomeAmount or incomePeriod changes
+            if ('incomeAmount' in updates || 'incomePeriod' in updates) {
+              merged.currentIncome = annualizeIncome(merged.incomeAmount, merged.incomePeriod);
+            }
+            return { inputs: merged, errors: {} };
+          });
           
           // Only auto-calculate if user has calculated at least once
           const { hasCalculatedOnce } = get();

@@ -68,13 +68,29 @@ function calculateTDFVolatilityForAge(age: number): number {
   );
 }
 
+export type IncomePeriod = 'hourly' | 'biweekly' | 'semimonthly' | 'monthly' | 'yearly';
+
+export const INCOME_PERIOD_MULTIPLIERS: Record<IncomePeriod, number> = {
+  hourly: 2080,       // 40 hrs/week × 52 weeks
+  biweekly: 26,       // 26 pay periods/year
+  semimonthly: 24,    // 24 pay periods/year (twice per month)
+  monthly: 12,
+  yearly: 1,
+};
+
+export function annualizeIncome(amount: number, period: IncomePeriod): number {
+  return amount * INCOME_PERIOD_MULTIPLIERS[period];
+}
+
 export interface RetirementInputs {
   startingAge: number;
   retirementAge: number;
   lifeExpectancy: number; // ADDED: User-defined life expectancy instead of hardcoded value
   targetIncome: number;
   startingBalance: number;
-  currentIncome: number;
+  currentIncome: number; // Always annual — derived from incomeAmount × period multiplier
+  incomeAmount: number;  // Raw user-entered income value
+  incomePeriod: IncomePeriod; // Pay period for the entered amount
   monthlySavings: number;
   necessaryMonthlyExpenses: number;
   accumulationReturn: number;
@@ -344,7 +360,7 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
     let currentBalance = inputs.startingBalance;
     
     for (let age = inputs.startingAge; age <= inputs.lifeExpectancy; age++) {
-      if (age <= inputs.retirementAge) {
+      if (age < inputs.retirementAge) {
         // Accumulation phase with TDF glide path
         if (age > inputs.startingAge) {
           const annualReturn = calculateTDFReturnForAge(age);
@@ -353,7 +369,7 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
         }
         netWorthByAge[age] = currentBalance;
       } else {
-        // Retirement phase with TDF glide path
+        // Retirement phase with TDF glide path (starts at retirementAge)
         const yearsInRetirement = age - inputs.retirementAge;
         const annualReturn = calculateTDFReturnForAge(age);
         
@@ -376,23 +392,23 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
   } else {
     // Standard calculation for custom risk profile
     const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
+    const preWithdrawalBalance = calculateProjectedBalance(inputs);
     for (let age = inputs.startingAge; age <= inputs.lifeExpectancy; age++) {
       const yearsFromStart = age - inputs.startingAge;
       const monthsFromStart = yearsFromStart * 12;
-      
-      if (age <= inputs.retirementAge) {
+
+      if (age < inputs.retirementAge) {
         // Accumulation phase
         const growthOfStartingBalance = futureValue(inputs.startingBalance, inputs.accumulationReturn, yearsFromStart);
         const growthOfContributions = futureValueOfAnnuity(inputs.monthlySavings, monthlyRate, monthsFromStart);
         netWorthByAge[age] = growthOfStartingBalance + growthOfContributions;
       } else {
-        // Withdrawal phase - simulate year-by-year portfolio changes
+        // Withdrawal phase - simulate year-by-year portfolio changes (starts at retirementAge)
         const yearsInRetirement = age - inputs.retirementAge;
-        const startingRetirementBalance = netWorthByAge[inputs.retirementAge] || calculateProjectedBalance(inputs);
-        
+
         // Calculate balance year by year during retirement
-        let currentBalance = startingRetirementBalance;
-        for (let year = 1; year <= yearsInRetirement; year++) {
+        let currentBalance = preWithdrawalBalance;
+        for (let year = 0; year <= yearsInRetirement; year++) {
           // Standard 4% rule withdrawal with inflation adjustment from retirement start
           const yearWithdrawal = inflatedTargetIncome * Math.pow(1 + inputs.inflationRate, year);
           

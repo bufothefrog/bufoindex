@@ -12,7 +12,7 @@ import {
   Area,
   ComposedChart,
 } from 'recharts';
-import { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
+import { RetirementInputs, RetirementResults, calculateProjectedBalance } from '@/lib/calculations/retirement';
 import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
 
 export interface WithdrawalData {
@@ -61,7 +61,8 @@ export function WithdrawalTimeline({
     const data: WithdrawalData[] = [];
     const retirementYears = inputs.lifeExpectancy - inputs.retirementAge;
     const baseWithdrawal = inputs.targetIncome;
-    let currentBalance = results.netWorthByAge[inputs.retirementAge] || 0;
+    // Use pre-withdrawal balance at retirement
+    let currentBalance = calculateProjectedBalance(inputs);
     
     // CRITICAL: Start loop at retirement age, not before
     for (let year = 0; year <= retirementYears; year++) {
