@@ -5,9 +5,6 @@ This guide is for Claude Code acting as a project manager spawning child agents.
 
 ### Project Manager Workflow
 1. **EVALUATE** - Read all documentation and assess current state
-   - Pay special attention to previous agent communication files
-   - Look for patterns of what has failed before
-   - Identify recurring issues that need different approaches
 2. **PLAN** - Identify parallel execution opportunities
 3. **DEFINE** - Create clear task boundaries and contracts
 4. **SPAWN** - Launch multiple agents simultaneously
@@ -16,35 +13,9 @@ This guide is for Claude Code acting as a project manager spawning child agents.
 7. **DOCUMENT** - Update feature backlog with completion status
 
 ### Initial Project Evaluation (DO THIS FIRST - NEVER SKIP)
-Before spawning any agents, thoroughly assess the project. This prevents duplicate work, identifies critical issues, and enables effective parallelization.
+**CRITICAL:** Based on Sprint 1-7 analysis, many quality issues stem from skipping this evaluation. This is now MANDATORY.
 
-```bash
-# 1. Check project structure and health
-ls -la
-hugo version
-cat hugo.toml || cat config.toml  # Check Hugo config
-
-# 2. Read current project status  
-cat docs/prd.md                    # Project vision and requirements
-cat docs/feature-backlog.md        # Feature statuses (NOT STARTED/IN PROGRESS/COMPLETED)
-ls -la docs/agents/agent-communication/  # Ongoing work
-
-# 3. Evaluate codebase state
-find content -type f -name "*.md" | wc -l        # Article count
-find static/js -type f -name "*.js" | wc -l      # Tool count
-find layouts -type f -name "*.html" | wc -l      # Template count
-grep -r "TODO\|FIXME\|XXX" --include="*.md" --include="*.js" --include="*.html" | wc -l  # Tech debt
-
-# 4. Check build status
-hugo --gc --minify                # See if site builds
-ls -la public/                     # Check generated files
-
-# 5. Identify integration gaps
-# - Which articles are written but lack tools?
-# - Which tools are built but not linked from articles?  
-# - Which features are in backlog but partially started?
-# - What's in navigation but not implemented?
-```
+**Run:** `source docs/agents/quality-scripts.sh && project_evaluation`
 
 ### Planning Questions to Answer
 - [ ] Which tasks are truly independent? (Most are!)
@@ -54,33 +25,6 @@ ls -la public/                     # Check generated files
 - [ ] Where are the integration points between agents?
 - [ ] What contracts/interfaces need pre-definition?
 - [ ] Are there any failing builds or broken links to fix first?
-
-### Example: Post-Evaluation Parallel Plan
-```markdown
-# After evaluating project state:
-
-## Current Status
-- Site Foundation: NOT STARTED
-- Article Template: NOT STARTED
-- Opportunity Cost Article: NOT STARTED
-- Credit Card Tool: NOT STARTED
-
-## Priority Order (Fix broken before building new)
-1. CRITICAL - Fix any build failures FIRST
-2. IN PROGRESS - Complete partially built features  
-3. NOT STARTED - Start new features in parallel
-
-## Parallel Execution Plan (4 agents)
-1. Frontend Agent A: Setup Hugo site and Tailwind (BUFO-001, BUFO-002)
-2. Frontend Agent B: Create article template with KaTeX (BUFO-005)
-3. Content Agent C: Write first article draft (BUFO-008)
-4. DevOps Agent D: Setup GitHub Actions deployment (BUFO-003)
-
-## Pre-defined Contracts
-- Article frontmatter format (defined in PRD)
-- Tailwind color palette (sage green #7FB069)
-- All agents use docs/feature-backlog.md task IDs
-```
 
 ### Task Prioritization Rules
 1. **CRITICAL** - Broken builds, non-rendering pages, deployment failures
@@ -126,12 +70,6 @@ static/                    # Static assets
 ├── css/                  # Compiled CSS
 ├── js/                   # JavaScript tools
 └── data/                 # JSON data files
-
-assets/                    # Source files
-└── css/                  # Tailwind source
-
-data/                      # Hugo data files
-└── tools/                # Tool configurations
 ```
 
 ### Content Creation Rules
@@ -149,13 +87,8 @@ data/                      # Hugo data files
 - [ ] `docs/agents/agent-communication/` - Check ongoing agent work
 - [ ] Check existing code in `content/`, `layouts/`, `static/` - Don't recreate
 
-### Verify Environment
-```bash
-hugo version  # Ensure Hugo is available
-ls -la content/  # Check existing content
-ls -la layouts/  # Check existing templates
-cat hugo.toml || cat config.toml  # Review configuration
-```
+**Run:** `source docs/agents/quality-scripts.sh && quick_health_check` (quick pre-agent check)  
+**Run:** `source docs/agents/quality-scripts.sh && verify_environment` (environment verification)
 
 ### Common Failures to Avoid
 - ✗ Hardcoded colors → Use Tailwind classes from config
@@ -173,21 +106,7 @@ cat hugo.toml || cat config.toml  # Review configuration
 - [ ] Do I need to coordinate with other agents?
 
 ### Step 2: BUILD INCREMENTALLY WITH TESTING
-```bash
-# Article Development
-1. Create content file: content/{section}/{slug}.md
-2. Add frontmatter with title, date, description
-3. Write content with KaTeX math where needed
-4. Test locally: hugo server -D
-5. Verify rendering and math formulas
-
-# Tool Development  
-1. Create tool file: static/js/{tool-name}.js
-2. Write vanilla JavaScript (no frameworks)
-3. Create test page to verify calculations
-4. Add URL hash persistence
-5. Test on mobile devices
-```
+**Run:** `source docs/agents/quality-scripts.sh && article_workflow` or `tool_workflow`
 
 ### Step 3: CONNECT TO APPLICATION (CRITICAL)
 Article Integration:
@@ -203,26 +122,15 @@ Tool Integration:
 - [ ] Test state persistence via URL hash
 
 ### Step 4: VALIDATE BEFORE HANDOFF
-```bash
-# Automated Checks
-hugo --gc --minify  # Build should succeed
-ls -la public/  # Verify output generated
+**Run:** `source docs/agents/quality-scripts.sh && validate_handoff`
 
-# Manual Verification
-- [ ] Content renders correctly
-- [ ] Math formulas display properly
-- [ ] Tools calculate accurately
-- [ ] Mobile layout works
-- [ ] Links are not broken
-```
-
-## MULTI-AGENT COORDINATION (AI PROJECT MANAGER)
+## MULTI-AGENT COORDINATION (AI PROJECT MANAGER) 
 
 ### Complete Workflow
 ```
 1. EVALUATE (15-30 min)
    ├─ Read all documentation
-   ├─ Check Hugo build
+   ├─ Run quality assessment
    ├─ Identify incomplete work
    └─ Document assessment
 
@@ -244,9 +152,244 @@ ls -la public/  # Verify output generated
 5. REVIEW & DOCUMENT (10-15 min)
    ├─ Verify all agent deliverables
    ├─ Test full site build
-   ├─ Update feature-backlog.md with NOT STARTED/IN PROGRESS/COMPLETED status
+   ├─ Update feature-backlog.md status
    └─ Create completion summary
 ```
+
+### Special Message: "EVALUATE -> PRIORITIZE -> PARALLELIZE -> EXECUTE -> REVIEW & DOCUMENT"
+
+## AGENT SUCCESS CRITERIA TEMPLATES
+
+**All agents must use appropriate templates for task completion validation:**
+
+- **Financial Calculation Agents:** See `docs/agents/templates/financial-agent-template.md`
+- **React Component Agents:** See `docs/agents/templates/component-agent-template.md`
+- **Testing Agents:** See `docs/agents/templates/testing-agent-template.md`
+
+## CRITICAL: QUALITY ENFORCEMENT (SPRINT 8 REQUIREMENTS)
+
+### Mandatory Quality Verification Checklist
+
+**EVERY AGENT MUST COMPLETE THIS CHECKLIST BEFORE AND AFTER TASK COMPLETION**
+
+Based on Sprint 1-7 analysis, these quality checks are now MANDATORY to prevent recurrence of critical issues:
+
+#### Quick Health Check (REQUIRED BEFORE STARTING)
+**Streamlined pre-agent validation - scan for critical blockers only:**
+
+- [ ] **TypeScript Compiles:** No critical compilation errors blocking development
+- [ ] **Build Succeeds:** Basic build process completes successfully
+- [ ] **Philosophy Compliance:** No conventional wisdom language in codebase
+- [ ] **Dependencies Present:** Critical project files exist (package.json, tsconfig.json, vitest.config.ts)
+
+**Run:** `source docs/agents/quality-scripts.sh && quick_health_check`
+
+**If ANY critical blocker found, agent MUST NOT proceed until resolved.**
+
+*Note: Comprehensive testing (full test suite, linting, coverage, performance) will be enforced at pre-commit time.*
+
+#### Post-Task Validation (REQUIRED BEFORE COMPLETION)
+**Quick validation to ensure no regressions introduced:**
+
+- [ ] **Functionality Verified:** Manual testing of implemented features completed
+- [ ] **Build Still Passes:** `npm run build` still succeeds after changes
+- [ ] **TypeScript Clean:** No new compilation errors introduced  
+- [ ] **Philosophy Consistent:** All new content follows BufoIndex contrarian principles
+- [ ] **Documentation Updated:** Changes documented appropriately
+
+**Run:** `source docs/agents/quality-scripts.sh && quick_health_check` (post-implementation)
+
+*Note: Comprehensive validation (full tests, linting, coverage, performance) happens at pre-commit.*
+
+#### Pre-Commit Comprehensive Validation (AUTOMATIC)
+**Full quality suite enforced before code enters repository:**
+
+- **Complete Test Suite:** All tests must pass with coverage targets
+- **Code Quality:** Linting with zero errors, warnings allowed within limits
+- **Performance:** Benchmark validation for calculation speed
+- **TypeScript:** Strict compilation with zero errors
+- **Philosophy:** Complete scan for conventional wisdom violations
+- **Security:** No hardcoded secrets or vulnerabilities
+
+**Enforced by:** Pre-commit hooks (`scripts/quality-gates.sh all`)
+
+*Agents focus on functionality - quality gates catch issues automatically.*
+
+#### Integration Validation (REQUIRED FOR MULTI-AGENT SESSIONS)
+- [ ] **File Ownership Respected:** Only modified files within claimed ownership
+- [ ] **Import/Export Integrity:** All module imports resolve correctly
+- [ ] **Cross-Agent Integration:** Changes integrate properly with other agent outputs
+- [ ] **Shared Component Compatibility:** No breaking changes to shared components
+- [ ] **API Contract Compliance:** All interfaces remain compatible
+
+### Common Failure Patterns & Prevention (Sprint 1-7 Lessons)
+
+#### Pattern 1: TypeScript Compilation Failures
+**Historical Issue:** Test pattern files with invalid syntax blocking all development  
+**Prevention:**
+- ALWAYS run `npm run type-check` before and after any file modifications
+- Validate generated code templates before using them
+- Use TypeScript-aware editors with real-time error checking
+- Test import statements immediately after creating them
+
+#### Pattern 2: Philosophy Compliance Violations  
+**Historical Issue:** Conventional wisdom language ("Money Guys recommend 6 months") in contrarian platform  
+**Prevention:**
+- Scan all user-facing text for prohibited phrases: "Money Guys", "Dave Ramsey", "conventional wisdom", "6 months emergency"
+- Always emphasize opportunity cost in financial recommendations
+- Enforce 3-month emergency fund maximum (not 6-12 months)
+- Use 7% debt threshold consistently
+- Replace conventional advice with BufoIndex contrarian philosophy
+
+#### Pattern 3: Test Infrastructure Breakage
+**Historical Issue:** Test utilities with syntax errors preventing quality assurance  
+**Prevention:**
+- Test all test utilities before using them: `npm run test:dry-run`
+- Validate custom matchers work correctly
+- Ensure mock data includes all required fields
+- Run tests frequently during development
+
+#### Pattern 4: Module Integration Failures
+**Historical Issue:** Empty exports and incomplete implementations causing import failures  
+**Prevention:**
+- Complete all declared functions and classes before committing
+- Test import chains: attempt to import and use exported functions
+- Avoid declaring interfaces without implementations
+- Validate that all exports are actually implemented
+
+#### Pattern 5: Performance Regressions
+**Historical Issue:** No automated performance monitoring allowing degradation  
+**Prevention:**
+- Benchmark calculation performance before and after changes
+- Maintain <50ms for basic calculations, <500ms for complex calculations
+- Monitor memory usage for calculation-heavy operations
+- Use performance.now() to measure critical operations
+
+#### Pattern 6: Agent Coordination Failures
+**Historical Issue:** Agents creating conflicting files without coordination  
+**Prevention:**
+- Claim file ownership explicitly before making changes
+- Communicate with other agents about shared dependencies
+- Test integration after completing multi-agent sessions
+- Validate that changes don't break other agents' work
+
+### Testing Requirements for All Agent-Generated Code
+
+**MANDATORY:** All code generated by agents must meet these testing standards:
+
+#### Financial Calculations (100% Coverage Required)
+- Every financial calculation must have IRS-verified test cases where applicable
+- All calculations must include opportunity cost analysis
+- BufoIndex philosophy (3-month emergency fund max, 7% debt threshold) must be validated
+- Performance benchmarks required for complex calculations
+
+#### React Components (80% Coverage Target)
+- All components must pass WCAG 2.1 AA accessibility tests
+- Responsive design must be validated on mobile and desktop
+- Error states and edge cases must be tested
+- User interaction patterns must be validated
+
+#### Integration Tests (70% Coverage Target)  
+- URL hash persistence must be tested
+- Cross-calculator data flow must be validated
+- End-to-end user workflows must be tested
+- Performance under realistic usage must be verified
+
+### Multi-Agent Quality Coordination Requirements
+
+**MANDATORY for multi-agent sessions:**
+
+#### File Ownership Protocol
+```markdown
+## Claimed Files (Agent: [agent-name])
+**Exclusive Ownership:** (Only this agent may modify)
+- path/to/file1.ts
+- path/to/file2.tsx
+
+**Shared Access:** (Coordinate with other agents)
+- path/to/shared-file.ts (with Agent-B)
+
+**Read-Only Dependencies:**
+- path/to/dependency.ts (used but not modified)
+```
+
+#### Integration Points Declaration
+```typescript
+// REQUIRED: Document integration contracts
+interface IntegrationContract {
+  component: string;
+  interface: ComponentInterface;
+  testingRequired: boolean;
+  dependencies: string[];
+}
+```
+
+#### Cross-Agent Validation
+- Test that Agent A's outputs work with Agent B's inputs
+- Validate shared component changes don't break existing usage
+- Ensure data structure changes are backward compatible
+- Run full integration test suite after multi-agent completion
+
+### Quality Gate Compliance Requirements
+
+**NO TASK COMPLETION WITHOUT:**
+
+1. **Pre-Commit Quality Gates:**
+   - TypeScript compilation: PASS
+   - Test execution: PASS  
+   - Linting standards: PASS
+   - Philosophy compliance: PASS
+
+2. **Performance Gates:**
+   - Basic calculations: <50ms
+   - Complex calculations: <500ms
+   - Monte Carlo simulations: <5000ms for 10k iterations
+   - Memory usage: <10MB increase for calculation operations
+
+3. **Philosophy Gates:**
+   - Zero conventional wisdom language
+   - Opportunity cost emphasized in financial recommendations
+   - BufoIndex contrarian principles consistently applied
+   - 3-month emergency fund maximum enforced
+   - 7% debt threshold decision point used
+
+**REMEMBER:** Quality gates exist to catch issues early. They are guardrails that enable confident, rapid development.
+
+## MANDATORY PROJECT MANAGER QUALITY ORCHESTRATION
+
+### Project Manager Quality Responsibilities
+**CRITICAL:** Project managers are responsible for ensuring ALL agents meet quality standards. This is non-negotiable.
+
+**Pre-Agent-Spawn Quick Check:** `source docs/agents/quality-scripts.sh && quick_health_check`  
+**Comprehensive Quality Assessment:** `source docs/agents/quality-scripts.sh && quality_assessment` (pre-commit level)
+**Agent Quality Monitoring:** See `docs/agents/conflict-resolution.md` for monitoring templates
+**Conflict Resolution:** See `docs/agents/conflict-resolution.md` for complete procedures
+
+## PROJECT MANAGER AGENT SUCCESS VERIFICATION
+
+### Multi-Agent Session Success Criteria
+**MANDATORY:** Project manager must verify ALL criteria before session completion.
+
+#### Technical Integration Verification ✅
+- [ ] **Build Success:** Full project builds without errors
+- [ ] **TypeScript Clean:** Zero compilation errors across all agent changes
+- [ ] **Test Suite Health:** All tests pass, coverage targets met
+- [ ] **Performance Maintained:** No performance regressions detected
+- [ ] **Cross-Agent Integration:** All agent outputs work together correctly
+
+#### Quality Compliance Verification ✅  
+- [ ] **Philosophy Alignment:** All agent outputs follow BufoIndex principles
+- [ ] **Code Quality:** All code meets established standards
+- [ ] **Documentation Complete:** All changes properly documented
+- [ ] **Accessibility Maintained:** WCAG compliance preserved
+- [ ] **Security Standards:** No security vulnerabilities introduced
+
+#### Process Compliance Verification ✅
+- [ ] **Agent Communication:** All agents documented their work
+- [ ] **Feature Backlog Updated:** All completed features marked
+- [ ] **File Ownership Respected:** No unauthorized file modifications
+- [ ] **Conflict Resolution:** All conflicts properly resolved and documented
+- [ ] **Handoff Documentation:** Complete handoff documentation created
 
 ### Post-Execution Documentation (REQUIRED)
 After all agents complete their tasks and you've verified the work:
@@ -399,26 +542,6 @@ All run SIMULTANEOUSLY with pre-defined interfaces
 - [ ] Mobile testing done
 ```
 
-### Parallel vs Sequential Decision Examples
-
-**PARALLEL (Default):**
-```
-# These can ALL run simultaneously:
-- Agent 1: Setup Hugo site structure (Frontend)
-- Agent 2: Configure Tailwind with custom colors (Frontend)
-- Agent 3: Write opportunity cost article (Content)
-- Agent 4: Build credit card data pipeline (DevOps)
-```
-
-**SEQUENTIAL (Only when required):**
-```
-# These MUST run in order:
-1. Agent 1: Create Hugo site structure
-2. Agent 2: Create article template (needs Hugo)
-3. Agent 3: Write articles using template
-4. Agent 4: Build navigation with all articles
-```
-
 ## QUICK REFERENCE
 
 ### Project Structure
@@ -498,24 +621,9 @@ Tool:
 
 ## BUILD SYSTEM COORDINATION
 
-### Hugo Build Coordination
-Since Hugo is simpler than the original system, coordination is easier:
+**Run:** `source docs/agents/quality-scripts.sh && hugo_coordination`
 
-1. **Content agents** can work independently on articles
-2. **Template agents** establish patterns others follow
-3. **Tool agents** build JavaScript independently
-4. **DevOps agents** setup GitHub Actions in parallel
-
-### Pre-Work Coordination
-```bash
-# Check current state
-hugo version
-ls -la content/
-ls -la layouts/
-hugo --gc --minify  # Test build
-```
-
-### Model Ownership (Simplified for Hugo)
+### File Ownership Matrix
 ```markdown
 ## File Ownership Matrix
 
@@ -564,16 +672,57 @@ hugo --gc --minify  # Test build
 - [ ] No broken links
 - [ ] Documentation complete
 
+## CODE PATTERNS & REFERENCE FILES
+
+**TypeScript Export/Import Patterns:** See `docs/agents/code-patterns.md` for required patterns  
+**Conflict Resolution Procedures:** See `docs/agents/conflict-resolution.md` for complete procedures  
+**Quality Assessment Scripts:** Use `docs/agents/quality-scripts.sh` functions
+
+## FINAL AGENT QUALITY REQUIREMENTS
+
+### Non-Negotiable Requirements
+**EVERY AGENT MUST COMPLY - NO EXCEPTIONS:**
+
+1. **Pre-Task Validation:** All quality gates must pass before starting work
+2. **TypeScript Compliance:** Zero compilation errors in all generated code
+3. **Test Coverage:** Minimum coverage targets must be met
+4. **Philosophy Alignment:** Zero conventional wisdom language allowed
+5. **Performance Standards:** All benchmarks must be met or exceeded
+6. **Documentation:** All code must be properly documented
+7. **Integration Testing:** All components must integrate properly
+8. **Accessibility:** WCAG 2.1 AA compliance required
+9. **Post-Task Validation:** All quality gates must pass after completion
+10. **Handoff Documentation:** Complete handoff documentation required
+
+### Agent Accountability
+**CRITICAL:** Agents cannot claim task completion unless ALL requirements are met:
+
+- ✅ **COMPLIANT:** All quality gates pass, documentation complete, integration verified
+- ❌ **NON-COMPLIANT:** Any quality gate fails, incomplete documentation, integration issues
+
+### Project Manager Responsibility
+**Project managers are accountable for overall quality and must:**
+1. Verify all agents meet quality standards before task completion
+2. Document any quality issues and ensure resolution
+3. Update feature backlog with accurate completion status
+4. Ensure all agent work integrates properly
+5. Maintain system quality throughout multi-agent sessions
+
 ## REMEMBER
 - **Evaluate project state thoroughly before spawning any agents**
-- **Fix broken builds before adding new features**
+- **Fix broken builds before adding new features** 
 - **Complete partial work before starting new work**
+- **ALL AGENTS MUST PASS QUALITY GATES - NO EXCEPTIONS**
 - **Document completion in feature-backlog.md after reviewing all agent work**
 - **Parallel execution is the default** - Only go sequential if dependencies require it
+- **Quality is non-negotiable** - Better to complete fewer features with high quality than many with poor quality
 - Always check what exists before creating new code
-- Test continuously with `hugo server -D`
+- Test continuously with appropriate tools
 - Every feature must be accessible from navigation
-- Use Tailwind classes for ALL styling
+- Use established patterns for ALL styling
 - Update task status immediately when complete
 - Document in `/agent-communication/` for other agents
 - When in doubt, look at the PRD and feature backlog
+- **Quality gates exist to enable confident, rapid development**
+
+Action(s) completed with agents.md in context. SPECIAL MESSAGE: "EVALUATE -> PRIORITIZE -> PARALLELIZE -> EXECUTE -> REVIEW & DOCUMENT"

@@ -106,11 +106,58 @@ coverage/
 *.sqlite
 *.sqlite3
 
-# Claude
-.claude
-
 # Vercel
 .vercel
 
 # Git artifacts
 .gitmodules
+
+# Next.js build artifacts
+.next/
+.next/**
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# React/Next.js development
+.react-dev-overlay/
+.react/
+
+# TypeScript
+*.d.ts.map
+.tsbuild/
+
+# ESLint
+.eslintcache
+
+# Turborepo
+.turbo/
+
+# Sentry
+.sentryclirc
+
+# Package managers (keep package-lock.json for build consistency)
+pnpm-lock.yaml
+yarn.lock
+.yarn/
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+test-results/
+playwright-report/
+playwright/.cache/
+junit.xml
+
+# Quality monitoring and performance files
+quality-check.log
+philosophy-violations.log
+performance-baseline.json
+
+# Claude Code local files (keep agents synced)
+.claude/**/*.local
+.claude/**/*.local.*
+.claude/**/local-*
+.claude/local_*
