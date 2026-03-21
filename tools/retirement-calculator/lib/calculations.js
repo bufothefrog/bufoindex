@@ -232,16 +232,11 @@ class FinancialCalculations {
                     // Apply monthly growth during accumulation phase
                     netWorth = netWorth * (1 + monthlyAccumulationReturn);
                 }
-            } else if (age === retirementAge) {
-                // First year of retirement - transition year
-                // Continue growth without withdrawals for this year, use retirement return rate
-                for (let month = 0; month < 12; month++) {
-                    netWorth = netWorth * (1 + monthlyRetirementReturn);
-                }
             } else {
                 // Retirement phase - monthly withdrawals with inflation adjustment
-                const yearsFromStart = age - startingAge; // Calculate inflation from starting age for consistency
-                const inflationAdjustedWithdrawal = monthlyWithdrawal * Math.pow(1 + monthlyInflation, yearsFromStart * 12);
+                // Use years since retirement for post-retirement inflation (monthlyWithdrawal already includes inflation to retirement date)
+                const yearsFromRetirement = age - retirementAge;
+                const inflationAdjustedWithdrawal = monthlyWithdrawal * Math.pow(1 + monthlyInflation, yearsFromRetirement * 12);
                 
                 for (let month = 0; month < 12; month++) {
                     // Withdraw at beginning of month
@@ -887,18 +882,27 @@ class FinancialCalculations {
                 return null; // Invalid inputs
             }
 
-            const annualContribution = currentIncome * savingsRate;
-            
+            const monthlyContribution = (currentIncome * savingsRate) / 12;
+            const monthlyReturn = Math.pow(1 + annualReturn, 1/12) - 1;
+
+            // Helper: calculate portfolio value using monthly compounding (matches generateNetWorthProgression)
+            const calcPortfolioValue = (yearsToSave) => {
+                let value = startingBalance;
+                const totalMonths = yearsToSave * 12;
+                for (let month = 0; month < totalMonths; month++) {
+                    value = value + monthlyContribution;
+                    value = value * (1 + monthlyReturn);
+                }
+                return value;
+            };
+
             // Feasibility check: even with maximum savings at max age, is goal achievable?
             const maxYearsToSave = MAX_RETIREMENT_AGE - currentAge;
-            let maxPortfolioValue = startingBalance;
-            for (let year = 0; year < maxYearsToSave; year++) {
-                maxPortfolioValue = maxPortfolioValue * (1 + annualReturn) + annualContribution;
-            }
-            
+            const maxPortfolioValue = calcPortfolioValue(maxYearsToSave);
+
             const maxInflatedIncome = targetIncome * Math.pow(1 + inflationRate, maxYearsToSave);
             const maxRequiredPortfolio = maxInflatedIncome / WITHDRAWAL_RATE;
-            
+
             if (maxPortfolioValue < maxRequiredPortfolio) {
                 console.warn('Retirement goal impossible even at age 100', {
                     maxPortfolio: maxPortfolioValue,
@@ -907,7 +911,7 @@ class FinancialCalculations {
                 });
                 return null; // Impossible scenario
             }
-            
+
             // Binary search to find retirement age
             let minAge = currentAge + 1;
             let maxAge = MAX_RETIREMENT_AGE;
@@ -916,17 +920,14 @@ class FinancialCalculations {
             while (minAge <= maxAge) {
                 const testAge = Math.floor((minAge + maxAge) / 2);
                 const yearsToSave = testAge - currentAge;
-                
+
                 if (yearsToSave <= 0) {
                     minAge = testAge + 1;
                     continue;
                 }
 
-                // Calculate portfolio value at test retirement age
-                let portfolioValue = startingBalance;
-                for (let year = 0; year < yearsToSave; year++) {
-                    portfolioValue = portfolioValue * (1 + annualReturn) + annualContribution;
-                }
+                // Calculate portfolio value at test retirement age (monthly compounding)
+                const portfolioValue = calcPortfolioValue(yearsToSave);
 
                 // Calculate required portfolio for target income (inflation-adjusted)
                 const inflatedTargetIncome = targetIncome * Math.pow(1 + inflationRate, yearsToSave);
