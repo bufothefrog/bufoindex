@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { AllocationItem, PaycheckProfile, SkippedItem } from '@/lib/types';
@@ -54,7 +54,7 @@ interface StepStatus {
   whyItMatters: string;
 }
 
-export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownProps) {
+export const PaycheckBreakdown = React.memo(function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownProps) {
   const [expandedSteps, setExpandedSteps] = React.useState<Set<string>>(new Set());
   
   const toggleExpanded = (stepId: string) => {
@@ -68,7 +68,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
   };
   
   // Define the complete financial order of operations
-  const financialSteps = [
+  const financialSteps = useMemo(() => [
     { id: 'emergency-1month', name: '1-Month Emergency Fund', category: 'emergency_fund', priority: 1, icon: Shield, color: 'blue' },
     { id: 'employer-match', name: 'Employer 401k Match', category: 'employer_match', priority: 2, icon: Building2, color: 'green' },
     { id: 'high-interest-debt', name: 'High-Interest Debt (7%+)', category: 'high_interest_debt', priority: 3, icon: CreditCard, color: 'red' },
@@ -78,7 +78,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
     { id: 'additional-401k', name: '401k Maximum', category: 'tax_advantaged', priority: 7, icon: Building2, color: 'orange' },
     { id: 'mega-backdoor', name: 'Mega Backdoor Roth', category: 'tax_optimization', priority: 8, icon: TrendingUp, color: 'pink' },
     { id: 'taxable-investment', name: 'Taxable Investment', category: 'investment', priority: 9, icon: TrendingUp, color: 'teal' },
-  ];
+  ], []);
 
   // Calculate pre-tax deductions (401k match + additional)
   // const pretaxDeductions = allocations
@@ -86,7 +86,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
   //   .reduce((sum, a) => sum + a.amount, 0);
 
   // Map allocations to steps
-  const stepStatus = financialSteps.map(step => {
+  const stepStatus = useMemo(() => financialSteps.map(step => {
     // More robust allocation matching
     const allocation = allocations.find(a => {
       switch (step.id) {
@@ -433,14 +433,17 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
       implementationSteps: getImplementationSteps(),
       whyItMatters: getWhyItMatters()
     } as StepStatus;
-  });
+  }), [financialSteps, allocations, profile]);
 
   // Calculate progress metrics
-  const totalApplicableSteps = stepStatus.filter(step => !step.isNotApplicable).length;
-  const completedSteps = stepStatus.filter(step => step.isComplete).length;
-  const progressPercentage = totalApplicableSteps > 0 ? Math.round((completedSteps / totalApplicableSteps) * 100) : 0;
-  const criticalIssues = stepStatus.filter(step => step.urgencyLevel === 'critical').length;
-  const importantItems = stepStatus.filter(step => step.urgencyLevel === 'important').length;
+  const { totalApplicableSteps, completedSteps, progressPercentage, criticalIssues, importantItems } = useMemo(() => {
+    const totalApplicableSteps = stepStatus.filter(step => !step.isNotApplicable).length;
+    const completedSteps = stepStatus.filter(step => step.isComplete).length;
+    const progressPercentage = totalApplicableSteps > 0 ? Math.round((completedSteps / totalApplicableSteps) * 100) : 0;
+    const criticalIssues = stepStatus.filter(step => step.urgencyLevel === 'critical').length;
+    const importantItems = stepStatus.filter(step => step.urgencyLevel === 'important').length;
+    return { totalApplicableSteps, completedSteps, progressPercentage, criticalIssues, importantItems };
+  }, [stepStatus]);
 
   // Show all steps - completed items for celebration, non-applicable for roadmap visibility
   const visibleSteps = stepStatus;
@@ -499,7 +502,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
     <Card className="border-border bg-card">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-center justify-center">
-          <DollarSign className="w-6 h-6 text-info" />
+          <DollarSign className="w-6 h-6 text-info" aria-hidden="true" />
           <span>Your {profile.income.frequency === 'bi-weekly' ? 'Bi-Weekly' : 
                      profile.income.frequency === 'semi-monthly' ? 'Semi-Monthly' : 
                      profile.income.frequency === 'weekly' ? 'Weekly' : 'Monthly'} Paycheck Allocation</span>
@@ -527,13 +530,13 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
               <div className="flex items-center space-x-4 text-sm">
                 {criticalIssues > 0 && (
                   <div className="flex items-center space-x-1 text-destructive">
-                    <AlertTriangle className="w-4 h-4" />
+                    <AlertTriangle className="w-4 h-4" aria-hidden="true" />
                     <span>{criticalIssues} Critical Issue{criticalIssues !== 1 ? 's' : ''}</span>
                   </div>
                 )}
                 {importantItems > 0 && (
                   <div className="flex items-center space-x-1 text-warning">
-                    <Target className="w-4 h-4" />
+                    <Target className="w-4 h-4" aria-hidden="true" />
                     <span>{importantItems} Optimization{importantItems !== 1 ? 's' : ''}</span>
                   </div>
                 )}
@@ -548,7 +551,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
           <PaycheckSummaryBox profile={profile} />
 
           <div className="flex justify-center">
-            <ArrowDown className="w-5 h-5 text-muted-foreground" />
+            <ArrowDown className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
           </div>
 
           {/* Enhanced Financial Order of Operations */}
@@ -568,7 +571,16 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                     "border-l-4 rounded-lg transition-all duration-200 hover:shadow-md cursor-pointer",
                     styles.card
                   )}
-                  onClick={() => toggleExpanded(step.id)}>
+                  onClick={() => toggleExpanded(step.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleExpanded(step.id);
+                    }
+                  }}>
                     <div className="flex items-center justify-between p-4">
                       <div className="flex items-center space-x-3">
                         <div className={cn(
@@ -577,24 +589,24 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         )}>
                           {step.isComplete ? (
                             <>
-                              <CheckCircle className="w-4 h-4" />
+                              <CheckCircle className="w-4 h-4" aria-hidden="true" />
                               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full flex items-center justify-center text-xs font-bold text-foreground border">
                                 {step.priority}
                               </div>
                             </>
                           ) : step.urgencyLevel === 'critical' ? (
-                            <AlertTriangle className="w-4 h-4" />
+                            <AlertTriangle className="w-4 h-4" aria-hidden="true" />
                           ) : step.urgencyLevel === 'important' ? (
-                            <AlertTriangle className="w-4 h-4" />
+                            <AlertTriangle className="w-4 h-4" aria-hidden="true" />
                           ) : step.isNotApplicable ? (
                             <>
-                              <X className="w-4 h-4" />
+                              <X className="w-4 h-4" aria-hidden="true" />
                               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full flex items-center justify-center text-xs font-bold text-muted-foreground border">
                                 {step.priority}
                               </div>
                             </>
                           ) : (
-                            <AlertTriangle className="w-4 h-4" />
+                            <AlertTriangle className="w-4 h-4" aria-hidden="true" />
                           )}
                         </div>
                         <div className="flex-1">
@@ -696,9 +708,9 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                           </div>
                         )}
                         <div className="flex items-center space-x-2">
-                          {isExpanded ? 
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" /> : 
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          {isExpanded ?
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> :
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                           }
                         </div>
                       </div>
@@ -719,7 +731,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                       <div className="space-y-4">
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
-                            <Info className="w-4 h-4 text-info" />
+                            <Info className="w-4 h-4 text-info" aria-hidden="true" />
                             <h4 className="font-medium text-foreground">Why This Matters</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">{step.whyItMatters}</p>
@@ -729,7 +741,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         {(step.potentialSavings.monthly > 0 || step.potentialSavings.annual > 0) && (
                           <div>
                             <div className="flex items-center space-x-2 mb-2">
-                              <TrendingUp className="w-4 h-4 text-success" />
+                              <TrendingUp className="w-4 h-4 text-success" aria-hidden="true" />
                               <h4 className="font-medium text-foreground">Financial Impact</h4>
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -754,7 +766,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         {/* Implementation Steps */}
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
-                            <Target className="w-4 h-4 text-muted-foreground" />
+                            <Target className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                             <h4 className="font-medium text-foreground">How to Implement</h4>
                           </div>
                           <ol className="space-y-1 text-sm text-muted-foreground">
@@ -771,7 +783,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         <div className="pt-2 border-t border-border">
                           {step.isComplete ? (
                             <div className="flex items-center justify-center p-3 bg-success/5 rounded-lg">
-                              <CheckCircle className="w-5 h-5 text-success mr-2" />
+                              <CheckCircle className="w-5 h-5 text-success mr-2" aria-hidden="true" />
                               <span className="font-medium text-success">
                                 Completed! Keep up the great work.
                               </span>
@@ -816,4 +828,4 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
       </CardContent>
     </Card>
   );
-}
+});

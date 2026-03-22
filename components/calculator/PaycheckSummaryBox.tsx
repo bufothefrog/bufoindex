@@ -8,7 +8,7 @@ interface PaycheckSummaryBoxProps {
   profile: PaycheckProfile;
 }
 
-export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
+export const PaycheckSummaryBox = React.memo(function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Calculate employee contributions that are deducted from paycheck
@@ -53,13 +53,22 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
 
   return (
     <Card className="border-indigo-200 dark:border-indigo-600 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-800 dark:to-blue-800">
-      <CardHeader 
+      <CardHeader
         className="cursor-pointer py-2 px-3"
         onClick={() => setIsExpanded(!isExpanded)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
       >
         <CardTitle className="flex items-center justify-between text-base">
           <div className="flex items-center space-x-2">
-            <DollarSign className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
+            <DollarSign className="w-4 h-4 text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
             <span>{getFrequencyText()} Paycheck Breakdown</span>
           </div>
           <div className="flex items-center space-x-2">
@@ -67,9 +76,9 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
               {formatCurrency(profile.income.grossPaycheck)} → {formatCurrency(profile.income.netPaycheck)}
             </span>
             {isExpanded ? (
-              <ChevronUp className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
+              <ChevronUp className="w-4 h-4 text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
+              <ChevronDown className="w-4 h-4 text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
             )}
           </div>
         </CardTitle>
@@ -82,7 +91,7 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
             <div className="flex items-center justify-between p-2 rounded-lg border bg-blue-50 dark:bg-blue-800 border-blue-200 dark:border-blue-600">
               <div className="flex items-center space-x-2">
                 <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                  <DollarSign className="w-3 h-3 text-white" />
+                  <DollarSign className="w-3 h-3 text-white" aria-hidden="true" />
                 </div>
                 <span className="text-sm font-medium text-blue-800 dark:text-blue-100">Gross Paycheck</span>
               </div>
@@ -96,7 +105,7 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
               <div className="flex items-center justify-between p-2 rounded-lg border bg-green-50 dark:bg-green-800 border-green-200 dark:border-green-600">
                 <div className="flex items-center space-x-2">
                   <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                    <Building2 className="w-3 h-3 text-white" />
+                    <Building2 className="w-3 h-3 text-white" aria-hidden="true" />
                   </div>
                   <div>
                     <div className="text-sm font-medium text-green-800 dark:text-green-100">Traditional 401k</div>
@@ -115,7 +124,7 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
             <div className="flex items-center justify-between p-2 rounded-lg border bg-red-50 dark:bg-red-800 border-red-200 dark:border-red-600">
               <div className="flex items-center space-x-2">
                 <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                  <Calculator className="w-3 h-3 text-white" />
+                  <Calculator className="w-3 h-3 text-white" aria-hidden="true" />
                 </div>
                 <div>
                   <div className="text-sm font-medium text-red-800 dark:text-red-100">Taxes & Deductions</div>
@@ -132,7 +141,7 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
               <div className="flex items-center justify-between p-2 rounded-lg border bg-blue-50 dark:bg-blue-800 border-blue-200 dark:border-blue-600">
                 <div className="flex items-center space-x-2">
                   <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                    <Building2 className="w-3 h-3 text-white" />
+                    <Building2 className="w-3 h-3 text-white" aria-hidden="true" />
                   </div>
                   <div>
                     <div className="text-sm font-medium text-blue-800 dark:text-blue-100">Roth 401k</div>
@@ -153,7 +162,7 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
             <div className="flex items-center justify-between p-2 rounded-lg border bg-blue-50 dark:bg-blue-800 border-blue-200 dark:border-blue-600">
               <div className="flex items-center space-x-2">
                 <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                  <DollarSign className="w-3 h-3 text-white" />
+                  <DollarSign className="w-3 h-3 text-white" aria-hidden="true" />
                 </div>
                 <span className="text-sm font-medium text-blue-800 dark:text-blue-100">Take-Home Pay</span>
               </div>
@@ -167,7 +176,7 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
               <div className="flex items-center justify-between p-2 rounded-lg border bg-emerald-50 dark:bg-emerald-800 border-emerald-200 dark:border-emerald-600">
                 <div className="flex items-center space-x-2">
                   <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
-                    <Building2 className="w-3 h-3 text-white" />
+                    <Building2 className="w-3 h-3 text-white" aria-hidden="true" />
                   </div>
                   <div>
                     <div className="text-sm font-medium text-emerald-800 dark:text-emerald-100">Employer 401k Match</div>
@@ -200,4 +209,4 @@ export function PaycheckSummaryBox({ profile }: PaycheckSummaryBoxProps) {
       )}
     </Card>
   );
-}
+});

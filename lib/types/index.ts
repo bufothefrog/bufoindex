@@ -231,47 +231,22 @@ export interface ExportableData {
   };
 }
 
-// Constants and enums
+// Constants - imported from single source of truth
+import {
+  FEDERAL_TAX_BRACKETS_2026,
+  CONTRIBUTION_LIMITS_2026,
+} from '../constants/irs-2026';
+
+// Re-export with legacy keyed structure for backward compatibility
 export const TAX_BRACKETS = {
   2026: {
-    single: [
-      { min: 0, max: 12400, rate: 0.10 },
-      { min: 12400, max: 50400, rate: 0.12 },
-      { min: 50400, max: 105700, rate: 0.22 },
-      { min: 105700, max: 201775, rate: 0.24 },
-      { min: 201775, max: 256225, rate: 0.32 },
-      { min: 256225, max: 640600, rate: 0.35 },
-      { min: 640600, max: Infinity, rate: 0.37 },
-    ],
-    marriedJoint: [
-      { min: 0, max: 24800, rate: 0.10 },
-      { min: 24800, max: 100800, rate: 0.12 },
-      { min: 100800, max: 211400, rate: 0.22 },
-      { min: 211400, max: 403550, rate: 0.24 },
-      { min: 403550, max: 512450, rate: 0.32 },
-      { min: 512450, max: 768700, rate: 0.35 },
-      { min: 768700, max: Infinity, rate: 0.37 },
-    ],
+    single: FEDERAL_TAX_BRACKETS_2026.single,
+    marriedJoint: FEDERAL_TAX_BRACKETS_2026.marriedFilingJointly,
   }
 } as const;
 
 export const CONTRIBUTION_LIMITS = {
-  2026: {
-    ira: 7500,
-    roth401k: 24500,
-    traditional401k: 24500,
-    hsa: {
-      individual: 4400,
-      family: 8750,
-    },
-    catchUp: {
-      ira: 1100, // Age 50+
-      '401k': 8000, // Age 50+
-      superCatchUp401k: 11250, // Ages 60-63 (SECURE 2.0)
-      hsa: 1000, // Age 55+ (statutory, not indexed)
-    },
-    total415c: 72000, // Total annual additions limit (415(c))
-  }
+  2026: CONTRIBUTION_LIMITS_2026,
 } as const;
 
 export const STATE_TAX_RATES = {

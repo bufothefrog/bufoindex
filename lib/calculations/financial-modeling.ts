@@ -4,6 +4,11 @@
  * for real-world retirement planning scenarios
  */
 
+import {
+  FEDERAL_TAX_BRACKETS_2026,
+  STANDARD_DEDUCTIONS_2026,
+} from '../constants/irs-2026';
+
 // Type definitions
 export interface TaxBracket {
   min: number;
@@ -52,39 +57,13 @@ export interface HealthcareCostProjection {
 }
 
 export class FinancialModeling {
-  /**
-   * 2026 Federal Tax Brackets (Rev. Proc. 2025-32, as amended by OBBBA)
-   */
+  // Imported from single source of truth (lib/constants/irs-2026.ts)
   static readonly FEDERAL_TAX_BRACKETS: TaxBrackets = {
-    single: [
-      { min: 0, max: 12400, rate: 0.10 },
-      { min: 12400, max: 50400, rate: 0.12 },
-      { min: 50400, max: 105700, rate: 0.22 },
-      { min: 105700, max: 201775, rate: 0.24 },
-      { min: 201775, max: 256225, rate: 0.32 },
-      { min: 256225, max: 640600, rate: 0.35 },
-      { min: 640600, max: Infinity, rate: 0.37 }
-    ],
-    marriedFilingJointly: [
-      { min: 0, max: 24800, rate: 0.10 },
-      { min: 24800, max: 100800, rate: 0.12 },
-      { min: 100800, max: 211400, rate: 0.22 },
-      { min: 211400, max: 403550, rate: 0.24 },
-      { min: 403550, max: 512450, rate: 0.32 },
-      { min: 512450, max: 768700, rate: 0.35 },
-      { min: 768700, max: Infinity, rate: 0.37 }
-    ]
+    single: [...FEDERAL_TAX_BRACKETS_2026.single],
+    marriedFilingJointly: [...FEDERAL_TAX_BRACKETS_2026.marriedFilingJointly],
   };
 
-  /**
-   * 2026 Standard Deductions (Rev. Proc. 2025-32, as amended by OBBBA)
-   */
-  static readonly STANDARD_DEDUCTIONS: StandardDeductions = {
-    single: 16100,
-    marriedFilingJointly: 32200,
-    marriedFilingSeparately: 16100,
-    headOfHousehold: 24150
-  };
+  static readonly STANDARD_DEDUCTIONS: StandardDeductions = { ...STANDARD_DEDUCTIONS_2026 };
 
   /**
    * 2024 California State Tax Brackets

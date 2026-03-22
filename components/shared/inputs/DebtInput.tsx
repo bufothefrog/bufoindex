@@ -75,7 +75,7 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
             return (
               <div key={debt.id} className={`p-4 border rounded-lg ${debtStatus.bgColor} ${debtStatus.borderColor}`}>
                 <div className="flex items-start space-x-3">
-                  <IconComponent className={`w-5 h-5 mt-1 ${debtStatus.color}`} />
+                  <IconComponent className={`w-5 h-5 mt-1 ${debtStatus.color}`} aria-hidden="true" />
                   <div className="flex-1 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -153,8 +153,9 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         size="sm"
                         onClick={() => onRemoveDebt(index)}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        aria-label={`Remove debt: ${debt.name || 'Unnamed debt'}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </Button>
                     </div>
                   </div>
@@ -167,10 +168,10 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
         {/* Add Debt Button */}
         {debts.length === 0 && (
           <div className="text-center py-6 text-muted-foreground">
-            <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+            <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground" aria-hidden="true" />
             <p className="mb-4">No debts added yet</p>
             <Button onClick={addNewDebt} variant="outline">
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
               Add Your First Debt
             </Button>
           </div>
@@ -178,7 +179,7 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
         
         {debts.length > 0 && (
           <Button onClick={addNewDebt} variant="outline" className="w-full">
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
             Add Another Debt
           </Button>
         )}

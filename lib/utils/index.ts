@@ -1,6 +1,13 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { STATE_TAX_RATES } from '../types'
+import {
+  SS_WAGE_BASE_2026,
+  FICA_RATE,
+  MEDICARE_RATE,
+  ADDITIONAL_MEDICARE_RATE,
+  ADDITIONAL_MEDICARE_THRESHOLD,
+} from '../constants/irs-2026'
 
 /**
  * Utility function for merging Tailwind CSS classes
@@ -88,23 +95,16 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * 2026 Social Security wage base (SSA announcement Oct 2025)
- */
-const SS_WAGE_BASE_2026 = 184500;
-
-/**
  * Get the applicable FICA rate based on gross annual income.
- * - Below SS wage base: 7.65% (6.2% SS + 1.45% Medicare)
- * - Above SS wage base but <= $200k: 1.45% (Medicare only)
- * - Above $200k: 2.35% (Medicare + 0.9% Additional Medicare Tax)
+ * Constants imported from lib/constants/irs-2026.ts (single source of truth).
  */
 export function getFICARate(grossAnnualIncome: number): number {
   if (grossAnnualIncome <= SS_WAGE_BASE_2026) {
-    return 0.0765; // 6.2% SS + 1.45% Medicare
-  } else if (grossAnnualIncome <= 200000) {
-    return 0.0145; // Medicare only (above SS cap)
+    return FICA_RATE;
+  } else if (grossAnnualIncome <= ADDITIONAL_MEDICARE_THRESHOLD) {
+    return MEDICARE_RATE;
   } else {
-    return 0.0235; // 1.45% Medicare + 0.9% Additional Medicare Tax
+    return ADDITIONAL_MEDICARE_RATE;
   }
 }
 
@@ -140,9 +140,7 @@ export function calculateMarginalTaxRate(federalRate: number, stateCode: string)
     ? STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES].rate
     : 0;
 
-  const ficaRate = 0.0765; // Social Security (6.2%) + Medicare (1.45%)
-
-  return federalRate + stateRate + ficaRate;
+  return federalRate + stateRate + FICA_RATE;
 }
 
 /**

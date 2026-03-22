@@ -1,10 +1,11 @@
-import { 
-  PaycheckProfile, 
+import {
+  PaycheckProfile,
   AllocationItem,
   SkippedItem,
   TAX_BRACKETS,
   CONTRIBUTION_LIMITS
 } from '../types';
+import { ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '../constants/irs-2026';
 import { calculateIncomeTaxRate, calculateHSATaxRate } from '../utils';
 import { formatCurrency, formatPercent, paycheckToMonthly, monthlyToPaycheck } from './core';
 
@@ -329,9 +330,12 @@ export function calculateRothIRA(
 ): AllocationItem | null {
   const annualIncome = profile.income.gross * 12;
   
-  // Check income eligibility for Roth IRA (2026 limits - IRS Notice 2025-67)
-  const rothPhaseoutStart = profile.taxes.filingStatus === 'marriedJoint' ? 242000 : 153000;
-  const rothPhaseoutEnd = profile.taxes.filingStatus === 'marriedJoint' ? 252000 : 168000;
+  // Check income eligibility for Roth IRA (from single source: lib/constants/irs-2026.ts)
+  const phaseout = profile.taxes.filingStatus === 'marriedJoint'
+    ? ROTH_IRA_PHASEOUT_2026.marriedFilingJointly
+    : ROTH_IRA_PHASEOUT_2026.single;
+  const rothPhaseoutStart = phaseout.start;
+  const rothPhaseoutEnd = phaseout.end;
   
   if (annualIncome > rothPhaseoutEnd) return null; // Not eligible
   
@@ -455,16 +459,22 @@ export function calculateMegaBackdoorRoth(
   
   // Check income threshold - typically beneficial for higher earners
   // who are above Roth IRA limits
-  const rothPhaseoutEnd = profile.taxes.filingStatus === 'marriedJoint' ? 252000 : 168000;
+  const megaPhaseout = profile.taxes.filingStatus === 'marriedJoint'
+    ? ROTH_IRA_PHASEOUT_2026.marriedFilingJointly
+    : ROTH_IRA_PHASEOUT_2026.single;
 
-  if (annualIncome < rothPhaseoutEnd) return null; // Regular Roth IRA is better
+  if (annualIncome < megaPhaseout.end) return null; // Regular Roth IRA is better
 
   const annualSalary = profile.income.gross * 12;
   const currentAnnualContribution = annualSalary * benefits.currentContribution;
 
-  // Total 401k limit including after-tax contributions (2026: $72,000 or $80,000/$83,250 with catch-up)
+  // Total 401k limit including after-tax contributions (from lib/constants/irs-2026.ts)
   const age = profile.preferences.age;
-  const totalLimit = age >= 60 && age <= 63 ? 83250 : age >= 50 ? 80000 : 72000;
+  const totalLimit = age >= 60 && age <= 63
+    ? TOTAL_415C_BY_AGE.superCatchUp60to63
+    : age >= 50
+      ? TOTAL_415C_BY_AGE.catchUp50
+      : TOTAL_415C_BY_AGE.standard;
   const employerMatch = annualSalary * benefits.matchPercent * Math.min(benefits.matchLimit, benefits.currentContribution);
   
   const remainingAfterTaxRoom = totalLimit - currentAnnualContribution - employerMatch;

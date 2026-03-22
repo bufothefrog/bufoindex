@@ -54,6 +54,15 @@ export function BenefitsSelector({
                 : "bg-muted border-border hover:bg-muted/80"
             )}
             onClick={() => toggleOption(option.id)}
+            role="button"
+            tabIndex={0}
+            aria-pressed={option.enabled}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleOption(option.id);
+              }
+            }}
           >
             <div className="flex-1">
               <div className="font-medium text-sm">{option.name}</div>
@@ -68,9 +77,9 @@ export function BenefitsSelector({
                 : "bg-muted-foreground/30 text-muted-foreground"
             )}>
               {option.enabled ? (
-                <Check className="w-4 h-4" />
+                <Check className="w-4 h-4" aria-hidden="true" />
               ) : (
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               )}
             </div>
           </div>

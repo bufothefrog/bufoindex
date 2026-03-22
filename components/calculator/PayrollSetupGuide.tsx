@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PaycheckProfile, AllocationResult } from '@/lib/types';
@@ -21,7 +21,7 @@ interface PayrollSetupGuideProps {
 
 type AutomationTier = 'basic' | 'intermediate' | 'advanced';
 
-export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
+export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
   const [selectedTier, setSelectedTier] = useState<AutomationTier>('intermediate');
   const [copiedInstructions, setCopiedInstructions] = useState(false);
   
@@ -35,10 +35,10 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
     frequency
   );
   
-  const priorityAllocations = result.allocations.map(allocation => ({
+  const priorityAllocations = useMemo(() => result.allocations.map(allocation => ({
     ...allocation,
     paycheckAmount: monthlyToPaycheck(allocation.amount, frequency)
-  }));
+  })), [result.allocations, frequency]);
   
   const remainingPerPaycheck = monthlyToPaycheck(result.remainingAmount, frequency);
   
@@ -123,7 +123,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
     <Card className="border-green-200 dark:border-green-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <Building2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+          <Building2 className="w-5 h-5 text-green-600 dark:text-green-400" aria-hidden="true" />
           <span>Payroll Configuration Guide</span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
@@ -153,15 +153,17 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
         {/* Automation Tier Selection */}
         <div className="space-y-3">
           <h4 className="font-medium text-foreground">Choose Your Automation Level</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3" role="tablist" aria-label="Automation level">
             {(['basic', 'intermediate', 'advanced'] as AutomationTier[]).map((tier) => {
               const icons = { basic: Settings, intermediate: Target, advanced: Zap };
               const Icon = icons[tier];
-              
+
               return (
                 <button
                   key={tier}
                   onClick={() => setSelectedTier(tier)}
+                  role="tab"
+                  aria-selected={selectedTier === tier}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     selectedTier === tier
                       ? 'border-green-500 bg-green-50 dark:bg-green-950'
@@ -169,7 +171,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
                   }`}
                 >
                   <div className="flex items-center space-x-2 mb-1">
-                    <Icon className={`w-4 h-4 ${selectedTier === tier ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+                    <Icon className={`w-4 h-4 ${selectedTier === tier ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} aria-hidden="true" />
                     <span className={`text-sm font-medium capitalize ${selectedTier === tier ? 'text-green-900 dark:text-green-100' : 'text-muted-foreground'}`}>
                       {tier}
                     </span>
@@ -186,7 +188,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
         </div>
         
         {/* Selected Instructions */}
-        <div className="space-y-4">
+        <div className="space-y-4" role="tabpanel" aria-label={`${selectedTier} setup instructions`}>
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-foreground">{instructions.title}</h4>
             <Button
@@ -194,15 +196,16 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
               variant="outline"
               size="sm"
               className="flex items-center space-x-2"
+              aria-label="Copy setup instructions"
             >
               {copiedInstructions ? (
                 <>
-                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" aria-hidden="true" />
                   <span>Copied!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4" />
+                  <Copy className="w-4 h-4" aria-hidden="true" />
                   <span>Copy Instructions</span>
                 </>
               )}
@@ -228,7 +231,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
               <ul className="space-y-1">
                 {instructions.pros.map((pro, index) => (
                   <li key={index} className="text-xs text-green-700 dark:text-green-400 flex items-center space-x-2">
-                    <CheckCircle className="w-3 h-3" />
+                    <CheckCircle className="w-3 h-3" aria-hidden="true" />
                     <span>{pro}</span>
                   </li>
                 ))}
@@ -239,7 +242,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
               <ul className="space-y-1">
                 {instructions.cons.map((con, index) => (
                   <li key={index} className="text-xs text-amber-700 dark:text-amber-400 flex items-center space-x-2">
-                    <Info className="w-3 h-3" />
+                    <Info className="w-3 h-3" aria-hidden="true" />
                     <span>{con}</span>
                   </li>
                 ))}
@@ -261,4 +264,4 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
       </CardContent>
     </Card>
   );
-}
+});

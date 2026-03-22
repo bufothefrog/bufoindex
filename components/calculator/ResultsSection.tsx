@@ -18,7 +18,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-export function ResultsSection() {
+export const ResultsSection = React.memo(function ResultsSection() {
   const result = useResult();
   const profile = useProfile();
   const [expandedAllocation, setExpandedAllocation] = React.useState<string | null>(null);
@@ -63,7 +63,7 @@ export function ResultsSection() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-foreground flex items-center space-x-2">
-              <AlertTriangle className="w-5 h-5 text-warning" />
+              <AlertTriangle className="w-5 h-5 text-warning" aria-hidden="true" />
               <span>Contrarian Recommendations</span>
             </h3>
           </div>
@@ -94,15 +94,16 @@ export function ResultsSection() {
               variant="outline"
               onClick={() => setShowAllSkipped(!showAllSkipped)}
               className="w-full"
+              aria-expanded={showAllSkipped}
             >
               {showAllSkipped ? (
                 <>
-                  <ChevronUp className="w-4 h-4 mr-2" />
+                  <ChevronUp className="w-4 h-4 mr-2" aria-hidden="true" />
                   Show Less
                 </>
               ) : (
                 <>
-                  <ChevronDown className="w-4 h-4 mr-2" />
+                  <ChevronDown className="w-4 h-4 mr-2" aria-hidden="true" />
                   Show {result.skippedItems.length - 2} More Recommendations
                 </>
               )}
@@ -122,7 +123,7 @@ export function ResultsSection() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
+            <TrendingUp className="w-5 h-5 text-primary" aria-hidden="true" />
             <span>Long-Term Impact</span>
           </CardTitle>
         </CardHeader>
@@ -161,4 +162,4 @@ export function ResultsSection() {
       </Card>
     </div>
   );
-}
+});

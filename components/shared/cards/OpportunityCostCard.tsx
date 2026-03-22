@@ -24,7 +24,7 @@ const riskLevelIcons = {
   high: AlertTriangle,
 };
 
-export function OpportunityCostCard({
+export const OpportunityCostCard = React.memo(function OpportunityCostCard({
   skippedItem,
   showDetails = false,
   onToggleDetails,
@@ -134,4 +134,4 @@ export function OpportunityCostCard({
       </CardContent>
     </Card>
   );
-}
+});

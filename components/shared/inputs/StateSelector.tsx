@@ -235,7 +235,7 @@ export function StateSelector({
       
       <div className="relative" ref={dropdownRef}>
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
@@ -265,11 +265,12 @@ export function StateSelector({
           role="combobox"
           aria-autocomplete="list"
           aria-controls={listboxId}
+          aria-invalid={!!error}
         />
         <ChevronDown className={cn(
           "absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform",
           isOpen && "rotate-180"
-        )} />
+        )} aria-hidden="true" />
       </div>
 
       {isOpen && (
@@ -321,7 +322,7 @@ export function StateSelector({
       )}
       
       {error && (
-        <p className="text-xs text-destructive">
+        <p className="text-xs text-destructive" role="alert">
           {error}
         </p>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
@@ -43,7 +43,7 @@ interface QuickAction {
   onAction: () => void;
 }
 
-export function QuickActions({ profile }: QuickActionsProps) {
+export const QuickActions = React.memo(function QuickActions({ profile }: QuickActionsProps) {
   // Generate quick actions based on current situation
   const generateQuickActions = (): QuickAction[] => {
     const actions: QuickAction[] = [];
@@ -216,10 +216,10 @@ export function QuickActions({ profile }: QuickActionsProps) {
     });
   };
 
-  const quickActions = generateQuickActions();
-  const criticalActions = quickActions.filter(action => action.urgency === 'critical');
-  const importantActions = quickActions.filter(action => action.urgency === 'important');
-  const optimizationActions = quickActions.filter(action => action.urgency === 'optimization');
+  const quickActions = useMemo(() => generateQuickActions(), [profile]);
+  const criticalActions = useMemo(() => quickActions.filter(action => action.urgency === 'critical'), [quickActions]);
+  const importantActions = useMemo(() => quickActions.filter(action => action.urgency === 'important'), [quickActions]);
+  const optimizationActions = useMemo(() => quickActions.filter(action => action.urgency === 'optimization'), [quickActions]);
 
   const getUrgencyStyles = (urgency: 'critical' | 'important' | 'optimization') => {
     switch (urgency) {
@@ -263,15 +263,15 @@ export function QuickActions({ profile }: QuickActionsProps) {
         <CardContent className="p-4">
           <div className="flex items-start space-x-4">
             <div className="p-2 rounded-full bg-card shadow-sm">
-              <IconComponent className={cn("w-5 h-5", styles.icon)} />
+              <IconComponent className={cn("w-5 h-5", styles.icon)} aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-2">
                 <h4 className={cn("font-semibold text-sm", styles.header)}>
                   {action.title}
                 </h4>
-                <div className={cn("px-2 py-1 rounded-full text-xs font-medium", styles.badge)}>
-                  {action.urgency === 'critical' ? 'URGENT' : 
+                <div className={cn("px-2 py-1 rounded-full text-xs font-medium", styles.badge)} aria-label={`Priority: ${action.urgency === 'critical' ? 'urgent' : action.urgency === 'important' ? 'high impact' : 'optimization'}`}>
+                  {action.urgency === 'critical' ? 'URGENT' :
                    action.urgency === 'important' ? 'HIGH IMPACT' : 'OPTIMIZATION'}
                 </div>
               </div>
@@ -280,11 +280,11 @@ export function QuickActions({ profile }: QuickActionsProps) {
               
               <div className="grid grid-cols-2 gap-4 mb-3 text-xs">
                 <div className="flex items-center space-x-1">
-                  <DollarSign className="w-3 h-3 text-success" />
+                  <DollarSign className="w-3 h-3 text-success" aria-hidden="true" />
                   <span className="text-muted-foreground">{action.impact}</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <Clock className="w-3 h-3 text-info" />
+                  <Clock className="w-3 h-3 text-info" aria-hidden="true" />
                   <span className="text-muted-foreground">{action.timeToImplement}</span>
                 </div>
               </div>
@@ -294,9 +294,9 @@ export function QuickActions({ profile }: QuickActionsProps) {
                 className={cn("w-full text-sm", styles.button)}
                 size="sm"
               >
-                <Zap className="w-4 h-4 mr-2" />
+                <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
                 {action.actionLabel}
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
               </Button>
             </div>
           </div>
@@ -311,7 +311,7 @@ export function QuickActions({ profile }: QuickActionsProps) {
       {criticalActions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <AlertTriangle className="w-5 h-5 text-destructive" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-destructive">
               Fix These First - You&apos;re Losing Money
             </h3>
@@ -328,7 +328,7 @@ export function QuickActions({ profile }: QuickActionsProps) {
       {importantActions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <Target className="w-5 h-5 text-warning" />
+            <Target className="w-5 h-5 text-warning" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-foreground">
               High-Impact Optimizations
             </h3>
@@ -345,7 +345,7 @@ export function QuickActions({ profile }: QuickActionsProps) {
       {optimizationActions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-success" />
+            <TrendingUp className="w-5 h-5 text-success" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-foreground">
               Advanced Optimizations
             </h3>
@@ -359,4 +359,4 @@ export function QuickActions({ profile }: QuickActionsProps) {
       )}
     </div>
   );
-}
+});

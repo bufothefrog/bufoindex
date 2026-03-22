@@ -32,7 +32,7 @@ const categoryIcons = {
   debt_payoff: CreditCard,
 };
 
-export function AllocationCard({
+export const AllocationCard = React.memo(function AllocationCard({
   allocation,
   showDetails = false,
   onToggleDetails,
@@ -127,4 +127,4 @@ export function AllocationCard({
       </CardContent>
     </Card>
   );
-}
+});
