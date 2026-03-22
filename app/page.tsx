@@ -7,7 +7,7 @@ export default function HomePage() {
       {/* Hero Strip */}
       <section className="text-center space-y-3 pt-8">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-          Financial Optimization Tools
+          Bufo Index
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           Math-driven calculators that replace conventional financial wisdom with
@@ -62,11 +62,6 @@ export default function HomePage() {
             Plan Retirement <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
-      </div>
-
-      {/* Footer Strip */}
-      <div className="text-center text-xs text-muted-foreground/60 pb-4">
-        Not investment advice &middot; No tracking
       </div>
     </div>
   )

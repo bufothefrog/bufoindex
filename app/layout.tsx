@@ -21,19 +21,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider>
           <div className="min-h-screen bg-background">
-            <div className="fixed top-4 right-4 z-50">
+            <div className="container mx-auto px-4 pt-4 flex justify-end">
               <ThemeToggle />
             </div>
 
             <main className="container mx-auto px-4 py-8">
               {children}
             </main>
-
-            <footer className="border-t bg-muted/50 mt-16">
-              <div className="container mx-auto px-4 py-4 text-center text-xs text-muted-foreground">
-                Not investment advice.
-              </div>
-            </footer>
           </div>
         </ThemeProvider>
       </body>
