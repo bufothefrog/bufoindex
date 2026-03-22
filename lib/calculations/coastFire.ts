@@ -35,7 +35,8 @@ export function calculateCoastFire(inputs: RetirementInputs): CoastFireResult {
   const currentAge = inputs.startingAge;
   const targetAge = inputs.retirementAge;
   const yearsToRetirement = targetAge - currentAge;
-  const requiredBalance = calculateRequiredBalance(inputs.targetIncome);
+  const inflatedTargetIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirement);
+  const requiredBalance = calculateRequiredBalance(inflatedTargetIncome);
   
   // Calculate what balance we need TODAY to coast to retirement
   const currentBalanceNeeded = calculateCoastFireBalance(
@@ -125,27 +126,26 @@ function calculateCoastFireBalance(
  * Find the age at which Coast FIRE is achievable with current savings
  */
 function findCoastFireAge(inputs: RetirementInputs): number | undefined {
-  const requiredBalance = calculateRequiredBalance(inputs.targetIncome);
   const maxAge = Math.min(inputs.retirementAge - 1, inputs.startingAge + 40); // Don't go beyond reasonable limits
-  
+
   for (let age = inputs.startingAge; age <= maxAge; age++) {
     const yearsFromStart = age - inputs.startingAge;
     const monthsFromStart = yearsFromStart * 12;
-    const monthlyRate = inputs.accumulationReturn / 12;
-    
+    const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
+
     // Calculate projected balance at this age
     const growthOfStartingBalance = futureValue(
       inputs.startingBalance,
       inputs.accumulationReturn,
       yearsFromStart
     );
-    
+
     const growthOfContributions = inputs.monthlySavings > 0 ?
       inputs.monthlySavings * ((Math.pow(1 + monthlyRate, monthsFromStart) - 1) / monthlyRate) :
       0;
-    
+
     const projectedBalanceAtAge = growthOfStartingBalance + growthOfContributions;
-    
+
     // Calculate what this balance would grow to by retirement (coasting from this age)
     const yearsToRetirement = inputs.retirementAge - age;
     const coastedBalance = futureValue(
@@ -153,12 +153,17 @@ function findCoastFireAge(inputs: RetirementInputs): number | undefined {
       inputs.accumulationReturn,
       yearsToRetirement
     );
-    
+
+    // Inflate target income to retirement-year dollars
+    const yearsToRetirementFromStart = inputs.retirementAge - inputs.startingAge;
+    const inflatedTargetIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirementFromStart);
+    const requiredBalance = calculateRequiredBalance(inflatedTargetIncome);
+
     if (coastedBalance >= requiredBalance) {
       return age;
     }
   }
-  
+
   return undefined; // Coast FIRE not achievable
 }
 
@@ -171,7 +176,7 @@ function calculateMonthlyContributionsForCoastFire(
   yearsAvailable: number
 ): number {
   const monthsAvailable = yearsAvailable * 12;
-  const monthlyRate = annualReturn / 12;
+  const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
   
   if (monthlyRate === 0) {
     return shortfall / monthsAvailable;
@@ -189,11 +194,13 @@ export function calculateCoastFireNumber(
   currentAge: number,
   retirementAge: number,
   annualReturn: number,
-  withdrawalRate: number = 0.04
+  withdrawalRate: number = 0.04,
+  inflationRate: number = 0.03
 ): number {
-  const requiredBalance = targetIncome / withdrawalRate;
   const yearsToRetirement = retirementAge - currentAge;
-  
+  const inflatedTargetIncome = targetIncome * Math.pow(1 + inflationRate, yearsToRetirement);
+  const requiredBalance = inflatedTargetIncome / withdrawalRate;
+
   return calculateCoastFireBalance(requiredBalance, annualReturn, yearsToRetirement);
 }
 

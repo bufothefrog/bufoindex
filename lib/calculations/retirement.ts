@@ -4,10 +4,11 @@
  */
 
 import { RetirementConstants } from '@/lib/constants/retirement';
-import { ScenarioAnalysis, analyzeRetirementScenarios } from './scenarioAnalysis';
+import { ScenarioAnalysis, analyzeRetirementScenarios, determineRetirementStatus } from './scenarioAnalysis';
 import { CoastFireAnalysis, calculateCoastFireAnalysis } from './coastFire';
 import { InflationAnalysis, analyzeInflationImpact } from './inflationAdjustment';
 import { formatCurrency } from '@/lib/utils';
+import { boxMullerRandom } from '@/lib/utils/random';
 // Import to register retirement formulas
 import '@/lib/formulas/retirement-formulas';
 
@@ -68,13 +69,29 @@ function calculateTDFVolatilityForAge(age: number): number {
   );
 }
 
+export type IncomePeriod = 'hourly' | 'biweekly' | 'semimonthly' | 'monthly' | 'yearly';
+
+export const INCOME_PERIOD_MULTIPLIERS: Record<IncomePeriod, number> = {
+  hourly: 2080,       // 40 hrs/week × 52 weeks
+  biweekly: 26,       // 26 pay periods/year
+  semimonthly: 24,    // 24 pay periods/year (twice per month)
+  monthly: 12,
+  yearly: 1,
+};
+
+export function annualizeIncome(amount: number, period: IncomePeriod): number {
+  return amount * INCOME_PERIOD_MULTIPLIERS[period];
+}
+
 export interface RetirementInputs {
   startingAge: number;
   retirementAge: number;
   lifeExpectancy: number; // ADDED: User-defined life expectancy instead of hardcoded value
   targetIncome: number;
   startingBalance: number;
-  currentIncome: number;
+  currentIncome: number; // Always annual — derived from incomeAmount × period multiplier
+  incomeAmount: number;  // Raw user-entered income value
+  incomePeriod: IncomePeriod; // Pay period for the entered amount
   monthlySavings: number;
   necessaryMonthlyExpenses: number;
   accumulationReturn: number;
@@ -87,7 +104,8 @@ export interface RetirementInputs {
   filingStatus: 'single' | 'marriedJoint';
   state: string; // ADDED: State for tax calculations
   riskProfile: 'tdf' | 'custom'; // Risk profile: Target Date Fund or Custom
-  wealthGoal: 'maximize' | 'balanced' | 'zero'; // NEW: Wealth preservation goal
+  effectiveTaxRate: number | null;           // null = auto-calculate from income/filing
+  estimatedAnnualHealthcareCost: number | null; // null = use default model
 }
 
 export interface RetirementScenario {
@@ -150,18 +168,15 @@ export function calculateRequiredBalance(
  */
 function calculateProjectedBalanceTDF(inputs: RetirementInputs): number {
   let currentBalance = inputs.startingBalance;
-  
   for (let year = 0; year < (inputs.retirementAge - inputs.startingAge); year++) {
     const currentAge = inputs.startingAge + year;
     const annualReturn = calculateTDFReturnForAge(currentAge);
-    
-    // Apply growth for this year
-    currentBalance = currentBalance * (1 + annualReturn);
-    
-    // Add annual contributions (monthly savings * 12)
-    currentBalance += inputs.monthlySavings * 12;
+    const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
+    for (let month = 0; month < 12; month++) {
+      currentBalance = currentBalance * (1 + monthlyRate);
+      currentBalance += inputs.monthlySavings;
+    }
   }
-  
   return currentBalance;
 }
 
@@ -177,7 +192,7 @@ export function calculateProjectedBalance(inputs: RetirementInputs): number {
   // Standard calculation for custom risk profile
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
   const monthsToRetirement = yearsToRetirement * 12;
-  const monthlyRate = inputs.accumulationReturn / 12;
+  const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
   
   // Growth of starting balance
   const growthOfStartingBalance = futureValue(
@@ -220,10 +235,15 @@ export function calculateSocialSecurityBenefit(
   if (claimingAge > RetirementConstants.SS_MAX_AGE) claimingAge = RetirementConstants.SS_MAX_AGE;
   
   if (claimingAge < fullRetirementAge) {
-    // Early claiming reduction
-    const yearsEarly = fullRetirementAge - claimingAge;
-    const reductionRate = RetirementConstants.SS_REDUCTION_RATE * yearsEarly;
-    return baseBenefit * (1 - reductionRate);
+    // SSA two-tier early claiming reduction
+    const monthsEarly = (fullRetirementAge - claimingAge) * 12;
+    let reductionPercent: number;
+    if (monthsEarly <= 36) {
+      reductionPercent = monthsEarly * (5 / 9 / 100);
+    } else {
+      reductionPercent = 36 * (5 / 9 / 100) + (monthsEarly - 36) * (5 / 12 / 100);
+    }
+    return baseBenefit * (1 - reductionPercent);
   } else if (claimingAge > fullRetirementAge) {
     // Delayed retirement credits
     const yearsDelayed = claimingAge - fullRetirementAge;
@@ -235,18 +255,41 @@ export function calculateSocialSecurityBenefit(
 }
 
 /**
- * Calculate healthcare costs with age adjustments
+ * Calculate healthcare costs with age adjustments and healthcare-specific inflation
  */
-export function calculateHealthcareCosts(age: number, multiplier: number = 1): number {
+export function calculateHealthcareCosts(
+  age: number,
+  multiplier: number = 1,
+  yearsFromRetirement: number = 0
+): number {
   const baseCost = RetirementConstants.HEALTHCARE_BASE_COST * multiplier;
-  
-  // Increase healthcare costs with age
+  const inflatedCost = baseCost * Math.pow(1 + RetirementConstants.HEALTHCARE_INFLATION_RATE, yearsFromRetirement);
   if (age >= 65) {
-    const ageMultiplier = 1 + ((age - 65) * 0.02); // 2% increase per year after 65
-    return baseCost * ageMultiplier;
+    const ageMultiplier = 1 + ((age - 65) * 0.02);
+    return inflatedCost * ageMultiplier;
   }
-  
-  return baseCost;
+  return inflatedCost;
+}
+
+/**
+ * Calculate effective tax rate based on income and filing status
+ */
+export function calculateEffectiveTaxRate(
+  annualIncome: number,
+  filingStatus: 'single' | 'marriedJoint' = 'single'
+): number {
+  const brackets = RetirementConstants.FEDERAL_TAX_BRACKETS[2024][filingStatus === 'marriedJoint' ? 'marriedJoint' : 'single'];
+  const standardDeduction = filingStatus === 'marriedJoint'
+    ? RetirementConstants.STANDARD_DEDUCTION_MFJ_2024
+    : RetirementConstants.STANDARD_DEDUCTION_SINGLE_2024;
+  const taxableIncome = Math.max(0, annualIncome - standardDeduction);
+  let totalTax = 0;
+  for (const bracket of brackets) {
+    if (taxableIncome <= bracket.min) break;
+    const taxableInBracket = Math.min(taxableIncome, bracket.max) - bracket.min;
+    totalTax += taxableInBracket * bracket.rate;
+  }
+  return annualIncome > 0 ? totalTax / annualIncome : 0;
 }
 
 /**
@@ -273,17 +316,19 @@ export function runMonteCarloSimulation(
 function simulateSingleRetirementPath(inputs: RetirementInputs): boolean {
   let currentBalance = calculateProjectedBalance(inputs);
   const retirementYears = inputs.lifeExpectancy - inputs.retirementAge;
-  const annualWithdrawal = inputs.targetIncome;
-  
+  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
+  // Start withdrawals at inflation-adjusted amount (what targetIncome will cost at retirement)
+  const annualWithdrawalAtRetirement = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirement);
+
   for (let year = 0; year < retirementYears; year++) {
     // Generate random return based on normal distribution
     const randomReturn = generateNormalReturn(inputs.retirementReturn, inputs.volatility);
-    
+
     // Apply market return
     currentBalance *= (1 + randomReturn);
-    
-    // Subtract annual withdrawal (adjusted for inflation)
-    const inflationAdjustedWithdrawal = annualWithdrawal * Math.pow(1 + inputs.inflationRate, year);
+
+    // Subtract annual withdrawal (adjusted for post-retirement inflation)
+    const inflationAdjustedWithdrawal = annualWithdrawalAtRetirement * Math.pow(1 + inputs.inflationRate, year);
     currentBalance -= inflationAdjustedWithdrawal;
     
     // If balance goes negative, retirement fails
@@ -299,12 +344,7 @@ function simulateSingleRetirementPath(inputs: RetirementInputs): boolean {
  * Generate random return following normal distribution
  */
 function generateNormalReturn(mean: number, volatility: number): number {
-  // Box-Muller transformation for normal distribution
-  const u1 = Math.random();
-  const u2 = Math.random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  
-  return mean + volatility * z0;
+  return boxMullerRandom(mean, volatility);
 }
 
 /**
@@ -318,19 +358,14 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
   
   // Generate sophisticated scenarios based on user's trajectory
   const baseProjectedBalance = calculateProjectedBalance(inputs);
-  const baseRequiredBalance = calculateRequiredBalanceWithGoal(inputs.targetIncome, inputs.wealthGoal);
+  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
+  const inflatedTargetIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirement);
+  const baseRequiredBalance = calculateRequiredBalance(inflatedTargetIncome);
   const balanceRatio = baseProjectedBalance / baseRequiredBalance;
   const baseSuccessRate = runMonteCarloSimulation(inputs, 1000);
   
-  // Determine user's status
-  let userStatus: 'exceeding' | 'onTrack' | 'falling';
-  if (balanceRatio > 1.2 && baseSuccessRate > 0.85) {
-    userStatus = 'exceeding';
-  } else if (balanceRatio >= 0.8 && baseSuccessRate >= 0.7) {
-    userStatus = 'onTrack';
-  } else {
-    userStatus = 'falling';
-  }
+  // Determine user's status using unified thresholds
+  const userStatus = determineRetirementStatus(balanceRatio, baseSuccessRate);
   
   // Generate scenarios based on status
   scenarios.push(...generateSophisticatedScenarios(inputs, userStatus, baseProjectedBalance, baseRequiredBalance));
@@ -341,123 +376,72 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
     let currentBalance = inputs.startingBalance;
     
     for (let age = inputs.startingAge; age <= inputs.lifeExpectancy; age++) {
-      if (age <= inputs.retirementAge) {
-        // Accumulation phase with TDF glide path
-        if (age > inputs.startingAge) {
-          const annualReturn = calculateTDFReturnForAge(age);
-          currentBalance = currentBalance * (1 + annualReturn);
-          currentBalance += inputs.monthlySavings * 12; // Add annual contributions
+      if (age < inputs.retirementAge) {
+        // Accumulation phase with TDF glide path (monthly compounding, same as calculateProjectedBalanceTDF)
+        if (age === inputs.startingAge) {
+          netWorthByAge[age] = currentBalance; // Starting balance, no growth yet
+        } else {
+          const annualReturn = calculateTDFReturnForAge(age - 1);
+          const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
+          for (let month = 0; month < 12; month++) {
+            currentBalance = currentBalance * (1 + monthlyRate);
+            currentBalance += inputs.monthlySavings;
+          }
+          netWorthByAge[age] = currentBalance;
         }
-        netWorthByAge[age] = currentBalance;
       } else {
-        // Retirement phase with TDF glide path
+        // Apply final year of accumulation growth at retirement age boundary
+        if (age === inputs.retirementAge) {
+          const annualReturn = calculateTDFReturnForAge(age - 1);
+          const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
+          for (let month = 0; month < 12; month++) {
+            currentBalance = currentBalance * (1 + monthlyRate);
+            currentBalance += inputs.monthlySavings;
+          }
+        }
+        // Retirement/withdrawal phase with TDF glide path
         const yearsInRetirement = age - inputs.retirementAge;
         const annualReturn = calculateTDFReturnForAge(age);
-        
-        // Calculate withdrawal based on wealth goal FIRST (at beginning of year)
-        let yearWithdrawal: number;
-        if (inputs.wealthGoal === 'zero') {
-          // For "die with zero", use escalating withdrawals that increase over time
-          // Philosophy: Spend more each year to ensure portfolio drains to zero
-          // This allows for lifestyle expansion and prevents leaving money on the table
-          const yearsRemaining = inputs.lifeExpectancy - age + 1;
-          if (yearsRemaining <= 1) {
-            yearWithdrawal = currentBalance; // Last year, take everything
-          } else {
-            // Calculate escalating withdrawal strategy
-            // Start with a base amount and increase by inflation + 2% annually for lifestyle expansion
-            const escalationRate = inputs.inflationRate + 0.02; // Inflation + 2% real increase
-            
-            if (age === inputs.retirementAge) {
-              // First year of retirement - calculate initial withdrawal that allows for escalation
-              // We need to solve for initial payment that escalates and drains the portfolio
-              const totalRetirementYears = inputs.lifeExpectancy - inputs.retirementAge + 1;
-              
-              // Calculate present value of escalating annuity
-              let pvFactor = 0;
-              for (let year = 0; year < totalRetirementYears; year++) {
-                const discountRate = annualReturn;
-                const growthRate = escalationRate;
-                pvFactor += Math.pow(1 + growthRate, year) / Math.pow(1 + discountRate, year);
-              }
-              
-              const initialWithdrawal = currentBalance / pvFactor;
-              yearWithdrawal = initialWithdrawal;
-            } else {
-              // Subsequent years - escalate from the target income baseline
-              const yearsIntoRetirement = age - inputs.retirementAge;
-              const baseWithdrawal = inputs.targetIncome * 1.25; // Start 25% higher than target
-              yearWithdrawal = baseWithdrawal * Math.pow(1 + escalationRate, yearsIntoRetirement);
-            }
-          }
-        } else {
-          // Standard withdrawal with inflation adjustment
-          const baseWithdrawal = inputs.wealthGoal === 'maximize' 
-            ? inputs.targetIncome * 0.875 // 87.5% of target for wealth maximization
-            : inputs.targetIncome;
-          yearWithdrawal = baseWithdrawal * Math.pow(1 + inputs.inflationRate, yearsInRetirement);
-        }
-        
-        // Subtract withdrawal FIRST (beginning of year)
-        currentBalance = Math.max(0, currentBalance - yearWithdrawal);
-        
-        // Then apply growth for remainder of year
+
+        // Calculate withdrawal: inflation-adjusted target income (4% rule)
+        const yearWithdrawal = inflatedTargetIncome * Math.pow(1 + inputs.inflationRate, yearsInRetirement);
+
+        // Growth first, then withdraw (Trinity Study standard)
         currentBalance = currentBalance * (1 + annualReturn);
-        
+        currentBalance = Math.max(0, currentBalance - yearWithdrawal);
+
         netWorthByAge[age] = currentBalance;
-        
+
         // Store the actual withdrawal amount for the chart
         withdrawalsByAge[age] = yearWithdrawal;
       }
     }
   } else {
     // Standard calculation for custom risk profile
+    const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
+    const preWithdrawalBalance = calculateProjectedBalance(inputs);
     for (let age = inputs.startingAge; age <= inputs.lifeExpectancy; age++) {
       const yearsFromStart = age - inputs.startingAge;
       const monthsFromStart = yearsFromStart * 12;
-      const monthlyRate = inputs.accumulationReturn / 12;
-      
-      if (age <= inputs.retirementAge) {
+
+      if (age < inputs.retirementAge) {
         // Accumulation phase
         const growthOfStartingBalance = futureValue(inputs.startingBalance, inputs.accumulationReturn, yearsFromStart);
         const growthOfContributions = futureValueOfAnnuity(inputs.monthlySavings, monthlyRate, monthsFromStart);
         netWorthByAge[age] = growthOfStartingBalance + growthOfContributions;
       } else {
-        // Withdrawal phase - simulate year-by-year portfolio changes
+        // Withdrawal phase - simulate year-by-year portfolio changes (starts at retirementAge)
         const yearsInRetirement = age - inputs.retirementAge;
-        const startingRetirementBalance = netWorthByAge[inputs.retirementAge] || calculateProjectedBalance(inputs);
-        
+
         // Calculate balance year by year during retirement
-        let currentBalance = startingRetirementBalance;
-        for (let year = 1; year <= yearsInRetirement; year++) {
-          // Calculate withdrawal based on wealth goal FIRST (beginning of year)
-          let yearWithdrawal: number;
-          if (inputs.wealthGoal === 'zero') {
-            // For "die with zero", use escalating withdrawals that increase over time
-            const currentAge = inputs.retirementAge + year;
-            const yearsRemaining = inputs.lifeExpectancy - currentAge + 1;
-            
-            if (yearsRemaining <= 1) {
-              yearWithdrawal = currentBalance; // Last year, take everything
-            } else {
-              // Use escalating withdrawal strategy - inflation + 2% real increase annually
-              const escalationRate = inputs.inflationRate + 0.02;
-              const baseWithdrawal = inputs.targetIncome * 1.25; // Start 25% higher than target
-              yearWithdrawal = baseWithdrawal * Math.pow(1 + escalationRate, year);
-            }
-          } else {
-            // Standard withdrawal with inflation adjustment
-            const baseWithdrawal = inputs.wealthGoal === 'maximize' 
-              ? inputs.targetIncome * 0.875 // 87.5% of target for wealth maximization
-              : inputs.targetIncome;
-            yearWithdrawal = baseWithdrawal * Math.pow(1 + inputs.inflationRate, year);
-          }
+        let currentBalance = preWithdrawalBalance;
+        for (let year = 0; year <= yearsInRetirement; year++) {
+          // Standard 4% rule withdrawal with inflation adjustment from retirement start
+          const yearWithdrawal = inflatedTargetIncome * Math.pow(1 + inputs.inflationRate, year);
           
-          // Subtract withdrawal FIRST (beginning of year)
-          currentBalance = Math.max(0, currentBalance - yearWithdrawal);
-          
-          // Then apply growth for remainder of year
+          // Growth first, then withdraw (Trinity Study standard)
           currentBalance = currentBalance * (1 + inputs.retirementReturn);
+          currentBalance = Math.max(0, currentBalance - yearWithdrawal);
           
           // If we've reached the target age, store withdrawal and break
           if (year === yearsInRetirement) {
@@ -597,30 +581,6 @@ function prioritizeInsights(
 }
 
 /**
- * Get withdrawal rate based on wealth goal
- */
-function getWithdrawalRateForGoal(wealthGoal: 'maximize' | 'balanced' | 'zero'): number {
-  switch (wealthGoal) {
-    case 'maximize':
-      return 0.035; // 3.5% - conservative for wealth preservation
-    case 'balanced':
-      return 0.04; // 4% - standard rule
-    case 'zero':
-      return 0.055; // 5.5% - more aggressive spending
-    default:
-      return 0.04;
-  }
-}
-
-/**
- * Calculate required balance based on wealth goal
- */
-function calculateRequiredBalanceWithGoal(targetIncome: number, wealthGoal: 'maximize' | 'balanced' | 'zero'): number {
-  const withdrawalRate = getWithdrawalRateForGoal(wealthGoal);
-  return targetIncome / withdrawalRate;
-}
-
-/**
  * Generate sophisticated scenarios based on user's financial trajectory
  */
 function generateSophisticatedScenarios(
@@ -630,101 +590,84 @@ function generateSophisticatedScenarios(
   baseRequiredBalance: number
 ): RetirementScenario[] {
   const scenarios: RetirementScenario[] = [];
-  
+  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
+  const inflationFactor = Math.pow(1 + inputs.inflationRate, yearsToRetirement);
+
+  // Helper to compute after-tax monthly withdrawal for a given annual withdrawal
+  const afterTaxMonthly = (annualWithdrawal: number): number => {
+    const effectiveTaxRate = inputs.effectiveTaxRate ?? calculateEffectiveTaxRate(annualWithdrawal, inputs.filingStatus);
+    return (annualWithdrawal / 12) * (1 - effectiveTaxRate);
+  };
+
   if (status === 'exceeding') {
     // SCENARIO 1: Current Plan (Baseline)
-    const currentPlanWithdrawal = inputs.wealthGoal === 'zero' 
-      ? Math.min(inputs.targetIncome, baseProjectedBalance * getWithdrawalRateForGoal(inputs.wealthGoal))
-      : inputs.targetIncome;
-    
     scenarios.push({
       id: 'current-plan-exceeding',
       name: 'Your Current Plan',
       retirementAge: inputs.retirementAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: baseProjectedBalance,
-      monthlyWithdrawal: currentPlanWithdrawal / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation(inputs, 1000),
       yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
     });
-    
+
     // SCENARIO 2: Early Retirement Option
-    const earliestAge = Math.max(inputs.startingAge + 10, inputs.retirementAge - 5); // At least 10 years to save, max 5 years early
+    const earliestAge = Math.max(inputs.startingAge + 10, inputs.retirementAge - 5);
     const earlyInputs = { ...inputs, retirementAge: earliestAge };
     const earlyBalance = calculateProjectedBalance(earlyInputs);
     const yearsDifference = inputs.retirementAge - earliestAge;
-    
+    const earlyInflatedIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, earliestAge - inputs.startingAge);
+
     if (yearsDifference > 0) {
       scenarios.push({
         id: 'early-retirement',
         name: `Retire ${yearsDifference} ${yearsDifference === 1 ? 'year' : 'years'} early at ${earliestAge}`,
         retirementAge: earliestAge,
-        requiredBalance: calculateRequiredBalanceWithGoal(inputs.targetIncome, inputs.wealthGoal),
+        requiredBalance: calculateRequiredBalance(earlyInflatedIncome),
         projectedBalance: earlyBalance,
-        monthlyWithdrawal: inputs.targetIncome / 12,
+        monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
         successProbability: runMonteCarloSimulation(earlyInputs, 1000),
         yearsOfIncome: inputs.lifeExpectancy - earliestAge
       });
     } else {
       // If can't retire early, show increased lifestyle option
       const enhancedIncome = inputs.targetIncome * 1.25;
+      const enhancedInflated = enhancedIncome * inflationFactor;
       scenarios.push({
         id: 'enhanced-lifestyle',
         name: `Enhanced lifestyle: ${formatCurrency(Math.round(enhancedIncome / 12 / 100) * 100)}/month`,
         retirementAge: inputs.retirementAge,
-        requiredBalance: calculateRequiredBalanceWithGoal(enhancedIncome, inputs.wealthGoal),
+        requiredBalance: calculateRequiredBalance(enhancedInflated),
         projectedBalance: baseProjectedBalance,
-        monthlyWithdrawal: enhancedIncome / 12,
+        monthlyWithdrawal: afterTaxMonthly(enhancedIncome),
         successProbability: runMonteCarloSimulation({ ...inputs, targetIncome: enhancedIncome }, 1000),
         yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
       });
     }
-    
-    // SCENARIO 3: Goal-specific option
-    if (inputs.wealthGoal === 'maximize') {
-      // Show maximum wealth scenario - spend LESS to build more wealth
-      const conservativeWithdrawal = inputs.targetIncome * 0.70; // 70% of target for maximum wealth building
-      const extraWealth = (inputs.targetIncome - conservativeWithdrawal) * (inputs.lifeExpectancy - inputs.retirementAge);
-      scenarios.push({
-        id: 'maximum-wealth',
-        name: `Maximize wealth: ${formatCurrency(Math.round(conservativeWithdrawal / 12 / 100) * 100)}/month, extra ${formatCurrency(Math.round(extraWealth / 1000) * 1000)} legacy`,
-        retirementAge: inputs.retirementAge,
-        requiredBalance: calculateRequiredBalanceWithGoal(conservativeWithdrawal, 'maximize'),
-        projectedBalance: baseProjectedBalance,
-        monthlyWithdrawal: conservativeWithdrawal / 12,
-        successProbability: runMonteCarloSimulation({ ...inputs, targetIncome: conservativeWithdrawal }, 1000),
-        yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
-      });
-    } else if (inputs.wealthGoal === 'zero') {
-      // Show maximum spending scenario - spend MORE to drain portfolio
-      const maxSpending = inputs.targetIncome * 1.40; // 140% of target for die-with-zero lifestyle
-      scenarios.push({
-        id: 'maximum-spending',
-        name: `Die with zero: ${formatCurrency(Math.round(maxSpending / 12 / 100) * 100)}/month (escalating annually)`,
-        retirementAge: inputs.retirementAge,
-        requiredBalance: calculateRequiredBalanceWithGoal(maxSpending, 'zero'),
-        projectedBalance: baseProjectedBalance,
-        monthlyWithdrawal: maxSpending / 12,
-        successProbability: runMonteCarloSimulation({ ...inputs, targetIncome: maxSpending }, 1000),
-        yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
-      });
-    } else {
-      // Balanced approach - show conservative spending that builds more wealth
-      const conservativeWithdrawal = inputs.targetIncome * 0.80; // 80% of target for wealth building
-      const extraWealth = (baseProjectedBalance * 0.04) - conservativeWithdrawal; // Extra wealth built per year
-      const totalExtraWealth = extraWealth * (inputs.lifeExpectancy - inputs.retirementAge);
-      
-      scenarios.push({
-        id: 'conservative-wealth-building',
-        name: `Conservative: ${formatCurrency(Math.round(conservativeWithdrawal / 12 / 100) * 100)}/month, leave ${formatCurrency(Math.round(totalExtraWealth / 1000) * 1000)} legacy`,
-        retirementAge: inputs.retirementAge,
-        requiredBalance: calculateRequiredBalanceWithGoal(conservativeWithdrawal, 'balanced'),
-        projectedBalance: baseProjectedBalance,
-        monthlyWithdrawal: conservativeWithdrawal / 12,
-        successProbability: runMonteCarloSimulation({ ...inputs, targetIncome: conservativeWithdrawal }, 1000),
-        yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
-      });
-    }
+
+    // SCENARIO 3: Conservative spending with wealth building
+    const conservativeWithdrawal = inputs.targetIncome * 0.80;
+    const conservativeInflated = conservativeWithdrawal * inflationFactor;
+    const extraWealth = (baseProjectedBalance * 0.04) - conservativeInflated;
+    const retirementYears = inputs.lifeExpectancy - inputs.retirementAge;
+    const retirementReturn = inputs.riskProfile === 'tdf'
+      ? calculateTDFReturnForAge(inputs.retirementAge)
+      : inputs.retirementReturn;
+    const totalExtraWealth = extraWealth > 0
+      ? futureValueOfAnnuity(extraWealth, retirementReturn, retirementYears)
+      : 0;
+
+    scenarios.push({
+      id: 'conservative-wealth-building',
+      name: `Conservative: ${formatCurrency(Math.round(conservativeWithdrawal / 12 / 100) * 100)}/month, leave ${formatCurrency(Math.round(Math.max(0, totalExtraWealth) / 1000) * 1000)} legacy`,
+      retirementAge: inputs.retirementAge,
+      requiredBalance: calculateRequiredBalance(conservativeInflated),
+      projectedBalance: baseProjectedBalance,
+      monthlyWithdrawal: afterTaxMonthly(conservativeWithdrawal),
+      successProbability: runMonteCarloSimulation({ ...inputs, targetIncome: conservativeWithdrawal }, 1000),
+      yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
+    });
     
     // SCENARIO 4: Coast option - reduce current savings
     const reducedSavings = Math.max(500, inputs.monthlySavings * 0.5); // Cut savings in half, minimum $500
@@ -738,7 +681,7 @@ function generateSophisticatedScenarios(
       retirementAge: inputs.retirementAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: coastBalance,
-      monthlyWithdrawal: inputs.targetIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation(coastInputs, 1000),
       yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
     });
@@ -751,7 +694,7 @@ function generateSophisticatedScenarios(
       retirementAge: inputs.retirementAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: baseProjectedBalance,
-      monthlyWithdrawal: inputs.targetIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation(inputs, 1000),
       yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
     });
@@ -759,7 +702,7 @@ function generateSophisticatedScenarios(
     // SCENARIO 2: Small Improvement (+$500/month)
     const plus500Inputs = { ...inputs, monthlySavings: inputs.monthlySavings + 500 };
     const plus500Balance = calculateProjectedBalance(plus500Inputs);
-    const plus500EarlyAge = findEarlierRetirementAgeWithBalance(plus500Balance, inputs.targetIncome);
+    const plus500EarlyAge = findEarlierRetirementAgeWithBalance(plus500Balance, inputs.targetIncome, plus500Inputs);
     const yearsDifference = Math.abs(inputs.retirementAge - plus500EarlyAge);
     const isEarlier = plus500EarlyAge < inputs.retirementAge;
     
@@ -769,22 +712,23 @@ function generateSophisticatedScenarios(
       retirementAge: plus500EarlyAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: plus500Balance,
-      monthlyWithdrawal: inputs.targetIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation({ ...plus500Inputs, retirementAge: plus500EarlyAge }, 1000),
       yearsOfIncome: inputs.lifeExpectancy - plus500EarlyAge
     });
     
     // SCENARIO 3: Conservative buffer approach
     const conservativeWithdrawal = inputs.targetIncome * 0.90; // 90% of target for safety buffer
+    const conservativeInflated = conservativeWithdrawal * inflationFactor;
     const bufferAmount = inputs.targetIncome - conservativeWithdrawal;
-    
+
     scenarios.push({
       id: 'conservative-buffer',
       name: `Conservative: ${formatCurrency(Math.round(conservativeWithdrawal / 12 / 100) * 100)}/month with ${formatCurrency(bufferAmount)} annual buffer`,
       retirementAge: inputs.retirementAge,
-      requiredBalance: calculateRequiredBalanceWithGoal(conservativeWithdrawal, inputs.wealthGoal),
+      requiredBalance: calculateRequiredBalance(conservativeInflated),
       projectedBalance: baseProjectedBalance,
-      monthlyWithdrawal: conservativeWithdrawal / 12,
+      monthlyWithdrawal: afterTaxMonthly(conservativeWithdrawal),
       successProbability: runMonteCarloSimulation({ ...inputs, targetIncome: conservativeWithdrawal }, 1000),
       yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
     });
@@ -797,13 +741,13 @@ function generateSophisticatedScenarios(
       retirementAge: inputs.retirementAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: baseProjectedBalance,
-      monthlyWithdrawal: inputs.targetIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation(inputs, 1000),
       yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
     });
     
     // SCENARIO 2: Reality Check - Age
-    const actualRetirementAge = findActualRetirementAge(baseProjectedBalance, inputs.targetIncome);
+    const actualRetirementAge = findActualRetirementAge(baseProjectedBalance, inputs.targetIncome, inputs);
     const realityAgeInputs = { ...inputs, retirementAge: actualRetirementAge };
     const realityAgeBalance = calculateProjectedBalance(realityAgeInputs);
     scenarios.push({
@@ -812,7 +756,7 @@ function generateSophisticatedScenarios(
       retirementAge: actualRetirementAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: realityAgeBalance,
-      monthlyWithdrawal: inputs.targetIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation(realityAgeInputs, 1000),
       yearsOfIncome: inputs.lifeExpectancy - actualRetirementAge
     });
@@ -826,7 +770,7 @@ function generateSophisticatedScenarios(
       retirementAge: inputs.retirementAge,
       requiredBalance: calculateRequiredBalance(affordableIncome),
       projectedBalance: baseProjectedBalance, // This stays the same - it's what we can afford with current balance
-      monthlyWithdrawal: affordableIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(affordableIncome),
       successProbability: runMonteCarloSimulation(realityIncomeInputs, 1000),
       yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
     });
@@ -834,7 +778,7 @@ function generateSophisticatedScenarios(
     // SCENARIO 4: Modest Fix (+$500/month)
     const plus500Inputs = { ...inputs, monthlySavings: inputs.monthlySavings + 500 };
     const plus500Balance = calculateProjectedBalance(plus500Inputs);
-    const plus500RetirementAge = findActualRetirementAge(plus500Balance, inputs.targetIncome);
+    const plus500RetirementAge = findActualRetirementAge(plus500Balance, inputs.targetIncome, inputs);
     
     scenarios.push({
       id: 'modest-fix',
@@ -842,7 +786,7 @@ function generateSophisticatedScenarios(
       retirementAge: plus500RetirementAge,
       requiredBalance: baseRequiredBalance,
       projectedBalance: plus500Balance,
-      monthlyWithdrawal: inputs.targetIncome / 12,
+      monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation({ ...plus500Inputs, retirementAge: plus500RetirementAge }, 1000),
       yearsOfIncome: inputs.lifeExpectancy - plus500RetirementAge
     });
@@ -862,7 +806,7 @@ function generateSophisticatedScenarios(
         retirementAge: inputs.retirementAge,
         requiredBalance: baseRequiredBalance,
         projectedBalance: fullSolutionBalance,
-        monthlyWithdrawal: inputs.targetIncome / 12,
+        monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
         successProbability: runMonteCarloSimulation(fullSolutionInputs, 1000),
         yearsOfIncome: inputs.lifeExpectancy - inputs.retirementAge
       });
@@ -887,25 +831,24 @@ function generateSophisticatedScenarios(
  */
 function findEarlierRetirementAge(inputs: RetirementInputs): number {
   const projectedBalance = calculateProjectedBalance(inputs);
-  return findEarlierRetirementAgeWithBalance(projectedBalance, inputs.targetIncome);
+  return findEarlierRetirementAgeWithBalance(projectedBalance, inputs.targetIncome, inputs);
 }
 
 /**
  * Find earliest retirement age given a specific balance
  */
-function findEarlierRetirementAgeWithBalance(balance: number, targetIncome: number): number {
-  const withdrawalRate = 0.04; // 4% rule
-  const requiredBalance = targetIncome / withdrawalRate;
-  
-  // If balance exceeds required, calculate how much earlier we can retire
-  if (balance > requiredBalance) {
-    const excessBalance = balance - requiredBalance;
-    // Simplified calculation - could be more sophisticated
-    const yearsEarlier = Math.min(10, Math.floor(excessBalance / (targetIncome * 2))); // Conservative estimate
-    return Math.max(50, 65 - yearsEarlier); // Don't go below reasonable retirement age
+function findEarlierRetirementAgeWithBalance(balance: number, targetIncome: number, inputs?: RetirementInputs): number {
+  if (!inputs) return 65;
+  const withdrawalRate = 0.04;
+  for (let age = Math.max(inputs.startingAge + 10, 40); age < inputs.retirementAge; age++) {
+    const modifiedInputs = { ...inputs, retirementAge: age };
+    const projectedBalance = calculateProjectedBalance(modifiedInputs);
+    const yearsToAge = age - inputs.startingAge;
+    const inflatedIncome = targetIncome * Math.pow(1 + inputs.inflationRate, yearsToAge);
+    const requiredBalance = inflatedIncome / withdrawalRate;
+    if (projectedBalance >= requiredBalance) return age;
   }
-  
-  return 65; // Default retirement age if not enough excess
+  return inputs.retirementAge;
 }
 
 /**
@@ -919,17 +862,19 @@ function calculateAffordableIncome(projectedBalance: number): number {
 /**
  * Find actual retirement age given current trajectory
  */
-function findActualRetirementAge(projectedBalance: number, targetIncome: number): number {
+function findActualRetirementAge(projectedBalance: number, targetIncome: number, inputs?: RetirementInputs): number {
+  if (!inputs) return 65;
   const withdrawalRate = 0.04;
-  const requiredBalance = targetIncome / withdrawalRate;
-  
-  if (projectedBalance < requiredBalance) {
-    // Need to work longer - simplified calculation
-    const shortfallYears = Math.ceil((requiredBalance - projectedBalance) / (targetIncome * 0.25)); // Assume 25% savings rate
-    return Math.min(75, 65 + shortfallYears); // Cap at reasonable maximum
+  const maxAge = Math.min(inputs.lifeExpectancy - 5, 75);
+  for (let age = inputs.retirementAge; age <= maxAge; age++) {
+    const modifiedInputs = { ...inputs, retirementAge: age };
+    const projected = calculateProjectedBalance(modifiedInputs);
+    const yearsToAge = age - inputs.startingAge;
+    const inflatedIncome = targetIncome * Math.pow(1 + inputs.inflationRate, yearsToAge);
+    const requiredBalance = inflatedIncome / withdrawalRate;
+    if (projected >= requiredBalance) return age;
   }
-  
-  return 65; // Can retire at normal age
+  return maxAge;
 }
 
 /**
@@ -938,7 +883,7 @@ function findActualRetirementAge(projectedBalance: number, targetIncome: number)
 function calculateMinimumSavingsNeeded(inputs: RetirementInputs, requiredBalance: number): number {
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
   const monthsToRetirement = yearsToRetirement * 12;
-  const monthlyRate = inputs.accumulationReturn / 12;
+  const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
   
   // Account for growth of existing balance
   const growthOfStartingBalance = futureValue(inputs.startingBalance, inputs.accumulationReturn, yearsToRetirement);

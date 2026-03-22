@@ -45,7 +45,7 @@ export class RetirementConstants {
   static readonly SS_CREDIT_RATE = 0.08;                   // 8% credit per year after FRA
   
   // Healthcare Costs
-  static readonly HEALTHCARE_BASE_COST = 5000;             // Base annual healthcare cost
+  static readonly HEALTHCARE_BASE_COST = 7500;             // Base annual healthcare cost
   static readonly HEALTHCARE_AGE_MULTIPLIER = 1.5;         // Multiplier for older ages
   
   // Monte Carlo Simulation
@@ -77,6 +77,11 @@ export class RetirementConstants {
     }
   } as const;
   
+  // Tax Defaults
+  static readonly DEFAULT_EFFECTIVE_TAX_RATE = 0.15;
+  static readonly STANDARD_DEDUCTION_SINGLE_2024 = 14600;
+  static readonly STANDARD_DEDUCTION_MFJ_2024 = 29200;
+
   // Form Validation
   static readonly MAX_INCOME = 10000000;                   // $10M max income
   static readonly MAX_BALANCE = 100000000;                 // $100M max balance

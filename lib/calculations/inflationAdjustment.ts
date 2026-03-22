@@ -5,6 +5,7 @@
  */
 
 import { RetirementInputs } from './retirement';
+import { boxMullerRandom } from '@/lib/utils/random';
 
 export interface InflationAdjustedValues {
   currentDollars: number;
@@ -112,7 +113,7 @@ function calculateInflationBreakeven(inputs: RetirementInputs, yearsToRetirement
   
   // Calculate additional monthly savings needed (simplified)
   const monthsToRetirement = yearsToRetirement * 12;
-  const monthlyRate = inputs.accumulationReturn / 12;
+  const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
   
   let additionalMonthlySavings = 0;
   if (monthlyRate > 0) {
@@ -288,10 +289,5 @@ export function calculateSequenceRiskWithInflation(
  * Generate normal distribution random return
  */
 function generateNormalReturn(mean: number, standardDeviation: number): number {
-  // Box-Muller transformation
-  const u1 = Math.random();
-  const u2 = Math.random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  
-  return mean + standardDeviation * z0;
+  return boxMullerRandom(mean, standardDeviation);
 }

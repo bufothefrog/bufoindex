@@ -13,7 +13,7 @@
 import { bench, describe } from 'vitest'
 import { FinancialCalculations } from '@/lib/calculations/calculations'
 import { calculateOptimalAllocation } from '@/lib/calculations/core'
-import MonteCarloEngine from '@/lib/calculations/monte-carlo'
+import { generateReturnSequence } from '@/lib/calculations/monte-carlo'
 import { generateMockProfile, measureCalculationPerformance } from '../../utils/financial-test-helpers'
 import { getDefaultProfile } from '@/lib/calculations/core'
 
@@ -149,54 +149,30 @@ describe('Complex Tax Calculation Benchmarks', () => {
 })
 
 describe('Monte Carlo Simulation Benchmarks', () => {
-  // Monte Carlo simulation benchmarks
-  
-  bench('Monte Carlo 100 iterations (fast)', () => {
-    MonteCarloEngine.runSimulation(
-      BENCHMARK_DATA.monteCarloScenario,
-      BENCHMARK_DATA.monteCarloAssumptions,
-      100
-    )
+  // Monte Carlo simulation benchmarks using generateReturnSequence
+
+  bench('Generate return sequence 100 years', () => {
+    generateReturnSequence(100, 0.07, 0.15, 42)
   }, {
-    time: 100 // 100 iterations should be very fast
+    time: 100 // Should be very fast
   })
 
-  bench('Monte Carlo 1,000 iterations', () => {
-    MonteCarloEngine.runSimulation(
-      BENCHMARK_DATA.monteCarloScenario,
-      BENCHMARK_DATA.monteCarloAssumptions,
-      1000
-    )
+  bench('Generate return sequence 1,000 years', () => {
+    generateReturnSequence(1000, 0.07, 0.15, 42)
   }, {
-    time: 500 // 1,000 iterations should complete in <500ms
+    time: 500 // Should complete in <500ms
   })
 
-  bench('Monte Carlo 10,000 iterations', () => {
-    MonteCarloEngine.runSimulation(
-      BENCHMARK_DATA.monteCarloScenario,
-      BENCHMARK_DATA.monteCarloAssumptions,
-      10000
-    )
+  bench('Generate return sequence 10,000 years', () => {
+    generateReturnSequence(10000, 0.07, 0.15, 42)
   }, {
-    time: 2000 // 10,000 iterations should complete in <2,000ms (2 seconds)
+    time: 2000 // Should complete in <2,000ms
   })
 
-  bench('Monte Carlo with complex scenario', () => {
-    const complexScenario = {
-      ...BENCHMARK_DATA.monteCarloScenario,
-      targetIncome: 120000,
-      startingBalance: 100000,
-      lifeExpectancy: 95
-    }
-    
-    const complexAssumptions = {
-      ...BENCHMARK_DATA.monteCarloAssumptions,
-      volatility: 0.20 // Higher volatility = more calculations
-    }
-    
-    MonteCarloEngine.runSimulation(complexScenario, complexAssumptions, 5000)
+  bench('Generate return sequence with high volatility', () => {
+    generateReturnSequence(5000, 0.07, 0.20, 42)
   }, {
-    time: 1500 // Complex 5,000 iterations should complete in <1.5s
+    time: 1500 // Higher volatility, 5,000 years should complete in <1.5s
   })
 })
 
@@ -226,26 +202,17 @@ describe('Memory Usage Benchmarks', () => {
     }
   })
 
-  bench('Memory usage - Monte Carlo intensive', () => {
+  bench('Memory usage - Return sequence generation intensive', () => {
     const startMemory = process.memoryUsage?.()?.heapUsed || 0
-    
-    // Run multiple Monte Carlo simulations
-    const promises = []
+
+    // Run multiple return sequence generations
     for (let i = 0; i < 5; i++) {
-      promises.push(
-        MonteCarloEngine.runSimulation(
-          BENCHMARK_DATA.monteCarloScenario,
-          BENCHMARK_DATA.monteCarloAssumptions,
-          1000
-        )
-      )
+      generateReturnSequence(1000, 0.07, 0.15, i)
     }
-    
-    Promise.all(promises)
-    
+
     const endMemory = process.memoryUsage?.()?.heapUsed || 0
     const memoryIncrease = endMemory - startMemory
-    
+
     // Memory increase should be <10MB
     if (memoryIncrease > 10485760) {
       throw new Error(`Memory usage too high: ${(memoryIncrease / 1048576).toFixed(2)}MB > 10MB limit`)
@@ -308,14 +275,10 @@ describe('Performance Regression Detection', () => {
     time: 50 // Baseline optimization time
   })
 
-  bench('Baseline: Monte Carlo 1,000', () => {
-    MonteCarloEngine.runSimulation(
-      BENCHMARK_DATA.monteCarloScenario,
-      BENCHMARK_DATA.monteCarloAssumptions,
-      1000
-    )
+  bench('Baseline: Return sequence generation 1,000', () => {
+    generateReturnSequence(1000, 0.07, 0.15, 42)
   }, {
-    time: 300 // Baseline Monte Carlo time (more aggressive than user-facing target)
+    time: 300 // Baseline return sequence generation time
   })
 
   // Performance consistency tests

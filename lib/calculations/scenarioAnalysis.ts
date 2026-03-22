@@ -52,6 +52,23 @@ export interface ScenarioProjection {
 }
 
 /**
+ * Unified status determination function.
+ * Prevents conflicting thresholds across modules.
+ */
+export function determineRetirementStatus(
+  balanceRatio: number,
+  successRate?: number
+): 'exceeding' | 'onTrack' | 'falling' {
+  if (balanceRatio >= 1.2 && (successRate === undefined || successRate > 0.85)) {
+    return 'exceeding';
+  }
+  if (balanceRatio >= 0.9 && (successRate === undefined || successRate >= 0.70)) {
+    return 'onTrack';
+  }
+  return 'falling';
+}
+
+/**
  * Perform comprehensive scenario analysis
  */
 export function analyzeRetirementScenarios(inputs: RetirementInputs): ScenarioAnalysis {
@@ -59,18 +76,13 @@ export function analyzeRetirementScenarios(inputs: RetirementInputs): ScenarioAn
   
   // Calculate base scenario
   const projectedBalance = calculateProjectedBalance(inputs);
-  const requiredBalance = calculateRequiredBalance(inputs.targetIncome);
+  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
+  const inflatedTargetIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirement);
+  const requiredBalance = calculateRequiredBalance(inflatedTargetIncome);
   const balanceRatio = projectedBalance / requiredBalance;
   
-  // Determine scenario status (10% tolerance for "on track")
-  let status: 'exceeding' | 'onTrack' | 'falling';
-  if (balanceRatio >= 1.1) {
-    status = 'exceeding';
-  } else if (balanceRatio >= 0.9) {
-    status = 'onTrack';
-  } else {
-    status = 'falling';
-  }
+  // Determine scenario status using unified thresholds
+  const status = determineRetirementStatus(balanceRatio);
   
   // Calculate scenarios with additional savings
   const with500Extra = calculateScenarioWithExtraSavings(inputs, 500);
@@ -108,9 +120,11 @@ function calculateScenarioWithExtraSavings(inputs: RetirementInputs, extraAmount
   };
   
   const projectedBalance = calculateProjectedBalance(modifiedInputs);
-  const requiredBalance = calculateRequiredBalance(inputs.targetIncome);
+  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
+  const inflatedTargetIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirement);
+  const requiredBalance = calculateRequiredBalance(inflatedTargetIncome);
   const balanceRatio = projectedBalance / requiredBalance;
-  
+
   // Calculate earlier retirement age if exceeding target
   let earlierRetirementAge: number | undefined;
   let additionalIncome: number | undefined;
@@ -190,18 +204,18 @@ function buildExtraScenario(projection: ScenarioProjection, status: 'exceeding' 
  * Find the earliest age at which retirement is possible with target income
  */
 function findEarlierRetirementAge(inputs: RetirementInputs, targetIncome: number): number {
-  const requiredBalance = calculateRequiredBalance(targetIncome);
-  const withdrawalRate = 0.04; // 4% rule
-  
   for (let age = inputs.startingAge + 1; age < inputs.retirementAge; age++) {
+    const yearsToAge = age - inputs.startingAge;
+    const inflatedIncome = targetIncome * Math.pow(1 + inputs.inflationRate, yearsToAge);
+    const requiredBalance = calculateRequiredBalance(inflatedIncome);
     const modifiedInputs = { ...inputs, retirementAge: age };
     const projectedBalance = calculateProjectedBalance(modifiedInputs);
-    
+
     if (projectedBalance >= requiredBalance) {
       return age;
     }
   }
-  
+
   return inputs.retirementAge; // Fallback to original retirement age
 }
 
@@ -218,18 +232,20 @@ function calculateAdditionalIncomeAtTargetAge(projectedBalance: number, baseTarg
  * Find actual retirement age when falling short (when balance can support target income)
  */
 function findActualRetirementAge(inputs: RetirementInputs, targetIncome: number): number {
-  const requiredBalance = calculateRequiredBalance(targetIncome);
   const maxAge = Math.min(inputs.lifeExpectancy - 5, 75); // Don't work past reasonable age
-  
+
   for (let age = inputs.retirementAge; age <= maxAge; age++) {
+    const yearsToAge = age - inputs.startingAge;
+    const inflatedIncome = targetIncome * Math.pow(1 + inputs.inflationRate, yearsToAge);
+    const requiredBalance = calculateRequiredBalance(inflatedIncome);
     const modifiedInputs = { ...inputs, retirementAge: age };
     const projectedBalance = calculateProjectedBalance(modifiedInputs);
-    
+
     if (projectedBalance >= requiredBalance) {
       return age;
     }
   }
-  
+
   return maxAge; // Fallback - may still be short but this is realistic limit
 }
 
@@ -269,8 +285,10 @@ function generateScenarioRecommendations(
   }
   
   if (status === 'falling') {
-    const shortfall = calculateRequiredBalance(inputs.targetIncome) - calculateProjectedBalance(inputs);
-    const monthlyShortfall = Math.round(shortfall / ((inputs.retirementAge - inputs.startingAge) * 12));
+    const ytr = inputs.retirementAge - inputs.startingAge;
+    const inflatedIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, ytr);
+    const shortfall = calculateRequiredBalance(inflatedIncome) - calculateProjectedBalance(inputs);
+    const monthlyShortfall = Math.round(shortfall / (ytr * 12));
     const actualAge = findActualRetirementAge(inputs, inputs.targetIncome);
     
     return [`⚠️ Gap analysis: Need +$${monthlyShortfall.toLocaleString()}/month to hit target, or retire at age ${actualAge} instead (${actualAge - inputs.retirementAge} years later).`];

@@ -22,9 +22,8 @@ describe('Import verification', () => {
 
   it('should import from monte-carlo.ts correctly', async () => {
     const module = await import('@/lib/calculations/monte-carlo')
-    const MonteCarloEngine = module.default || module.MonteCarloEngine
-    expect(MonteCarloEngine).toBeDefined()
-    expect(typeof MonteCarloEngine.runSimulation).toBe('function')
+    expect(module.generateReturnSequence).toBeDefined()
+    expect(typeof module.generateReturnSequence).toBe('function')
   })
 
   it('should import from financial-modeling.ts correctly', async () => {

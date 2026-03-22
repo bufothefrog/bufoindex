@@ -1,9 +1,13 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { RetirementInputs, RetirementResults } from '../calculations/retirement';
+import { RetirementInputs, RetirementResults, annualizeIncome } from '../calculations/retirement';
 import { calculateRetirementAnalysis } from '../calculations/retirement';
 import { RetirementConstants } from '../constants/retirement';
 import { encodeRetirementToUrlHash, decodeRetirementFromUrlHash } from '../utils/retirementState';
+
+// Module-level timeout references to prevent debounce leaks (BUG-13)
+let recalculateTimeout: ReturnType<typeof setTimeout> | null = null;
+let hashUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
 interface RetirementState {
   // Current calculation data
@@ -36,6 +40,8 @@ const getDefaultInputs = (): RetirementInputs => ({
   targetIncome: 80000,
   startingBalance: 10000,
   currentIncome: 100000,
+  incomeAmount: 100000,
+  incomePeriod: 'yearly' as const,
   monthlySavings: 2000,
   necessaryMonthlyExpenses: 4000,
   accumulationReturn: RetirementConstants.DEFAULT_ACCUMULATION_RETURN,
@@ -48,7 +54,8 @@ const getDefaultInputs = (): RetirementInputs => ({
   filingStatus: 'single',
   state: 'TX', // NEW: Default to Texas (no state income tax)
   riskProfile: 'tdf', // NEW: Default risk profile
-  wealthGoal: 'balanced' // NEW: Default wealth goal
+  effectiveTaxRate: null,
+  estimatedAnnualHealthcareCost: null,
 });
 
 export const useRetirementStore = create<RetirementState>()(
@@ -66,18 +73,23 @@ export const useRetirementStore = create<RetirementState>()(
 
         // Actions
         updateInputs: (updates) => {
-          set((state) => ({
-            inputs: { ...state.inputs, ...updates },
-            errors: {} // Clear errors when inputs change
-          }));
+          set((state) => {
+            const merged = { ...state.inputs, ...updates };
+            // Auto-derive currentIncome when incomeAmount or incomePeriod changes
+            if ('incomeAmount' in updates || 'incomePeriod' in updates) {
+              merged.currentIncome = annualizeIncome(merged.incomeAmount, merged.incomePeriod);
+            }
+            return { inputs: merged, errors: {} };
+          });
           
           // Only auto-calculate if user has calculated at least once
           const { hasCalculatedOnce } = get();
           if (hasCalculatedOnce) {
-            // Automatically recalculate when inputs change (debounced)
-            const timeoutId = setTimeout(async () => {
+            // Clear previous timeout to prevent debounce leak (BUG-13)
+            if (recalculateTimeout) clearTimeout(recalculateTimeout);
+            recalculateTimeout = setTimeout(async () => {
               const { inputs } = get();
-              
+
               // Update URL hash
               try {
                 const hash = encodeRetirementToUrlHash(inputs);
@@ -87,25 +99,25 @@ export const useRetirementStore = create<RetirementState>()(
               } catch (error) {
                 console.warn('Failed to update URL hash:', error);
               }
-              
+
               // Auto-calculate with minimal delay
               try {
                 const calculationResults = calculateRetirementAnalysis(inputs);
                 set({ results: calculationResults });
               } catch (error) {
                 console.error('Auto-calculation error:', error);
-                set({ 
-                  errors: { 
-                    calculation: error instanceof Error ? error.message : 'Calculation failed' 
+                set({
+                  errors: {
+                    calculation: error instanceof Error ? error.message : 'Calculation failed'
                   }
                 });
               }
+              recalculateTimeout = null;
             }, 300); // Shorter debounce for better UX
-
-            return () => clearTimeout(timeoutId);
           } else {
-            // Just update URL hash without calculating
-            const timeoutId = setTimeout(() => {
+            // Clear previous timeout to prevent debounce leak (BUG-13)
+            if (hashUpdateTimeout) clearTimeout(hashUpdateTimeout);
+            hashUpdateTimeout = setTimeout(() => {
               const { inputs } = get();
               try {
                 const hash = encodeRetirementToUrlHash(inputs);
@@ -115,9 +127,8 @@ export const useRetirementStore = create<RetirementState>()(
               } catch (error) {
                 console.warn('Failed to update URL hash:', error);
               }
+              hashUpdateTimeout = null;
             }, 1000);
-
-            return () => clearTimeout(timeoutId);
           }
         },
 
@@ -204,25 +215,25 @@ export const useRetirementStore = create<RetirementState>()(
       }),
       {
         name: 'retirement-calculator',
-        version: 2, // Increment version to handle risk profile migration
+        version: 3, // v3: add effectiveTaxRate & estimatedAnnualHealthcareCost
         partialize: (state) => ({
           inputs: state.inputs,
           showAdvanced: state.showAdvanced,
           hasCalculatedOnce: state.hasCalculatedOnce
         }),
         migrate: (persistedState: unknown, version: number) => {
-          // Migrate from version 1 to version 2: simplify risk profiles
-          if (version === 1 && 
-              typeof persistedState === 'object' && 
-              persistedState !== null &&
-              'inputs' in persistedState &&
-              typeof persistedState.inputs === 'object' &&
-              persistedState.inputs !== null &&
-              'riskProfile' in persistedState.inputs) {
-            const inputs = persistedState.inputs as { riskProfile: string };
-            const oldProfile = inputs.riskProfile;
-            if (!['tdf', 'custom'].includes(oldProfile)) {
-              inputs.riskProfile = 'custom'; // Convert old profiles to custom
+          if (typeof persistedState === 'object' && persistedState !== null && 'inputs' in persistedState) {
+            const inputs = (persistedState as { inputs: Record<string, unknown> }).inputs;
+            // v1->v2: risk profile migration
+            if (version < 2 && 'riskProfile' in inputs) {
+              if (!['tdf', 'custom'].includes(inputs.riskProfile as string)) {
+                inputs.riskProfile = 'custom';
+              }
+            }
+            // v2->v3: add new fields with defaults
+            if (version < 3) {
+              if (!('effectiveTaxRate' in inputs)) inputs.effectiveTaxRate = null;
+              if (!('estimatedAnnualHealthcareCost' in inputs)) inputs.estimatedAnnualHealthcareCost = null;
             }
           }
           return persistedState;

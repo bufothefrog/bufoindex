@@ -19,8 +19,8 @@ describe('Debug imports', () => {
   it('should debug monte-carlo module', async () => {
     const monteCarloModule = await import('@/lib/calculations/monte-carlo')
     console.log('Monte Carlo module keys:', Object.keys(monteCarloModule))
-    console.log('Default export:', monteCarloModule.default)
-    console.log('Named exports:', Object.keys(monteCarloModule).filter(k => k !== 'default'))
+    console.log('Named exports:', Object.keys(monteCarloModule))
+    expect(monteCarloModule.generateReturnSequence).toBeDefined()
   })
 
   it('should debug financial-modeling module', async () => {

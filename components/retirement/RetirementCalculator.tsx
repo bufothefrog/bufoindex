@@ -23,6 +23,8 @@ export function RetirementCalculator() {
     targetIncome: 80000,
     startingBalance: 10000,
     currentIncome: 100000,
+    incomeAmount: 100000,
+    incomePeriod: 'yearly',
     monthlySavings: 2000,
     necessaryMonthlyExpenses: 4000,
     accumulationReturn: RetirementConstants.DEFAULT_ACCUMULATION_RETURN,
@@ -35,7 +37,8 @@ export function RetirementCalculator() {
     filingStatus: 'single',
     state: 'TX', // NEW: Default to Texas (no state income tax)
     riskProfile: 'tdf', // NEW: Default risk profile
-    wealthGoal: 'balanced' // NEW: Default wealth goal
+    effectiveTaxRate: null, // null = auto-calculate from income/filing
+    estimatedAnnualHealthcareCost: null, // null = use default model
   });
 
   const [results, setResults] = React.useState<RetirementResultsType | null>(null);
