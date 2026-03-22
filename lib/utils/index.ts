@@ -88,17 +88,60 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Calculate total marginal tax rate including federal, state, and FICA
+ * 2026 Social Security wage base (SSA announcement Oct 2025)
+ */
+const SS_WAGE_BASE_2026 = 184500;
+
+/**
+ * Get the applicable FICA rate based on gross annual income.
+ * - Below SS wage base: 7.65% (6.2% SS + 1.45% Medicare)
+ * - Above SS wage base but <= $200k: 1.45% (Medicare only)
+ * - Above $200k: 2.35% (Medicare + 0.9% Additional Medicare Tax)
+ */
+export function getFICARate(grossAnnualIncome: number): number {
+  if (grossAnnualIncome <= SS_WAGE_BASE_2026) {
+    return 0.0765; // 6.2% SS + 1.45% Medicare
+  } else if (grossAnnualIncome <= 200000) {
+    return 0.0145; // Medicare only (above SS cap)
+  } else {
+    return 0.0235; // 1.45% Medicare + 0.9% Additional Medicare Tax
+  }
+}
+
+/**
+ * Calculate income tax rate (federal + state only).
+ * Use for pre-tax 401k and traditional IRA tax savings,
+ * since these reduce income tax but NOT FICA.
+ */
+export function calculateIncomeTaxRate(federalRate: number, stateCode: string): number {
+  const stateRate = stateCode && STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES]
+    ? STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES].rate
+    : 0;
+
+  return federalRate + stateRate;
+}
+
+/**
+ * Calculate HSA tax savings rate (federal + state + FICA).
+ * HSA payroll deductions are exempt from FICA per IRC 3121(a)(2)(B),
+ * so the full FICA rate is a genuine tax saving.
+ */
+export function calculateHSATaxRate(federalRate: number, stateCode: string, grossAnnualIncome: number): number {
+  return calculateIncomeTaxRate(federalRate, stateCode) + getFICARate(grossAnnualIncome);
+}
+
+/**
+ * Calculate total marginal tax rate including federal, state, and FICA.
+ * Use for display/informational purposes only. For tax savings on specific
+ * contribution types, use calculateIncomeTaxRate or calculateHSATaxRate.
  */
 export function calculateMarginalTaxRate(federalRate: number, stateCode: string): number {
-  // Use the imported STATE_TAX_RATES
-  
-  const stateRate = stateCode && STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES] 
-    ? STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES].rate 
+  const stateRate = stateCode && STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES]
+    ? STATE_TAX_RATES[stateCode as keyof typeof STATE_TAX_RATES].rate
     : 0;
-  
+
   const ficaRate = 0.0765; // Social Security (6.2%) + Medicare (1.45%)
-  
+
   return federalRate + stateRate + ficaRate;
 }
 

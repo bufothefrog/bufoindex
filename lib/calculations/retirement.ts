@@ -278,10 +278,10 @@ export function calculateEffectiveTaxRate(
   annualIncome: number,
   filingStatus: 'single' | 'marriedJoint' = 'single'
 ): number {
-  const brackets = RetirementConstants.FEDERAL_TAX_BRACKETS[2024][filingStatus === 'marriedJoint' ? 'marriedJoint' : 'single'];
+  const brackets = RetirementConstants.FEDERAL_TAX_BRACKETS[2026][filingStatus === 'marriedJoint' ? 'marriedJoint' : 'single'];
   const standardDeduction = filingStatus === 'marriedJoint'
-    ? RetirementConstants.STANDARD_DEDUCTION_MFJ_2024
-    : RetirementConstants.STANDARD_DEDUCTION_SINGLE_2024;
+    ? RetirementConstants.STANDARD_DEDUCTION_MFJ_2026
+    : RetirementConstants.STANDARD_DEDUCTION_SINGLE_2026;
   const taxableIncome = Math.max(0, annualIncome - standardDeduction);
   let totalTax = 0;
   for (const bracket of brackets) {

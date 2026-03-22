@@ -5,7 +5,7 @@ import {
   TAX_BRACKETS,
   CONTRIBUTION_LIMITS
 } from '../types';
-import { calculateMarginalTaxRate } from '../utils';
+import { calculateIncomeTaxRate, calculateHSATaxRate } from '../utils';
 import { formatCurrency, formatPercent, paycheckToMonthly, monthlyToPaycheck } from './core';
 
 /**
@@ -130,7 +130,7 @@ export function calculateEmployerMatch(
     percentage: actualContribution / profile.income.netPaycheck,
     priority: 1,
     reasoning: `Free money! Your employer matches ${formatPercent(benefits.matchPercent)} up to ${formatPercent(benefits.matchLimit)} of salary`,
-    taxImpact: -actualContribution * calculateMarginalTaxRate(profile.taxes.federalBracket, profile.taxes.state),
+    taxImpact: -actualContribution * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state),
     category: 'employer_match',
     monthlyEquivalent,
     annualEquivalent: monthlyEquivalent * 12,
@@ -185,7 +185,9 @@ export function calculateHighInterestDebt(
   if (recommendedPayment <= highestRateDebt.minimumPayment) return null;
   
   const extraPayment = recommendedPayment - highestRateDebt.minimumPayment;
-  const annualSavings = extraPayment * 12 * highestRateDebt.interestRate;
+  // Average-balance correction: payments reduce balance over the year,
+  // so average effective time is ~6 months, not 12
+  const annualSavings = extraPayment * 12 * highestRateDebt.interestRate * 0.5;
   
   const reasoning = `Debt over 7% = guaranteed ${formatPercent(highestRateDebt.interestRate)} return. Prioritize before investing.`;
   
@@ -213,8 +215,8 @@ export function calculateHSAOptimal(
   if (!hsa.eligible) return null;
   
   const annualLimit = hsa.coverageType === 'family' 
-    ? CONTRIBUTION_LIMITS[2024].hsa.family 
-    : CONTRIBUTION_LIMITS[2024].hsa.individual;
+    ? CONTRIBUTION_LIMITS[2026].hsa.family 
+    : CONTRIBUTION_LIMITS[2026].hsa.individual;
     
   const monthlyLimit = annualLimit / 12;
   const additionalContribution = monthlyLimit - hsa.currentContribution;
@@ -223,8 +225,9 @@ export function calculateHSAOptimal(
   
   const recommendedContribution = Math.min(additionalContribution, availableAmount);
   
-  // HSA tax savings: federal + FICA (7.65%)
-  const taxSavings = recommendedContribution * calculateMarginalTaxRate(profile.taxes.federalBracket, profile.taxes.state);
+  // HSA payroll deductions are FICA-exempt (IRC 3121), so include FICA in savings
+  const annualGross = profile.income.gross * 12;
+  const taxSavings = recommendedContribution * calculateHSATaxRate(profile.taxes.federalBracket, profile.taxes.state, annualGross);
   
   return {
     id: 'hsa-contribution',
@@ -248,8 +251,8 @@ export function calculateTaxBracketOptimization(
 ): AllocationItem | null {
   const annualGross = profile.income.gross * 12;
   const brackets = profile.taxes.filingStatus === 'marriedJoint' 
-    ? TAX_BRACKETS[2024].marriedJoint 
-    : TAX_BRACKETS[2024].single;
+    ? TAX_BRACKETS[2026].marriedJoint 
+    : TAX_BRACKETS[2026].single;
   
   const currentBracket = brackets.find(bracket => 
     annualGross > bracket.min && annualGross <= bracket.max
@@ -326,13 +329,13 @@ export function calculateRothIRA(
 ): AllocationItem | null {
   const annualIncome = profile.income.gross * 12;
   
-  // Check income eligibility for Roth IRA (2024 limits)
-  const rothPhaseoutStart = profile.taxes.filingStatus === 'marriedJoint' ? 230000 : 138000;
-  const rothPhaseoutEnd = profile.taxes.filingStatus === 'marriedJoint' ? 240000 : 153000;
+  // Check income eligibility for Roth IRA (2026 limits - IRS Notice 2025-67)
+  const rothPhaseoutStart = profile.taxes.filingStatus === 'marriedJoint' ? 242000 : 153000;
+  const rothPhaseoutEnd = profile.taxes.filingStatus === 'marriedJoint' ? 252000 : 168000;
   
   if (annualIncome > rothPhaseoutEnd) return null; // Not eligible
   
-  let maxContribution: number = CONTRIBUTION_LIMITS[2024].ira;
+  let maxContribution: number = CONTRIBUTION_LIMITS[2026].ira;
   
   // Reduce contribution if in phaseout range
   if (annualIncome > rothPhaseoutStart) {
@@ -393,7 +396,7 @@ export function calculateAdditional401k(
   
   const annualSalary = profile.income.gross * 12;
   const currentAnnualContribution = annualSalary * benefits.currentContribution;
-  const maxAnnualContribution = CONTRIBUTION_LIMITS[2024].traditional401k; // Same limit for both
+  const maxAnnualContribution = CONTRIBUTION_LIMITS[2026].traditional401k; // Same limit for both
   
   const remainingContributionRoom = maxAnnualContribution - currentAnnualContribution;
   const monthlyRemainingRoom = remainingContributionRoom / 12;
@@ -418,11 +421,11 @@ export function calculateAdditional401k(
   } else if (recommendation === 'traditional') {
     accountType = 'Traditional 401k';
     reasoning = 'Traditional 401k recommended for current tax savings';
-    taxImpact = -recommendedContribution * calculateMarginalTaxRate(profile.taxes.federalBracket, profile.taxes.state);
+    taxImpact = -recommendedContribution * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state);
   } else { // mixed
     accountType = '401k (Roth + Traditional)';
     reasoning = 'Consider splitting between Roth and Traditional 401k for tax diversification';
-    taxImpact = -recommendedContribution * 0.5 * calculateMarginalTaxRate(profile.taxes.federalBracket, profile.taxes.state);
+    taxImpact = -recommendedContribution * 0.5 * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state);
   }
   
   return {
@@ -452,15 +455,16 @@ export function calculateMegaBackdoorRoth(
   
   // Check income threshold - typically beneficial for higher earners
   // who are above Roth IRA limits
-  const rothPhaseoutEnd = profile.taxes.filingStatus === 'marriedJoint' ? 240000 : 153000;
-  
+  const rothPhaseoutEnd = profile.taxes.filingStatus === 'marriedJoint' ? 252000 : 168000;
+
   if (annualIncome < rothPhaseoutEnd) return null; // Regular Roth IRA is better
-  
+
   const annualSalary = profile.income.gross * 12;
   const currentAnnualContribution = annualSalary * benefits.currentContribution;
-  
-  // Total 401k limit including after-tax contributions (2024: $69,000 or $76,500 with catch-up)
-  const totalLimit = profile.preferences.age >= 50 ? 76500 : 69000;
+
+  // Total 401k limit including after-tax contributions (2026: $72,000 or $80,000/$83,250 with catch-up)
+  const age = profile.preferences.age;
+  const totalLimit = age >= 60 && age <= 63 ? 83250 : age >= 50 ? 80000 : 72000;
   const employerMatch = annualSalary * benefits.matchPercent * Math.min(benefits.matchLimit, benefits.currentContribution);
   
   const remainingAfterTaxRoom = totalLimit - currentAnnualContribution - employerMatch;

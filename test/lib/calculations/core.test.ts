@@ -24,7 +24,7 @@ import {
   measureCalculationPerformance,
   generateMockProfile,
   FINANCIAL_TEST_CASES,
-  IRS_2025_LIMITS
+  IRS_2026_LIMITS
 } from '@/test/utils/financial-test-helpers'
 import { 
   createPaycheckProfile,

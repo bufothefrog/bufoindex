@@ -9,40 +9,42 @@
 
 import { expect } from 'vitest'
 
-// IRS tax bracket data for 2025 (for exact verification in tests)
-export const IRS_2025_TAX_BRACKETS = {
+// IRS tax bracket data for 2026 (Rev. Proc. 2025-32, as amended by OBBBA)
+export const IRS_2026_TAX_BRACKETS = {
   single: [
-    { min: 0, max: 11925, rate: 0.10 },
-    { min: 11925, max: 48475, rate: 0.12 },
-    { min: 48475, max: 103350, rate: 0.22 },
-    { min: 103350, max: 197300, rate: 0.24 },
-    { min: 197300, max: 250525, rate: 0.32 },
-    { min: 250525, max: 626350, rate: 0.35 },
-    { min: 626350, max: Infinity, rate: 0.37 }
+    { min: 0, max: 12400, rate: 0.10 },
+    { min: 12400, max: 50400, rate: 0.12 },
+    { min: 50400, max: 105700, rate: 0.22 },
+    { min: 105700, max: 201775, rate: 0.24 },
+    { min: 201775, max: 256225, rate: 0.32 },
+    { min: 256225, max: 640600, rate: 0.35 },
+    { min: 640600, max: Infinity, rate: 0.37 }
   ],
   marriedFilingJointly: [
-    { min: 0, max: 23850, rate: 0.10 },
-    { min: 23850, max: 96950, rate: 0.12 },
-    { min: 96950, max: 206700, rate: 0.22 },
-    { min: 206700, max: 394600, rate: 0.24 },
-    { min: 394600, max: 501050, rate: 0.32 },
-    { min: 501050, max: 751600, rate: 0.35 },
-    { min: 751600, max: Infinity, rate: 0.37 }
+    { min: 0, max: 24800, rate: 0.10 },
+    { min: 24800, max: 100800, rate: 0.12 },
+    { min: 100800, max: 211400, rate: 0.22 },
+    { min: 211400, max: 403550, rate: 0.24 },
+    { min: 403550, max: 512450, rate: 0.32 },
+    { min: 512450, max: 768700, rate: 0.35 },
+    { min: 768700, max: Infinity, rate: 0.37 }
   ]
 }
 
-// 2025 contribution limits for exact verification
-export const IRS_2025_LIMITS = {
-  retirement401k: 23000,
-  retirement401kCatchup: 7500,
-  retirementIRA: 7000,
-  retirementIRACatchup: 1000,
+// 2026 contribution limits (IRS Notice 2025-67, Rev. Proc. 2025-19)
+export const IRS_2026_LIMITS = {
+  retirement401k: 24500,
+  retirement401kCatchup: 8000,
+  superCatchUp401k: 11250, // Ages 60-63 (SECURE 2.0)
+  retirementIRA: 7500,
+  retirementIRACatchup: 1100,
   hsa: {
-    individual: 4300,
-    family: 8550,
-    catchup: 1000
+    individual: 4400,
+    family: 8750,
+    catchup: 1000 // Statutory, not indexed
   },
-  socialSecurityWageBase: 160200,
+  socialSecurityWageBase: 184500,
+  total415c: 72000,
   highInterestDebtThreshold: 0.07 // 7% threshold from BufoIndex methodology
 }
 
@@ -80,8 +82,8 @@ expect.extend({
    * Verify tax calculation against IRS brackets (includes 2025 standard deduction)
    */
   toMatchTaxCalculation(received: number, income: number, filingStatus: 'single' | 'marriedFilingJointly') {
-    const brackets = IRS_2025_TAX_BRACKETS[filingStatus]
-    const standardDeduction = filingStatus === 'single' ? 15000 : 30000 // 2025 amounts
+    const brackets = IRS_2026_TAX_BRACKETS[filingStatus]
+    const standardDeduction = filingStatus === 'single' ? 16100 : 32200 // 2026 amounts
     const taxableIncome = Math.max(0, income - standardDeduction)
     
     let expectedTax = 0
@@ -297,7 +299,7 @@ export function checkAccessibilityCompliance(element: HTMLElement) {
 /**
  * Export all utilities for easy importing
  */
-export { 
-  IRS_2025_TAX_BRACKETS as TAX_BRACKETS,
-  IRS_2025_LIMITS as CONTRIBUTION_LIMITS
+export {
+  IRS_2026_TAX_BRACKETS as TAX_BRACKETS,
+  IRS_2026_LIMITS as CONTRIBUTION_LIMITS
 }

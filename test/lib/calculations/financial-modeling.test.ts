@@ -12,37 +12,37 @@ import FinancialModeling, {
 } from '@/lib/calculations/financial-modeling'
 import {
   measureCalculationPerformance,
-  IRS_2025_TAX_BRACKETS,
-  IRS_2025_LIMITS,
+  IRS_2026_TAX_BRACKETS,
+  IRS_2026_LIMITS,
   FINANCIAL_TEST_CASES
 } from '../../utils/financial-test-helpers'
 
 describe('FinancialModeling', () => {
   describe('tax bracket constants', () => {
-    it('should have correct 2025 federal tax brackets', () => {
+    it('should have correct 2026 federal tax brackets', () => {
       const singleBrackets = FinancialModeling.FEDERAL_TAX_BRACKETS.single
       const marriedBrackets = FinancialModeling.FEDERAL_TAX_BRACKETS.marriedFilingJointly
 
-      // Verify single filer brackets match IRS 2025
-      expect(singleBrackets[0]).toEqual({ min: 0, max: 11925, rate: 0.10 })
-      expect(singleBrackets[1]).toEqual({ min: 11925, max: 48475, rate: 0.12 })
-      expect(singleBrackets[2]).toEqual({ min: 48475, max: 103350, rate: 0.22 })
-      expect(singleBrackets[3]).toEqual({ min: 103350, max: 197300, rate: 0.24 })
-      expect(singleBrackets[4]).toEqual({ min: 197300, max: 250525, rate: 0.32 })
-      expect(singleBrackets[5]).toEqual({ min: 250525, max: 626350, rate: 0.35 })
-      expect(singleBrackets[6]).toEqual({ min: 626350, max: Infinity, rate: 0.37 })
+      // Verify single filer brackets match IRS 2026 (Rev. Proc. 2025-32, OBBBA)
+      expect(singleBrackets[0]).toEqual({ min: 0, max: 12400, rate: 0.10 })
+      expect(singleBrackets[1]).toEqual({ min: 12400, max: 50400, rate: 0.12 })
+      expect(singleBrackets[2]).toEqual({ min: 50400, max: 105700, rate: 0.22 })
+      expect(singleBrackets[3]).toEqual({ min: 105700, max: 201775, rate: 0.24 })
+      expect(singleBrackets[4]).toEqual({ min: 201775, max: 256225, rate: 0.32 })
+      expect(singleBrackets[5]).toEqual({ min: 256225, max: 640600, rate: 0.35 })
+      expect(singleBrackets[6]).toEqual({ min: 640600, max: Infinity, rate: 0.37 })
 
       // Verify married filing jointly brackets
-      expect(marriedBrackets[0]).toEqual({ min: 0, max: 23850, rate: 0.10 })
-      expect(marriedBrackets[1]).toEqual({ min: 23850, max: 96950, rate: 0.12 })
-      expect(marriedBrackets[6]).toEqual({ min: 751600, max: Infinity, rate: 0.37 })
+      expect(marriedBrackets[0]).toEqual({ min: 0, max: 24800, rate: 0.10 })
+      expect(marriedBrackets[1]).toEqual({ min: 24800, max: 100800, rate: 0.12 })
+      expect(marriedBrackets[6]).toEqual({ min: 768700, max: Infinity, rate: 0.37 })
     })
 
-    it('should have correct 2025 standard deductions', () => {
-      expect(FinancialModeling.STANDARD_DEDUCTIONS.single).toBe(15000)
-      expect(FinancialModeling.STANDARD_DEDUCTIONS.marriedFilingJointly).toBe(30000)
-      expect(FinancialModeling.STANDARD_DEDUCTIONS.marriedFilingSeparately).toBe(15000)
-      expect(FinancialModeling.STANDARD_DEDUCTIONS.headOfHousehold).toBe(22500)
+    it('should have correct 2026 standard deductions', () => {
+      expect(FinancialModeling.STANDARD_DEDUCTIONS.single).toBe(16100)
+      expect(FinancialModeling.STANDARD_DEDUCTIONS.marriedFilingJointly).toBe(32200)
+      expect(FinancialModeling.STANDARD_DEDUCTIONS.marriedFilingSeparately).toBe(16100)
+      expect(FinancialModeling.STANDARD_DEDUCTIONS.headOfHousehold).toBe(24150)
     })
 
     it('should have correct California tax brackets', () => {
@@ -119,41 +119,41 @@ describe('FinancialModeling', () => {
     it('should calculate federal tax correctly for known test cases', () => {
       const { result: tax50k } = measureCalculationPerformance(
         'federal-tax-50k-single',
-        () => FinancialModeling.calculateFederalTax(50000, 'single', 2025),
+        () => FinancialModeling.calculateFederalTax(50000, 'single', 2026),
         20 // Max 20ms per calculation
       )
       expect(tax50k).toMatchTaxCalculation(50000, 'single')
 
-      const tax100kMarried = FinancialModeling.calculateFederalTax(100000, 'marriedFilingJointly', 2025)
+      const tax100kMarried = FinancialModeling.calculateFederalTax(100000, 'marriedFilingJointly', 2026)
       expect(tax100kMarried).toMatchTaxCalculation(100000, 'marriedFilingJointly')
 
-      const tax200kSingle = FinancialModeling.calculateFederalTax(200000, 'single', 2025)
+      const tax200kSingle = FinancialModeling.calculateFederalTax(200000, 'single', 2026)
       expect(tax200kSingle).toMatchTaxCalculation(200000, 'single')
     })
 
     it('should verify against known IRS examples', () => {
       // Test cases from IRS Publication 17 (2025)
-      const tax75kSingle = FinancialModeling.calculateFederalTax(75000, 'single', 2025)
-      expect(tax75kSingle).toBeCloseToCurrency(8114, 1) // Known 2025 calculation: ($75k - $15k std ded) * brackets
+      const tax75kSingle = FinancialModeling.calculateFederalTax(75000, 'single', 2026)
+      expect(tax75kSingle).toBeCloseToCurrency(7670, 1) // 2026: ($75k - $16.1k std ded) = $58.9k taxable
 
-      const tax150kMarried = FinancialModeling.calculateFederalTax(150000, 'marriedFilingJointly', 2025)
-      expect(tax150kMarried).toBeCloseToCurrency(16228, 1) // Known 2025 calculation: ($150k - $30k std ded) * brackets
+      const tax150kMarried = FinancialModeling.calculateFederalTax(150000, 'marriedFilingJointly', 2026)
+      expect(tax150kMarried).toBeCloseToCurrency(15340, 1) // 2026: ($150k - $32.2k std ded) = $117.8k taxable
     })
 
     it('should handle standard deduction correctly', () => {
       // Income below standard deduction should have zero tax
-      const lowIncomeSingle = FinancialModeling.calculateFederalTax(10000, 'single', 2025)
+      const lowIncomeSingle = FinancialModeling.calculateFederalTax(10000, 'single', 2026)
       expect(lowIncomeSingle).toBe(0)
 
-      const lowIncomeMarried = FinancialModeling.calculateFederalTax(20000, 'marriedFilingJointly', 2025)
+      const lowIncomeMarried = FinancialModeling.calculateFederalTax(20000, 'marriedFilingJointly', 2026)
       expect(lowIncomeMarried).toBe(0)
     })
 
     it('should handle different filing statuses', () => {
       const income = 100000
 
-      const singleTax = FinancialModeling.calculateFederalTax(income, 'single', 2025)
-      const marriedTax = FinancialModeling.calculateFederalTax(income, 'marriedFilingJointly', 2025)
+      const singleTax = FinancialModeling.calculateFederalTax(income, 'single', 2026)
+      const marriedTax = FinancialModeling.calculateFederalTax(income, 'marriedFilingJointly', 2026)
 
       // Single filer should pay more than married filing jointly at same income
       expect(singleTax).toBeGreaterThan(marriedTax)
@@ -166,7 +166,7 @@ describe('FinancialModeling', () => {
     it('should handle high-income scenarios', () => {
       // Test high income in top tax bracket
       const highIncome = 1000000
-      const tax = FinancialModeling.calculateFederalTax(highIncome, 'single', 2025)
+      const tax = FinancialModeling.calculateFederalTax(highIncome, 'single', 2026)
       
       expect(tax).toBeGreaterThan(300000) // Should be substantial
       expect(tax).toBeLessThan(highIncome * 0.37) // Should be less than flat 37%
@@ -177,17 +177,17 @@ describe('FinancialModeling', () => {
       
       FinancialModeling.calculateFederalTax(50000, 'single', 2023)
       
-      expect(consoleSpy).toHaveBeenCalledWith('Tax calculation only supports 2025 tax year, got 2023')
+      expect(consoleSpy).toHaveBeenCalledWith('Tax calculation only supports 2026 tax year, got 2023')
       
       consoleSpy.mockRestore()
     })
 
     it('should handle edge cases', () => {
-      expect(FinancialModeling.calculateFederalTax(0, 'single', 2025)).toBe(0)
-      expect(FinancialModeling.calculateFederalTax(-1000, 'single', 2025)).toBe(0)
+      expect(FinancialModeling.calculateFederalTax(0, 'single', 2026)).toBe(0)
+      expect(FinancialModeling.calculateFederalTax(-1000, 'single', 2026)).toBe(0)
       
-      // Exactly at standard deduction
-      const exactDeduction = FinancialModeling.calculateFederalTax(15000, 'single', 2025)
+      // Exactly at standard deduction ($16,100 for 2026 single)
+      const exactDeduction = FinancialModeling.calculateFederalTax(16100, 'single', 2026)
       expect(exactDeduction).toBe(0)
     })
   })
@@ -385,8 +385,8 @@ describe('FinancialModeling', () => {
     })
 
     it('should handle edge cases at the 22% boundary', () => {
-      // Test income that puts marginal rate exactly at 22%
-      const boundaryIncome = 47150 // Start of 22% federal bracket for single filer
+      // Test income that puts marginal rate in 22% bracket (2026: 22% starts at $50,400 taxable)
+      const boundaryIncome = 67000 // Above $50,400 + $16,100 std deduction = $66,500 to enter 22%
       const strategy = FinancialModeling.validateTaxOptimizationStrategy(boundaryIncome, 'single')
 
       // Should include state tax, so marginal rate should be > 22%
@@ -523,7 +523,7 @@ describe('FinancialModeling', () => {
 
     it('should work without window object (Node.js)', () => {
       // This test runs in jsdom but simulates server environment
-      const tax = FinancialModeling.calculateFederalTax(50000, 'single', 2025)
+      const tax = FinancialModeling.calculateFederalTax(50000, 'single', 2026)
       expect(tax).toBeGreaterThan(0)
     })
   })
@@ -585,7 +585,7 @@ describe('FinancialModeling', () => {
       ]
 
       testIncomes.forEach(income => {
-        const federalTax = FinancialModeling.calculateFederalTax(income, 'single', 2025)
+        const federalTax = FinancialModeling.calculateFederalTax(income, 'single', 2026)
         const analysis = FinancialModeling.calculateTaxAnalysis(income, 'single', 'CA')
         
         expect(federalTax).toBeGreaterThanOrEqual(0)

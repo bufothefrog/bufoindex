@@ -1,6 +1,6 @@
 import { PaycheckProfile, SkippedItem } from '../types';
 import { formatCurrency, formatPercent, calculateOpportunityCost } from './core';
-import { calculateMarginalTaxRate } from '../utils';
+import { calculateIncomeTaxRate } from '../utils';
 
 /**
  * Identify optimization opportunities and provide contrarian advice
@@ -163,7 +163,7 @@ function analyzeDebtStrategy(profile: PaycheckProfile): SkippedItem[] {
   profile.debts.forEach(debt => {
     if (debt.extraPayment > 0) {
       const effectiveRate = debt.taxDeductible 
-        ? debt.interestRate * (1 - calculateMarginalTaxRate(profile.taxes.federalBracket, profile.taxes.state))
+        ? debt.interestRate * (1 - calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state))
         : debt.interestRate;
       
       const expectedMarketReturn = 0.07; // Conservative market return assumption
