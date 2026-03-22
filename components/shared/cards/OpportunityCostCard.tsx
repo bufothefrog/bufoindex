@@ -1,9 +1,9 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { SkippedItem } from '@/lib/types';
-import { AlertTriangle, TrendingDown, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
+import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
+import { AlertTriangle, Info } from 'lucide-react';
 
 interface OpportunityCostCardProps {
   skippedItem: SkippedItem;
@@ -12,17 +12,16 @@ interface OpportunityCostCardProps {
   className?: string;
 }
 
-const riskLevelStyles = {
-  low: 'border-l-warning/50',
-  medium: 'border-l-warning',
-  high: 'border-l-destructive',
-};
-
 const riskLevelIcons = {
   low: Info,
   medium: AlertTriangle,
   high: AlertTriangle,
 };
+
+function mapRiskToVariant(riskLevel: SkippedItem['riskLevel']): CardVariant {
+  if (riskLevel === 'high') return 'danger';
+  return 'warning';
+}
 
 export const OpportunityCostCard = React.memo(function OpportunityCostCard({
   skippedItem,
@@ -30,108 +29,47 @@ export const OpportunityCostCard = React.memo(function OpportunityCostCard({
   onToggleDetails,
   className,
 }: OpportunityCostCardProps) {
-  const riskStyle = riskLevelStyles[skippedItem.riskLevel];
   const RiskIcon = riskLevelIcons[skippedItem.riskLevel];
-  
+
   const getHighestOpportunityCost = () => {
     const costs = skippedItem.opportunityCost;
     if (costs.twentyYear) return { amount: costs.twentyYear, period: '20 years' };
     if (costs.tenYear) return { amount: costs.tenYear, period: '10 years' };
     return { amount: costs.annual, period: 'annually' };
   };
-  
+
   const highestCost = getHighestOpportunityCost();
-  
+
   return (
-    <Card className={cn(
-      "border-l-4 transition-all duration-200 hover:shadow-md",
-      riskStyle,
-      className
-    )}>
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-full bg-card shadow-sm">
-              <RiskIcon className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-lg flex items-center">
-                <span className="mr-2">🚫</span>
-                SKIP {skippedItem.item}
-              </CardTitle>
-              <div className="text-sm text-muted-foreground capitalize">
-                {skippedItem.riskLevel} risk optimization
-              </div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xl font-bold text-warning font-mono tabular-nums">
-              {formatCurrency(highestCost.amount)}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              cost over {highestCost.period}
-            </div>
-          </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="pt-0">
-        <div className="space-y-3">
-          <div className="p-3 bg-muted/50 rounded-md border border-border">
-            <div className="font-medium text-sm text-foreground mb-1">Why skip this:</div>
-            <p className="text-sm text-muted-foreground">
-              {skippedItem.reason}
-            </p>
-          </div>
-          
-          <div className="p-3 bg-muted/50 rounded-md border border-border">
-            <div className="font-medium text-sm text-sage-600 dark:text-sage-400 mb-1">Do this instead:</div>
-            <p className="text-sm text-muted-foreground">
-              {skippedItem.alternative}
-            </p>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-              <span>Monthly: <span className="font-mono tabular-nums">{formatCurrency(skippedItem.opportunityCost.monthly)}</span></span>
-              <span>Annual: <span className="font-mono tabular-nums">{formatCurrency(skippedItem.opportunityCost.annual)}</span></span>
-            </div>
-            
-            {onToggleDetails && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onToggleDetails}
-                className="text-xs"
-              >
-                {showDetails ? (
-                  <>
-                    <ChevronDown className="w-4 h-4 mr-1" />
-                    Hide Math
-                  </>
-                ) : (
-                  <>
-                    <ChevronRight className="w-4 h-4 mr-1" />
-                    Show Math
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-          
-          {showDetails && skippedItem.education && (
-            <div className="mt-4 p-4 bg-muted/50 rounded-md border border-border">
-              <h4 className="font-medium text-sm text-foreground mb-2 flex items-center">
-                <Info className="w-4 h-4 mr-1" />
-                Why This Matters:
-              </h4>
-              <p className="text-sm text-muted-foreground">
-                {skippedItem.education}
-              </p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <ExpandableListCard
+      icon={RiskIcon}
+      title={`SKIP ${skippedItem.item}`}
+      subtitle={`${skippedItem.riskLevel} risk optimization`}
+      value={formatCurrency(highestCost.amount)}
+      valueSubtext={`cost over ${highestCost.period}`}
+      variant={mapRiskToVariant(skippedItem.riskLevel)}
+      expanded={showDetails}
+      onToggle={onToggleDetails}
+      className={className}
+    >
+      <StatusAlert variant="warning" icon={AlertTriangle} title="Why skip this">
+        {skippedItem.reason}
+      </StatusAlert>
+
+      <StatusAlert variant="success" icon={Info} title="Do this instead">
+        {skippedItem.alternative}
+      </StatusAlert>
+
+      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+        <span>Monthly: <span className="font-mono tabular-nums">{formatCurrency(skippedItem.opportunityCost.monthly)}</span></span>
+        <span>Annual: <span className="font-mono tabular-nums">{formatCurrency(skippedItem.opportunityCost.annual)}</span></span>
+      </div>
+
+      {skippedItem.education && (
+        <StatusAlert variant="info" icon={Info} title="Why This Matters">
+          {skippedItem.education}
+        </StatusAlert>
+      )}
+    </ExpandableListCard>
   );
 });

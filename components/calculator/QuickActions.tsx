@@ -5,12 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { AllocationItem, PaycheckProfile, SkippedItem } from '@/lib/types';
-import { 
-  AlertTriangle, 
-  Target, 
-  TrendingUp, 
-  Clock, 
-  Zap, 
+import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
+import {
+  AlertTriangle,
+  Target,
+  TrendingUp,
+  Clock,
+  Zap,
   ArrowRight,
   DollarSign,
   Building2,
@@ -43,28 +44,52 @@ interface QuickAction {
   onAction: () => void;
 }
 
+const urgencyBorderStyles: Record<QuickAction['urgency'], string> = {
+  critical: 'border-l-4 border-l-destructive',
+  important: 'border-l-4 border-l-warning',
+  optimization: 'border-l-4 border-l-success',
+};
+
+const urgencyIconStyles: Record<QuickAction['urgency'], string> = {
+  critical: 'text-destructive',
+  important: 'text-warning',
+  optimization: 'text-success',
+};
+
+const urgencyBadgeStyles: Record<QuickAction['urgency'], string> = {
+  critical: 'bg-destructive text-destructive-foreground',
+  important: 'bg-warning text-warning-foreground',
+  optimization: 'bg-success text-success-foreground',
+};
+
+const urgencyLabels: Record<QuickAction['urgency'], string> = {
+  critical: 'URGENT',
+  important: 'HIGH IMPACT',
+  optimization: 'OPTIMIZATION',
+};
+
 export const QuickActions = React.memo(function QuickActions({ profile }: QuickActionsProps) {
   // Generate quick actions based on current situation
   const generateQuickActions = (): QuickAction[] => {
     const actions: QuickAction[] = [];
 
     // Check for missing employer match (Critical)
-    if (profile.benefits.employer401k.available && 
+    if (profile.benefits.employer401k.available &&
         profile.benefits.employer401k.currentContribution < profile.benefits.employer401k.matchLimit) {
       const monthlyGross = profile.income.gross;
       const potentialMatch = monthlyGross * profile.benefits.employer401k.matchLimit * profile.benefits.employer401k.matchPercent;
       const currentMatch = monthlyGross * profile.benefits.employer401k.currentContribution * profile.benefits.employer401k.matchPercent;
       const missedMatch = potentialMatch - currentMatch;
-      
+
       // Convert to per-paycheck amount
       const frequency = profile.income.frequency;
-      const multiplier = frequency === 'weekly' ? 52/12 : 
-                        frequency === 'bi-weekly' ? 26/12 : 
+      const multiplier = frequency === 'weekly' ? 52/12 :
+                        frequency === 'bi-weekly' ? 26/12 :
                         frequency === 'semi-monthly' ? 2 : 1;
       const missedMatchPerPaycheck = missedMatch / multiplier;
-      
-      const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' : 
-                           frequency === 'semi-monthly' ? 'semi-monthly' : 
+
+      const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' :
+                           frequency === 'semi-monthly' ? 'semi-monthly' :
                            frequency === 'weekly' ? 'weekly' : 'monthly';
 
       actions.push({
@@ -82,7 +107,6 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
           annual: missedMatch * 12
         },
         onAction: () => {
-          // Scroll to 401k input section
           const element = document.querySelector('[data-section="employer-benefits"]');
           element?.scrollIntoView({ behavior: 'smooth' });
         }
@@ -93,18 +117,18 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
     const highInterestDebt = profile.debts.find(d => d.interestRate > 0.07);
     if (highInterestDebt) {
       const monthlyInterest = (highInterestDebt.balance * highInterestDebt.interestRate) / 12;
-      
+
       // Convert to per-paycheck amount
       const frequency = profile.income.frequency;
-      const multiplier = frequency === 'weekly' ? 52/12 : 
-                        frequency === 'bi-weekly' ? 26/12 : 
+      const multiplier = frequency === 'weekly' ? 52/12 :
+                        frequency === 'bi-weekly' ? 26/12 :
                         frequency === 'semi-monthly' ? 2 : 1;
       const interestPerPaycheck = monthlyInterest / multiplier;
-      
-      const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' : 
-                           frequency === 'semi-monthly' ? 'semi-monthly' : 
+
+      const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' :
+                           frequency === 'semi-monthly' ? 'semi-monthly' :
                            frequency === 'weekly' ? 'weekly' : 'monthly';
-      
+
       actions.push({
         id: 'high-interest-debt',
         title: `${(highInterestDebt.interestRate * 100).toFixed(1)}% Debt Costing You Money`,
@@ -128,8 +152,6 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
 
     // Check for insufficient emergency fund (Important)
     if (profile.preferences.currentEmergencyFund < profile.preferences.necessaryExpenses) {
-      // const needed = profile.preferences.necessaryExpenses - profile.preferences.currentEmergencyFund;
-      
       actions.push({
         id: 'emergency-fund',
         title: 'Build 1-Month Emergency Fund',
@@ -156,7 +178,7 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
       const hsaLimit = profile.benefits.hsa.coverageType === 'family' ? 8300 : 4150;
       const monthlyMax = hsaLimit / 12;
       const taxSavings = hsaLimit * 0.22; // Assume 22% tax bracket
-      
+
       actions.push({
         id: 'hsa-max',
         title: 'Triple Tax Advantage HSA',
@@ -184,7 +206,7 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
       const rothLimit = profile.preferences.age >= 50 ? 8000 : 7000;
       const monthlyRoth = rothLimit / 12;
       const potentialGrowth = rothLimit * 0.07; // Assume 7% growth
-      
+
       actions.push({
         id: 'roth-ira',
         title: 'Tax-Free Retirement Growth',
@@ -207,7 +229,6 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
     }
 
     return actions.sort((a, b) => {
-      // Sort by urgency first, then by potential savings
       const urgencyOrder = { critical: 0, important: 1, optimization: 2 };
       if (urgencyOrder[a.urgency] !== urgencyOrder[b.urgency]) {
         return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
@@ -221,77 +242,53 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
   const importantActions = useMemo(() => quickActions.filter(action => action.urgency === 'important'), [quickActions]);
   const optimizationActions = useMemo(() => quickActions.filter(action => action.urgency === 'optimization'), [quickActions]);
 
-  const getUrgencyStyles = (urgency: 'critical' | 'important' | 'optimization') => {
-    switch (urgency) {
-      case 'critical':
-        return {
-          card: 'border-l-4 border-l-destructive',
-          header: 'text-destructive',
-          icon: 'text-destructive',
-          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
-          badge: 'bg-destructive text-destructive-foreground'
-        };
-      case 'important':
-        return {
-          card: 'border-l-4 border-l-warning',
-          header: 'text-foreground',
-          icon: 'text-warning',
-          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
-          badge: 'bg-warning text-warning-foreground'
-        };
-      case 'optimization':
-        return {
-          card: 'border-l-4 border-l-success',
-          header: 'text-foreground',
-          icon: 'text-success',
-          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
-          badge: 'bg-success text-success-foreground'
-        };
-    }
-  };
-
   if (quickActions.length === 0) {
     return null;
   }
 
   const ActionCard = ({ action }: { action: QuickAction }) => {
-    const styles = getUrgencyStyles(action.urgency);
     const IconComponent = action.icon;
 
     return (
-      <Card className={cn("transition-all duration-200 hover:shadow-md", styles.card)}>
+      <Card className={cn("transition-all duration-200 hover:shadow-md", urgencyBorderStyles[action.urgency])}>
         <CardContent className="p-4">
           <div className="flex items-start space-x-4">
             <div className="p-2 rounded-full bg-card shadow-sm">
-              <IconComponent className={cn("w-5 h-5", styles.icon)} aria-hidden="true" />
+              <IconComponent className={cn("w-5 h-5", urgencyIconStyles[action.urgency])} aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-2">
-                <h4 className={cn("font-semibold text-sm", styles.header)}>
+                <h4 className="font-semibold text-sm">
                   {action.title}
                 </h4>
-                <div className={cn("px-2 py-1 rounded-full text-xs font-medium", styles.badge)} aria-label={`Priority: ${action.urgency === 'critical' ? 'urgent' : action.urgency === 'important' ? 'high impact' : 'optimization'}`}>
-                  {action.urgency === 'critical' ? 'URGENT' :
-                   action.urgency === 'important' ? 'HIGH IMPACT' : 'OPTIMIZATION'}
-                </div>
+                <span
+                  className={cn("px-2 py-1 rounded-full text-xs font-medium", urgencyBadgeStyles[action.urgency])}
+                  aria-label={`Priority: ${action.urgency === 'critical' ? 'urgent' : action.urgency === 'important' ? 'high impact' : 'optimization'}`}
+                >
+                  {urgencyLabels[action.urgency]}
+                </span>
               </div>
-              
+
               <p className="text-sm text-muted-foreground mb-3">{action.description}</p>
-              
-              <div className="grid grid-cols-2 gap-4 mb-3 text-xs">
-                <div className="flex items-center space-x-1">
-                  <DollarSign className="w-3 h-3 text-success" aria-hidden="true" />
-                  <span className="text-muted-foreground">{action.impact}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Clock className="w-3 h-3 text-info" aria-hidden="true" />
-                  <span className="text-muted-foreground">{action.timeToImplement}</span>
-                </div>
+
+              <div className="space-y-1 mb-3">
+                <BreakdownRow
+                  icon={DollarSign}
+                  label="Impact"
+                  value={action.impact}
+                  variant="success"
+                />
+                <BreakdownRow
+                  icon={Clock}
+                  label="Time to implement"
+                  value={action.timeToImplement}
+                  variant="info"
+                />
               </div>
-              
-              <Button 
+
+              <Button
                 onClick={action.onAction}
-                className={cn("w-full text-sm", styles.button)}
+                className="w-full text-sm bg-primary hover:bg-primary/90 text-primary-foreground"
                 size="sm"
               >
                 <Zap className="w-4 h-4 mr-2" aria-hidden="true" />

@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AllocationCard } from '@/components/shared/cards/AllocationCard';
 import { OpportunityCostCard } from '@/components/shared/cards/OpportunityCostCard';
+import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
+import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { PayrollSetupGuide } from './PayrollSetupGuide';
 import { PaycheckBreakdown } from './PaycheckBreakdown';
 import { QuickActions } from './QuickActions';
 import { formatCurrency, formatYearsAndMonths } from '@/lib/utils';
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   ChevronDown,
   ChevronUp,
   Calculator,
@@ -68,13 +70,10 @@ export const ResultsSection = React.memo(function ResultsSection() {
             </h3>
           </div>
           
-          <div className="p-4 bg-warning/10 border border-warning/20 rounded-md">
-            <p className="text-sm text-foreground">
-              <strong>Reject financial myths:</strong> These recommendations go against 
-              traditional financial advice but are mathematically optimized for your situation. 
-              Review the math and make informed decisions.
-            </p>
-          </div>
+          <StatusAlert variant="warning" icon={AlertTriangle} title="Reject financial myths">
+            These recommendations go against traditional financial advice but are mathematically
+            optimized for your situation. Review the math and make informed decisions.
+          </StatusAlert>
           
           {visibleSkippedItems.map((skippedItem) => (
             <OpportunityCostCard
@@ -129,34 +128,33 @@ export const ResultsSection = React.memo(function ResultsSection() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Current Path (10 years)</span>
-              <span className="font-semibold">
-                {formatCurrency(result.projections.currentPath.tenYear)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Optimized Path (10 years)</span>
-              <span className="font-semibold text-success">
-                {formatCurrency(result.projections.optimizedPath.tenYear)}
-              </span>
-            </div>
+            <BreakdownRow
+              label="Current Path (10 years)"
+              value={formatCurrency(result.projections.currentPath.tenYear)}
+            />
+            <BreakdownRow
+              label="Optimized Path (10 years)"
+              value={formatCurrency(result.projections.optimizedPath.tenYear)}
+              variant="success"
+            />
             <hr className="border" />
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-foreground">Improvement</span>
-              <span className="font-bold text-success text-lg">
-                +{formatCurrency(result.projections.improvement.tenYear)}
-              </span>
-            </div>
+            <BreakdownRow
+              label="Improvement"
+              value={formatCurrency(result.projections.improvement.tenYear)}
+              prefix="+"
+              variant="success"
+            />
           </div>
-          
+
           {result.projections.improvement.fiYearsEarlier > 0 && (
-            <div className="p-3 bg-info/10 rounded-md text-center">
-              <div className="text-sm font-medium text-foreground">Financial Independence</div>
-              <div className="text-lg font-bold text-info">
-                {formatYearsAndMonths(result.projections.improvement.fiYearsEarlier)} earlier
+            <StatusAlert variant="info">
+              <div className="text-center">
+                <div className="text-sm font-medium">Financial Independence</div>
+                <div className="text-lg font-bold text-info">
+                  {formatYearsAndMonths(result.projections.improvement.fiYearsEarlier)} earlier
+                </div>
               </div>
-            </div>
+            </StatusAlert>
           )}
         </CardContent>
       </Card>
