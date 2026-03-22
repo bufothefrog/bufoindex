@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'BufoIndex - Personal Finance Optimization',
+  title: 'Bufo Index - Personal Finance Optimization',
   description: 'For Those Who Want Financial Control, Not Financial Comfort',
 }
 
@@ -26,7 +26,7 @@ export default function RootLayout({
               <div className="container mx-auto px-4 py-3">
                 <nav className="flex items-center justify-between">
                   <Link href="/" className="text-xl font-semibold hover:text-sage-600 dark:hover:text-sage-300 transition-colors">
-                    BufoIndex
+                    Bufo Index
                   </Link>
                   <ThemeToggle />
                 </nav>
