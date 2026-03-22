@@ -55,20 +55,20 @@ export function WealthGoalSelector({ value, onChange, className }: WealthGoalSel
                 "hover:bg-sage-50 dark:hover:bg-sage-900/50 focus:outline-none focus:ring-2 focus:ring-sage-500",
                 isSelected 
                   ? "border-sage-500 bg-sage-50 dark:bg-sage-900/50 text-sage-900 dark:text-sage-100" 
-                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  : "border-border bg-card text-foreground"
               )}
             >
               <div className="flex items-center space-x-2 mb-1">
                 <Icon className={cn(
                   "w-4 h-4",
-                  isSelected ? "text-sage-600 dark:text-sage-400" : "text-gray-400 dark:text-gray-500"
+                  isSelected ? "text-sage-600 dark:text-sage-400" : "text-muted-foreground"
                 )} />
                 <span className="font-medium text-xs">{goal.name}</span>
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <div className="text-xs text-muted-foreground mb-1">
                 {goal.description}
               </div>
-              <div className="text-xs text-gray-400 dark:text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {goal.details}
               </div>
               {isSelected && (
@@ -78,7 +78,7 @@ export function WealthGoalSelector({ value, onChange, className }: WealthGoalSel
           );
         })}
       </div>
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-xs text-muted-foreground">
         Your wealth goal affects withdrawal rates and scenario recommendations.
       </p>
     </div>

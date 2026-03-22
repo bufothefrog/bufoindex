@@ -62,13 +62,13 @@ export function FormulaInput({
 
   const getInputIcon = () => {
     if (config.unit?.includes('$') || config.unit?.includes('dollar')) {
-      return <DollarSign className="w-4 h-4 text-gray-400" />;
+      return <DollarSign className="w-4 h-4 text-muted-foreground" />;
     }
     if (config.unit?.includes('%') || config.unit?.includes('percent')) {
-      return <Percent className="w-4 h-4 text-gray-400" />;
+      return <Percent className="w-4 h-4 text-muted-foreground" />;
     }
     if (config.unit?.includes('year') || config.unit?.includes('month')) {
-      return <Calendar className="w-4 h-4 text-gray-400" />;
+      return <Calendar className="w-4 h-4 text-muted-foreground" />;
     }
     return null;
   };
@@ -88,20 +88,20 @@ export function FormulaInput({
       {/* Label */}
       <div className="flex items-center justify-between">
         <label className="flex items-center space-x-2 text-sm font-medium">
-          <code className="bg-gray-100 px-1 rounded font-mono text-xs">
+          <code className="bg-muted px-1 rounded font-mono text-xs">
             {variable}
           </code>
           <span>{config.description}</span>
           {config.unit && (
-            <span className="text-gray-500 text-xs">({config.unit})</span>
+            <span className="text-muted-foreground text-xs">({config.unit})</span>
           )}
         </label>
         
         {/* Help tooltip */}
         {config.constraints && (
           <div className="group relative">
-            <Info className="w-4 h-4 text-gray-400 cursor-help" />
-            <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+            <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+            <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-foreground text-background text-xs rounded shadow-lg z-10">
               {config.constraints}
             </div>
           </div>
@@ -128,12 +128,12 @@ export function FormulaInput({
             w-full px-3 py-2 border rounded-md transition-colors
             ${getInputIcon() ? 'pl-10' : ''}
             ${error 
-              ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-              : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+              ? 'border-destructive focus:ring-destructive focus:border-destructive' 
+              : 'border-input focus:ring-ring focus:border-ring'
             }
             ${disabled 
-              ? 'bg-gray-100 cursor-not-allowed' 
-              : 'bg-white focus:outline-none focus:ring-2'
+              ? 'bg-muted cursor-not-allowed' 
+              : 'bg-background focus:outline-none focus:ring-2'
             }
           `}
           placeholder={`Enter ${config.description.toLowerCase()}`}
@@ -141,14 +141,14 @@ export function FormulaInput({
         
         {error && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <AlertCircle className="w-4 h-4 text-red-500" />
+            <AlertCircle className="w-4 h-4 text-destructive" />
           </div>
         )}
       </div>
 
       {/* Error message */}
       {error && (
-        <p className="text-sm text-red-600 flex items-center space-x-1">
+        <p className="text-sm text-destructive flex items-center space-x-1">
           <AlertCircle className="w-3 h-3" />
           <span>{error}</span>
         </p>
@@ -156,7 +156,7 @@ export function FormulaInput({
 
       {/* Help text */}
       {config.constraints && !error && (
-        <p className="text-xs text-gray-500">{config.constraints}</p>
+        <p className="text-xs text-muted-foreground">{config.constraints}</p>
       )}
     </div>
   );
@@ -191,12 +191,12 @@ export function FormulaRangeInput({
       {/* Label */}
       <div className="flex items-center justify-between">
         <label className="flex items-center space-x-2 text-sm font-medium">
-          <code className="bg-gray-100 px-1 rounded font-mono text-xs">
+          <code className="bg-muted px-1 rounded font-mono text-xs">
             {variable}
           </code>
           <span>{config.description}</span>
           {config.unit && (
-            <span className="text-gray-500 text-xs">({config.unit})</span>
+            <span className="text-muted-foreground text-xs">({config.unit})</span>
           )}
         </label>
         
@@ -218,14 +218,14 @@ export function FormulaRangeInput({
           onChange={(e) => onChange(parseFloat(e.target.value))}
           disabled={disabled}
           className={`
-            w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer
+            w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer
             ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-            ${error ? 'bg-red-200' : ''}
+            ${error ? 'bg-destructive/30' : ''}
           `}
         />
         
         {/* Range indicators */}
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>{formatDisplayValue(min, config.unit)}</span>
           <span>{formatDisplayValue(max, config.unit)}</span>
         </div>
@@ -233,7 +233,7 @@ export function FormulaRangeInput({
 
       {/* Error message */}
       {error && (
-        <p className="text-sm text-red-600 flex items-center space-x-1">
+        <p className="text-sm text-destructive flex items-center space-x-1">
           <AlertCircle className="w-3 h-3" />
           <span>{error}</span>
         </p>
@@ -265,12 +265,12 @@ export function FormulaSelectInput({
     <div className={`space-y-1 ${className}`}>
       {/* Label */}
       <label className="flex items-center space-x-2 text-sm font-medium">
-        <code className="bg-gray-100 px-1 rounded font-mono text-xs">
+        <code className="bg-muted px-1 rounded font-mono text-xs">
           {variable}
         </code>
         <span>{config.description}</span>
         {config.unit && (
-          <span className="text-gray-500 text-xs">({config.unit})</span>
+          <span className="text-muted-foreground text-xs">({config.unit})</span>
         )}
       </label>
 
@@ -287,12 +287,12 @@ export function FormulaSelectInput({
         className={`
           w-full px-3 py-2 border rounded-md transition-colors
           ${error 
-            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+            ? 'border-destructive focus:ring-destructive focus:border-destructive' 
+            : 'border-input focus:ring-ring focus:border-ring'
           }
           ${disabled 
-            ? 'bg-gray-100 cursor-not-allowed' 
-            : 'bg-white focus:outline-none focus:ring-2'
+            ? 'bg-muted cursor-not-allowed' 
+            : 'bg-background focus:outline-none focus:ring-2'
           }
         `}
       >
@@ -305,7 +305,7 @@ export function FormulaSelectInput({
 
       {/* Error message */}
       {error && (
-        <p className="text-sm text-red-600 flex items-center space-x-1">
+        <p className="text-sm text-destructive flex items-center space-x-1">
           <AlertCircle className="w-3 h-3" />
           <span>{error}</span>
         </p>

@@ -63,13 +63,13 @@ export function ResultsSection() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-foreground flex items-center space-x-2">
-              <AlertTriangle className="w-5 h-5 text-orange-600" />
+              <AlertTriangle className="w-5 h-5 text-warning" />
               <span>Contrarian Recommendations</span>
             </h3>
           </div>
           
-          <div className="p-4 bg-orange-50 border border-orange-200 rounded-md">
-            <p className="text-sm text-orange-800">
+          <div className="p-4 bg-warning/10 border border-warning/20 rounded-md">
+            <p className="text-sm text-foreground">
               <strong>Reject financial myths:</strong> These recommendations go against 
               traditional financial advice but are mathematically optimized for your situation. 
               Review the math and make informed decisions.
@@ -122,7 +122,7 @@ export function ResultsSection() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-sage-600" />
+            <TrendingUp className="w-5 h-5 text-primary" />
             <span>Long-Term Impact</span>
           </CardTitle>
         </CardHeader>
@@ -136,23 +136,23 @@ export function ResultsSection() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Optimized Path (10 years)</span>
-              <span className="font-semibold text-green-600">
+              <span className="font-semibold text-success">
                 {formatCurrency(result.projections.optimizedPath.tenYear)}
               </span>
             </div>
             <hr className="border" />
             <div className="flex justify-between items-center">
               <span className="font-medium text-foreground">Improvement</span>
-              <span className="font-bold text-green-600 text-lg">
+              <span className="font-bold text-success text-lg">
                 +{formatCurrency(result.projections.improvement.tenYear)}
               </span>
             </div>
           </div>
           
           {result.projections.improvement.fiYearsEarlier > 0 && (
-            <div className="p-3 bg-blue-50 rounded-md text-center">
-              <div className="text-sm font-medium text-blue-800">Financial Independence</div>
-              <div className="text-lg font-bold text-blue-600">
+            <div className="p-3 bg-info/10 rounded-md text-center">
+              <div className="text-sm font-medium text-foreground">Financial Independence</div>
+              <div className="text-lg font-bold text-info">
                 {formatYearsAndMonths(result.projections.improvement.fiYearsEarlier)} earlier
               </div>
             </div>

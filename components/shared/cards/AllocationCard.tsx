@@ -13,13 +13,13 @@ interface AllocationCardProps {
 }
 
 const priorityStyles = {
-  1: 'border-l-green-500 bg-green-50',
-  2: 'border-l-green-400 bg-green-50',
-  3: 'border-l-blue-500 bg-blue-50',
-  4: 'border-l-yellow-500 bg-yellow-50',
-  5: 'border-l-orange-500 bg-orange-50',
-  6: 'border-l-purple-500 bg-purple-50',
-  7: 'border-l-gray-500 bg-gray-50',
+  1: 'border-l-sage-500',
+  2: 'border-l-sage-400',
+  3: 'border-l-sage-300',
+  4: 'border-l-primary/50',
+  5: 'border-l-primary/40',
+  6: 'border-l-primary/30',
+  7: 'border-l-border',
 };
 
 const categoryIcons = {
@@ -50,8 +50,8 @@ export function AllocationCard({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-full bg-white shadow-sm">
-              <IconComponent className="w-5 h-5 text-gray-700" />
+            <div className="p-2 rounded-full bg-card shadow-sm">
+              <IconComponent className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
               <CardTitle className="text-lg">{allocation.account}</CardTitle>
@@ -61,7 +61,7 @@ export function AllocationCard({
             </div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-green-600 font-mono tabular-nums">
+            <div className="text-2xl font-bold text-success font-mono tabular-nums">
               {formatCurrency(allocation.amount)}
             </div>
             <div className="text-sm text-muted-foreground">
@@ -73,14 +73,14 @@ export function AllocationCard({
       
       <CardContent className="pt-0">
         <div className="space-y-3">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-muted-foreground">
             {allocation.reasoning}
           </p>
           
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-4">
               {allocation.taxImpact < 0 && (
-                <div className="text-green-600 font-medium">
+                <div className="text-success font-medium">
                   Tax savings: <span className="font-mono tabular-nums">{formatCurrency(Math.abs(allocation.taxImpact))}/month</span>
                 </div>
               )}
@@ -109,14 +109,14 @@ export function AllocationCard({
           </div>
           
           {showDetails && (
-            <div className="mt-4 p-4 bg-white rounded-md border border-gray-200">
+            <div className="mt-4 p-4 bg-muted/50 rounded-md border border-border">
               <h4 className="font-medium text-sm mb-2">Implementation:</h4>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-sm text-muted-foreground mb-3">
                 {allocation.implementation}
               </p>
               
               {allocation.taxImpact < 0 && (
-                <div className="space-y-1 text-xs text-gray-500">
+                <div className="space-y-1 text-xs text-muted-foreground">
                   <div>Monthly tax savings: <span className="font-mono tabular-nums">{formatCurrency(Math.abs(allocation.taxImpact))}</span></div>
                   <div>Annual tax savings: <span className="font-mono tabular-nums">{formatCurrency(Math.abs(allocation.taxImpact) * 12)}</span></div>
                 </div>

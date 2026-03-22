@@ -88,7 +88,7 @@ export function CalculatorTabs({
   return (
     <div className={`w-full ${className}`}>
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-border">
         <nav className="-mb-px flex space-x-8" role="tablist">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -105,8 +105,8 @@ export function CalculatorTabs({
                 className={`
                   flex items-center space-x-2 py-3 px-1 border-b-2 font-medium text-sm transition-colors
                   ${isActive
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                   }
                   ${isDisabled
                     ? 'opacity-50 cursor-not-allowed'

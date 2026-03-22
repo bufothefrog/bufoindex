@@ -34,16 +34,16 @@ export function CalculatorWidget({
   if (trigger === 'inline') {
     return (
       <div className={`border rounded-lg overflow-hidden ${className}`}>
-        <div className="bg-blue-50 border-b px-4 py-2">
+        <div className="bg-info/10 border-b border-info/20 px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Calculator className="w-4 h-4 text-blue-600" />
-              <span className="font-medium text-blue-900">Try This Formula</span>
+              <Calculator className="w-4 h-4 text-primary" />
+              <span className="font-medium text-foreground">Try This Formula</span>
             </div>
             <div className="flex items-center space-x-1">
               <button
                 onClick={toggleFullscreen}
-                className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+                className="p-1 text-primary hover:text-primary/80 transition-colors"
                 title="Fullscreen"
               >
                 <Maximize2 className="w-4 h-4" />
@@ -67,7 +67,7 @@ export function CalculatorWidget({
       <div className={`fixed bottom-4 right-4 z-50 ${className}`}>
         <button
           onClick={toggleExpanded}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors"
         >
           <Calculator className="w-4 h-4" />
           <span>Calculate</span>
@@ -94,24 +94,24 @@ export function CalculatorWidget({
   // Expandable widget
   if (isExpanded) {
     return (
-      <div className={`border rounded-lg bg-white shadow-lg overflow-hidden ${className}`}>
-        <div className="bg-blue-50 border-b px-4 py-2">
+      <div className={`border rounded-lg bg-background shadow-lg overflow-hidden ${className}`}>
+        <div className="bg-info/10 border-b border-info/20 px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Calculator className="w-4 h-4 text-blue-600" />
-              <span className="font-medium text-blue-900">Interactive Calculator</span>
+              <Calculator className="w-4 h-4 text-primary" />
+              <span className="font-medium text-foreground">Interactive Calculator</span>
             </div>
             <div className="flex items-center space-x-1">
               <button
                 onClick={toggleFullscreen}
-                className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+                className="p-1 text-primary hover:text-primary/80 transition-colors"
                 title="Fullscreen"
               >
                 <Maximize2 className="w-4 h-4" />
               </button>
               <button
                 onClick={toggleExpanded}
-                className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+                className="p-1 text-primary hover:text-primary/80 transition-colors"
                 title="Close"
               >
                 <Minimize2 className="w-4 h-4" />
@@ -134,7 +134,7 @@ export function CalculatorWidget({
   return (
     <button
       onClick={toggleExpanded}
-      className={`flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors ${className}`}
+      className={`flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors ${className}`}
     >
       <Calculator className="w-4 h-4" />
       <span>Try This Formula</span>
@@ -190,8 +190,8 @@ export function CalculatorWidgetManager({
             className={`
               flex items-center space-x-2 px-3 py-2 text-sm rounded border transition-colors
               ${activeWidgets.has(formula.id)
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-blue-600 border-blue-600 hover:bg-blue-50'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-background text-primary border-primary hover:bg-info/10'
               }
             `}
           >
@@ -222,7 +222,7 @@ export function CalculatorWidgetManager({
 
       {/* Status */}
       {activeWidgets.size > 0 && (
-        <div className="text-sm text-gray-600 text-center">
+        <div className="text-sm text-muted-foreground text-center">
           {activeWidgets.size} of {maxConcurrent} calculators active
         </div>
       )}

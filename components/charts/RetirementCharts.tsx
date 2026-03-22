@@ -193,7 +193,7 @@ export function RetirementCharts({
         {/* Withdrawal Timeline - STARTS AT RETIREMENT ONLY */}
         {(activeChart === 'all' || activeChart === 'withdrawal') && (
           <div className="chart-container">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-sage-200 dark:border-gray-700 p-4">
+            <div className="bg-card rounded-lg shadow-sm border border-border p-4">
               {withPerformanceTracking('withdrawal', chartComponents.withdrawal)}
             </div>
           </div>
@@ -203,7 +203,7 @@ export function RetirementCharts({
         {/* Net Worth Progression */}
         {(activeChart === 'all' || activeChart === 'netWorth') && (
           <div className="chart-container">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-sage-200 dark:border-gray-700 p-4">
+            <div className="bg-card rounded-lg shadow-sm border border-border p-4">
               {withPerformanceTracking('netWorth', chartComponents.netWorth)}
             </div>
           </div>
@@ -212,7 +212,7 @@ export function RetirementCharts({
         {/* Scenario Comparison */}
         {(activeChart === 'all' || activeChart === 'scenarios') && (
           <div className="chart-container">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-sage-200 dark:border-gray-700 p-4">
+            <div className="bg-card rounded-lg shadow-sm border border-border p-4">
               {withPerformanceTracking('scenarios', chartComponents.scenarios)}
             </div>
           </div>

@@ -33,10 +33,10 @@ export function ResultCard({
 
   const variantClasses = {
     default: 'border-border',
-    success: 'border-green-200 bg-green-50',
-    warning: 'border-yellow-200 bg-yellow-50',
-    danger: 'border-red-200 bg-red-50',
-    info: 'border-blue-200 bg-blue-50'
+    success: 'border-success/30 bg-success/5',
+    warning: 'border-warning/30 bg-warning/5',
+    danger: 'border-destructive/30 bg-destructive/5',
+    info: 'border-info/30 bg-info/5'
   };
 
   const sizeClasses = {
@@ -100,9 +100,9 @@ export function MetricCard({
   className
 }: MetricCardProps) {
   const trendColors = {
-    up: 'text-green-600',
-    down: 'text-red-600',
-    neutral: 'text-gray-600'
+    up: 'text-success',
+    down: 'text-destructive',
+    neutral: 'text-muted-foreground'
   };
 
   return (
@@ -156,9 +156,9 @@ export function ComparisonCard({
             key={index}
             className={cn(
               'flex items-center justify-between p-3 rounded-lg border',
-              scenario.isRecommended 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-gray-50 border-gray-200'
+              scenario.isRecommended
+                ? 'bg-success/5 border-success/30'
+                : 'bg-muted border-border'
             )}
           >
             <div>
@@ -199,7 +199,7 @@ export function InsightCard({
       <ul className="space-y-2">
         {insights.map((insight, index) => (
           <li key={index} className="flex items-start space-x-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
+            <div className="w-2 h-2 bg-info rounded-full mt-2 flex-shrink-0" />
             <div className="text-sm">{insight}</div>
           </li>
         ))}

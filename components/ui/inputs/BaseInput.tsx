@@ -39,11 +39,11 @@ export function BaseInput({
         htmlFor={inputId}
         className={cn(
           "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-          hasError && "text-red-600"
+          hasError && "text-destructive"
         )}
       >
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-destructive ml-1">*</span>}
       </label>
       
       {/* Input Container */}
@@ -61,10 +61,10 @@ export function BaseInput({
                 'aria-invalid': hasError,
                 className: cn(
                   "w-full border bg-background rounded-md text-sm transition-colors",
-                  "focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-400",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
                   hasError
-                    ? "border-red-300 focus:border-red-500 focus:ring-red-200"
-                    : "border-input hover:border-sage-300",
+                    ? "border-destructive focus:border-destructive focus:ring-destructive/20"
+                    : "border-input hover:border-ring/50",
                   disabled && "opacity-50 cursor-not-allowed",
                   (child as React.ReactElement).props.className
                 ),
@@ -79,9 +79,9 @@ export function BaseInput({
       
       {/* Help Text */}
       {help && !hasError && (
-        <p 
+        <p
           id={helpId}
-          className="text-xs text-gray-500"
+          className="text-xs text-muted-foreground"
         >
           {help}
         </p>
@@ -91,10 +91,10 @@ export function BaseInput({
       {hasError && errorMessage && (
         <p 
           id={errorId}
-          className="text-xs text-red-600 flex items-start space-x-1"
+          className="text-xs text-destructive flex items-start space-x-1"
           role="alert"
         >
-          <span className="text-red-500 font-bold">⚠</span>
+          <span className="text-destructive font-bold">⚠</span>
           <span>{errorMessage}</span>
         </p>
       )}

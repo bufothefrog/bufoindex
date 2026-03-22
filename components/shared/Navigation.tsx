@@ -55,7 +55,7 @@ export function Navigation() {
   }
 
   return (
-    <div className="flex items-center space-x-4 mt-3 pt-3 border-t border-gray-200/50">
+    <div className="flex items-center space-x-4 mt-3 pt-3 border-t border-border">
       {breadcrumbs.map((crumb, index) => (
         <div key={crumb.href} className="flex items-center">
           {index > 0 && (

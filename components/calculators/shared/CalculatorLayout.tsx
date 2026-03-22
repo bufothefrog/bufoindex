@@ -67,11 +67,11 @@ export function CalculatorLayout({
       <div className={cn('mx-auto p-6', maxWidthClasses[maxWidth])}>
         {/* Header */}
         <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+          <h2 className="text-3xl font-bold text-foreground mb-2">
             {title}
           </h2>
           {description && (
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               {description}
             </p>
           )}
@@ -154,7 +154,7 @@ export function CalculatorLayout({
 
                     {/* Errors */}
                     {Object.keys(errors).length > 0 && (
-                      <div className="mt-4 text-sm text-red-600">
+                      <div className="mt-4 text-sm text-destructive">
                         {Object.values(errors).join(', ')}
                       </div>
                     )}
@@ -218,7 +218,7 @@ export function CalculatorLayout({
 
         {/* Global Errors */}
         {Object.keys(errors).length > 0 && layout !== 'responsive' && (
-          <div className="mt-4 text-center text-sm text-red-600">
+          <div className="mt-4 text-center text-sm text-destructive">
             {Object.values(errors).join(', ')}
           </div>
         )}

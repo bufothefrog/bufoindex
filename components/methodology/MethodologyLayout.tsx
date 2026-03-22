@@ -116,19 +116,19 @@ export function MethodologyLayout({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border">
+      <div className="bg-info/10 rounded-lg p-6 border border-info/20">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
-              <BookOpen className="w-6 h-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+              <BookOpen className="w-6 h-6 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">{title}</h1>
             </div>
             
             {description && (
-              <p className="text-gray-700 mb-4 max-w-3xl">{description}</p>
+              <p className="text-foreground mb-4 max-w-3xl">{description}</p>
             )}
 
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
+            <div className="flex items-center space-x-6 text-sm text-muted-foreground">
               <div className="flex items-center space-x-2">
                 <Calculator className="w-4 h-4" />
                 <span>{totalFormulas} formulas</span>
@@ -156,7 +156,7 @@ export function MethodologyLayout({
             {onBackToCalculator && (
               <button
                 onClick={onBackToCalculator}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center space-x-2"
               >
                 <Calculator className="w-4 h-4" />
                 <span>Back to Calculator</span>
@@ -170,27 +170,27 @@ export function MethodologyLayout({
       <CategorySummary categories={categorySummary} />
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-lg border p-4">
+      <div className="bg-card rounded-lg border p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <input
               type="text"
               placeholder="Search formulas, variables, or concepts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
             />
           </div>
 
           {/* Category Filter */}
           <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-400" />
+            <Filter className="w-4 h-4 text-muted-foreground" />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value as FormulaCategory | 'all')}
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
             >
               <option value="all">All Categories</option>
               {Object.entries(CATEGORY_INFO)
@@ -210,8 +210,8 @@ export function MethodologyLayout({
               onClick={() => setViewMode('detailed')}
               className={`px-3 py-1 rounded text-sm transition-colors ${
                 viewMode === 'detailed'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
               }`}
             >
               Detailed
@@ -220,8 +220,8 @@ export function MethodologyLayout({
               onClick={() => setViewMode('compact')}
               className={`px-3 py-1 rounded text-sm transition-colors ${
                 viewMode === 'compact'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
               }`}
             >
               Compact
@@ -232,9 +232,9 @@ export function MethodologyLayout({
 
       {/* Results Count */}
       {(searchQuery || selectedCategory !== 'all') && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="bg-info/10 border border-info/20 rounded-lg p-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-800">
+            <span className="text-sm text-foreground">
               {Object.values(filteredFormulas).reduce((sum, arr) => sum + arr.length, 0)} results
               {searchQuery && ` for "${searchQuery}"`}
               {selectedCategory !== 'all' && ` in ${CATEGORY_INFO[selectedCategory].title}`}
@@ -245,7 +245,7 @@ export function MethodologyLayout({
                   setSearchQuery('');
                   setSelectedCategory('all');
                 }}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                className="text-sm text-primary hover:text-primary/80 underline"
               >
                 Clear filters
               </button>
@@ -285,9 +285,9 @@ export function MethodologyLayout({
       {/* No Results */}
       {Object.values(filteredFormulas).every(arr => arr.length === 0) && (searchQuery || selectedCategory !== 'all') && (
         <div className="text-center py-12">
-          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No formulas found</h3>
-          <p className="text-gray-600 mb-4">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No formulas found</h3>
+          <p className="text-muted-foreground mb-4">
             Try adjusting your search terms or category filter.
           </p>
           <button
@@ -295,7 +295,7 @@ export function MethodologyLayout({
               setSearchQuery('');
               setSelectedCategory('all');
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             Show All Formulas
           </button>
@@ -304,16 +304,16 @@ export function MethodologyLayout({
 
       {/* Footer */}
       <div className="border-t pt-6 mt-12">
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           <div>
             This methodology page is automatically generated from the calculator&apos;s source code.
           </div>
           <div className="flex items-center space-x-4">
-            <button className="flex items-center space-x-2 hover:text-gray-900 transition-colors">
+            <button className="flex items-center space-x-2 hover:text-foreground transition-colors">
               <Share className="w-4 h-4" />
               <span>Share</span>
             </button>
-            <button className="flex items-center space-x-2 hover:text-gray-900 transition-colors">
+            <button className="flex items-center space-x-2 hover:text-foreground transition-colors">
               <Download className="w-4 h-4" />
               <span>Export</span>
             </button>

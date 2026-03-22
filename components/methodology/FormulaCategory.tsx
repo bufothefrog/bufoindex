@@ -90,7 +90,7 @@ export function FormulaCategory({
         >
           <div className="flex items-center space-x-3">
             <h2 className="text-xl font-bold">{title}</h2>
-            <span className="px-2 py-1 bg-white/50 rounded-full text-sm">
+            <span className="px-2 py-1 bg-background/50 rounded-full text-sm">
               {formulas.length} {formulas.length === 1 ? 'formula' : 'formulas'}
             </span>
           </div>
@@ -111,13 +111,13 @@ export function FormulaCategory({
         {expanded && showSearch && formulas.length > 3 && (
           <div className="mt-4 flex items-center space-x-4">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search formulas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-white/70 border border-white/50 rounded-md focus:outline-none focus:ring-2 focus:ring-white/50 placeholder-gray-500"
+                className="w-full pl-10 pr-3 py-2 bg-background/70 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
               />
             </div>
             
@@ -126,7 +126,7 @@ export function FormulaCategory({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'name' | 'complexity')}
-                className="bg-white/70 border border-white/50 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                className="bg-background/70 border border-border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="name">Sort by Name</option>
                 <option value="complexity">Sort by Complexity</option>

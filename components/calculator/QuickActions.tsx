@@ -225,27 +225,27 @@ export function QuickActions({ profile }: QuickActionsProps) {
     switch (urgency) {
       case 'critical':
         return {
-          card: 'border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800',
-          header: 'text-red-800 dark:text-red-200',
-          icon: 'text-red-600 dark:text-red-400',
-          button: 'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800 text-white',
-          badge: 'bg-red-500 dark:bg-red-600 text-white'
+          card: 'border-l-4 border-l-destructive',
+          header: 'text-destructive',
+          icon: 'text-destructive',
+          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+          badge: 'bg-destructive text-destructive-foreground'
         };
       case 'important':
         return {
-          card: 'border-yellow-200 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900 hover:bg-yellow-100 dark:hover:bg-yellow-800',
-          header: 'text-yellow-800 dark:text-yellow-200',
-          icon: 'text-yellow-600 dark:text-yellow-400',
-          button: 'bg-yellow-600 dark:bg-yellow-700 hover:bg-yellow-700 dark:hover:bg-yellow-800 text-white',
-          badge: 'bg-yellow-500 dark:bg-yellow-600 text-white'
+          card: 'border-l-4 border-l-warning',
+          header: 'text-foreground',
+          icon: 'text-warning',
+          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+          badge: 'bg-warning text-warning-foreground'
         };
       case 'optimization':
         return {
-          card: 'border-green-200 dark:border-green-600 bg-green-50 dark:bg-green-900 hover:bg-green-100 dark:hover:bg-green-800',
-          header: 'text-green-800 dark:text-green-200',
-          icon: 'text-green-600 dark:text-green-400',
-          button: 'bg-green-600 dark:bg-green-700 hover:bg-green-700 dark:hover:bg-green-800 text-white',
-          badge: 'bg-green-500 dark:bg-green-600 text-white'
+          card: 'border-l-4 border-l-success',
+          header: 'text-foreground',
+          icon: 'text-success',
+          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+          badge: 'bg-success text-success-foreground'
         };
     }
   };
@@ -262,7 +262,7 @@ export function QuickActions({ profile }: QuickActionsProps) {
       <Card className={cn("transition-all duration-200 hover:shadow-md", styles.card)}>
         <CardContent className="p-4">
           <div className="flex items-start space-x-4">
-            <div className="p-2 rounded-full bg-white shadow-sm">
+            <div className="p-2 rounded-full bg-card shadow-sm">
               <IconComponent className={cn("w-5 h-5", styles.icon)} />
             </div>
             <div className="flex-1 min-w-0">
@@ -276,16 +276,16 @@ export function QuickActions({ profile }: QuickActionsProps) {
                 </div>
               </div>
               
-              <p className="text-sm text-gray-600 mb-3">{action.description}</p>
+              <p className="text-sm text-muted-foreground mb-3">{action.description}</p>
               
               <div className="grid grid-cols-2 gap-4 mb-3 text-xs">
                 <div className="flex items-center space-x-1">
-                  <DollarSign className="w-3 h-3 text-green-500 dark:text-green-400" />
-                  <span className="text-gray-600">{action.impact}</span>
+                  <DollarSign className="w-3 h-3 text-success" />
+                  <span className="text-muted-foreground">{action.impact}</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <Clock className="w-3 h-3 text-blue-500 dark:text-blue-400" />
-                  <span className="text-gray-600">{action.timeToImplement}</span>
+                  <Clock className="w-3 h-3 text-info" />
+                  <span className="text-muted-foreground">{action.timeToImplement}</span>
                 </div>
               </div>
               
@@ -311,8 +311,8 @@ export function QuickActions({ profile }: QuickActionsProps) {
       {criticalActions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <h3 className="text-lg font-semibold text-destructive">
               Fix These First - You&apos;re Losing Money
             </h3>
           </div>
@@ -328,8 +328,8 @@ export function QuickActions({ profile }: QuickActionsProps) {
       {importantActions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <Target className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200">
+            <Target className="w-5 h-5 text-warning" />
+            <h3 className="text-lg font-semibold text-foreground">
               High-Impact Optimizations
             </h3>
           </div>
@@ -345,8 +345,8 @@ export function QuickActions({ profile }: QuickActionsProps) {
       {optimizationActions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
+            <TrendingUp className="w-5 h-5 text-success" />
+            <h3 className="text-lg font-semibold text-foreground">
               Advanced Optimizations
             </h3>
           </div>

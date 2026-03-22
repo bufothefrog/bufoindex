@@ -126,24 +126,24 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
           <Building2 className="w-5 h-5 text-green-600 dark:text-green-400" />
           <span>Payroll Configuration Guide</span>
         </CardTitle>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Configure your {getFrequencyText().toLowerCase()} payroll to automate your optimized allocation
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Paycheck Summary */}
-        <div className="p-4 bg-white rounded-lg border border-green-200">
-          <h4 className="font-medium text-gray-900 mb-3">Your {getFrequencyText()} Paycheck Flow</h4>
+        <div className="p-4 bg-card rounded-lg border border-border">
+          <h4 className="font-medium text-foreground mb-3">Your {getFrequencyText()} Paycheck Flow</h4>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-gray-600">Take-Home Pay:</span>
+              <span className="text-muted-foreground">Take-Home Pay:</span>
               <span className="font-medium">{formatCurrency(paycheckAmount)}</span>
             </div>
-            <div className="flex items-center justify-between text-green-700">
+            <div className="flex items-center justify-between text-green-700 dark:text-green-400">
               <span>Expenses + Fun Money:</span>
               <span className="font-medium">{formatCurrency(expensesAndFunMoney)}</span>
             </div>
-            <div className="flex items-center justify-between text-blue-700">
+            <div className="flex items-center justify-between text-blue-700 dark:text-blue-400">
               <span>Priority Investments:</span>
               <span className="font-medium">{formatCurrency(paycheckAmount - expensesAndFunMoney)}</span>
             </div>
@@ -152,7 +152,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
         
         {/* Automation Tier Selection */}
         <div className="space-y-3">
-          <h4 className="font-medium text-gray-900">Choose Your Automation Level</h4>
+          <h4 className="font-medium text-foreground">Choose Your Automation Level</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {(['basic', 'intermediate', 'advanced'] as AutomationTier[]).map((tier) => {
               const icons = { basic: Settings, intermediate: Target, advanced: Zap };
@@ -164,17 +164,17 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
                   onClick={() => setSelectedTier(tier)}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     selectedTier === tier
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                      : 'border-border hover:border-border'
                   }`}
                 >
                   <div className="flex items-center space-x-2 mb-1">
-                    <Icon className={`w-4 h-4 ${selectedTier === tier ? 'text-green-600' : 'text-gray-500'}`} />
-                    <span className={`text-sm font-medium capitalize ${selectedTier === tier ? 'text-green-900' : 'text-gray-700'}`}>
+                    <Icon className={`w-4 h-4 ${selectedTier === tier ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+                    <span className={`text-sm font-medium capitalize ${selectedTier === tier ? 'text-green-900 dark:text-green-100' : 'text-muted-foreground'}`}>
                       {tier}
                     </span>
                   </div>
-                  <p className={`text-xs ${selectedTier === tier ? 'text-green-700' : 'text-gray-500'}`}>
+                  <p className={`text-xs ${selectedTier === tier ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground'}`}>
                     {tier === 'basic' && 'Manual transfers'}
                     {tier === 'intermediate' && '2-account split'}
                     {tier === 'advanced' && 'Multi-account split'}
@@ -188,7 +188,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
         {/* Selected Instructions */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium text-gray-900">{instructions.title}</h4>
+            <h4 className="font-medium text-foreground">{instructions.title}</h4>
             <Button
               onClick={copyInstructions}
               variant="outline"
@@ -197,7 +197,7 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
             >
               {copiedInstructions ? (
                 <>
-                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
                   <span>Copied!</span>
                 </>
               ) : (
@@ -209,12 +209,12 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
             </Button>
           </div>
           
-          <p className="text-sm text-gray-600">{instructions.description}</p>
+          <p className="text-sm text-muted-foreground">{instructions.description}</p>
           
-          <div className="p-4 bg-white rounded-lg border border-gray-200">
+          <div className="p-4 bg-card rounded-lg border border-border">
             <div className="space-y-2">
               {instructions.setup.map((line, index) => (
-                <div key={index} className={`text-sm ${line === '' ? 'py-1' : 'text-gray-800'} ${line.startsWith('•') ? 'ml-4' : ''}`}>
+                <div key={index} className={`text-sm ${line === '' ? 'py-1' : 'text-foreground'} ${line.startsWith('•') ? 'ml-4' : ''}`}>
                   {line}
                 </div>
               ))}
@@ -224,10 +224,10 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
           {/* Pros/Cons */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <h5 className="text-sm font-medium text-green-800">Pros:</h5>
+              <h5 className="text-sm font-medium text-green-800 dark:text-green-300">Pros:</h5>
               <ul className="space-y-1">
                 {instructions.pros.map((pro, index) => (
-                  <li key={index} className="text-xs text-green-700 flex items-center space-x-2">
+                  <li key={index} className="text-xs text-green-700 dark:text-green-400 flex items-center space-x-2">
                     <CheckCircle className="w-3 h-3" />
                     <span>{pro}</span>
                   </li>
@@ -235,10 +235,10 @@ export function PayrollSetupGuide({ profile, result }: PayrollSetupGuideProps) {
               </ul>
             </div>
             <div className="space-y-2">
-              <h5 className="text-sm font-medium text-amber-800">Cons:</h5>
+              <h5 className="text-sm font-medium text-amber-800 dark:text-amber-300">Cons:</h5>
               <ul className="space-y-1">
                 {instructions.cons.map((con, index) => (
-                  <li key={index} className="text-xs text-amber-700 flex items-center space-x-2">
+                  <li key={index} className="text-xs text-amber-700 dark:text-amber-400 flex items-center space-x-2">
                     <Info className="w-3 h-3" />
                     <span>{con}</span>
                   </li>

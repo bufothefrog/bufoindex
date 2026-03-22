@@ -47,8 +47,8 @@ export function InsightsDisplay({
   const opportunityCost = generateOpportunityCostAnalysis();
 
   const renderOpportunityCostInsight = () => (
-    <div className="bg-sage-50 border border-sage-200 p-4 rounded-lg">
-      <h4 className="font-semibold text-sage-800 mb-3 flex items-center">
+    <div className="bg-sage-50 dark:bg-sage-800/20 border border-sage-200 dark:border-sage-600 p-4 rounded-lg">
+      <h4 className="font-semibold text-sage-800 dark:text-sage-200 mb-3 flex items-center">
         <Scale className="w-4 h-4 mr-2" />
         Opportunity Cost Analysis
       </h4>
@@ -56,32 +56,32 @@ export function InsightsDisplay({
       <div className="grid md:grid-cols-2 gap-4 text-sm">
         <div className="space-y-2">
           <div className="flex justify-between">
-            <span className="text-sage-600">Total retirement savings:</span>
+            <span className="text-sage-600 dark:text-sage-400">Total retirement savings:</span>
             <span className="font-mono">{formatCurrency(opportunityCost.totalContributions)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sage-600">Working years:</span>
+            <span className="text-sage-600 dark:text-sage-400">Working years:</span>
             <span className="font-mono">{opportunityCost.yearsWorking} years</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sage-600">Retirement years:</span>
+            <span className="text-sage-600 dark:text-sage-400">Retirement years:</span>
             <span className="font-mono">{opportunityCost.yearsRetired} years</span>
           </div>
         </div>
         
         <div className="space-y-2">
           <div className="flex justify-between">
-            <span className="text-sage-600">Cost per retirement day:</span>
+            <span className="text-sage-600 dark:text-sage-400">Cost per retirement day:</span>
             <span className="font-mono">${opportunityCost.costPerRetirementDay.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-sage-600">Savings rate:</span>
+            <span className="text-sage-600 dark:text-sage-400">Savings rate:</span>
             <span className="font-mono">{(savingsRate * 100).toFixed(1)}%</span>
           </div>
         </div>
       </div>
       
-      <div className="mt-3 p-3 bg-white border border-sage-200 rounded text-sm">
+      <div className="mt-3 p-3 bg-background border border-sage-200 dark:border-sage-600 rounded text-sm">
         <strong>BufoIndex Perspective:</strong> You&apos;re investing {formatCurrency(inputs.monthlySavings * 12)} 
         annually for {opportunityCost.yearsWorking} years to fund {opportunityCost.yearsRetired} retirement years. 
         Each retirement day costs ${opportunityCost.costPerRetirementDay.toFixed(2)} in foregone present-day spending.
@@ -107,7 +107,7 @@ export function InsightsDisplay({
               <strong>You have choices:</strong> Your projected retirement income 
               ({formatCurrency(currentProjected)}) exceeds your target ({formatCurrency(currentRequirement)}).
             </p>
-            <div className="bg-white p-3 rounded border">
+            <div className="bg-background p-3 rounded border border-border">
               <strong>Option 1:</strong> Maintain savings rate, retire with {formatCurrency(surplus)} extra annually<br/>
               <strong>Option 2:</strong> Reduce savings rate, use extra for present experiences<br/>
               <strong>Option 3:</strong> Retire earlier with same income level
@@ -120,7 +120,7 @@ export function InsightsDisplay({
         ) : status === 'onTrack' ? (
           <div className="text-sm space-y-2">
             <p>Your current trajectory meets your target. Small optimizations can provide meaningful benefits:</p>
-            <div className="bg-white p-3 rounded border">
+            <div className="bg-background p-3 rounded border border-border">
               <strong>+$500/month trade-off:</strong> {inputs.monthlySavings * 6} less in present spending 
               for potentially 2+ years earlier retirement<br/>
               <strong>Status quo trade-off:</strong> Current lifestyle maintained, retirement at target age
@@ -129,7 +129,7 @@ export function InsightsDisplay({
         ) : (
           <div className="text-sm space-y-2">
             <p>Current trajectory falls short. Here&apos;s the reality check:</p>
-            <div className="bg-white p-3 rounded border">
+            <div className="bg-background p-3 rounded border border-border">
               <strong>Current path:</strong> Retire later or with less income<br/>
               <strong>Bridge the gap:</strong> Increase savings or work longer<br/>
               <strong>Reduce target:</strong> Consider if less retirement income enables earlier freedom
@@ -208,7 +208,7 @@ export function InsightsDisplay({
         </div>
         
         {coastFire?.isAchievable && coastFire.ageAchievable && (
-          <div className="bg-purple-100 p-3 rounded border">
+          <div className="bg-purple-100 dark:bg-purple-800/30 p-3 rounded border border-border">
             <strong>Coast FIRE Strategy:</strong> Focus intensively until age {coastFire.ageAchievable}, 
             then shift to lifestyle optimization. This provides maximum optionality with minimal time commitment.
           </div>
@@ -226,9 +226,9 @@ export function InsightsDisplay({
       {renderActionableRecommendations()}
       
       {/* Philosophy footer */}
-      <div className="bg-sage-100 p-4 rounded-lg border-l-4 border-sage-400">
-        <h5 className="font-semibold text-sage-800 mb-2">BufoIndex Philosophy</h5>
-        <p className="text-sm text-sage-700">
+      <div className="bg-sage-100 dark:bg-sage-800/30 p-4 rounded-lg border-l-4 border-sage-400">
+        <h5 className="font-semibold text-sage-800 dark:text-sage-200 mb-2">BufoIndex Philosophy</h5>
+        <p className="text-sm text-sage-700 dark:text-sage-300">
           Traditional retirement advice optimizes for maximum dollars in retirement. 
           BufoIndex optimizes for maximum life optionality. Sometimes retiring with less money 
           but more years of freedom creates better life outcomes than working longer for marginal gains. 

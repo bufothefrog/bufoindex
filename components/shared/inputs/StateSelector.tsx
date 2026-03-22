@@ -235,7 +235,7 @@ export function StateSelector({
       
       <div className="relative" ref={dropdownRef}>
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
           ref={inputRef}
           type="text"
@@ -256,8 +256,8 @@ export function StateSelector({
           placeholder={placeholder}
           className={cn(
             "w-full h-10 pl-10 pr-10 py-2 border border-input bg-background rounded-md text-sm",
-            "focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-sage-500",
-            "hover:border-sage-300 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
+            "hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
             error && "border-destructive focus-visible:ring-destructive"
           )}
           aria-expanded={isOpen}
@@ -267,24 +267,14 @@ export function StateSelector({
           aria-controls={listboxId}
         />
         <ChevronDown className={cn(
-          "absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform",
+          "absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform",
           isOpen && "rotate-180"
         )} />
       </div>
 
       {isOpen && (
-        <div 
-          className="absolute w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-auto"
-          style={{ 
-            position: 'absolute', 
-            top: '100%', 
-            left: 0, 
-            right: 0, 
-            zIndex: 9999,
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}
+        <div
+          className="absolute w-full mt-1 bg-popover border border-border rounded shadow-lg max-h-60 overflow-auto z-[9999]"
           onMouseDown={(e) => {
             // Prevent input blur when clicking dropdown
             e.preventDefault();
@@ -308,16 +298,16 @@ export function StateSelector({
                 >
                   <span className="flex items-center space-x-2">
                     <span>{state.name}</span>
-                    <span className="text-xs text-gray-400 font-mono">({state.code})</span>
+                    <span className="text-xs text-muted-foreground font-mono">({state.code})</span>
                   </span>
-                  <span className="text-xs text-gray-600 font-mono">
+                  <span className="text-xs text-muted-foreground font-mono">
                     {state.hasIncomeTax ? `${(state.rate * 100).toFixed(1)}%` : 'No tax'}
                   </span>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="px-3 py-2 text-sm text-gray-500 italic">
+            <div className="px-3 py-2 text-sm text-muted-foreground italic">
               No states found matching &quot;{searchTerm}&quot;
             </div>
           )}
@@ -325,7 +315,7 @@ export function StateSelector({
       )}
       
       {help && !error && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           {help}
         </p>
       )}

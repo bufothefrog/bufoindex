@@ -105,7 +105,7 @@ export function StreamlinedInputSection() {
                 })}
                 className="text-sm"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Months of expenses to save (typically 3-6)
               </p>
             </div>
@@ -124,7 +124,7 @@ export function StreamlinedInputSection() {
                 })}
                 className="text-sm"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 High-yield savings accounts currently offer 3.5-4.5% APY
               </p>
             </div>
@@ -155,7 +155,7 @@ export function StreamlinedInputSection() {
                 recordable
               />
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Range for dining out, entertainment, shopping, and discretionary spending
             </p>
           </div>
@@ -179,7 +179,7 @@ export function StreamlinedInputSection() {
                 onChange={(stateCode) => updateTaxes({ state: stateCode })}
                 placeholder="Type to search states..."
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Used for state income tax calculations in optimization
               </p>
             </div>
@@ -222,7 +222,7 @@ export function StreamlinedInputSection() {
                 onChange={(e) => updatePreferences({ age: Number(e.target.value) })}
                 className="text-sm"
               />
-              <p className="text-xs text-gray-500">Used for Roth vs Traditional optimization</p>
+              <p className="text-xs text-muted-foreground">Used for Roth vs Traditional optimization</p>
             </div>
             
             <div className="space-y-2">
@@ -239,7 +239,7 @@ export function StreamlinedInputSection() {
                 </label>
                 <Tooltip content="Are you currently in or approaching your highest earning years of your career? This affects Roth vs Traditional recommendations." />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Check if you&apos;re in/approaching your highest earning years
               </p>
             </div>
@@ -261,7 +261,7 @@ export function StreamlinedInputSection() {
               <option value="0.24">24% bracket</option>
               <option value="0.32">32% bracket</option>
             </select>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Leave as &quot;Auto-detect&quot; unless you have specific retirement income expectations
             </p>
           </div>
@@ -311,7 +311,7 @@ export function StreamlinedInputSection() {
                       })}
                       className="text-sm"
                     />
-                    <p className="text-xs text-gray-500">e.g., 50% means 50¢ per $1 you contribute</p>
+                    <p className="text-xs text-muted-foreground">e.g., 50% means 50¢ per $1 you contribute</p>
                   </div>
                   
                   <div className="space-y-2">
@@ -328,7 +328,7 @@ export function StreamlinedInputSection() {
                       })}
                       className="text-sm"
                     />
-                    <p className="text-xs text-gray-500">Maximum % of salary they&apos;ll match</p>
+                    <p className="text-xs text-muted-foreground">Maximum % of salary they&apos;ll match</p>
                   </div>
                 </div>
                 
@@ -346,7 +346,7 @@ export function StreamlinedInputSection() {
                     })}
                     className="text-sm"
                   />
-                  <p className="text-xs text-gray-500">Optional: What % have you already contributed this year?</p>
+                  <p className="text-xs text-muted-foreground">Optional: What % have you already contributed this year?</p>
                 </div>
               </div>
             )}
@@ -396,7 +396,7 @@ export function StreamlinedInputSection() {
                     })}
                     className="text-sm"
                   />
-                  <p className="text-xs text-gray-500">What you&apos;re already contributing per month this year</p>
+                  <p className="text-xs text-muted-foreground">What you&apos;re already contributing per month this year</p>
                 </div>
               </div>
             )}

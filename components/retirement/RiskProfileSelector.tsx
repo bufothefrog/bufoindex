@@ -146,21 +146,21 @@ export function RiskProfileSelector({
                 "hover:bg-sage-50 dark:hover:bg-sage-800/50 focus:outline-none focus:ring-2 focus:ring-sage-500",
                 isSelected 
                   ? "border-sage-500 bg-sage-50 dark:bg-sage-800/50 text-sage-900 dark:text-sage-100" 
-                  : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                  : "border-border bg-card text-foreground"
               )}
             >
               <div className="flex items-center space-x-2">
                 <Icon className={cn(
                   "w-4 h-4",
-                  isSelected ? "text-sage-600 dark:text-sage-300" : "text-gray-400 dark:text-gray-400"
+                  isSelected ? "text-sage-600 dark:text-sage-300" : "text-muted-foreground"
                 )} />
                 <span className="text-xs font-medium">{profile.name}</span>
               </div>
-              <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
+              <div className="mt-1 text-xs text-muted-foreground">
                 {profile.description}
               </div>
               {profile.type !== 'custom' && (
-                <div className="mt-2 text-xs text-gray-600 dark:text-gray-300 font-mono">
+                <div className="mt-2 text-xs text-muted-foreground font-mono">
                   {(profile.accumulationReturn * 100).toFixed(0)}% / {(profile.retirementReturn * 100).toFixed(0)}%
                 </div>
               )}
@@ -171,7 +171,7 @@ export function RiskProfileSelector({
           );
         })}
       </div>
-      <p className="text-xs text-gray-500 dark:text-gray-300">
+      <p className="text-xs text-muted-foreground">
         Target Date Fund automatically adjusts allocation based on your age. Select another profile for fixed allocations, or Custom to set your own values.
       </p>
     </div>

@@ -115,10 +115,10 @@ interface CalculatorHeaderProps {
 export function CalculatorHeader({ title, description, className }: CalculatorHeaderProps) {
   return (
     <div className={cn("mb-8 text-center", className)}>
-      <h2 className="text-3xl font-bold text-gray-900 mb-2">
+      <h2 className="text-3xl font-bold text-foreground mb-2">
         {title}
       </h2>
-      <p className="text-gray-600 max-w-2xl mx-auto">
+      <p className="text-muted-foreground max-w-2xl mx-auto">
         {description}
       </p>
     </div>
@@ -155,7 +155,7 @@ export function CalculateButton({
         onClick={onClick}
         disabled={disabled || isLoading || !onClick}
         size="lg"
-        className="w-full bg-sage-400 hover:bg-sage-500 text-white text-lg py-4"
+        className="w-full text-lg py-4"
       >
         {isLoading ? (
           <>
@@ -172,8 +172,8 @@ export function CalculateButton({
       
       {/* Error Display */}
       {hasErrors && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-          <div className="text-sm text-red-800">
+        <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+          <div className="text-sm text-destructive">
             <p className="font-medium mb-2">Please fix the following errors:</p>
             <ul className="list-disc list-inside space-y-1">
               {Object.entries(errors).map(([field, error]) => (
@@ -201,7 +201,7 @@ export function DisclaimerFooter({
 }: DisclaimerFooterProps) {
   return (
     <div className={cn("mt-12 text-center", className)}>
-      <p className="text-sm text-gray-500 max-w-4xl mx-auto">
+      <p className="text-sm text-muted-foreground max-w-4xl mx-auto">
         <strong>Disclaimer:</strong> {text}
       </p>
     </div>

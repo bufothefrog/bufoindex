@@ -50,8 +50,8 @@ export function BenefitsSelector({
             className={cn(
               "flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors",
               option.enabled
-                ? "bg-green-50 border-green-200 hover:bg-green-100"
-                : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                ? "bg-success/10 border-success/20 hover:bg-success/15"
+                : "bg-muted border-border hover:bg-muted/80"
             )}
             onClick={() => toggleOption(option.id)}
           >
@@ -64,8 +64,8 @@ export function BenefitsSelector({
             <div className={cn(
               "ml-3 w-6 h-6 rounded-full flex items-center justify-center",
               option.enabled
-                ? "bg-green-500 text-white"
-                : "bg-gray-300 text-gray-600"
+                ? "bg-success text-success-foreground"
+                : "bg-muted-foreground/30 text-muted-foreground"
             )}>
               {option.enabled ? (
                 <Check className="w-4 h-4" />

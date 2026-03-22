@@ -118,7 +118,7 @@ export function NumberInput({
       </div>
       
       {help && !error && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           {help}
         </p>
       )}

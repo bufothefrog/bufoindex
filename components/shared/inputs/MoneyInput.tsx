@@ -125,7 +125,7 @@ export function MoneyInput({
         />
       </div>
       {help && (
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           {help}
         </p>
       )}

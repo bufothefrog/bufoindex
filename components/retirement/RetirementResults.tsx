@@ -84,21 +84,21 @@ export function RetirementResults({ inputs, results, onShare }: RetirementResult
               <div className="text-2xl font-bold text-sage-600 dark:text-sage-300 font-mono tabular-nums">
                 {yearsToRetirement}
               </div>
-              <div className="text-sm text-gray-500">Years to Retirement</div>
+              <div className="text-sm text-muted-foreground">Years to Retirement</div>
             </div>
             
             <div>
               <div className="text-2xl font-bold text-sage-600 dark:text-sage-300 font-mono tabular-nums">
                 {(results.safeWithdrawalRate * 100).toFixed(2)}%
               </div>
-              <div className="text-sm text-gray-500">Safe Withdrawal Rate</div>
+              <div className="text-sm text-muted-foreground">Safe Withdrawal Rate</div>
             </div>
             
             <div>
               <div className="text-2xl font-bold text-sage-600 dark:text-sage-300 font-mono tabular-nums">
                 {formatCurrency(currentIncome)}
               </div>
-              <div className="text-sm text-gray-500">Projected Annual Income</div>
+              <div className="text-sm text-muted-foreground">Projected Annual Income</div>
             </div>
           </div>
 
@@ -176,7 +176,7 @@ export function RetirementResults({ inputs, results, onShare }: RetirementResult
             />
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">Click &quot;Show Charts&quot; to view detailed visualizations</p>
             <p className="text-xs mt-1">Includes withdrawal timeline, savings rate impact, net worth progression, and scenario comparisons</p>
@@ -208,7 +208,7 @@ export function RetirementResults({ inputs, results, onShare }: RetirementResult
             />
           </div>
         ) : (
-          <div className="text-center py-6 text-gray-500">
+          <div className="text-center py-6 text-muted-foreground">
             <p className="text-sm">Click &quot;Show Insights&quot; for detailed opportunity cost analysis and BufoIndex philosophy</p>
             <p className="text-xs mt-1">Includes inflation impact, time vs money trade-offs, and actionable recommendations</p>
           </div>
@@ -219,24 +219,24 @@ export function RetirementResults({ inputs, results, onShare }: RetirementResult
       <InputCard title="Scenario Summary">
         <div className="space-y-4">
           {results.scenarios.map((scenario) => (
-            <div key={scenario.id} className="border dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+            <div key={scenario.id} className="border border-border rounded-lg p-4 hover:bg-muted transition-colors">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-semibold text-sage-800 dark:text-sage-100">{scenario.name}</h3>
                 <div className="text-right">
                   <div className="text-sm font-medium text-sage-600 dark:text-sage-300 font-mono tabular-nums">
                     {(scenario.successProbability * 100).toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-300">Success Rate</div>
+                  <div className="text-xs text-muted-foreground">Success Rate</div>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div>
-                  <div className="text-gray-500 dark:text-gray-300">Projected Balance</div>
+                  <div className="text-muted-foreground">Projected Balance</div>
                   <div className="font-medium font-mono tabular-nums">{formatCurrency(scenario.projectedBalance)}</div>
                 </div>
                 <div>
-                  <div className="text-gray-500 dark:text-gray-300">Required Balance</div>
+                  <div className="text-muted-foreground">Required Balance</div>
                   <div className="font-medium font-mono tabular-nums">{formatCurrency(scenario.requiredBalance)}</div>
                 </div>
               </div>
@@ -260,7 +260,7 @@ export function RetirementResults({ inputs, results, onShare }: RetirementResult
         <InputCard title="Traditional Planning Insights">
           <div className="space-y-2">
             {results.insights.map((insight, index) => (
-              <div key={index} className="text-sm p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-l-4 border-gray-300 dark:border-gray-500">
+              <div key={index} className="text-sm p-3 bg-muted rounded-lg border-l-4 border-border">
                 {insight}
               </div>
             ))}

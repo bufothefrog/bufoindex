@@ -56,8 +56,8 @@ export function SelectInput({
           required={required}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2",
-            "hover:border-sage-300 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
             "appearance-none pr-10", // Remove default arrow, add padding for custom arrow
             error && "border-destructive focus-visible:ring-destructive"
           )}
@@ -79,11 +79,11 @@ export function SelectInput({
         </select>
         
         {/* Custom dropdown arrow */}
-        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
       </div>
       
       {help && !error && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           {help}
         </p>
       )}

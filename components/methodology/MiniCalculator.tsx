@@ -117,13 +117,13 @@ export function MiniCalculator({
 
   if (compact) {
     return (
-      <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+      <div className="border rounded-lg p-4 bg-info/10 border-info/20">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-blue-900">{formula.name}</h4>
+          <h4 className="font-semibold text-foreground">{formula.name}</h4>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-blue-600 hover:text-blue-800 text-sm"
+              className="text-primary hover:text-primary/80 text-sm"
             >
               ✕
             </button>
@@ -138,7 +138,7 @@ export function MiniCalculator({
                 type="number"
                 value={inputs[variable] || ''}
                 onChange={(e) => handleInputChange(variable, e.target.value)}
-                className="flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder={info.unit}
               />
             </div>
@@ -146,9 +146,9 @@ export function MiniCalculator({
         </div>
 
         {calculatedResult !== null && (
-          <div className="mt-3 p-2 bg-white rounded border">
-            <div className="text-sm text-gray-600">Result:</div>
-            <div className="text-lg font-bold text-blue-900">
+          <div className="mt-3 p-2 bg-background rounded border">
+            <div className="text-sm text-muted-foreground">Result:</div>
+            <div className="text-lg font-bold text-foreground">
               {calculatedResult.toLocaleString()}
             </div>
           </div>
@@ -158,9 +158,9 @@ export function MiniCalculator({
   }
 
   return (
-    <div className="max-w-2xl mx-auto bg-white border rounded-lg shadow-lg overflow-hidden">
+    <div className="max-w-2xl mx-auto bg-background border rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-blue-600 text-white p-4">
+      <div className="bg-primary text-primary-foreground p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Calculator className="w-6 h-6" />
@@ -169,19 +169,19 @@ export function MiniCalculator({
           {onClose && (
             <button
               onClick={onClose}
-              className="text-blue-200 hover:text-white transition-colors"
+              className="text-primary-foreground/70 hover:text-primary-foreground transition-colors"
             >
               ✕
             </button>
           )}
         </div>
-        <p className="text-blue-100 text-sm mt-1">{formula.description}</p>
+        <p className="text-primary-foreground/80 text-sm mt-1">{formula.description}</p>
       </div>
 
       <div className="p-6 space-y-6">
         {/* Formula Display */}
         <div className="text-center">
-          <DisplayLatex latex={formula.latex} className="bg-gray-50" />
+          <DisplayLatex latex={formula.latex} className="bg-muted" />
         </div>
 
         {/* Input Variables */}
@@ -192,18 +192,18 @@ export function MiniCalculator({
               <div key={variable} className="space-y-1">
                 <label className="flex items-center justify-between text-sm font-medium">
                   <span className="flex items-center space-x-2">
-                    <code className="bg-gray-100 px-1 rounded">{variable}</code>
+                    <code className="bg-muted px-1 rounded">{variable}</code>
                     <span>{info.description}</span>
                   </span>
                   {info.unit && (
-                    <span className="text-gray-500">({info.unit})</span>
+                    <span className="text-muted-foreground">({info.unit})</span>
                   )}
                 </label>
                 <input
                   type="number"
                   value={inputs[variable] || ''}
                   onChange={(e) => handleInputChange(variable, e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                   placeholder={`Enter ${info.description.toLowerCase()}`}
                   step="any"
                 />
@@ -221,7 +221,7 @@ export function MiniCalculator({
             <button
               onClick={handleCalculate}
               disabled={isCalculating}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Play className="w-4 h-4" />
               <span>{isCalculating ? 'Calculating...' : 'Calculate'}</span>
@@ -229,7 +229,7 @@ export function MiniCalculator({
             
             <button
               onClick={handleReset}
-              className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 border border-input rounded hover:bg-muted transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Reset</span>
@@ -242,8 +242,8 @@ export function MiniCalculator({
           <div className="border-t pt-4">
             {error ? (
               <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="text-red-800 font-medium">Error</div>
-                <div className="text-red-600 text-sm">{error}</div>
+                <div className="text-destructive font-medium">Error</div>
+                <div className="text-destructive text-sm">{error}</div>
               </div>
             ) : result !== null ? (
               <div className="p-4 bg-green-50 border border-green-200 rounded-md">
@@ -296,7 +296,7 @@ export function MiniCalculator({
         {result !== null && formula.example && (
           <div className="border-t pt-4">
             <h5 className="font-medium mb-2">Compare with Example</h5>
-            <div className="bg-gray-50 p-3 rounded text-sm space-y-1">
+            <div className="bg-muted p-3 rounded text-sm space-y-1">
               <div>Example inputs: {JSON.stringify(formula.example.inputs)}</div>
               <div>Example result: {formula.example.output.toLocaleString()}</div>
               <div>Your result: {result.toLocaleString()}</div>

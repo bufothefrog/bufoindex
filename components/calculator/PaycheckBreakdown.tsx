@@ -450,32 +450,32 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
     switch (step.urgencyLevel) {
       case 'critical':
         return {
-          card: 'border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-800 shadow-lg',
-          text: 'text-red-800 dark:text-red-100',
-          icon: 'text-red-600 dark:text-red-300',
-          badge: 'bg-red-500 dark:bg-red-700 text-white dark:text-red-100'
+          card: 'border-destructive bg-destructive/5 shadow-lg',
+          text: 'text-destructive',
+          icon: 'text-destructive',
+          badge: 'bg-destructive text-destructive-foreground'
         };
       case 'important':
         return {
-          card: 'border-yellow-500 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-800',
-          text: 'text-yellow-800 dark:text-yellow-100',
-          icon: 'text-yellow-600 dark:text-yellow-300',
-          badge: 'bg-yellow-500 dark:bg-yellow-600 text-white dark:text-yellow-100'
+          card: 'border-warning bg-warning/5',
+          text: 'text-foreground',
+          icon: 'text-warning',
+          badge: 'bg-warning text-warning-foreground'
         };
       case 'optimization':
         return {
-          card: 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-800',
-          text: 'text-green-800 dark:text-green-100',
-          icon: 'text-green-600 dark:text-green-300',
-          badge: 'bg-green-500 dark:bg-green-600 text-white dark:text-green-100'
+          card: 'border-success bg-success/5',
+          text: 'text-foreground',
+          icon: 'text-success',
+          badge: 'bg-success text-success-foreground'
         };
       default:
         if (step.isComplete) {
           return {
-            card: 'border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-800',
-            text: 'text-green-700 dark:text-green-200',
-            icon: 'text-green-500 dark:text-green-300',
-            badge: 'bg-green-500 dark:bg-green-600 text-white dark:text-green-100'
+            card: 'border-success bg-success/5',
+            text: 'text-success',
+            icon: 'text-success',
+            badge: 'bg-success text-success-foreground'
           };
         }
         if (step.isNotApplicable) {
@@ -487,19 +487,19 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
           };
         }
         return {
-          card: 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-800',
-          text: 'text-blue-700 dark:text-blue-200',
-          icon: 'text-blue-500 dark:text-blue-300',
-          badge: 'bg-blue-500 dark:bg-blue-600 text-white dark:text-blue-100'
+          card: 'border-info bg-info/5',
+          text: 'text-info',
+          icon: 'text-info',
+          badge: 'bg-info text-info-foreground'
         };
     }
   };
 
   return (
-    <Card className="border-blue-200 dark:border-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-800 dark:to-indigo-800">
+    <Card className="border-border bg-card">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-center justify-center">
-          <DollarSign className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+          <DollarSign className="w-6 h-6 text-info" />
           <span>Your {profile.income.frequency === 'bi-weekly' ? 'Bi-Weekly' : 
                      profile.income.frequency === 'semi-monthly' ? 'Semi-Monthly' : 
                      profile.income.frequency === 'weekly' ? 'Weekly' : 'Monthly'} Paycheck Allocation</span>
@@ -515,24 +515,24 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
               <span className="font-medium text-foreground">
                 Optimization Progress: {completedSteps} of {totalApplicableSteps} steps
               </span>
-              <span className="text-blue-600 font-semibold">{progressPercentage}% Complete</span>
+              <span className="text-info font-semibold">{progressPercentage}% Complete</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div 
-                className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className="bg-info h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progressPercentage}%` }}
               />
             </div>
             {(criticalIssues > 0 || importantItems > 0) && (
               <div className="flex items-center space-x-4 text-sm">
                 {criticalIssues > 0 && (
-                  <div className="flex items-center space-x-1 text-red-600 dark:text-red-400">
+                  <div className="flex items-center space-x-1 text-destructive">
                     <AlertTriangle className="w-4 h-4" />
                     <span>{criticalIssues} Critical Issue{criticalIssues !== 1 ? 's' : ''}</span>
                   </div>
                 )}
                 {importantItems > 0 && (
-                  <div className="flex items-center space-x-1 text-yellow-600 dark:text-yellow-400">
+                  <div className="flex items-center space-x-1 text-warning">
                     <Target className="w-4 h-4" />
                     <span>{importantItems} Optimization{importantItems !== 1 ? 's' : ''}</span>
                   </div>
@@ -552,8 +552,8 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
           </div>
 
           {/* Enhanced Financial Order of Operations */}
-          <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-800 dark:to-purple-800 rounded-lg border border-indigo-200 dark:border-indigo-600">
-            <div className="text-center text-sm font-medium text-indigo-800 dark:text-indigo-100 mb-3">
+          <div className="p-4 bg-muted rounded-lg border border-border">
+            <div className="text-center text-sm font-medium text-foreground mb-3">
               Financial Order of Operations
             </div>
             <div className="space-y-3">
@@ -601,7 +601,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                           <div className={cn("text-sm font-semibold", styles.text)}>
                             {step.name}
                             {step.urgencyLevel === 'critical' && step.potentialSavings.monthly > 0 && (
-                              <span className="ml-2 text-red-600 font-bold">
+                              <span className="ml-2 text-destructive font-bold">
                                 Losing <span className="font-mono tabular-nums">{formatCurrency(step.potentialSavings.monthly)}/mo</span>
                               </span>
                             )}
@@ -627,7 +627,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                                                      profile.income.frequency === 'weekly' ? 'weekly' : 'monthly';
                                 return (
                                   <div>
-                                    <div className="text-sm font-bold text-blue-600 font-mono tabular-nums">
+                                    <div className="text-sm font-bold text-info font-mono tabular-nums">
                                       {formatCurrency(step.allocation.amount)}
                                     </div>
                                     <div className="text-xs text-muted-foreground">per {frequencyText} paycheck</div>
@@ -686,7 +686,7 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                                     ({progressPercent}% maxed annually)
                                   </div>
                                   {additional > 0 && (
-                                    <div className="text-xs text-red-600 mt-1">
+                                    <div className="text-xs text-destructive mt-1">
                                       <span className="font-mono tabular-nums">{formatCurrency(additionalPerPaycheck)}</span> per paycheck needed
                                     </div>
                                   )}
@@ -709,17 +709,17 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                   {isExpanded && (
                     <div className={cn(
                       "ml-6 p-4 rounded-lg border transition-all duration-200",
-                      step.urgencyLevel === 'critical' ? 'bg-red-25 dark:bg-red-800 border-red-200 dark:border-red-600' :
-                      step.urgencyLevel === 'important' ? 'bg-yellow-25 dark:bg-yellow-800 border-yellow-200 dark:border-yellow-600' :
-                      step.isComplete ? 'bg-green-25 dark:bg-green-800 border-green-200 dark:border-green-600' :
+                      step.urgencyLevel === 'critical' ? 'bg-destructive/5 border-destructive' :
+                      step.urgencyLevel === 'important' ? 'bg-warning/5 border-warning' :
+                      step.isComplete ? 'bg-success/5 border-success' :
                       step.isNotApplicable ? 'bg-muted/20 border-border' :
-                      'bg-blue-25 dark:bg-blue-800 border-blue-200 dark:border-blue-600'
+                      'bg-info/5 border-info'
                     )}>
                       {/* Why It Matters */}
                       <div className="space-y-4">
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
-                            <Info className="w-4 h-4 text-blue-500" />
+                            <Info className="w-4 h-4 text-info" />
                             <h4 className="font-medium text-foreground">Why This Matters</h4>
                           </div>
                           <p className="text-sm text-muted-foreground">{step.whyItMatters}</p>
@@ -729,20 +729,20 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         {(step.potentialSavings.monthly > 0 || step.potentialSavings.annual > 0) && (
                           <div>
                             <div className="flex items-center space-x-2 mb-2">
-                              <TrendingUp className="w-4 h-4 text-green-500" />
+                              <TrendingUp className="w-4 h-4 text-success" />
                               <h4 className="font-medium text-foreground">Financial Impact</h4>
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div className="p-3 bg-green-50 dark:bg-green-800 rounded border dark:border-green-600">
-                                <div className="font-semibold text-green-800 dark:text-green-100">Monthly Impact</div>
-                                <div className="text-lg font-bold text-green-600 dark:text-green-300 font-mono tabular-nums">
+                              <div className="p-3 bg-success/5 rounded border border-border">
+                                <div className="font-semibold text-foreground">Monthly Impact</div>
+                                <div className="text-lg font-bold text-success font-mono tabular-nums">
                                   {step.urgencyLevel === 'critical' ? '-' : '+'}
                                   {formatCurrency(step.potentialSavings.monthly)}
                                 </div>
                               </div>
-                              <div className="p-3 bg-blue-50 dark:bg-blue-800 rounded border dark:border-blue-600">
-                                <div className="font-semibold text-blue-800 dark:text-blue-100">Annual Impact</div>
-                                <div className="text-lg font-bold text-blue-600 dark:text-blue-300 font-mono tabular-nums">
+                              <div className="p-3 bg-info/5 rounded border border-border">
+                                <div className="font-semibold text-foreground">Annual Impact</div>
+                                <div className="text-lg font-bold text-info font-mono tabular-nums">
                                   {step.urgencyLevel === 'critical' ? '-' : '+'}
                                   {formatCurrency(step.potentialSavings.annual)}
                                 </div>
@@ -754,13 +754,13 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         {/* Implementation Steps */}
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
-                            <Target className="w-4 h-4 text-purple-500" />
+                            <Target className="w-4 h-4 text-muted-foreground" />
                             <h4 className="font-medium text-foreground">How to Implement</h4>
                           </div>
                           <ol className="space-y-1 text-sm text-muted-foreground">
                             {step.implementationSteps.map((stepText, idx) => (
                               <li key={idx} className="flex items-start space-x-2">
-                                <span className="font-medium text-purple-600 min-w-[20px]">{idx + 1}.</span>
+                                <span className="font-medium text-foreground min-w-[20px]">{idx + 1}.</span>
                                 <span>{stepText}</span>
                               </li>
                             ))}
@@ -770,9 +770,9 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                         {/* Status Messages */}
                         <div className="pt-2 border-t border-border">
                           {step.isComplete ? (
-                            <div className="flex items-center justify-center p-3 bg-green-100 dark:bg-green-700 rounded-lg">
-                              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                              <span className="font-medium text-green-800 dark:text-green-100">
+                            <div className="flex items-center justify-center p-3 bg-success/5 rounded-lg">
+                              <CheckCircle className="w-5 h-5 text-success mr-2" />
+                              <span className="font-medium text-success">
                                 Completed! Keep up the great work.
                               </span>
                             </div>
@@ -784,20 +784,20 @@ export function PaycheckBreakdown({ profile, allocations }: PaycheckBreakdownPro
                               </div>
                             </div>
                           ) : step.urgencyLevel === 'critical' ? (
-                            <div className="p-3 bg-red-100 dark:bg-red-700 rounded-lg">
-                              <div className="text-sm text-red-700 dark:text-red-100">
+                            <div className="p-3 bg-destructive/5 rounded-lg">
+                              <div className="text-sm text-destructive">
                                 <strong>Critical:</strong> This is costing you money right now. Address this as soon as possible.
                               </div>
                             </div>
                           ) : step.urgencyLevel === 'important' ? (
-                            <div className="p-3 bg-yellow-100 dark:bg-yellow-700 rounded-lg">
-                              <div className="text-sm text-yellow-700 dark:text-yellow-100">
+                            <div className="p-3 bg-warning/5 rounded-lg">
+                              <div className="text-sm text-warning">
                                 <strong>High impact:</strong> Significant opportunity to optimize your financial situation.
                               </div>
                             </div>
                           ) : (
-                            <div className="p-3 bg-blue-100 dark:bg-blue-700 rounded-lg">
-                              <div className="text-sm text-blue-700 dark:text-blue-100">
+                            <div className="p-3 bg-info/5 rounded-lg">
+                              <div className="text-sm text-info">
                                 <strong>Optimization opportunity:</strong> Consider this step once higher priority items are complete.
                               </div>
                             </div>

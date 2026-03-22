@@ -37,27 +37,27 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
       return {
         status: 'high' as const,
         icon: AlertTriangle,
-        color: 'text-red-600',
-        bgColor: 'bg-red-50',
-        borderColor: 'border-red-200',
+        color: 'text-destructive',
+        bgColor: 'bg-destructive/10',
+        borderColor: 'border-destructive/20',
         message: 'High-interest debt - prioritize paying off',
       };
     } else if (interestRate >= 0.05) {
       return {
         status: 'medium' as const,
         icon: AlertTriangle,
-        color: 'text-yellow-600',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
+        color: 'text-warning',
+        bgColor: 'bg-warning/10',
+        borderColor: 'border-warning/20',
         message: 'Moderate-interest debt - evaluate vs. investing',
       };
     } else {
       return {
         status: 'low' as const,
         icon: CheckCircle,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-50',
-        borderColor: 'border-blue-200',
+        color: 'text-success',
+        bgColor: 'bg-success/10',
+        borderColor: 'border-success/20',
         message: 'Low-interest debt - likely better to invest',
       };
     }
@@ -143,7 +143,7 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         <span className={`font-medium ${debtStatus.color}`}>
                           {formatPercent(debt.interestRate)} interest rate
                         </span>
-                        <span className="text-gray-500">•</span>
+                        <span className="text-muted-foreground">•</span>
                         <span className={debtStatus.color}>
                           {debtStatus.message}
                         </span>
@@ -152,7 +152,7 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         variant="ghost"
                         size="sm"
                         onClick={() => onRemoveDebt(index)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -166,8 +166,8 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
 
         {/* Add Debt Button */}
         {debts.length === 0 && (
-          <div className="text-center py-6 text-gray-500">
-            <CreditCard className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+          <div className="text-center py-6 text-muted-foreground">
+            <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
             <p className="mb-4">No debts added yet</p>
             <Button onClick={addNewDebt} variant="outline">
               <Plus className="w-4 h-4 mr-2" />
@@ -185,7 +185,7 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
         
         {/* Summary */}
         {debts.length > 0 && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+          <div className="mt-4 p-3 bg-muted rounded-lg">
             <div className="text-sm">
               <div className="flex justify-between mb-1">
                 <span>Total Debt:</span>

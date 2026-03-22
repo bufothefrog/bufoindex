@@ -129,7 +129,7 @@ export function PercentageInput({
               'font-mono tabular-nums text-right pr-8',
               inputSizeClasses[size],
               showIcon && !label && 'pl-8',
-              error && 'border-red-500'
+              error && 'border-destructive'
             )}
           />
           
@@ -169,13 +169,13 @@ export function PercentageInput({
       )}
 
       {error && (
-        <div className="text-sm text-red-600">
+        <div className="text-sm text-destructive">
           {error}
         </div>
       )}
 
       {helperText && !error && (
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-muted-foreground">
           {helperText}
         </div>
       )}

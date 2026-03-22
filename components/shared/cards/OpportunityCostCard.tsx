@@ -13,9 +13,9 @@ interface OpportunityCostCardProps {
 }
 
 const riskLevelStyles = {
-  low: 'border-l-yellow-400 dark:border-l-yellow-500 bg-yellow-50 dark:bg-yellow-800',
-  medium: 'border-l-orange-500 dark:border-l-orange-600 bg-orange-50 dark:bg-orange-800',
-  high: 'border-l-red-500 dark:border-l-red-600 bg-red-50 dark:bg-red-800',
+  low: 'border-l-warning/50',
+  medium: 'border-l-warning',
+  high: 'border-l-destructive',
 };
 
 const riskLevelIcons = {
@@ -51,8 +51,8 @@ export function OpportunityCostCard({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-full bg-white shadow-sm">
-              <RiskIcon className="w-5 h-5 text-gray-700" />
+            <div className="p-2 rounded-full bg-card shadow-sm">
+              <RiskIcon className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
               <CardTitle className="text-lg flex items-center">
@@ -65,7 +65,7 @@ export function OpportunityCostCard({
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xl font-bold text-orange-600 font-mono tabular-nums">
+            <div className="text-xl font-bold text-warning font-mono tabular-nums">
               {formatCurrency(highestCost.amount)}
             </div>
             <div className="text-sm text-muted-foreground">
@@ -77,22 +77,22 @@ export function OpportunityCostCard({
       
       <CardContent className="pt-0">
         <div className="space-y-3">
-          <div className="p-3 bg-white rounded-md border border-gray-200">
-            <div className="font-medium text-sm text-gray-700 mb-1">Why skip this:</div>
-            <p className="text-sm text-gray-600">
+          <div className="p-3 bg-muted/50 rounded-md border border-border">
+            <div className="font-medium text-sm text-foreground mb-1">Why skip this:</div>
+            <p className="text-sm text-muted-foreground">
               {skippedItem.reason}
             </p>
           </div>
           
-          <div className="p-3 bg-white rounded-md border border-green-200">
-            <div className="font-medium text-sm text-green-700 mb-1">Do this instead:</div>
-            <p className="text-sm text-gray-600">
+          <div className="p-3 bg-muted/50 rounded-md border border-border">
+            <div className="font-medium text-sm text-sage-600 dark:text-sage-400 mb-1">Do this instead:</div>
+            <p className="text-sm text-muted-foreground">
               {skippedItem.alternative}
             </p>
           </div>
           
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
               <span>Monthly: <span className="font-mono tabular-nums">{formatCurrency(skippedItem.opportunityCost.monthly)}</span></span>
               <span>Annual: <span className="font-mono tabular-nums">{formatCurrency(skippedItem.opportunityCost.annual)}</span></span>
             </div>
@@ -120,12 +120,12 @@ export function OpportunityCostCard({
           </div>
           
           {showDetails && skippedItem.education && (
-            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-800 rounded-md border border-blue-200 dark:border-blue-600">
-              <h4 className="font-medium text-sm text-blue-900 dark:text-blue-50 mb-2 flex items-center">
+            <div className="mt-4 p-4 bg-muted/50 rounded-md border border-border">
+              <h4 className="font-medium text-sm text-foreground mb-2 flex items-center">
                 <Info className="w-4 h-4 mr-1" />
                 Why This Matters:
               </h4>
-              <p className="text-sm text-blue-800 dark:text-blue-100">
+              <p className="text-sm text-muted-foreground">
                 {skippedItem.education}
               </p>
             </div>

@@ -19,13 +19,13 @@ export function Tooltip({ content, children, className = '' }: TooltipProps) {
         onMouseLeave={() => setIsVisible(false)}
         className="cursor-help"
       >
-        {children || <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-600" />}
+        {children || <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground" />}
       </div>
       
       {isVisible && (
-        <div className="absolute z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg -top-2 left-6 min-w-[200px] max-w-[300px]">
+        <div className="absolute z-50 px-3 py-2 text-sm text-popover-foreground bg-popover border border-border rounded-md shadow-lg -top-2 left-6 min-w-[200px] max-w-[300px]">
           {content}
-          <div className="absolute w-2 h-2 bg-gray-900 rotate-45 -left-1 top-3"></div>
+          <div className="absolute w-2 h-2 bg-popover border-l border-b border-border rotate-45 -left-1 top-3"></div>
         </div>
       )}
     </div>
