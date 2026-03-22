@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { UtilityBar } from '@/components/shared/UtilityBar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,8 +21,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider>
           <div className="min-h-screen bg-background">
-            <div className="container mx-auto px-4 pt-4 flex justify-end">
-              <ThemeToggle />
+            <div className="container mx-auto px-4 pt-4">
+              <UtilityBar />
             </div>
 
             <main className="container mx-auto px-4 py-8">
