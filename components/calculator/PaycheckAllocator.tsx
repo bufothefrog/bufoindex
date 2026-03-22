@@ -29,7 +29,7 @@ export function PaycheckAllocator() {
   
   return (
     <ResponsiveCalculatorLayout
-      title="Optimize Your Next Paycheck"
+      title="Paycheck Allocator Calculator"
       description="Smart monthly allocation for your next paycheck. Get a clear priority list that maximizes tax efficiency and exposes financial industry myths."
       inputSection={<InputSection />}
       resultsSection={<ResultsSection />}
