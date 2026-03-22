@@ -160,4 +160,4 @@ performance-baseline.json
 .claude/**/*.local
 .claude/**/*.local.*
 .claude/**/local-*
-.claude/local_*
+.claude/local_*.claude/worktrees/
