@@ -30,7 +30,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [18, 20]
+        node-version: [20, 22]
       fail-fast: false
     
     steps:
@@ -110,7 +110,7 @@ jobs:
         echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor || true
         
         # Run the comprehensive performance monitor
-        node scripts/performance-monitor.js \
+        node scripts/performance-monitor.mjs \
           --ci \
           --memory \
           --report \
@@ -123,7 +123,7 @@ jobs:
       run: |
         echo "🔍 Running performance regression analysis..."
         node -e "
-          import('./scripts/regression-detector.js').then(async ({ RegressionDetector }) => {
+          import('./scripts/regression-detector.mjs').then(async ({ RegressionDetector }) => {
             const detector = new RegressionDetector();
             // Import current results and analyze
             const fs = require('fs').promises;
