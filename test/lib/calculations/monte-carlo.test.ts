@@ -220,10 +220,10 @@ describe('generateReturnSequence', () => {
 
 describe('Type exports', () => {
   it('should export all required type interfaces', async () => {
-    const module = await import('@/lib/calculations/monte-carlo')
+    const mod = await import('@/lib/calculations/monte-carlo')
 
     // Verify generateReturnSequence is exported
-    expect(module.generateReturnSequence).toBeDefined()
-    expect(typeof module.generateReturnSequence).toBe('function')
+    expect(mod.generateReturnSequence).toBeDefined()
+    expect(typeof mod.generateReturnSequence).toBe('function')
   })
 })
