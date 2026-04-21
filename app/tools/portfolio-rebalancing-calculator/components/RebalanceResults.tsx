@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, PiggyBank, Scale, TrendingDown, Wallet } from 'lucide-react';
-import { BaseCard, ResultCard, SummaryCard } from '@/components/ui/cards/BaseCard';
+import { ArrowRight, PiggyBank, Scale, Wallet } from 'lucide-react';
+import { ResultCard, SummaryCard } from '@/components/ui/cards/BaseCard';
 import { RebalanceResult } from '@/lib/calculations/portfolioRebalancing';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -151,22 +151,6 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
           )}
         </div>
       </ResultCard>
-
-      {cashLeftover > 0 && (
-        <BaseCard title="Opportunity Cost of Idle Cash" icon={TrendingDown} variant="bordered" color="warning">
-          <div className="text-sm space-y-2">
-            <p>
-              Leaving <span className="font-mono tabular-nums">{formatCurrency(cashLeftover)}</span> uninvested for
-              a year at a 10% expected equity return costs you about{' '}
-              <span className="font-mono tabular-nums font-semibold">{formatCurrency(cashLeftover * 0.1)}</span> in
-              foregone growth. Consider carrying it to your next deposit or lowering share-price thresholds (e.g. fractional mode).
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Math: 10% annual expected return on US equities &middot; compounded longer, the cost grows — every year of delay is another year of missed compounding.
-            </p>
-          </div>
-        </BaseCard>
-      )}
 
       <div className="text-xs text-muted-foreground">
         Starting portfolio value: <span className="tabular-nums">{formatCurrency(totalValueBefore)}</span>
