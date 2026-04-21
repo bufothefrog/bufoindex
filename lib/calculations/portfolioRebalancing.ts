@@ -836,11 +836,11 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
       : new Set([gk]);
     const groupCurrentValue = sumBy(groupHoldings, h => h.startShares * h.price);
     const groupNewValue = sumBy(groupHoldings, h => h.shares * h.price);
-    const groupStartCash = sumBy(
-      inputs.accounts.filter(a => groupAccountIds.has(a.id)),
-      a => a.deposit,
-    );
-    const combinedBefore = groupCurrentValue + groupStartCash;
+    // "Before" reflects the portfolio as it stands pre-deposit: holdings only,
+    // no deposit cash. Including the deposit diluted every asset's current %
+    // toward its post-deposit %, which made holdings with no action (e.g. a
+    // held bond position) display identical current and after allocations.
+    const combinedBefore = groupCurrentValue;
     const combinedAfter = groupNewValue +
       sumBy(Array.from(groupAccountIds), id => cashByAccount.get(id) ?? 0);
     const targets = classTargetsByGroup.get(gk) ?? new Map();
