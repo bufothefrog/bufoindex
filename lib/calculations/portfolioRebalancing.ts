@@ -368,3 +368,186 @@ export function rebalancePortfolio(inputs: RebalanceInputs): RebalanceResult {
     mode,
   };
 }
+
+// ============================================================================
+// Phase 2 — Multi-account, securities-registry contract (v2)
+// ----------------------------------------------------------------------------
+// The Phase 1 API above (RebalanceAsset / RebalanceInputs / rebalancePortfolio)
+// stays exported for back-compat. Phase 2 introduces a new shape where:
+//   • Ticker/price/asset-class lives in a top-level `Security` registry
+//   • Holdings reference accounts + securities (no re-entry across accounts)
+//   • Targets are declared by asset class, either portfolio-wide or per-account
+//   • Each account carries its own deposit and tax treatment
+//
+// The caller chooses a `SetupMode` up-front so the UI and algorithm agree on
+// how class targets and asset-location preferences apply.
+// ============================================================================
+
+/**
+ * Tool configuration chosen in the setup wizard.
+ *   single        — one account; Phase 1 behavior. `accounts.length === 1`.
+ *   multi-shared  — multiple accounts; one portfolio-wide target set.
+ *                   Calculator routes new cash using LOCATION_PREFERENCE.
+ *   multi-unique  — multiple accounts; each declares its own class targets.
+ *                   No cross-account rebalancing; no placement advice.
+ */
+export type SetupMode = 'single' | 'multi-shared' | 'multi-unique';
+
+/** One entry in the top-level securities registry. Ticker/price/class live here. */
+export interface Security {
+  id: string;
+  ticker: string;
+  /** Optional long name, e.g. "Vanguard Total US Stock Market". */
+  name?: string;
+  price: number;
+  assetClass: AssetClass;
+}
+
+/**
+ * Target allocation for a single asset class.
+ *   • `accountId === null` → portfolio-wide (used in single + multi-shared).
+ *   • `accountId === <id>` → per-account (used in multi-unique only).
+ *
+ * Within a group (same accountId), `target` values must sum to ~1.
+ */
+export interface ClassTarget {
+  accountId: string | null;
+  assetClass: AssetClass;
+  /** Decimal in [0, 1]. */
+  target: number;
+}
+
+/** One brokerage / retirement account. */
+export interface Account {
+  id: string;
+  /** User-facing name, e.g. "Fidelity Roth IRA". */
+  name: string;
+  accountType: AccountType;
+  /** New cash flowing INTO this account (not spread across accounts). */
+  deposit: number;
+}
+
+/** Shares of one security held inside one account. */
+export interface Holding {
+  id: string;
+  accountId: string;
+  securityId: string;
+  shares: number;
+}
+
+export interface RebalanceInputsV2 {
+  setupMode: SetupMode;
+  securities: Security[];
+  classTargets: ClassTarget[];
+  accounts: Account[];
+  holdings: Holding[];
+  allowTaxableSelling: boolean;
+  /** Ignored in multi-unique mode. */
+  showPlacementAdvice: boolean;
+  mode: RebalanceMode;
+}
+
+/** Per-holding plan inside a v2 result. */
+export interface HoldingRebalancePlan {
+  holdingId: string;
+  accountId: string;
+  securityId: string;
+  ticker: string;
+  accountType: AccountType;
+  assetClass: AssetClass;
+  price: number;
+
+  currentShares: number;
+  currentValue: number;
+
+  action: RebalanceAction;
+  sharesToBuy: number;
+  sharesToSell: number;
+  dollarsSpent: number;
+  dollarsReceived: number;
+
+  newShares: number;
+  newValue: number;
+}
+
+/** Per-account summary inside a v2 result. */
+export interface AccountRebalanceSummary {
+  accountId: string;
+  accountName: string;
+  accountType: AccountType;
+  deposit: number;
+  depositUsed: number;
+  depositLeftover: number;
+  holdings: HoldingRebalancePlan[];
+}
+
+/**
+ * Class-level drift row. `accountId === null` rows are portfolio-wide;
+ * `accountId === <id>` rows are per-account (multi-unique).
+ */
+export interface ClassDrift {
+  accountId: string | null;
+  assetClass: AssetClass;
+  target: number;
+  currentValue: number;
+  currentAllocation: number;
+  newValue: number;
+  newAllocation: number;
+  driftBefore: number;
+  driftAfter: number;
+}
+
+export interface RebalanceResultV2 {
+  setupMode: SetupMode;
+  accounts: AccountRebalanceSummary[];
+
+  totalValueBefore: number;
+  totalValueAfter: number;
+  totalDeposit: number;
+  totalSpent: number;
+  totalReceived: number;
+  cashLeftover: number;
+
+  taxEventDollars: number;
+  totalDriftBefore: number;
+  totalDriftAfter: number;
+
+  classDrift: ClassDrift[];
+  mode: RebalanceMode;
+}
+
+/**
+ * Stub implementation. Agent A replaces this with the real three-branch
+ * algorithm (single / multi-shared / multi-unique).
+ */
+export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResultV2 {
+  return {
+    setupMode: inputs.setupMode,
+    accounts: inputs.accounts.map(a => ({
+      accountId: a.id,
+      accountName: a.name,
+      accountType: a.accountType,
+      deposit: a.deposit,
+      depositUsed: 0,
+      depositLeftover: a.deposit,
+      holdings: [],
+    })),
+    totalValueBefore: 0,
+    totalValueAfter: 0,
+    totalDeposit: inputs.accounts.reduce((s, a) => s + a.deposit, 0),
+    totalSpent: 0,
+    totalReceived: 0,
+    cashLeftover: 0,
+    taxEventDollars: 0,
+    totalDriftBefore: 0,
+    totalDriftAfter: 0,
+    classDrift: [],
+    mode: inputs.mode,
+  };
+}
+
+/** Stub validator. Agent A replaces with real rules. */
+export function validateRebalanceInputsV2(_inputs: RebalanceInputsV2): ValidationError[] {
+  return [];
+}
+
