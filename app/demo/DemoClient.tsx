@@ -79,6 +79,15 @@ import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { Tooltip as HelpTooltip, HELP_TOOLTIPS } from '@/components/shared/Tooltip';
 import { CalculatorTabs } from '@/components/calculators/shared/CalculatorTabs';
 
+// Portfolio rebalancing composed widgets
+import { SecurityRow } from '@/app/tools/portfolio-rebalancing-calculator/components/SecurityRow';
+import {
+  RebalanceMode,
+  Security,
+} from '@/lib/calculations/portfolioRebalancing';
+import { cn } from '@/lib/utils';
+import { Coins, Scissors, Scale } from 'lucide-react';
+
 interface DemoState {
   basicInputs: {
     text: string;
@@ -97,6 +106,10 @@ interface DemoState {
     selectedState: string;
     riskTolerance: string;
     filingStatus: string;
+  };
+  rebalanceDemo: {
+    securities: Security[];
+    mode: RebalanceMode;
   };
 }
 
@@ -120,6 +133,25 @@ export function DemoClient() {
       selectedState: 'CA',
       riskTolerance: 'moderate',
       filingStatus: 'single'
+    },
+    rebalanceDemo: {
+      securities: [
+        {
+          id: 'demo-vti',
+          ticker: 'VTI',
+          name: 'Vanguard Total US Stock',
+          price: 250,
+          assetClass: 'us-stock',
+        },
+        {
+          id: 'demo-bnd',
+          ticker: 'BND',
+          name: 'Vanguard Total Bond',
+          price: 70,
+          assetClass: 'bonds',
+        }
+      ],
+      mode: 'whole'
     }
   });
 
@@ -188,6 +220,38 @@ export function DemoClient() {
     setDemoState(prev => ({
       ...prev,
       specializedInputs: { ...prev.specializedInputs, [key]: value }
+    }));
+  };
+
+  const updateRebalanceSecurity = (
+    id: string,
+    updates: Partial<Omit<Security, 'id'>>
+  ) => {
+    setDemoState(prev => ({
+      ...prev,
+      rebalanceDemo: {
+        ...prev.rebalanceDemo,
+        securities: prev.rebalanceDemo.securities.map(s =>
+          s.id === id ? { ...s, ...updates } : s
+        )
+      }
+    }));
+  };
+
+  const removeRebalanceSecurity = (id: string) => {
+    setDemoState(prev => ({
+      ...prev,
+      rebalanceDemo: {
+        ...prev.rebalanceDemo,
+        securities: prev.rebalanceDemo.securities.filter(s => s.id !== id)
+      }
+    }));
+  };
+
+  const setRebalanceMode = (mode: RebalanceMode) => {
+    setDemoState(prev => ({
+      ...prev,
+      rebalanceDemo: { ...prev.rebalanceDemo, mode }
     }));
   };
 
@@ -605,6 +669,113 @@ export function DemoClient() {
           </div>
         </InputCard>
       </div>
+
+      {/* Portfolio Rebalancing Composed Widgets */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Scale className="w-5 h-5" />
+            Portfolio Rebalancing Widgets
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-sm font-medium mb-1">Security Row</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Composed row of ticker / name / price / asset-class inputs used by the rebalancing
+                calculator. Pattern for dynamic list rows in future calculators.
+              </p>
+              <div className="space-y-2">
+                {demoState.rebalanceDemo.securities.map((security, index) => (
+                  <SecurityRow
+                    key={security.id}
+                    security={security}
+                    index={index}
+                    canRemove={demoState.rebalanceDemo.securities.length > 1}
+                    onChange={(updates) => updateRebalanceSecurity(security.id, updates)}
+                    onRemove={() => removeRebalanceSecurity(security.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium mb-1">Segmented Mode Toggle</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Two-button radiogroup pattern for exclusive choices (whole vs fractional shares).
+                Not a new primitive — composed from <code className="text-xs">button</code> +
+                sage-themed active styling.
+              </p>
+              <div
+                className="grid grid-cols-2 gap-2 max-w-md"
+                role="radiogroup"
+                aria-label="Purchase mode"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={demoState.rebalanceDemo.mode === 'whole'}
+                  onClick={() => setRebalanceMode('whole')}
+                  className={cn(
+                    'text-left p-3 rounded-lg border transition-all',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
+                    demoState.rebalanceDemo.mode === 'whole'
+                      ? 'border-sage-400 bg-sage-50 dark:bg-sage-800/50 dark:border-sage-500'
+                      : 'border-border bg-background hover:border-sage-300 dark:hover:border-sage-600'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'flex items-center gap-2 font-medium text-sm',
+                      demoState.rebalanceDemo.mode === 'whole'
+                        ? 'text-sage-700 dark:text-sage-200'
+                        : 'text-foreground'
+                    )}
+                  >
+                    <Coins className="w-4 h-4" />
+                    Whole shares
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Floor to integers; leftover kept as cash.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={demoState.rebalanceDemo.mode === 'fractional'}
+                  onClick={() => setRebalanceMode('fractional')}
+                  className={cn(
+                    'text-left p-3 rounded-lg border transition-all',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
+                    demoState.rebalanceDemo.mode === 'fractional'
+                      ? 'border-sage-400 bg-sage-50 dark:bg-sage-800/50 dark:border-sage-500'
+                      : 'border-border bg-background hover:border-sage-300 dark:hover:border-sage-600'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'flex items-center gap-2 font-medium text-sm',
+                      demoState.rebalanceDemo.mode === 'fractional'
+                        ? 'text-sage-700 dark:text-sage-200'
+                        : 'text-foreground'
+                    )}
+                  >
+                    <Scissors className="w-4 h-4" />
+                    Fractional
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Exact-to-penny splits. Requires broker support.
+                  </div>
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Selected: <span className="font-mono">{demoState.rebalanceDemo.mode}</span>
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 

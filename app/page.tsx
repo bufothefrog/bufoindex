@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Calculator, TrendingUp, ArrowRight } from 'lucide-react'
+import { Calculator, TrendingUp, ArrowRight, Scale } from 'lucide-react'
 
 export default function HomePage() {
   return (
@@ -60,6 +60,29 @@ export default function HomePage() {
 
           <div className="flex items-center text-sm text-sage-600 dark:text-sage-300 font-medium group-hover:text-sage-700 dark:group-hover:text-sage-200 transition-colors">
             Plan Retirement <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
+
+        <Link
+          href="/tools/portfolio-rebalancing-calculator"
+          className="group block p-6 bg-card border rounded-xl hover:shadow-lg transition-all duration-200 hover:border-sage-400 dark:hover:border-sage-500"
+        >
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2.5 bg-sage-100 dark:bg-sage-700 rounded-lg">
+              <Scale className="w-5 h-5 text-sage-600 dark:text-sage-300" />
+            </div>
+            <h2 className="text-lg font-semibold group-hover:text-sage-600 dark:group-hover:text-sage-300 transition-colors">
+              Portfolio Rebalancing
+            </h2>
+          </div>
+
+          <p className="text-sm text-muted-foreground mb-4">
+            Stay on target without selling. Tell us your holdings and new deposit;
+            we&apos;ll compute exactly how many shares to buy of each asset.
+          </p>
+
+          <div className="flex items-center text-sm text-sage-600 dark:text-sage-300 font-medium group-hover:text-sage-700 dark:group-hover:text-sage-200 transition-colors">
+            Rebalance with Cash Flow <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
       </div>
