@@ -4,9 +4,15 @@ import {
   validateRebalanceInputs,
   DEFAULT_ACCOUNT_TYPE,
   DEFAULT_ASSET_CLASS,
+  AccountType,
+  AssetClass,
   RebalanceAsset,
   RebalanceInputs,
 } from '@/lib/calculations/portfolioRebalancing';
+import {
+  encodeRebalancingToUrlHash,
+  decodeRebalancingFromUrlHash,
+} from '@/lib/utils/portfolioRebalancingState';
 
 function asset(
   id: string,
@@ -14,6 +20,8 @@ function asset(
   currentShares: number,
   price: number,
   targetAllocation: number,
+  accountType: AccountType = DEFAULT_ACCOUNT_TYPE,
+  assetClass: AssetClass = DEFAULT_ASSET_CLASS,
 ): RebalanceAsset {
   return {
     id,
@@ -21,8 +29,8 @@ function asset(
     currentShares,
     price,
     targetAllocation,
-    accountType: DEFAULT_ACCOUNT_TYPE,
-    assetClass: DEFAULT_ASSET_CLASS,
+    accountType,
+    assetClass,
   };
 }
 
@@ -429,5 +437,216 @@ describe('rebalancePortfolio — validation & performance', () => {
 
     // 10/3 = 3.333... → 3.3333 at 4-decimal precision.
     expect(result.assets[0].sharesToBuy).toBeCloseTo(3.3333, 4);
+  });
+});
+
+describe('rebalancePortfolio — selling & account types', () => {
+  it('all-taxable with allowTaxableSelling=false matches legacy cash-flow behavior', () => {
+    // Regression: this is the same scenario as the whole-share greedy test.
+    // With no sells, taxEventDollars must be zero and no asset action is 'sell'.
+    const result = rebalancePortfolio({
+      assets: [
+        asset('a', 'A', 10, 100, 0.6, 'taxable'),
+        asset('b', 'B', 5, 60, 0.3, 'taxable'),
+        asset('c', 'C', 20, 70, 0.1, 'taxable'),
+      ],
+      deposit: 1000,
+      mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
+    });
+
+    expect(result.taxEventDollars).toBe(0);
+    expect(result.assets.every(a => a.sharesToSell === 0)).toBe(true);
+    expect(result.assets.every(a => a.dollarsReceived === 0)).toBe(true);
+    expect(result.assets.every(a => a.action !== 'sell')).toBe(true);
+    // Unchanged from legacy: A=6, B=6, C=0, leftover $40.
+    expect(result.assets[0].sharesToBuy).toBe(6);
+    expect(result.assets[1].sharesToBuy).toBe(6);
+    expect(result.assets[2].sharesToBuy).toBe(0);
+    expect(result.cashLeftover).toBeCloseTo(40, 4);
+  });
+
+  it('sells Roth overweight to fund another asset with zero deposit', () => {
+    const result = rebalancePortfolio({
+      assets: [
+        // Roth overweight: $1500 current vs $1000 target at same total.
+        asset('a', 'A', 150, 10, 0.5, 'tax-free', 'us-stock'),
+        asset('b', 'B', 50, 10, 0.5, 'tax-free', 'bonds'),
+      ],
+      deposit: 0,
+      mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
+    });
+
+    // Total = $2000, targets $1000 each. A overweight by $500 → sell 50 shares.
+    // Proceeds $500 → buy 50 shares of B.
+    expect(result.taxEventDollars).toBe(0);
+    expect(result.assets[0].action).toBe('sell');
+    expect(result.assets[0].sharesToSell).toBeCloseTo(50, 4);
+    expect(result.assets[0].dollarsReceived).toBeCloseTo(500, 4);
+    expect(result.assets[1].action).toBe('buy');
+    expect(result.assets[1].sharesToBuy).toBeCloseTo(50, 4);
+    expect(result.totalDriftAfter).toBeCloseTo(0, 6);
+  });
+
+  it('mixed: Roth stock overweight + taxable bond underweight + small deposit', () => {
+    const result = rebalancePortfolio({
+      assets: [
+        // Roth stocks at $1200, target 50% ⇒ $800 at $1600 new total. Overweight $400.
+        asset('a', 'A', 120, 10, 0.5, 'tax-free', 'us-stock'),
+        // Taxable bonds at $300, target 50% ⇒ $800. Underweight $500.
+        asset('b', 'B', 30, 10, 0.5, 'taxable', 'bonds'),
+      ],
+      deposit: 100,
+      mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
+    });
+
+    // Roth sells 40 shares ($400). Taxable buys from $400 + $100 = $500 → 50 shares.
+    expect(result.assets[0].action).toBe('sell');
+    expect(result.assets[0].sharesToSell).toBeCloseTo(40, 4);
+    expect(result.assets[0].dollarsReceived).toBeCloseTo(400, 4);
+    expect(result.assets[1].action).toBe('buy');
+    expect(result.assets[1].sharesToBuy).toBeCloseTo(50, 4);
+    expect(result.taxEventDollars).toBe(0); // sale was in Roth
+  });
+
+  it('taxable overweight with allowTaxableSelling=false does not sell', () => {
+    const result = rebalancePortfolio({
+      assets: [
+        asset('a', 'A', 150, 10, 0.5, 'taxable'),
+        asset('b', 'B', 50, 10, 0.5, 'taxable'),
+      ],
+      deposit: 0,
+      mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
+    });
+
+    expect(result.taxEventDollars).toBe(0);
+    expect(result.assets.every(a => a.sharesToSell === 0)).toBe(true);
+    expect(result.assets.every(a => a.action !== 'sell')).toBe(true);
+  });
+
+  it('taxable overweight with allowTaxableSelling=true sells and reports taxEventDollars', () => {
+    const result = rebalancePortfolio({
+      assets: [
+        asset('a', 'A', 150, 10, 0.5, 'taxable', 'us-stock'),
+        asset('b', 'B', 50, 10, 0.5, 'taxable', 'bonds'),
+      ],
+      deposit: 0,
+      mode: 'fractional',
+      allowTaxableSelling: true,
+      showPlacementAdvice: false,
+    });
+
+    // Sell 50 A shares ($500 realized in taxable).
+    expect(result.assets[0].action).toBe('sell');
+    expect(result.assets[0].sharesToSell).toBeCloseTo(50, 4);
+    expect(result.taxEventDollars).toBeCloseTo(500, 4);
+    expect(result.assets[1].action).toBe('buy');
+    expect(result.assets[1].sharesToBuy).toBeCloseTo(50, 4);
+  });
+
+  it('whole-share mode sell produces integer sharesToSell', () => {
+    const result = rebalancePortfolio({
+      assets: [
+        // Overweight by $505: excess / price = 50.5 shares → floored to 50.
+        asset('a', 'A', 200, 10, 0.5, 'tax-free'),
+        asset('b', 'B', 99, 10, 0.5, 'tax-free'),
+      ],
+      deposit: 0,
+      mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
+    });
+
+    expect(Number.isInteger(result.assets[0].sharesToSell)).toBe(true);
+    expect(result.assets[0].sharesToSell).toBeGreaterThan(0);
+    expect(Number.isInteger(result.assets[1].sharesToBuy)).toBe(true);
+  });
+
+  it('fractional mode sell can be non-integer', () => {
+    // Total = 100*3 + 11*3 = $333. Targets $166.50 each.
+    // A overweight by $133.50 ⇒ 44.5 shares — not an integer.
+    const result = rebalancePortfolio({
+      assets: [
+        asset('a', 'A', 100, 3, 0.5, 'tax-free'),
+        asset('b', 'B', 11, 3, 0.5, 'tax-free'),
+      ],
+      deposit: 0,
+      mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
+    });
+
+    expect(result.assets[0].sharesToSell).toBeCloseTo(44.5, 4);
+    expect(Number.isInteger(result.assets[0].sharesToSell)).toBe(false);
+  });
+
+  it('URL hash v1 decodes to defaults for new fields', () => {
+    // Hand-built v1 payload: no c/k/s/p fields.
+    const v1Payload = {
+      v: 1,
+      d: 500,
+      a: [
+        { t: 'VTI', s: 10, p: 100, a: 0.6 },
+        { t: 'BND', s: 20, p: 50, a: 0.4 },
+      ],
+    };
+    const json = JSON.stringify(v1Payload);
+    const b64 = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    const decoded = decodeRebalancingFromUrlHash(b64);
+    expect(decoded).not.toBeNull();
+    expect(decoded!.allowTaxableSelling).toBe(false);
+    expect(decoded!.showPlacementAdvice).toBe(false);
+    expect(decoded!.deposit).toBe(500);
+    decoded!.assets.forEach(a => {
+      expect(a.accountType).toBe(DEFAULT_ACCOUNT_TYPE);
+      expect(a.assetClass).toBe(DEFAULT_ASSET_CLASS);
+    });
+  });
+
+  it('URL hash v2 roundtrip preserves all fields', () => {
+    const inputs: RebalanceInputs = {
+      assets: [
+        asset('id-1', 'VTI', 10, 100, 0.6, 'tax-free', 'us-stock'),
+        asset('id-2', 'VXUS', 5, 50, 0.2, 'taxable', 'intl-stock'),
+        asset('id-3', 'BND', 20, 80, 0.2, 'tax-deferred', 'bonds'),
+      ],
+      deposit: 1234,
+      mode: 'fractional',
+      allowTaxableSelling: true,
+      showPlacementAdvice: true,
+    };
+
+    const hash = encodeRebalancingToUrlHash(inputs);
+    expect(hash.length).toBeGreaterThan(0);
+    const decoded = decodeRebalancingFromUrlHash(hash);
+
+    expect(decoded).not.toBeNull();
+    expect(decoded!.deposit).toBe(1234);
+    expect(decoded!.mode).toBe('fractional');
+    expect(decoded!.allowTaxableSelling).toBe(true);
+    expect(decoded!.showPlacementAdvice).toBe(true);
+    expect(decoded!.assets).toHaveLength(3);
+
+    // ids are regenerated by the decoder; match on ticker + structural fields.
+    const byTicker = new Map(decoded!.assets.map(a => [a.ticker, a]));
+    expect(byTicker.get('VTI')?.accountType).toBe('tax-free');
+    expect(byTicker.get('VTI')?.assetClass).toBe('us-stock');
+    expect(byTicker.get('VTI')?.currentShares).toBe(10);
+    expect(byTicker.get('VTI')?.price).toBe(100);
+    expect(byTicker.get('VTI')?.targetAllocation).toBeCloseTo(0.6, 10);
+
+    expect(byTicker.get('VXUS')?.accountType).toBe('taxable');
+    expect(byTicker.get('VXUS')?.assetClass).toBe('intl-stock');
+
+    expect(byTicker.get('BND')?.accountType).toBe('tax-deferred');
+    expect(byTicker.get('BND')?.assetClass).toBe('bonds');
   });
 });

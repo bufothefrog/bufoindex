@@ -6,6 +6,7 @@ import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingSt
 import { AssetListCard } from './AssetListCard';
 import { DepositAndModeCard } from './DepositAndModeCard';
 import { RebalanceResults } from './RebalanceResults';
+import { PlacementAdviceCard } from './PlacementAdviceCard';
 
 export function PortfolioRebalancingCalculator() {
   const {
@@ -18,6 +19,8 @@ export function PortfolioRebalancingCalculator() {
     removeAsset,
     setDeposit,
     setMode,
+    setAllowTaxableSelling,
+    setShowPlacementAdvice,
     loadFromUrl,
   } = usePortfolioRebalancingStore();
 
@@ -48,12 +51,25 @@ export function PortfolioRebalancingCalculator() {
           <DepositAndModeCard
             deposit={inputs.deposit}
             mode={inputs.mode}
+            allowTaxableSelling={inputs.allowTaxableSelling}
+            showPlacementAdvice={inputs.showPlacementAdvice}
             onDepositChange={setDeposit}
             onModeChange={setMode}
+            onAllowTaxableSellingChange={setAllowTaxableSelling}
+            onShowPlacementAdviceChange={setShowPlacementAdvice}
           />
         </div>
       }
-      resultSection={result ? <RebalanceResults result={result} /> : undefined}
+      resultSection={
+        result ? (
+          <div className="space-y-6">
+            <RebalanceResults result={result} />
+            {inputs.showPlacementAdvice && (
+              <PlacementAdviceCard assets={inputs.assets} />
+            )}
+          </div>
+        ) : undefined
+      }
       disclaimer="Educational tool only. Assumes stated prices are current and executable. Not tax or investment advice."
     />
   );

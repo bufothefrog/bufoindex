@@ -5,7 +5,12 @@ import { Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { NumberInput, PercentInput } from '@/components/ui/inputs';
-import { RebalanceAsset } from '@/lib/calculations/portfolioRebalancing';
+import { SelectInput } from '@/components/shared/inputs/SelectInput';
+import {
+  AccountType,
+  AssetClass,
+  RebalanceAsset,
+} from '@/lib/calculations/portfolioRebalancing';
 import { cn } from '@/lib/utils';
 
 interface AssetRowProps {
@@ -16,6 +21,21 @@ interface AssetRowProps {
   onRemove: () => void;
   className?: string;
 }
+
+const ACCOUNT_OPTIONS: { value: AccountType; label: string }[] = [
+  { value: 'taxable', label: 'Taxable' },
+  { value: 'tax-deferred', label: 'Tax-Deferred' },
+  { value: 'tax-free', label: 'Tax-Free' },
+];
+
+const ASSET_CLASS_OPTIONS: { value: AssetClass; label: string }[] = [
+  { value: 'us-stock', label: 'US Stock' },
+  { value: 'intl-stock', label: 'Intl Stock' },
+  { value: 'bonds', label: 'Bonds' },
+  { value: 'reits', label: 'REITs' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'other', label: 'Other' },
+];
 
 export function AssetRow({
   asset,
@@ -28,7 +48,7 @@ export function AssetRow({
   return (
     <div
       className={cn(
-        'grid grid-cols-1 md:grid-cols-[1.1fr_1fr_1fr_1fr_auto] gap-3 md:gap-2 items-start md:items-end p-3 rounded-lg border border-border bg-muted/30',
+        'grid grid-cols-1 md:grid-cols-[1fr_0.8fr_0.8fr_0.8fr_1fr_1fr_auto] gap-3 md:gap-2 items-start md:items-end p-3 rounded-lg border border-border bg-muted/30',
         className
       )}
       data-testid={`asset-row-${index}`}
@@ -83,6 +103,26 @@ export function AssetRow({
         precision={1}
         testId={`target-${index}`}
       />
+
+      <div data-testid={`account-${index}`}>
+        <SelectInput
+          name={`account-${asset.id}`}
+          label="Account"
+          value={asset.accountType}
+          onChange={value => onChange({ accountType: value as AccountType })}
+          options={ACCOUNT_OPTIONS}
+        />
+      </div>
+
+      <div data-testid={`class-${index}`}>
+        <SelectInput
+          name={`class-${asset.id}`}
+          label="Class"
+          value={asset.assetClass}
+          onChange={value => onChange({ assetClass: value as AssetClass })}
+          options={ASSET_CLASS_OPTIONS}
+        />
+      </div>
 
       <div className="flex items-end md:pb-0.5">
         <Button

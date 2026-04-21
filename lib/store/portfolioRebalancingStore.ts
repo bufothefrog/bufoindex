@@ -66,6 +66,8 @@ interface StoreState {
   removeAsset: (id: string) => void;
   setDeposit: (deposit: number) => void;
   setMode: (mode: RebalanceMode) => void;
+  setAllowTaxableSelling: (value: boolean) => void;
+  setShowPlacementAdvice: (value: boolean) => void;
   calculate: () => void;
   loadFromUrl: () => void;
   reset: () => void;
@@ -145,6 +147,20 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
 
       setMode: (mode) => {
         set(state => ({ inputs: { ...state.inputs, mode } }));
+        const { hasCalculatedOnce, inputs } = get();
+        if (hasCalculatedOnce) get().calculate();
+        scheduleHashUpdate(inputs);
+      },
+
+      setAllowTaxableSelling: (value) => {
+        set(state => ({ inputs: { ...state.inputs, allowTaxableSelling: value } }));
+        const { hasCalculatedOnce, inputs } = get();
+        if (hasCalculatedOnce) get().calculate();
+        scheduleHashUpdate(inputs);
+      },
+
+      setShowPlacementAdvice: (value) => {
+        set(state => ({ inputs: { ...state.inputs, showPlacementAdvice: value } }));
         const { hasCalculatedOnce, inputs } = get();
         if (hasCalculatedOnce) get().calculate();
         scheduleHashUpdate(inputs);

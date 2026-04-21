@@ -137,4 +137,74 @@ describe('AssetRow', () => {
     fireEvent.change(inputIn('price-0'), { target: { value: '300' } });
     expect(onChange).toHaveBeenCalledWith({ price: 300 });
   });
+
+  it('renders account type dropdown with current value', () => {
+    render(
+      <AssetRow
+        asset={makeAsset({ accountType: 'tax-free' })}
+        index={0}
+        canRemove={true}
+        onChange={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const wrapper = screen.getByTestId('account-0');
+    const select = within(wrapper).getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('tax-free');
+  });
+
+  it('emits onChange with new accountType when dropdown changes', () => {
+    const onChange = vi.fn();
+    render(
+      <AssetRow
+        asset={makeAsset({ accountType: 'taxable' })}
+        index={0}
+        canRemove={true}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const wrapper = screen.getByTestId('account-0');
+    const select = within(wrapper).getByRole('combobox') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'tax-deferred' } });
+
+    expect(onChange).toHaveBeenCalledWith({ accountType: 'tax-deferred' });
+  });
+
+  it('renders asset class dropdown with current value', () => {
+    render(
+      <AssetRow
+        asset={makeAsset({ assetClass: 'bonds' })}
+        index={0}
+        canRemove={true}
+        onChange={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const wrapper = screen.getByTestId('class-0');
+    const select = within(wrapper).getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('bonds');
+  });
+
+  it('emits onChange with new assetClass when dropdown changes', () => {
+    const onChange = vi.fn();
+    render(
+      <AssetRow
+        asset={makeAsset({ assetClass: 'us-stock' })}
+        index={0}
+        canRemove={true}
+        onChange={onChange}
+        onRemove={vi.fn()}
+      />
+    );
+
+    const wrapper = screen.getByTestId('class-0');
+    const select = within(wrapper).getByRole('combobox') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'intl-stock' } });
+
+    expect(onChange).toHaveBeenCalledWith({ assetClass: 'intl-stock' });
+  });
 });

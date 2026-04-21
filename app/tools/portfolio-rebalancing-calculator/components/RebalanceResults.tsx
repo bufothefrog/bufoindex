@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, PiggyBank, Scale, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowRight, PiggyBank, Scale, Wallet } from 'lucide-react';
 import { ResultCard, SummaryCard } from '@/components/ui/cards/BaseCard';
 import { RebalanceResult } from '@/lib/calculations/portfolioRebalancing';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -24,13 +24,26 @@ function formatPercentPoints(decimal: number, signed = false): string {
 }
 
 export function RebalanceResults({ result }: RebalanceResultsProps) {
-  const { assets, totalValueBefore, totalValueAfter, totalSpent, cashLeftover, totalDriftBefore, totalDriftAfter, mode } = result;
+  const { assets, totalValueBefore, totalValueAfter, totalSpent, cashLeftover, totalDriftBefore, totalDriftAfter, taxEventDollars, mode } = result;
 
   const driftReduction = totalDriftBefore - totalDriftAfter;
   const driftReductionPct = totalDriftBefore > 0 ? (driftReduction / totalDriftBefore) * 100 : 0;
 
   return (
     <div className="space-y-6">
+      {taxEventDollars > 0 && (
+        <div
+          role="alert"
+          data-testid="tax-event-warning"
+          className="flex items-start gap-3 rounded-lg border border-orange-300 bg-orange-50 dark:border-orange-600 dark:bg-orange-900/30 p-3 text-sm"
+        >
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-600 dark:text-orange-300" />
+          <div className="text-orange-800 dark:text-orange-100">
+            This plan sells {formatCurrency(taxEventDollars)} in taxable accounts. Review your cost basis to estimate the tax impact.
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <SummaryCard
           icon={Wallet}
@@ -54,17 +67,23 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
             <thead>
               <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
                 <th className="py-2 pr-2 font-medium">Asset</th>
-                <th className="py-2 px-2 text-right font-medium">Buy</th>
+                <th className="py-2 px-2 text-right font-medium">Action</th>
                 <th className="py-2 px-2 text-right font-medium">Cost</th>
                 <th className="py-2 pl-2 text-right font-medium">After</th>
               </tr>
             </thead>
             <tbody>
               {assets.map(asset => {
-                const isZero = asset.sharesToBuy === 0;
-                const wasOverweight = asset.driftBefore > 0;
+                const isSell = asset.action === 'sell';
+                const isBuy = asset.action === 'buy';
+                // Net cost is negative on sells (we receive cash), positive on buys.
+                const netCost = isSell ? -asset.dollarsReceived : asset.dollarsSpent;
                 return (
-                  <tr key={asset.id} className="border-b border-border/50 last:border-b-0">
+                  <tr
+                    key={asset.id}
+                    className="border-b border-border/50 last:border-b-0"
+                    data-testid={`plan-row-${asset.id}`}
+                  >
                     <td className="py-3 pr-2">
                       <div className="font-semibold tabular-nums">
                         {asset.ticker || '—'}
@@ -76,17 +95,26 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
                     <td
                       className={cn(
                         'py-3 px-2 text-right font-mono tabular-nums',
-                        isZero && 'text-muted-foreground'
+                        isBuy && 'text-sage-700 dark:text-sage-300',
+                        isSell && 'text-orange-700 dark:text-orange-300',
+                        !isBuy && !isSell && 'text-muted-foreground'
                       )}
                     >
-                      {isZero
-                        ? wasOverweight
-                          ? 'Skip (overweight)'
-                          : '—'
-                        : `+${formatShares(asset.sharesToBuy, mode)}`}
+                      {isBuy
+                        ? `Buy ${formatShares(asset.sharesToBuy, mode)}`
+                        : isSell
+                        ? `Sell ${formatShares(asset.sharesToSell, mode)}`
+                        : '—'}
                     </td>
-                    <td className="py-3 px-2 text-right font-mono tabular-nums">
-                      {formatCurrency(asset.dollarsSpent)}
+                    <td
+                      className={cn(
+                        'py-3 px-2 text-right font-mono tabular-nums',
+                        isSell && 'text-orange-700 dark:text-orange-300'
+                      )}
+                    >
+                      {isSell
+                        ? `-${formatCurrency(asset.dollarsReceived)}`
+                        : formatCurrency(netCost)}
                     </td>
                     <td className="py-3 pl-2 text-right">
                       <div className="font-mono tabular-nums">
