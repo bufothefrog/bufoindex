@@ -32,10 +32,12 @@ const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
 };
 
 /**
- * Returns the set of asset classes that have at least one holding in the
- * given scope. When `accountId` is null the scope is the whole portfolio.
- * Always includes any asset class that already has a non-zero class target,
- * so zero-holding-but-non-zero-target rows remain editable.
+ * Returns the set of asset classes to render target rows for. Includes:
+ *   • every class held in scope,
+ *   • every class with a declared target in scope,
+ *   • a default trio (US / Intl / Bonds) when the scope has no holdings yet,
+ *     so the user always has somewhere to type — without this trio collapsing
+ *     to one row the moment the user enters the first percent.
  */
 function relevantClasses(
   holdings: Holding[],
@@ -44,21 +46,27 @@ function relevantClasses(
   accountId: string | null
 ): AssetClass[] {
   const securityClass = new Map(securities.map(s => [s.id, s.assetClass]));
-  const held = new Set<AssetClass>();
+  const shown = new Set<AssetClass>();
+
+  let hasHoldingsInScope = false;
   holdings.forEach(h => {
     if (accountId !== null && h.accountId !== accountId) return;
     const cls = securityClass.get(h.securityId);
-    if (cls) held.add(cls);
+    if (cls) {
+      shown.add(cls);
+      hasHoldingsInScope = true;
+    }
   });
-  // Include any class with a declared target at this scope.
+
   classTargets.forEach(t => {
-    if (t.accountId === accountId && t.target > 0) held.add(t.assetClass);
+    if (t.accountId === accountId && t.target > 0) shown.add(t.assetClass);
   });
-  // Fall back to all classes when the scope is empty so users always see options.
-  if (held.size === 0) {
-    return ['us-stock', 'intl-stock', 'bonds'];
+
+  if (!hasHoldingsInScope) {
+    (['us-stock', 'intl-stock', 'bonds'] as AssetClass[]).forEach(c => shown.add(c));
   }
-  return ASSET_CLASSES.filter(c => held.has(c));
+
+  return ASSET_CLASSES.filter(c => shown.has(c));
 }
 
 export function TargetsCard() {
