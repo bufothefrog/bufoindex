@@ -1,16 +1,45 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ArrowRight, PiggyBank, Scale, Wallet } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  PiggyBank,
+  Scale,
+  Wallet,
+} from 'lucide-react';
 import { ResultCard, SummaryCard } from '@/components/ui/cards/BaseCard';
-import { RebalanceResult } from '@/lib/calculations/portfolioRebalancing';
+import {
+  AccountType,
+  AssetClass,
+  AccountRebalanceSummary,
+  ClassDrift,
+  HoldingRebalancePlan,
+  RebalanceMode,
+  RebalanceResultV2,
+} from '@/lib/calculations/portfolioRebalancing';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface RebalanceResultsProps {
-  result: RebalanceResult;
+  result: RebalanceResultV2;
 }
 
-function formatShares(n: number, mode: 'whole' | 'fractional'): string {
+const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
+  'us-stock': 'US Stock',
+  'intl-stock': 'Intl Stock',
+  'bonds': 'Bonds',
+  'reits': 'REITs',
+  'cash': 'Cash',
+  'other': 'Other',
+};
+
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  'taxable': 'Taxable',
+  'tax-deferred': 'Tax-Deferred',
+  'tax-free': 'Tax-Free',
+};
+
+function formatShares(n: number, mode: RebalanceMode): string {
   if (mode === 'whole') return Math.round(n).toLocaleString('en-US');
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
 }
@@ -24,10 +53,26 @@ function formatPercentPoints(decimal: number, signed = false): string {
 }
 
 export function RebalanceResults({ result }: RebalanceResultsProps) {
-  const { assets, totalValueBefore, totalValueAfter, totalSpent, cashLeftover, totalDriftBefore, totalDriftAfter, taxEventDollars, mode } = result;
+  const {
+    setupMode,
+    accounts,
+    totalValueBefore,
+    totalValueAfter,
+    totalDeposit,
+    totalSpent,
+    cashLeftover,
+    totalDriftBefore,
+    totalDriftAfter,
+    taxEventDollars,
+    classDrift,
+    mode,
+  } = result;
 
   const driftReduction = totalDriftBefore - totalDriftAfter;
-  const driftReductionPct = totalDriftBefore > 0 ? (driftReduction / totalDriftBefore) * 100 : 0;
+  const driftReductionPct =
+    totalDriftBefore > 0 ? (driftReduction / totalDriftBefore) * 100 : 0;
+
+  const portfolioDrift = classDrift.filter(d => d.accountId === null);
 
   return (
     <div className="space-y-6">
@@ -39,7 +84,8 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
         >
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-600 dark:text-orange-300" />
           <div className="text-orange-800 dark:text-orange-100">
-            This plan sells {formatCurrency(taxEventDollars)} in taxable accounts. Review your cost basis to estimate the tax impact.
+            This plan sells {formatCurrency(taxEventDollars)} in taxable accounts.
+            Review your cost basis to estimate the tax impact.
           </div>
         </div>
       )}
@@ -49,119 +95,60 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
           icon={Wallet}
           label="Invested"
           value={formatCurrency(totalSpent)}
-          secondaryValue={`of ${formatCurrency(result.deposit)} deposit`}
+          secondaryValue={`of ${formatCurrency(totalDeposit)} deposit`}
         />
         <SummaryCard
           icon={PiggyBank}
           label="Cash leftover"
           value={formatCurrency(cashLeftover)}
-          secondaryValue={
-            cashLeftover > 0 ? 'Carry to next deposit' : 'Fully invested'
-          }
+          secondaryValue={cashLeftover > 0 ? 'Carry to next deposit' : 'Fully invested'}
         />
       </div>
 
-      <ResultCard title="Purchase Plan" icon={ArrowRight} status="success" highlight>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" data-testid="purchase-plan-table">
-            <thead>
-              <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
-                <th className="py-2 pr-2 font-medium">Asset</th>
-                <th className="py-2 px-2 text-right font-medium">Action</th>
-                <th className="py-2 px-2 text-right font-medium">Cost</th>
-                <th className="py-2 pl-2 text-right font-medium">After</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map(asset => {
-                const isSell = asset.action === 'sell';
-                const isBuy = asset.action === 'buy';
-                // Net cost is negative on sells (we receive cash), positive on buys.
-                const netCost = isSell ? -asset.dollarsReceived : asset.dollarsSpent;
-                return (
-                  <tr
-                    key={asset.id}
-                    className="border-b border-border/50 last:border-b-0"
-                    data-testid={`plan-row-${asset.id}`}
-                  >
-                    <td className="py-3 pr-2">
-                      <div className="font-semibold tabular-nums">
-                        {asset.ticker || '—'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatCurrency(asset.price)}/share
-                      </div>
-                    </td>
-                    <td
-                      className={cn(
-                        'py-3 px-2 text-right font-mono tabular-nums',
-                        isBuy && 'text-sage-700 dark:text-sage-300',
-                        isSell && 'text-orange-700 dark:text-orange-300',
-                        !isBuy && !isSell && 'text-muted-foreground'
-                      )}
-                    >
-                      {isBuy
-                        ? `Buy ${formatShares(asset.sharesToBuy, mode)}`
-                        : isSell
-                        ? `Sell ${formatShares(asset.sharesToSell, mode)}`
-                        : '—'}
-                    </td>
-                    <td
-                      className={cn(
-                        'py-3 px-2 text-right font-mono tabular-nums',
-                        isSell && 'text-orange-700 dark:text-orange-300'
-                      )}
-                    >
-                      {isSell
-                        ? `-${formatCurrency(asset.dollarsReceived)}`
-                        : formatCurrency(netCost)}
-                    </td>
-                    <td className="py-3 pl-2 text-right">
-                      <div className="font-mono tabular-nums">
-                        {formatPercentPoints(asset.newAllocation)}
-                      </div>
-                      <div
-                        className={cn(
-                          'text-xs tabular-nums',
-                          Math.abs(asset.driftAfter) < 0.001
-                            ? 'text-sage-600 dark:text-sage-300'
-                            : asset.driftAfter > 0
-                            ? 'text-orange-600 dark:text-orange-300'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        target {formatPercentPoints(asset.targetAllocation)}
-                        {Math.abs(asset.driftAfter) >= 0.001 && (
-                          <> ({formatPercentPoints(asset.driftAfter, true)})</>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-border">
-                <td className="pt-3 pr-2 font-semibold">Portfolio</td>
-                <td className="pt-3 px-2"></td>
-                <td className="pt-3 px-2 text-right font-mono font-semibold tabular-nums">
-                  {formatCurrency(totalSpent)}
-                </td>
-                <td className="pt-3 pl-2 text-right font-mono font-semibold tabular-nums">
-                  {formatCurrency(totalValueAfter)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+      {setupMode === 'multi-unique' ? (
+        // Each account gets its own plan + its own drift table.
+        <div className="space-y-6">
+          {accounts.map(account => (
+            <AccountPlanBlock
+              key={account.accountId}
+              account={account}
+              mode={mode}
+              classDrift={classDrift.filter(d => d.accountId === account.accountId)}
+              showDrift
+            />
+          ))}
         </div>
-      </ResultCard>
+      ) : (
+        // Single + multi-shared: per-account plans, then ONE portfolio-wide drift.
+        <>
+          <div className="space-y-6">
+            {accounts.map(account => (
+              <AccountPlanBlock
+                key={account.accountId}
+                account={account}
+                mode={mode}
+                classDrift={[]}
+                showDrift={false}
+              />
+            ))}
+          </div>
+          {portfolioDrift.length > 0 && (
+            <ClassDriftCard
+              title="Portfolio Drift by Class"
+              drifts={portfolioDrift}
+            />
+          )}
+        </>
+      )}
 
       <ResultCard title="Drift Reduction" icon={Scale}>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-sm text-muted-foreground">Total drift before</div>
-              <div className="text-xl font-mono tabular-nums">{formatPercentPoints(totalDriftBefore)}</div>
+              <div className="text-xl font-mono tabular-nums">
+                {formatPercentPoints(totalDriftBefore)}
+              </div>
             </div>
             <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             <div className="text-right">
@@ -173,16 +160,245 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
           </div>
           {driftReduction > 0.0005 && (
             <div className="text-sm text-muted-foreground">
-              This deposit closes <span className="text-foreground font-medium">{driftReductionPct.toFixed(0)}%</span> of the gap
-              between your portfolio and its target allocation — without selling.
+              This deposit closes{' '}
+              <span className="text-foreground font-medium">
+                {driftReductionPct.toFixed(0)}%
+              </span>{' '}
+              of the gap between your portfolio and its target allocation.
             </div>
           )}
         </div>
       </ResultCard>
 
       <div className="text-xs text-muted-foreground">
-        Starting portfolio value: <span className="tabular-nums">{formatCurrency(totalValueBefore)}</span>
+        Starting portfolio value:{' '}
+        <span className="tabular-nums">{formatCurrency(totalValueBefore)}</span>
+        {totalValueAfter !== totalValueBefore && (
+          <>
+            {' '}
+            → After:{' '}
+            <span className="tabular-nums">{formatCurrency(totalValueAfter)}</span>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+interface AccountPlanBlockProps {
+  account: AccountRebalanceSummary;
+  mode: RebalanceMode;
+  classDrift: ClassDrift[];
+  showDrift: boolean;
+}
+
+function AccountPlanBlock({
+  account,
+  mode,
+  classDrift,
+  showDrift,
+}: AccountPlanBlockProps) {
+  const { accountName, accountType, deposit, depositUsed, depositLeftover, holdings } = account;
+
+  return (
+    <ResultCard
+      title={`${accountName || 'Account'} — ${ACCOUNT_TYPE_LABELS[accountType]}`}
+      icon={ArrowRight}
+      status="success"
+      testId={`account-plan-${account.accountId}`}
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex items-center justify-between p-2 rounded bg-muted/40">
+            <span className="text-muted-foreground">Deposit used</span>
+            <span className="font-mono tabular-nums">{formatCurrency(depositUsed)}</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded bg-muted/40">
+            <span className="text-muted-foreground">Leftover</span>
+            <span className="font-mono tabular-nums">{formatCurrency(depositLeftover)}</span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
+                <th className="py-2 pr-2 font-medium">Holding</th>
+                <th className="py-2 px-2 text-right font-medium">Action</th>
+                <th className="py-2 px-2 text-right font-medium">Dollars</th>
+                <th className="py-2 pl-2 text-right font-medium">Value After</th>
+              </tr>
+            </thead>
+            <tbody>
+              {holdings.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-muted-foreground">
+                    No holdings in this account.
+                  </td>
+                </tr>
+              ) : (
+                holdings.map(holding => (
+                  <HoldingPlanRow
+                    key={holding.holdingId}
+                    holding={holding}
+                    mode={mode}
+                  />
+                ))
+              )}
+            </tbody>
+            {holdings.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-border">
+                  <td className="pt-2 pr-2 text-xs text-muted-foreground">Deposit</td>
+                  <td className="pt-2 px-2"></td>
+                  <td className="pt-2 px-2 text-right font-mono tabular-nums text-xs text-muted-foreground">
+                    {formatCurrency(deposit)}
+                  </td>
+                  <td className="pt-2 pl-2"></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        {showDrift && classDrift.length > 0 && (
+          <div className="pt-2 border-t border-border/60">
+            <div className="text-xs font-medium uppercase text-muted-foreground mb-2">
+              Account Drift
+            </div>
+            <ClassDriftTable drifts={classDrift} />
+          </div>
+        )}
+      </div>
+    </ResultCard>
+  );
+}
+
+interface HoldingPlanRowProps {
+  holding: HoldingRebalancePlan;
+  mode: RebalanceMode;
+}
+
+function HoldingPlanRow({ holding, mode }: HoldingPlanRowProps) {
+  const { ticker, price, action, sharesToBuy, sharesToSell, dollarsSpent, dollarsReceived, newValue } = holding;
+  const isSell = action === 'sell';
+  const isBuy = action === 'buy';
+  return (
+    <tr
+      className="border-b border-border/50 last:border-b-0"
+      data-testid={`plan-row-${holding.holdingId}`}
+    >
+      <td className="py-3 pr-2">
+        <div className="font-semibold tabular-nums">{ticker || '—'}</div>
+        <div className="text-xs text-muted-foreground">
+          {formatCurrency(price)}/share · {ASSET_CLASS_LABELS[holding.assetClass]}
+        </div>
+      </td>
+      <td
+        className={cn(
+          'py-3 px-2 text-right font-mono tabular-nums',
+          isBuy && 'text-sage-700 dark:text-sage-300',
+          isSell && 'text-orange-700 dark:text-orange-300',
+          !isBuy && !isSell && 'text-muted-foreground'
+        )}
+      >
+        {isBuy
+          ? `Buy ${formatShares(sharesToBuy, mode)}`
+          : isSell
+          ? `Sell ${formatShares(sharesToSell, mode)}`
+          : '—'}
+      </td>
+      <td
+        className={cn(
+          'py-3 px-2 text-right font-mono tabular-nums',
+          isSell && 'text-orange-700 dark:text-orange-300'
+        )}
+      >
+        {isSell
+          ? `-${formatCurrency(dollarsReceived)}`
+          : isBuy
+          ? formatCurrency(dollarsSpent)
+          : '—'}
+      </td>
+      <td className="py-3 pl-2 text-right font-mono tabular-nums">
+        {formatCurrency(newValue)}
+      </td>
+    </tr>
+  );
+}
+
+interface ClassDriftCardProps {
+  title: string;
+  drifts: ClassDrift[];
+}
+
+function ClassDriftCard({ title, drifts }: ClassDriftCardProps) {
+  return (
+    <ResultCard title={title} icon={Scale}>
+      <ClassDriftTable drifts={drifts} />
+    </ResultCard>
+  );
+}
+
+function ClassDriftTable({ drifts }: { drifts: ClassDrift[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm" data-testid="class-drift-table">
+        <thead>
+          <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
+            <th className="py-2 pr-2 font-medium">Class</th>
+            <th className="py-2 px-2 text-right font-medium">Target</th>
+            <th className="py-2 px-2 text-right font-medium">Current</th>
+            <th className="py-2 pl-2 text-right font-medium">After</th>
+          </tr>
+        </thead>
+        <tbody>
+          {drifts.map(d => (
+            <tr
+              key={`${d.accountId ?? 'portfolio'}-${d.assetClass}`}
+              className="border-b border-border/50 last:border-b-0"
+              data-testid={`drift-row-${d.accountId ?? 'portfolio'}-${d.assetClass}`}
+            >
+              <td className="py-2 pr-2 font-medium">{ASSET_CLASS_LABELS[d.assetClass]}</td>
+              <td className="py-2 px-2 text-right font-mono tabular-nums">
+                {formatPercentPoints(d.target)}
+              </td>
+              <td className="py-2 px-2 text-right font-mono tabular-nums">
+                {formatPercentPoints(d.currentAllocation)}
+                <div
+                  className={cn(
+                    'text-xs',
+                    Math.abs(d.driftBefore) < 0.001
+                      ? 'text-sage-600 dark:text-sage-300'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {Math.abs(d.driftBefore) >= 0.001
+                    ? formatPercentPoints(d.driftBefore, true)
+                    : 'on target'}
+                </div>
+              </td>
+              <td className="py-2 pl-2 text-right font-mono tabular-nums">
+                {formatPercentPoints(d.newAllocation)}
+                <div
+                  className={cn(
+                    'text-xs',
+                    Math.abs(d.driftAfter) < 0.001
+                      ? 'text-sage-600 dark:text-sage-300'
+                      : d.driftAfter > 0
+                      ? 'text-orange-600 dark:text-orange-300'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {Math.abs(d.driftAfter) >= 0.001
+                    ? formatPercentPoints(d.driftAfter, true)
+                    : 'on target'}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

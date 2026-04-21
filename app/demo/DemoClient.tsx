@@ -80,12 +80,10 @@ import { Tooltip as HelpTooltip, HELP_TOOLTIPS } from '@/components/shared/Toolt
 import { CalculatorTabs } from '@/components/calculators/shared/CalculatorTabs';
 
 // Portfolio rebalancing composed widgets
-import { AssetRow } from '@/app/tools/portfolio-rebalancing-calculator/components/AssetRow';
+import { SecurityRow } from '@/app/tools/portfolio-rebalancing-calculator/components/SecurityRow';
 import {
-  DEFAULT_ACCOUNT_TYPE,
-  DEFAULT_ASSET_CLASS,
-  RebalanceAsset,
   RebalanceMode,
+  Security,
 } from '@/lib/calculations/portfolioRebalancing';
 import { cn } from '@/lib/utils';
 import { Coins, Scissors, Scale } from 'lucide-react';
@@ -110,7 +108,7 @@ interface DemoState {
     filingStatus: string;
   };
   rebalanceDemo: {
-    assets: RebalanceAsset[];
+    securities: Security[];
     mode: RebalanceMode;
   };
 }
@@ -137,23 +135,19 @@ export function DemoClient() {
       filingStatus: 'single'
     },
     rebalanceDemo: {
-      assets: [
+      securities: [
         {
           id: 'demo-vti',
           ticker: 'VTI',
-          currentShares: 10,
+          name: 'Vanguard Total US Stock',
           price: 250,
-          targetAllocation: 0.6,
-          accountType: DEFAULT_ACCOUNT_TYPE,
           assetClass: 'us-stock',
         },
         {
           id: 'demo-bnd',
           ticker: 'BND',
-          currentShares: 20,
+          name: 'Vanguard Total Bond',
           price: 70,
-          targetAllocation: 0.4,
-          accountType: DEFAULT_ACCOUNT_TYPE,
           assetClass: 'bonds',
         }
       ],
@@ -229,27 +223,27 @@ export function DemoClient() {
     }));
   };
 
-  const updateRebalanceAsset = (
+  const updateRebalanceSecurity = (
     id: string,
-    updates: Partial<Omit<RebalanceAsset, 'id'>>
+    updates: Partial<Omit<Security, 'id'>>
   ) => {
     setDemoState(prev => ({
       ...prev,
       rebalanceDemo: {
         ...prev.rebalanceDemo,
-        assets: prev.rebalanceDemo.assets.map(a =>
-          a.id === id ? { ...a, ...updates } : a
+        securities: prev.rebalanceDemo.securities.map(s =>
+          s.id === id ? { ...s, ...updates } : s
         )
       }
     }));
   };
 
-  const removeRebalanceAsset = (id: string) => {
+  const removeRebalanceSecurity = (id: string) => {
     setDemoState(prev => ({
       ...prev,
       rebalanceDemo: {
         ...prev.rebalanceDemo,
-        assets: prev.rebalanceDemo.assets.filter(a => a.id !== id)
+        securities: prev.rebalanceDemo.securities.filter(s => s.id !== id)
       }
     }));
   };
@@ -687,20 +681,20 @@ export function DemoClient() {
         <CardContent>
           <div className="space-y-6">
             <div>
-              <h4 className="text-sm font-medium mb-1">Asset Row</h4>
+              <h4 className="text-sm font-medium mb-1">Security Row</h4>
               <p className="text-xs text-muted-foreground mb-3">
-                Composed row of ticker / shares / price / target inputs used by the rebalancing
+                Composed row of ticker / name / price / asset-class inputs used by the rebalancing
                 calculator. Pattern for dynamic list rows in future calculators.
               </p>
               <div className="space-y-2">
-                {demoState.rebalanceDemo.assets.map((asset, index) => (
-                  <AssetRow
-                    key={asset.id}
-                    asset={asset}
+                {demoState.rebalanceDemo.securities.map((security, index) => (
+                  <SecurityRow
+                    key={security.id}
+                    security={security}
                     index={index}
-                    canRemove={demoState.rebalanceDemo.assets.length > 1}
-                    onChange={(updates) => updateRebalanceAsset(asset.id, updates)}
-                    onRemove={() => removeRebalanceAsset(asset.id)}
+                    canRemove={demoState.rebalanceDemo.securities.length > 1}
+                    onChange={(updates) => updateRebalanceSecurity(security.id, updates)}
+                    onRemove={() => removeRebalanceSecurity(security.id)}
                   />
                 ))}
               </div>

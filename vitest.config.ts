@@ -13,6 +13,8 @@ export default defineConfig({
     include: [
       // Unit tests for calculations (100% coverage required)
       'test/lib/calculations/**/*.test.{ts,js}',
+      // Unit tests for utility modules (90% coverage target)
+      'test/lib/utils/**/*.test.{ts,js}',
       // Component tests (80% coverage target)
       'test/components/**/*.test.{tsx,ts}',
       // Integration tests (70% coverage target)

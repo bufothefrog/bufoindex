@@ -1,51 +1,54 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Banknote, Coins, Scissors } from 'lucide-react';
+import { AlertTriangle, Coins, Scissors, Settings2 } from 'lucide-react';
 import { InputCard } from '@/components/ui/cards/BaseCard';
 import { EnhancedMoneyInput } from '@/components/ui/inputs';
-import { RebalanceMode } from '@/lib/calculations/portfolioRebalancing';
+import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { cn } from '@/lib/utils';
 
-interface DepositAndModeCardProps {
-  deposit: number;
-  mode: RebalanceMode;
-  allowTaxableSelling: boolean;
-  showPlacementAdvice: boolean;
-  onDepositChange: (value: number) => void;
-  onModeChange: (mode: RebalanceMode) => void;
-  onAllowTaxableSellingChange: (value: boolean) => void;
-  onShowPlacementAdviceChange: (value: boolean) => void;
-}
+/**
+ * Global calculator settings — purchase mode, selling toggle, placement
+ * advice toggle. Deposits live on Account rows.
+ *
+ * In 'single' mode we expose the single account's deposit inline here so
+ * that single-account users never see the Accounts card.
+ */
+export function SettingsCard() {
+  const setupMode = usePortfolioRebalancingStore(s => s.setupMode);
+  const mode = usePortfolioRebalancingStore(s => s.inputs.mode);
+  const allowTaxableSelling = usePortfolioRebalancingStore(s => s.inputs.allowTaxableSelling);
+  const showPlacementAdvice = usePortfolioRebalancingStore(s => s.inputs.showPlacementAdvice);
+  const accounts = usePortfolioRebalancingStore(s => s.inputs.accounts);
+  const setMode = usePortfolioRebalancingStore(s => s.setMode);
+  const setAllowTaxableSelling = usePortfolioRebalancingStore(s => s.setAllowTaxableSelling);
+  const setShowPlacementAdvice = usePortfolioRebalancingStore(s => s.setShowPlacementAdvice);
+  const updateAccount = usePortfolioRebalancingStore(s => s.updateAccount);
 
-export function DepositAndModeCard({
-  deposit,
-  mode,
-  allowTaxableSelling,
-  showPlacementAdvice,
-  onDepositChange,
-  onModeChange,
-  onAllowTaxableSellingChange,
-  onShowPlacementAdviceChange,
-}: DepositAndModeCardProps) {
+  const isSingle = setupMode === 'single';
+  const isMultiUnique = setupMode === 'multi-unique';
+  const soleAccount = isSingle ? accounts[0] : null;
+
   return (
-    <InputCard title="Deposit & Purchase Mode" icon={Banknote}>
+    <InputCard title="Settings" icon={Settings2}>
       <div className="space-y-5">
-        <EnhancedMoneyInput
-          name="deposit"
-          label="Deposit amount"
-          value={deposit}
-          onChange={onDepositChange}
-          placeholder="1,000"
-          help="New cash to invest this round. We'll direct it to whichever assets are most underweight."
-        />
+        {isSingle && soleAccount && (
+          <EnhancedMoneyInput
+            name="single-deposit"
+            label="Deposit amount"
+            value={soleAccount.deposit}
+            onChange={value => updateAccount(soleAccount.id, { deposit: value })}
+            placeholder="1,000"
+            help="New cash to invest this round."
+          />
+        )}
 
         <div className="space-y-2">
           <div className="text-sm font-medium">Purchase mode</div>
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Purchase mode">
             <ModeButton
               active={mode === 'whole'}
-              onClick={() => onModeChange('whole')}
+              onClick={() => setMode('whole')}
               icon={<Coins className="w-4 h-4" />}
               title="Whole shares"
               description="Floor to integers; leftover kept as cash."
@@ -53,7 +56,7 @@ export function DepositAndModeCard({
             />
             <ModeButton
               active={mode === 'fractional'}
-              onClick={() => onModeChange('fractional')}
+              onClick={() => setMode('fractional')}
               icon={<Scissors className="w-4 h-4" />}
               title="Fractional"
               description="Exact-to-penny splits. Requires broker support."
@@ -68,7 +71,7 @@ export function DepositAndModeCard({
               type="checkbox"
               id="allow-taxable-selling"
               checked={allowTaxableSelling}
-              onChange={e => onAllowTaxableSellingChange(e.target.checked)}
+              onChange={e => setAllowTaxableSelling(e.target.checked)}
               data-testid="toggle-allow-taxable-selling"
               className="w-4 h-4 mt-1 accent-sage-600"
             />
@@ -88,27 +91,29 @@ export function DepositAndModeCard({
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              id="show-placement-advice"
-              checked={showPlacementAdvice}
-              onChange={e => onShowPlacementAdviceChange(e.target.checked)}
-              data-testid="toggle-placement-advice"
-              className="w-4 h-4 mt-1 accent-sage-600"
-            />
-            <div className="flex-1">
-              <label
-                htmlFor="show-placement-advice"
-                className="text-sm font-medium cursor-pointer"
-              >
-                Show tax-efficient placement advice
-              </label>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Suggest which accounts each asset fits best, based on tax drag.
+          {!isMultiUnique && (
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="show-placement-advice"
+                checked={showPlacementAdvice}
+                onChange={e => setShowPlacementAdvice(e.target.checked)}
+                data-testid="toggle-placement-advice"
+                className="w-4 h-4 mt-1 accent-sage-600"
+              />
+              <div className="flex-1">
+                <label
+                  htmlFor="show-placement-advice"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Show tax-efficient placement advice
+                </label>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Suggest which accounts each asset fits best, based on tax drag.
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </InputCard>
@@ -153,3 +158,4 @@ function ModeButton({ active, onClick, icon, title, description, testId }: ModeB
     </button>
   );
 }
+

@@ -1,18 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import {
   rebalancePortfolio,
+  rebalancePortfolioV2,
   validateRebalanceInputs,
+  validateRebalanceInputsV2,
   DEFAULT_ACCOUNT_TYPE,
   DEFAULT_ASSET_CLASS,
   AccountType,
   AssetClass,
+  Account,
+  ClassTarget,
+  Holding,
   RebalanceAsset,
   RebalanceInputs,
+  RebalanceInputsV2,
+  Security,
+  SetupMode,
 } from '@/lib/calculations/portfolioRebalancing';
-import {
-  encodeRebalancingToUrlHash,
-  decodeRebalancingFromUrlHash,
-} from '@/lib/utils/portfolioRebalancingState';
 
 function asset(
   id: string,
@@ -587,66 +591,572 @@ describe('rebalancePortfolio — selling & account types', () => {
     expect(Number.isInteger(result.assets[0].sharesToSell)).toBe(false);
   });
 
-  it('URL hash v1 decodes to defaults for new fields', () => {
-    // Hand-built v1 payload: no c/k/s/p fields.
-    const v1Payload = {
-      v: 1,
-      d: 500,
-      a: [
-        { t: 'VTI', s: 10, p: 100, a: 0.6 },
-        { t: 'BND', s: 20, p: 50, a: 0.4 },
-      ],
-    };
-    const json = JSON.stringify(v1Payload);
-    const b64 = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  // URL hash v1/v2/v3 codec tests live in test/lib/utils/portfolioRebalancingState.test.ts.
+});
 
-    const decoded = decodeRebalancingFromUrlHash(b64);
-    expect(decoded).not.toBeNull();
-    expect(decoded!.allowTaxableSelling).toBe(false);
-    expect(decoded!.showPlacementAdvice).toBe(false);
-    expect(decoded!.deposit).toBe(500);
-    decoded!.assets.forEach(a => {
-      expect(a.accountType).toBe(DEFAULT_ACCOUNT_TYPE);
-      expect(a.assetClass).toBe(DEFAULT_ASSET_CLASS);
-    });
+// ----------------------------------------------------------------------------
+// Phase 2 — rebalancePortfolioV2 + validateRebalanceInputsV2
+// ----------------------------------------------------------------------------
+
+function security(
+  id: string,
+  ticker: string,
+  price: number,
+  assetClass: AssetClass,
+): Security {
+  return { id, ticker, price, assetClass };
+}
+
+function account(
+  id: string,
+  name: string,
+  accountType: AccountType,
+  deposit: number,
+): Account {
+  return { id, name, accountType, deposit };
+}
+
+function holding(
+  id: string,
+  accountId: string,
+  securityId: string,
+  shares: number,
+): Holding {
+  return { id, accountId, securityId, shares };
+}
+
+function classTarget(
+  accountId: string | null,
+  assetClass: AssetClass,
+  target: number,
+): ClassTarget {
+  return { accountId, assetClass, target };
+}
+
+function inputsV2(overrides: Partial<RebalanceInputsV2> = {}): RebalanceInputsV2 {
+  return {
+    setupMode: 'single',
+    securities: [],
+    classTargets: [],
+    accounts: [],
+    holdings: [],
+    allowTaxableSelling: false,
+    showPlacementAdvice: false,
+    mode: 'whole',
+    ...overrides,
+  };
+}
+
+describe('validateRebalanceInputsV2', () => {
+  it('requires exactly one account in single mode', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [
+          account('a1', 'A', 'taxable', 0),
+          account('a2', 'B', 'taxable', 0),
+        ],
+        classTargets: [classTarget(null, 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'setupMode')).toBe(true);
   });
 
-  it('URL hash v2 roundtrip preserves all fields', () => {
-    const inputs: RebalanceInputs = {
-      assets: [
-        asset('id-1', 'VTI', 10, 100, 0.6, 'tax-free', 'us-stock'),
-        asset('id-2', 'VXUS', 5, 50, 0.2, 'taxable', 'intl-stock'),
-        asset('id-3', 'BND', 20, 80, 0.2, 'tax-deferred', 'bonds'),
-      ],
-      deposit: 1234,
-      mode: 'fractional',
-      allowTaxableSelling: true,
-      showPlacementAdvice: true,
-    };
+  it('requires ≥2 accounts in multi-shared mode', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [account('a1', 'Solo', 'taxable', 0)],
+        classTargets: [classTarget(null, 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'setupMode')).toBe(true);
+  });
 
-    const hash = encodeRebalancingToUrlHash(inputs);
-    expect(hash.length).toBeGreaterThan(0);
-    const decoded = decodeRebalancingFromUrlHash(hash);
+  it('requires ≥2 accounts in multi-unique mode', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-unique',
+        accounts: [account('a1', 'Solo', 'taxable', 0)],
+        classTargets: [classTarget('a1', 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'setupMode')).toBe(true);
+  });
 
-    expect(decoded).not.toBeNull();
-    expect(decoded!.deposit).toBe(1234);
-    expect(decoded!.mode).toBe('fractional');
-    expect(decoded!.allowTaxableSelling).toBe(true);
-    expect(decoded!.showPlacementAdvice).toBe(true);
-    expect(decoded!.assets).toHaveLength(3);
+  it('flags negative deposits', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        accounts: [account('a1', 'A', 'taxable', -10)],
+        classTargets: [classTarget(null, 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'accounts[0].deposit')).toBe(true);
+  });
 
-    // ids are regenerated by the decoder; match on ticker + structural fields.
-    const byTicker = new Map(decoded!.assets.map(a => [a.ticker, a]));
-    expect(byTicker.get('VTI')?.accountType).toBe('tax-free');
-    expect(byTicker.get('VTI')?.assetClass).toBe('us-stock');
-    expect(byTicker.get('VTI')?.currentShares).toBe(10);
-    expect(byTicker.get('VTI')?.price).toBe(100);
-    expect(byTicker.get('VTI')?.targetAllocation).toBeCloseTo(0.6, 10);
+  it('flags negative security prices', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        accounts: [account('a1', 'A', 'taxable', 0)],
+        securities: [security('s1', 'VTI', -5, 'us-stock')],
+        classTargets: [classTarget(null, 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'securities[0].price')).toBe(true);
+  });
 
-    expect(byTicker.get('VXUS')?.accountType).toBe('taxable');
-    expect(byTicker.get('VXUS')?.assetClass).toBe('intl-stock');
+  it('flags holdings referencing unknown account/security', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        accounts: [account('a1', 'A', 'taxable', 0)],
+        securities: [security('s1', 'VTI', 100, 'us-stock')],
+        holdings: [
+          holding('h1', 'unknown-acct', 's1', 1),
+          holding('h2', 'a1', 'unknown-sec', 1),
+          holding('h3', 'a1', 's1', -1),
+        ],
+        classTargets: [classTarget(null, 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'holdings[0].accountId')).toBe(true);
+    expect(errors.some(e => e.field === 'holdings[1].securityId')).toBe(true);
+    expect(errors.some(e => e.field === 'holdings[2].shares')).toBe(true);
+  });
 
-    expect(byTicker.get('BND')?.accountType).toBe('tax-deferred');
-    expect(byTicker.get('BND')?.assetClass).toBe('bonds');
+  it('requires portfolio targets to sum to 100% in single mode', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        accounts: [account('a1', 'A', 'taxable', 0)],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.5),
+          classTarget(null, 'bonds', 0.3),
+        ],
+      }),
+    );
+    expect(errors.some(e => e.field === 'classTargets.sum')).toBe(true);
+  });
+
+  it('rejects per-account targets in multi-shared mode', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [
+          account('a1', 'A', 'taxable', 0),
+          account('a2', 'B', 'tax-free', 0),
+        ],
+        classTargets: [
+          classTarget('a1', 'us-stock', 1),
+        ],
+      }),
+    );
+    expect(errors.some(e => e.field === 'classTargets')).toBe(true);
+  });
+
+  it('requires per-account targets summing to 100% in multi-unique', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-unique',
+        accounts: [
+          account('a1', 'A', 'taxable', 0),
+          account('a2', 'B', 'tax-free', 0),
+        ],
+        classTargets: [
+          classTarget('a1', 'us-stock', 1),
+          classTarget('a2', 'us-stock', 0.6),
+          classTarget('a2', 'bonds', 0.3),
+        ],
+      }),
+    );
+    expect(errors.some(e => e.field === 'classTargets[a2].sum')).toBe(true);
+  });
+
+  it('requires every account to have at least one target in multi-unique', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-unique',
+        accounts: [
+          account('a1', 'A', 'taxable', 0),
+          account('a2', 'B', 'tax-free', 0),
+        ],
+        classTargets: [classTarget('a1', 'us-stock', 1)],
+      }),
+    );
+    expect(errors.some(e => e.field === 'classTargets[a2]')).toBe(true);
+  });
+
+  it('rejects portfolio-wide targets in multi-unique', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-unique',
+        accounts: [
+          account('a1', 'A', 'taxable', 0),
+          account('a2', 'B', 'tax-free', 0),
+        ],
+        classTargets: [
+          classTarget('a1', 'us-stock', 1),
+          classTarget('a2', 'us-stock', 1),
+          classTarget(null, 'us-stock', 1),
+        ],
+      }),
+    );
+    expect(errors.some(e => e.field === 'classTargets')).toBe(true);
+  });
+
+  it('accepts a fully valid single-mode setup', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [account('a1', 'A', 'taxable', 1000)],
+        securities: [security('s1', 'VTI', 100, 'us-stock')],
+        holdings: [holding('h1', 'a1', 's1', 5)],
+        classTargets: [classTarget(null, 'us-stock', 1)],
+      }),
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it('accepts a fully valid multi-shared setup', () => {
+    const errors = validateRebalanceInputsV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [
+          account('a1', 'Taxable', 'taxable', 500),
+          account('a2', 'Roth', 'tax-free', 500),
+        ],
+        securities: [
+          security('s1', 'VTI', 100, 'us-stock'),
+          security('s2', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 's1', 5),
+          holding('h2', 'a2', 's2', 3),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.6),
+          classTarget(null, 'bonds', 0.4),
+        ],
+      }),
+    );
+    expect(errors).toEqual([]);
+  });
+});
+
+describe('rebalancePortfolioV2 — single mode', () => {
+  it('balances a single-account portfolio with cash-flow only', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [account('a1', 'Brokerage', 'taxable', 1000)],
+        securities: [
+          security('s1', 'VTI', 100, 'us-stock'),
+          security('s2', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 's1', 10), // $1000 US
+          holding('h2', 'a1', 's2', 0),  // $0 bonds — but target calls for some
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.6),
+          classTarget(null, 'bonds', 0.4),
+        ],
+      }),
+    );
+
+    expect(result.setupMode).toBe('single');
+    expect(result.totalValueBefore).toBe(1000);
+    expect(result.taxEventDollars).toBe(0); // no selling
+    // $1000 existing US + $1000 deposit = $2000. Post-dilution, US is underweight
+    // by $200 (needs $1200, has $1000) and bonds by $800 (needs $800, has $0).
+    // Buy 2 VTI ($200) + 10 BND ($800) = $1000 deposited fully.
+    const vti = result.accounts[0].holdings.find(h => h.ticker === 'VTI')!;
+    const bnd = result.accounts[0].holdings.find(h => h.ticker === 'BND')!;
+    expect(vti.sharesToBuy).toBe(2);
+    expect(bnd.sharesToBuy).toBe(10);
+    expect(bnd.dollarsSpent).toBe(800);
+    expect(result.totalSpent).toBe(1000);
+    expect(result.cashLeftover).toBe(0);
+  });
+
+  it('does not sell taxable by default even when overweight', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [account('a1', 'Taxable', 'taxable', 0)],
+        securities: [
+          security('s1', 'VTI', 100, 'us-stock'),
+          security('s2', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 's1', 10), // 1000 US
+          holding('h2', 'a1', 's2', 0),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.6),
+          classTarget(null, 'bonds', 0.4),
+        ],
+      }),
+    );
+    const vti = result.accounts[0].holdings.find(h => h.ticker === 'VTI')!;
+    expect(vti.sharesToSell).toBe(0);
+    expect(result.taxEventDollars).toBe(0);
+  });
+
+  it('sells taxable when allowTaxableSelling is true, marks tax-event dollars', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'single',
+        allowTaxableSelling: true,
+        accounts: [account('a1', 'Taxable', 'taxable', 0)],
+        securities: [
+          security('s1', 'VTI', 100, 'us-stock'),
+          security('s2', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 's1', 10), // 1000 US
+          holding('h2', 'a1', 's2', 5),  // 400 bonds
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.5),
+          classTarget(null, 'bonds', 0.5),
+        ],
+      }),
+    );
+    const vti = result.accounts[0].holdings.find(h => h.ticker === 'VTI')!;
+    expect(vti.sharesToSell).toBeGreaterThan(0);
+    expect(result.taxEventDollars).toBeGreaterThan(0);
+  });
+
+  it('sells from tax-advantaged accounts without tax-event dollars', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [account('a1', 'Roth', 'tax-free', 0)],
+        securities: [
+          security('s1', 'VTI', 100, 'us-stock'),
+          security('s2', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 's1', 10),
+          holding('h2', 'a1', 's2', 5),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.5),
+          classTarget(null, 'bonds', 0.5),
+        ],
+      }),
+    );
+    const vti = result.accounts[0].holdings.find(h => h.ticker === 'VTI')!;
+    expect(vti.sharesToSell).toBeGreaterThan(0);
+    expect(result.taxEventDollars).toBe(0);
+  });
+});
+
+describe('rebalancePortfolioV2 — multi-shared mode', () => {
+  it('routes deposit to preferred-location accounts for underweight classes', () => {
+    // Location preference: bonds → tax-deferred > tax-free > taxable.
+    // Trad IRA receives the entire bond deposit available in its pool before
+    // Taxable's cash is tapped.
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [
+          account('taxable', 'Taxable', 'taxable', 200),
+          account('trad', 'Trad IRA', 'tax-deferred', 800),
+        ],
+        securities: [
+          security('vti', 'VTI', 100, 'us-stock'),
+          security('bnd', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'taxable', 'vti', 10), // 1000 US
+          holding('h2', 'trad', 'bnd', 0),     // bond seed in Trad
+          holding('h3', 'taxable', 'bnd', 0),  // bond seed in Taxable
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.6),
+          classTarget(null, 'bonds', 0.4),
+        ],
+      }),
+    );
+    // Bond deficit = $800 (target 40% of $2000 total, held $0).
+    // Trad IRA has $800 available and is the preferred bonds location →
+    // all bond buys land in Trad, none in Taxable.
+    const tradBnd = result.accounts.find(a => a.accountId === 'trad')!
+      .holdings.find(h => h.ticker === 'BND')!;
+    const taxableBnd = result.accounts.find(a => a.accountId === 'taxable')!
+      .holdings.find(h => h.ticker === 'BND')!;
+    expect(tradBnd.sharesToBuy).toBe(10);
+    expect(taxableBnd.sharesToBuy).toBe(0);
+  });
+
+  it('does not move cash across accounts', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [
+          account('a1', 'Brokerage', 'taxable', 1000),
+          account('a2', 'Roth', 'tax-free', 0),
+        ],
+        securities: [
+          security('vti', 'VTI', 100, 'us-stock'),
+          security('bnd', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 'vti', 5),
+          holding('h2', 'a2', 'bnd', 5),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.6),
+          classTarget(null, 'bonds', 0.4),
+        ],
+      }),
+    );
+    // Roth has $0 deposit — every Roth holding should have 0 dollarsSpent.
+    const roth = result.accounts.find(a => a.accountId === 'a2')!;
+    for (const h of roth.holdings) {
+      expect(h.dollarsSpent).toBe(0);
+    }
+  });
+
+  it('sells overweight tax-advantaged holdings without tax-event dollars', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [
+          account('taxable', 'Taxable', 'taxable', 0),
+          account('roth', 'Roth', 'tax-free', 0),
+        ],
+        securities: [
+          security('vti', 'VTI', 100, 'us-stock'),
+          security('bnd', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'taxable', 'vti', 0), // bond buyable on Taxable
+          holding('h2', 'taxable', 'bnd', 0),
+          holding('h3', 'roth', 'vti', 15),   // 1500 US in Roth — big overweight
+          holding('h4', 'roth', 'bnd', 0),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.5),
+          classTarget(null, 'bonds', 0.5),
+        ],
+      }),
+    );
+    const rothVti = result.accounts.find(a => a.accountId === 'roth')!
+      .holdings.find(h => h.ticker === 'VTI')!;
+    expect(rothVti.sharesToSell).toBeGreaterThan(0);
+    expect(result.taxEventDollars).toBe(0);
+    const rothBnd = result.accounts.find(a => a.accountId === 'roth')!
+      .holdings.find(h => h.ticker === 'BND')!;
+    // Sell proceeds land in Roth; Roth should use them to buy bonds.
+    expect(rothBnd.sharesToBuy).toBeGreaterThan(0);
+  });
+});
+
+describe('rebalancePortfolioV2 — multi-unique mode', () => {
+  it('rebalances each account independently', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-unique',
+        accounts: [
+          account('a1', 'Account A', 'taxable', 500),
+          account('a2', 'Account B', 'tax-free', 500),
+        ],
+        securities: [
+          security('vti', 'VTI', 100, 'us-stock'),
+          security('bnd', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 'vti', 5),
+          holding('h2', 'a1', 'bnd', 5),
+          holding('h3', 'a2', 'vti', 5),
+          holding('h4', 'a2', 'bnd', 5),
+        ],
+        classTargets: [
+          // A: 100% US
+          classTarget('a1', 'us-stock', 1),
+          // B: 100% Bonds
+          classTarget('a2', 'bonds', 1),
+        ],
+      }),
+    );
+    const aPlan = result.accounts.find(a => a.accountId === 'a1')!;
+    const bPlan = result.accounts.find(a => a.accountId === 'a2')!;
+    // Account A buys VTI with its deposit, doesn't touch B's holdings.
+    const aVti = aPlan.holdings.find(h => h.ticker === 'VTI')!;
+    expect(aVti.sharesToBuy).toBeGreaterThan(0);
+    // Account B buys BND, not VTI.
+    const bBnd = bPlan.holdings.find(h => h.ticker === 'BND')!;
+    expect(bBnd.sharesToBuy).toBeGreaterThan(0);
+    // Account B's VTI holding is untouched (no cross-account moves).
+    const bVti = bPlan.holdings.find(h => h.ticker === 'VTI')!;
+    expect(bVti.sharesToBuy).toBe(0);
+  });
+
+  it('produces per-account class drift rows (not portfolio-wide)', () => {
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-unique',
+        accounts: [
+          account('a1', 'A', 'taxable', 0),
+          account('a2', 'B', 'tax-free', 0),
+        ],
+        securities: [security('vti', 'VTI', 100, 'us-stock')],
+        holdings: [
+          holding('h1', 'a1', 'vti', 5),
+          holding('h2', 'a2', 'vti', 5),
+        ],
+        classTargets: [
+          classTarget('a1', 'us-stock', 1),
+          classTarget('a2', 'us-stock', 1),
+        ],
+      }),
+    );
+    const accountIds = new Set(result.classDrift.map(d => d.accountId));
+    expect(accountIds.has('a1')).toBe(true);
+    expect(accountIds.has('a2')).toBe(true);
+    expect(accountIds.has(null)).toBe(false);
+  });
+});
+
+describe('rebalancePortfolioV2 — performance', () => {
+  it('completes 5 accts × 6 classes × 15 holdings in < 50ms', () => {
+    const accounts: Account[] = [
+      account('t', 'Taxable', 'taxable', 1000),
+      account('r', 'Roth', 'tax-free', 1000),
+      account('d1', 'Trad 1', 'tax-deferred', 1000),
+      account('d2', 'Trad 2', 'tax-deferred', 1000),
+      account('r2', 'Roth 2', 'tax-free', 1000),
+    ];
+    const classes: AssetClass[] = ['us-stock', 'intl-stock', 'bonds', 'reits', 'cash', 'other'];
+    const securities: Security[] = classes.map((c, i) =>
+      security(`s${i}`, `T${i}`, 50 + i * 10, c),
+    );
+    const holdings: Holding[] = [];
+    let hid = 0;
+    // 3 holdings per account: 3 × 5 = 15 total, spread across classes
+    for (const a of accounts) {
+      for (let k = 0; k < 3; k++) {
+        const sec = securities[(hid + k) % securities.length];
+        holdings.push(holding(`h${hid++}`, a.id, sec.id, 5 + k));
+      }
+    }
+    const classTargets: ClassTarget[] = classes.map((c, i) => ({
+      accountId: null,
+      assetClass: c,
+      target: i === 0 ? 1 - 0.15 * 5 : 0.15, // first class takes slack so sum = 1
+    }));
+    const input = inputsV2({
+      setupMode: 'multi-shared',
+      accounts,
+      securities,
+      holdings,
+      classTargets,
+    });
+    const start = performance.now();
+    const result = rebalancePortfolioV2(input);
+    const elapsed = performance.now() - start;
+    expect(result.accounts).toHaveLength(5);
+    expect(elapsed).toBeLessThan(50);
   });
 });

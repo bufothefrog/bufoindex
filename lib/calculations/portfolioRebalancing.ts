@@ -19,6 +19,8 @@
  * proportionally to each underweight asset's shortfall.
  */
 
+import { LOCATION_PREFERENCE } from './assetLocation';
+
 export type RebalanceMode = 'whole' | 'fractional';
 
 /**
@@ -516,38 +518,497 @@ export interface RebalanceResultV2 {
   mode: RebalanceMode;
 }
 
+// ----------------------------------------------------------------------------
+// Phase 2 algorithm — rebalancePortfolioV2
+// ----------------------------------------------------------------------------
+
+const ASSET_CLASSES: AssetClass[] = [
+  'us-stock',
+  'intl-stock',
+  'bonds',
+  'reits',
+  'cash',
+  'other',
+];
+
+interface WorkingHolding {
+  id: string;
+  accountId: string;
+  securityId: string;
+  ticker: string;
+  price: number;
+  assetClass: AssetClass;
+  accountType: AccountType;
+  startShares: number;
+  shares: number; // mutated as we sell/buy
+}
+
+function buildWorkingHoldings(inputs: RebalanceInputsV2): WorkingHolding[] {
+  const securityById = new Map<string, Security>(inputs.securities.map(s => [s.id, s]));
+  const accountById = new Map<string, Account>(inputs.accounts.map(a => [a.id, a]));
+  const out: WorkingHolding[] = [];
+  for (const h of inputs.holdings) {
+    const sec = securityById.get(h.securityId);
+    const acct = accountById.get(h.accountId);
+    if (!sec || !acct) continue;
+    out.push({
+      id: h.id,
+      accountId: h.accountId,
+      securityId: h.securityId,
+      ticker: sec.ticker,
+      price: sec.price,
+      assetClass: sec.assetClass,
+      accountType: acct.accountType,
+      startShares: h.shares,
+      shares: h.shares,
+    });
+  }
+  return out;
+}
+
+function sumBy<T>(arr: T[], f: (t: T) => number): number {
+  return arr.reduce((s, t) => s + f(t), 0);
+}
+
 /**
- * Stub implementation. Agent A replaces this with the real three-branch
- * algorithm (single / multi-shared / multi-unique).
+ * Core rebalancing pass against a fixed slate of holdings, targets, and cash pools.
+ * Used by all three setup modes.
+ *
+ * Cash pool semantics:
+ *  - single / multi-unique: `cashByAccount` has one entry per covered account.
+ *    Proceeds from sells add back into that account's pool.
+ *  - multi-shared: same — cash does NOT cross accounts.
+ *
+ * Placement rules:
+ *  - `accountOrderByClass(assetClass)` chooses which account to sell from first
+ *    (reverse-preference for multi-shared; fixed for single/multi-unique) and which
+ *    to buy into first (preferred-first for multi-shared; fixed for single/multi-unique).
  */
+function runRebalancePass(
+  workingHoldings: WorkingHolding[],
+  classTargetsByGroup: Map<string | null, Map<AssetClass, number>>,
+  cashByAccount: Map<string, number>,
+  allowTaxableSelling: boolean,
+  mode: RebalanceMode,
+  accountOrderForBuy: (cls: AssetClass) => string[],
+  accountOrderForSell: (cls: AssetClass) => string[],
+  groupKey: (accountId: string) => string | null,
+): {
+  taxEventDollars: number;
+  spent: number;
+  received: number;
+} {
+  let taxEventDollars = 0;
+  let spent = 0;
+  let received = 0;
+
+  // For each account group (null = portfolio-wide), compute class deficits and act.
+  const groups = new Set<string | null>();
+  for (const h of workingHoldings) groups.add(groupKey(h.accountId));
+  for (const gk of classTargetsByGroup.keys()) groups.add(gk);
+
+  for (const gk of groups) {
+    const targets = classTargetsByGroup.get(gk) ?? new Map();
+    const holdings = gk === null
+      ? workingHoldings
+      : workingHoldings.filter(h => groupKey(h.accountId) === gk);
+    const accountsInGroup = new Set(holdings.map(h => h.accountId));
+    // Cash available in this group = sum of cashByAccount for accounts in group
+    const groupValue = () =>
+      sumBy(holdings, h => h.shares * h.price) +
+      sumBy(Array.from(accountsInGroup), a => cashByAccount.get(a) ?? 0);
+
+    // Sell phase: handle overweight classes
+    for (const cls of ASSET_CLASSES) {
+      const target = targets.get(cls) ?? 0;
+      if (target <= 0) continue;
+      const classHoldings = holdings.filter(h => h.assetClass === cls);
+      if (classHoldings.length === 0) continue;
+
+      const currentValue = () => sumBy(classHoldings, h => h.shares * h.price);
+      const combinedNow = groupValue();
+      const targetValue = target * combinedNow;
+      let deficit = targetValue - currentValue(); // negative = overweight
+
+      if (deficit >= -0.005) continue; // not meaningfully overweight
+
+      const order = accountOrderForSell(cls);
+      for (const acctId of order) {
+        if (!accountsInGroup.has(acctId)) continue;
+        const sellableHoldings = classHoldings
+          .filter(h => h.accountId === acctId)
+          .filter(h => {
+            const isTaxable = isTaxableAccount(h.accountType);
+            return !isTaxable || allowTaxableSelling;
+          })
+          .filter(h => h.price > 0 && h.shares > 0)
+          // prefer selling highest-priced first (fewer share count changes)
+          .sort((a, b) => b.price - a.price);
+
+        for (const h of sellableHoldings) {
+          if (deficit >= -0.005) break;
+          const overweightDollars = -deficit; // positive
+          const rawShares = overweightDollars / h.price;
+          const maxShares = h.shares;
+          let sell = Math.min(rawShares, maxShares);
+          sell = roundShares(sell, mode);
+          if (sell <= 0) continue;
+          const proceeds = sell * h.price;
+          h.shares -= sell;
+          cashByAccount.set(acctId, (cashByAccount.get(acctId) ?? 0) + proceeds);
+          received += proceeds;
+          if (h.accountType === 'taxable' && allowTaxableSelling) {
+            taxEventDollars += proceeds;
+          }
+          // recompute deficit: combined value stays ~the same
+          // (we sold shares but added cash — no net group value change)
+          deficit = target * groupValue() - currentValue();
+        }
+        if (deficit >= -0.005) break;
+      }
+    }
+
+    // Buy phase: handle underweight classes
+    for (const cls of ASSET_CLASSES) {
+      const target = targets.get(cls) ?? 0;
+      if (target <= 0) continue;
+      const classHoldings = holdings.filter(h => h.assetClass === cls);
+      if (classHoldings.length === 0) continue; // can't buy class with no existing holding
+
+      const currentValue = () => sumBy(classHoldings, h => h.shares * h.price);
+      const combinedNow = groupValue();
+      const targetValue = target * combinedNow;
+      let deficit = targetValue - currentValue(); // positive = underweight
+
+      if (deficit <= 0.005) continue;
+
+      const order = accountOrderForBuy(cls);
+      for (const acctId of order) {
+        if (!accountsInGroup.has(acctId)) continue;
+        const cash = cashByAccount.get(acctId) ?? 0;
+        if (cash <= 0.005) continue;
+        const buyable = classHoldings
+          .filter(h => h.accountId === acctId && h.price > 0)
+          .sort((a, b) => a.price - b.price); // lowest price first
+        if (buyable.length === 0) continue;
+        const target0 = buyable[0];
+
+        const maxSharesByCash = cash / target0.price;
+        const maxSharesByDeficit = deficit / target0.price;
+        let buy = Math.min(maxSharesByCash, maxSharesByDeficit);
+        buy = roundShares(buy, mode);
+        if (buy <= 0) continue;
+        const cost = buy * target0.price;
+        target0.shares += buy;
+        cashByAccount.set(acctId, cash - cost);
+        spent += cost;
+        deficit = target * groupValue() - currentValue();
+        if (deficit <= 0.005) break;
+      }
+    }
+  }
+
+  return { taxEventDollars, spent, received };
+}
+
+function isTaxableAccount(t: AccountType): boolean {
+  return t === 'taxable';
+}
+
 export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResultV2 {
-  return {
-    setupMode: inputs.setupMode,
-    accounts: inputs.accounts.map(a => ({
+  const working = buildWorkingHoldings(inputs);
+  const cashByAccount = new Map<string, number>(
+    inputs.accounts.map(a => [a.id, a.deposit]),
+  );
+  const totalValueBefore = sumBy(working, h => h.startShares * h.price);
+  const totalDeposit = sumBy(inputs.accounts, a => a.deposit);
+
+  // Build classTargets grouped by accountId (null = portfolio-wide).
+  const classTargetsByGroup = new Map<string | null, Map<AssetClass, number>>();
+  for (const t of inputs.classTargets) {
+    let m = classTargetsByGroup.get(t.accountId);
+    if (!m) {
+      m = new Map();
+      classTargetsByGroup.set(t.accountId, m);
+    }
+    m.set(t.assetClass, t.target);
+  }
+
+  // Account ordering rules per setup mode.
+  const accountOrderForBuy = (cls: AssetClass): string[] => {
+    if (inputs.setupMode === 'multi-shared') {
+      const pref = LOCATION_PREFERENCE[cls];
+      // accounts whose type matches preferred types, in order
+      return pref.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
+    }
+    // single / multi-unique: natural order
+    return inputs.accounts.map(a => a.id);
+  };
+  const accountOrderForSell = (cls: AssetClass): string[] => {
+    if (inputs.setupMode === 'multi-shared') {
+      const pref = [...LOCATION_PREFERENCE[cls]].reverse();
+      return pref.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
+    }
+    return inputs.accounts.map(a => a.id);
+  };
+  const groupKey = (accountId: string): string | null => {
+    if (inputs.setupMode === 'multi-unique') return accountId;
+    return null;
+  };
+
+  const { taxEventDollars, spent, received } = runRebalancePass(
+    working,
+    classTargetsByGroup,
+    cashByAccount,
+    inputs.allowTaxableSelling,
+    inputs.mode,
+    accountOrderForBuy,
+    accountOrderForSell,
+    groupKey,
+  );
+
+  // Build per-holding plans. Include untouched holdings too.
+  const holdingMap = new Map<string, WorkingHolding>(working.map(w => [w.id, w]));
+  const planByAccount = new Map<string, HoldingRebalancePlan[]>();
+  for (const h of inputs.holdings) {
+    const w = holdingMap.get(h.id);
+    if (!w) continue;
+    const sharesDelta = w.shares - w.startShares;
+    const sharesToBuy = sharesDelta > 0 ? sharesDelta : 0;
+    const sharesToSell = sharesDelta < 0 ? -sharesDelta : 0;
+    const dollarsSpent = sharesToBuy * w.price;
+    const dollarsReceived = sharesToSell * w.price;
+    const action: RebalanceAction =
+      sharesToBuy > 0 ? 'buy' : sharesToSell > 0 ? 'sell' : 'hold';
+    const plan: HoldingRebalancePlan = {
+      holdingId: w.id,
+      accountId: w.accountId,
+      securityId: w.securityId,
+      ticker: w.ticker,
+      accountType: w.accountType,
+      assetClass: w.assetClass,
+      price: w.price,
+      currentShares: w.startShares,
+      currentValue: w.startShares * w.price,
+      action,
+      sharesToBuy,
+      sharesToSell,
+      dollarsSpent,
+      dollarsReceived,
+      newShares: w.shares,
+      newValue: w.shares * w.price,
+    };
+    const arr = planByAccount.get(w.accountId) ?? [];
+    arr.push(plan);
+    planByAccount.set(w.accountId, arr);
+  }
+
+  // Per-account summaries.
+  const accounts: AccountRebalanceSummary[] = inputs.accounts.map(a => {
+    const planHoldings = planByAccount.get(a.id) ?? [];
+    const depositLeftover = Math.max(0, cashByAccount.get(a.id) ?? 0);
+    const depositUsed = Math.max(0, a.deposit - depositLeftover);
+    return {
       accountId: a.id,
       accountName: a.name,
       accountType: a.accountType,
       deposit: a.deposit,
-      depositUsed: 0,
-      depositLeftover: a.deposit,
-      holdings: [],
-    })),
-    totalValueBefore: 0,
-    totalValueAfter: 0,
-    totalDeposit: inputs.accounts.reduce((s, a) => s + a.deposit, 0),
-    totalSpent: 0,
-    totalReceived: 0,
-    cashLeftover: 0,
-    taxEventDollars: 0,
-    totalDriftBefore: 0,
-    totalDriftAfter: 0,
-    classDrift: [],
+      depositUsed,
+      depositLeftover,
+      holdings: planHoldings,
+    };
+  });
+
+  const totalValueAfter = sumBy(working, h => h.shares * h.price);
+  const cashLeftover = Math.max(0, totalDeposit + received - spent);
+
+  // classDrift rows.
+  const classDrift: ClassDrift[] = [];
+  const groups: Array<string | null> =
+    inputs.setupMode === 'multi-unique'
+      ? inputs.accounts.map(a => a.id)
+      : [null];
+
+  for (const gk of groups) {
+    const groupHoldings = gk === null ? working : working.filter(h => h.accountId === gk);
+    const groupAccountIds = gk === null
+      ? new Set(inputs.accounts.map(a => a.id))
+      : new Set([gk]);
+    const groupCurrentValue = sumBy(groupHoldings, h => h.startShares * h.price);
+    const groupNewValue = sumBy(groupHoldings, h => h.shares * h.price);
+    const groupStartCash = sumBy(
+      inputs.accounts.filter(a => groupAccountIds.has(a.id)),
+      a => a.deposit,
+    );
+    const combinedBefore = groupCurrentValue + groupStartCash;
+    const combinedAfter = groupNewValue +
+      sumBy(Array.from(groupAccountIds), id => cashByAccount.get(id) ?? 0);
+    const targets = classTargetsByGroup.get(gk) ?? new Map();
+    for (const cls of ASSET_CLASSES) {
+      const target = targets.get(cls) ?? 0;
+      if (target <= 0) {
+        // skip classes with no target AND no holdings
+        const hasHolding = groupHoldings.some(h => h.assetClass === cls);
+        if (!hasHolding) continue;
+      }
+      const currentValue = sumBy(
+        groupHoldings.filter(h => h.assetClass === cls),
+        h => h.startShares * h.price,
+      );
+      const newValue = sumBy(
+        groupHoldings.filter(h => h.assetClass === cls),
+        h => h.shares * h.price,
+      );
+      const currentAllocation = combinedBefore > 0 ? currentValue / combinedBefore : 0;
+      const newAllocation = combinedAfter > 0 ? newValue / combinedAfter : 0;
+      classDrift.push({
+        accountId: gk,
+        assetClass: cls,
+        target,
+        currentValue,
+        currentAllocation,
+        newValue,
+        newAllocation,
+        driftBefore: Math.abs(currentAllocation - target),
+        driftAfter: Math.abs(newAllocation - target),
+      });
+    }
+  }
+
+  const totalDriftBefore = sumBy(classDrift, d => d.driftBefore);
+  const totalDriftAfter = sumBy(classDrift, d => d.driftAfter);
+
+  return {
+    setupMode: inputs.setupMode,
+    accounts,
+    totalValueBefore,
+    totalValueAfter,
+    totalDeposit,
+    totalSpent: spent,
+    totalReceived: received,
+    cashLeftover,
+    taxEventDollars,
+    totalDriftBefore,
+    totalDriftAfter,
+    classDrift,
     mode: inputs.mode,
   };
 }
 
-/** Stub validator. Agent A replaces with real rules. */
-export function validateRebalanceInputsV2(_inputs: RebalanceInputsV2): ValidationError[] {
-  return [];
+// ----------------------------------------------------------------------------
+// Phase 2 validator — validateRebalanceInputsV2
+// ----------------------------------------------------------------------------
+
+export function validateRebalanceInputsV2(inputs: RebalanceInputsV2): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  // Setup mode / accounts count
+  if (inputs.setupMode === 'single' && inputs.accounts.length !== 1) {
+    errors.push({
+      field: 'setupMode',
+      message: 'Single mode requires exactly one account.',
+    });
+  }
+  if (
+    (inputs.setupMode === 'multi-shared' || inputs.setupMode === 'multi-unique') &&
+    inputs.accounts.length < 2
+  ) {
+    errors.push({
+      field: 'setupMode',
+      message: 'Multi-account modes require at least two accounts.',
+    });
+  }
+
+  // Account fields
+  inputs.accounts.forEach((a, i) => {
+    if (a.deposit < 0) {
+      errors.push({
+        field: `accounts[${i}].deposit`,
+        message: 'Deposit cannot be negative.',
+      });
+    }
+  });
+
+  // Security fields
+  inputs.securities.forEach((s, i) => {
+    if (s.price < 0) {
+      errors.push({
+        field: `securities[${i}].price`,
+        message: 'Price cannot be negative.',
+      });
+    }
+  });
+
+  // Holding references + shares
+  const accountIds = new Set(inputs.accounts.map(a => a.id));
+  const securityIds = new Set(inputs.securities.map(s => s.id));
+  inputs.holdings.forEach((h, i) => {
+    if (!accountIds.has(h.accountId)) {
+      errors.push({
+        field: `holdings[${i}].accountId`,
+        message: 'Holding references an unknown account.',
+      });
+    }
+    if (!securityIds.has(h.securityId)) {
+      errors.push({
+        field: `holdings[${i}].securityId`,
+        message: 'Holding references an unknown security.',
+      });
+    }
+    if (h.shares < 0) {
+      errors.push({
+        field: `holdings[${i}].shares`,
+        message: 'Shares cannot be negative.',
+      });
+    }
+  });
+
+  // Class targets: scope + sum rules
+  if (inputs.setupMode === 'single' || inputs.setupMode === 'multi-shared') {
+    const bad = inputs.classTargets.filter(t => t.accountId !== null);
+    if (bad.length > 0) {
+      errors.push({
+        field: 'classTargets',
+        message: 'Portfolio-wide targets must have accountId === null.',
+      });
+    }
+    const portfolioTargets = inputs.classTargets.filter(t => t.accountId === null);
+    const sum = sumBy(portfolioTargets, t => t.target);
+    if (portfolioTargets.length > 0 && Math.abs(sum - 1) > TARGET_SUM_TOLERANCE) {
+      errors.push({
+        field: 'classTargets.sum',
+        message: `Target allocations must sum to 100% (currently ${(sum * 100).toFixed(2)}%).`,
+      });
+    }
+  } else if (inputs.setupMode === 'multi-unique') {
+    // Each account must have its own target group summing to 1.
+    for (const acct of inputs.accounts) {
+      const group = inputs.classTargets.filter(t => t.accountId === acct.id);
+      if (group.length === 0) {
+        errors.push({
+          field: `classTargets[${acct.id}]`,
+          message: `Account "${acct.name}" needs at least one target.`,
+        });
+        continue;
+      }
+      const sum = sumBy(group, t => t.target);
+      if (Math.abs(sum - 1) > TARGET_SUM_TOLERANCE) {
+        errors.push({
+          field: `classTargets[${acct.id}].sum`,
+          message: `Account "${acct.name}" targets must sum to 100% (currently ${(sum * 100).toFixed(2)}%).`,
+        });
+      }
+    }
+    // Portfolio-wide targets are not allowed in multi-unique
+    const stray = inputs.classTargets.filter(t => t.accountId === null);
+    if (stray.length > 0) {
+      errors.push({
+        field: 'classTargets',
+        message: 'Per-account targets cannot be portfolio-wide (accountId must reference an account).',
+      });
+    }
+  }
+
+  return errors;
 }
 
