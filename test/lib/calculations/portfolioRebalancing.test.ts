@@ -948,6 +948,50 @@ describe('rebalancePortfolioV2 — single mode', () => {
     expect(vti.sharesToSell).toBeGreaterThan(0);
     expect(result.taxEventDollars).toBe(0);
   });
+
+  it('reports current allocation based on pre-deposit portfolio value', () => {
+    // Regression: current allocation previously divided by (holdings + deposit),
+    // which made a held asset's "current %" collapse onto its "after %".
+    // Screenshot scenario: SSO 620 sh × $61 = $37,820; BOXX 40 sh × $116 = $4,640;
+    // deposit $1,540 buys 25 SSO ($1,525), $15 leftover.
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [account('a1', 'Brokerage', 'taxable', 1540)],
+        securities: [
+          security('sso', 'SSO', 61, 'us-stock'),
+          security('boxx', 'BOXX', 116, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 'sso', 620),
+          holding('h2', 'a1', 'boxx', 40),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.9),
+          classTarget(null, 'bonds', 0.1),
+        ],
+      }),
+    );
+
+    const preDepositTotal = 620 * 61 + 40 * 116; // 42,460
+    const postTotal = result.totalValueAfter + result.cashLeftover;
+
+    const usStock = result.classDrift.find(d => d.assetClass === 'us-stock')!;
+    const bonds = result.classDrift.find(d => d.assetClass === 'bonds')!;
+
+    // Current % is measured against the pre-deposit portfolio, not post-deposit.
+    expect(usStock.currentAllocation).toBeCloseTo((620 * 61) / preDepositTotal, 6);
+    expect(bonds.currentAllocation).toBeCloseTo((40 * 116) / preDepositTotal, 6);
+
+    // After % is measured against the post-trade portfolio (including leftover cash).
+    expect(usStock.newAllocation).toBeCloseTo(usStock.newValue / postTotal, 6);
+    expect(bonds.newAllocation).toBeCloseTo(bonds.newValue / postTotal, 6);
+
+    // Held-only asset (BOXX, no action) must not report current === after, since
+    // the denominator differs even when its dollar value is unchanged.
+    expect(bonds.newValue).toBeCloseTo(bonds.currentValue, 6);
+    expect(bonds.currentAllocation).not.toBeCloseTo(bonds.newAllocation, 4);
+  });
 });
 
 describe('rebalancePortfolioV2 — multi-shared mode', () => {
