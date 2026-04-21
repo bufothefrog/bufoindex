@@ -84,7 +84,13 @@ export function HoldingRow({
           value={holding.securityId}
           onChange={value => onChange({ securityId: value })}
           options={securityOptions}
-          placeholder={securities.length === 0 ? 'Add a security' : undefined}
+          placeholder={
+            securities.length === 0
+              ? 'Add a security'
+              : !holding.securityId
+                ? 'Select a security'
+                : undefined
+          }
         />
       </div>
 

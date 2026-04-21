@@ -297,6 +297,7 @@ export const usePortfolioRebalancingStore = create<StoreStateV2>()(
       addHolding: (accountId) => {
         set(state => {
           const resolvedAccountId = accountId ?? state.inputs.accounts[0]?.id ?? '';
+          const resolvedSecurityId = state.inputs.securities[0]?.id ?? '';
           return {
             inputs: {
               ...state.inputs,
@@ -305,7 +306,7 @@ export const usePortfolioRebalancingStore = create<StoreStateV2>()(
                 {
                   id: makeId('hld'),
                   accountId: resolvedAccountId,
-                  securityId: '',
+                  securityId: resolvedSecurityId,
                   shares: 0,
                 },
               ],
