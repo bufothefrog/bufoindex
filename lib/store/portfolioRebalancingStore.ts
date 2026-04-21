@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import {
+  DEFAULT_ACCOUNT_TYPE,
+  DEFAULT_ASSET_CLASS,
   RebalanceAsset,
   RebalanceInputs,
   RebalanceMode,
@@ -22,8 +24,24 @@ function makeId(): string {
 
 function defaultAssets(): RebalanceAsset[] {
   return [
-    { id: makeId(), ticker: 'VTI', currentShares: 0, price: 0, targetAllocation: 0.6 },
-    { id: makeId(), ticker: 'BND', currentShares: 0, price: 0, targetAllocation: 0.4 },
+    {
+      id: makeId(),
+      ticker: 'VTI',
+      currentShares: 0,
+      price: 0,
+      targetAllocation: 0.6,
+      accountType: DEFAULT_ACCOUNT_TYPE,
+      assetClass: 'us-stock',
+    },
+    {
+      id: makeId(),
+      ticker: 'BND',
+      currentShares: 0,
+      price: 0,
+      targetAllocation: 0.4,
+      accountType: DEFAULT_ACCOUNT_TYPE,
+      assetClass: 'bonds',
+    },
   ];
 }
 
@@ -32,6 +50,8 @@ function defaultInputs(): RebalanceInputs {
     assets: defaultAssets(),
     deposit: 0,
     mode: 'whole',
+    allowTaxableSelling: false,
+    showPlacementAdvice: false,
   };
 }
 
@@ -89,7 +109,15 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
             ...state.inputs,
             assets: [
               ...state.inputs.assets,
-              { id: makeId(), ticker: '', currentShares: 0, price: 0, targetAllocation: 0 },
+              {
+                id: makeId(),
+                ticker: '',
+                currentShares: 0,
+                price: 0,
+                targetAllocation: 0,
+                accountType: DEFAULT_ACCOUNT_TYPE,
+                assetClass: DEFAULT_ASSET_CLASS,
+              },
             ],
           },
         }));

@@ -2,7 +2,11 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AssetRow } from '@/app/tools/portfolio-rebalancing-calculator/components/AssetRow';
-import { RebalanceAsset } from '@/lib/calculations/portfolioRebalancing';
+import {
+  DEFAULT_ACCOUNT_TYPE,
+  DEFAULT_ASSET_CLASS,
+  RebalanceAsset,
+} from '@/lib/calculations/portfolioRebalancing';
 
 function makeAsset(overrides: Partial<RebalanceAsset> = {}): RebalanceAsset {
   return {
@@ -11,6 +15,8 @@ function makeAsset(overrides: Partial<RebalanceAsset> = {}): RebalanceAsset {
     currentShares: 10,
     price: 250,
     targetAllocation: 0.6,
+    accountType: DEFAULT_ACCOUNT_TYPE,
+    assetClass: DEFAULT_ASSET_CLASS,
     ...overrides,
   };
 }

@@ -21,6 +21,30 @@
 
 export type RebalanceMode = 'whole' | 'fractional';
 
+/**
+ * Account tax treatment. Determines whether selling is allowed and informs
+ * asset-location preferences.
+ *   taxable       — brokerage / checking. Selling = tax event.
+ *   tax-deferred  — Traditional 401k/IRA. Sell freely.
+ *   tax-free      — Roth 401k/IRA / HSA. Sell freely.
+ */
+export type AccountType = 'taxable' | 'tax-deferred' | 'tax-free';
+
+/**
+ * Broad asset class used for placement advice and (in Phase 2) portfolio-wide
+ * target allocations.
+ */
+export type AssetClass =
+  | 'us-stock'
+  | 'intl-stock'
+  | 'bonds'
+  | 'reits'
+  | 'cash'
+  | 'other';
+
+export const DEFAULT_ACCOUNT_TYPE: AccountType = 'taxable';
+export const DEFAULT_ASSET_CLASS: AssetClass = 'other';
+
 export interface RebalanceAsset {
   /** Stable id (client-generated) for React keys */
   id: string;
@@ -32,18 +56,31 @@ export interface RebalanceAsset {
   price: number;
   /** Target allocation as a decimal (0..1). 0.6 = 60% */
   targetAllocation: number;
+  /** Tax treatment of the account this asset sits in. */
+  accountType: AccountType;
+  /** Broad asset class (used for placement advice). */
+  assetClass: AssetClass;
 }
 
 export interface RebalanceInputs {
   assets: RebalanceAsset[];
   deposit: number;
   mode: RebalanceMode;
+  /** When true, overweight taxable assets may be sold (triggers a tax event). */
+  allowTaxableSelling: boolean;
+  /** When true, results include a tax-efficient placement advice panel. */
+  showPlacementAdvice: boolean;
 }
+
+/** What the calculator decided to do with a given asset. */
+export type RebalanceAction = 'buy' | 'sell' | 'hold';
 
 export interface AssetRebalancePlan {
   id: string;
   ticker: string;
   price: number;
+  accountType: AccountType;
+  assetClass: AssetClass;
 
   // Before
   currentShares: number;
@@ -52,8 +89,14 @@ export interface AssetRebalancePlan {
   targetAllocation: number;
 
   // Action
+  action: RebalanceAction;
   sharesToBuy: number;
   dollarsSpent: number;
+  /** Shares sold in a sellable account (tax-advantaged, or taxable when
+   * `allowTaxableSelling` is enabled). Zero otherwise. */
+  sharesToSell: number;
+  /** Dollars realized from the sell leg (positive number). Zero when not selling. */
+  dollarsReceived: number;
 
   // After
   newShares: number;
@@ -74,6 +117,12 @@ export interface RebalanceResult {
   deposit: number;
   totalSpent: number;
   cashLeftover: number;
+
+  /**
+   * Total dollars sold in taxable accounts (0 when `allowTaxableSelling` is
+   * false). Used by the UI to warn about realized-gain exposure.
+   */
+  taxEventDollars: number;
 
   /** Sum-of-absolute-drift metric; lower = better balanced */
   totalDriftBefore: number;
@@ -224,16 +273,23 @@ export function rebalancePortfolio(inputs: RebalanceInputs): RebalanceResult {
     totalDriftBefore += Math.abs(driftBefore);
     totalDriftAfter += Math.abs(driftAfter);
 
+    const action: RebalanceAction = sharesToBuy[i] > 0 ? 'buy' : 'hold';
+
     return {
       id: a.id,
       ticker: a.ticker,
       price: a.price,
+      accountType: a.accountType,
+      assetClass: a.assetClass,
       currentShares: a.currentShares,
       currentValue: currentValues[i],
       currentAllocation,
       targetAllocation: a.targetAllocation,
+      action,
       sharesToBuy: sharesToBuy[i],
       dollarsSpent: dollarsSpent[i],
+      sharesToSell: 0,
+      dollarsReceived: 0,
       newShares,
       newValue,
       newAllocation,
@@ -249,6 +305,7 @@ export function rebalancePortfolio(inputs: RebalanceInputs): RebalanceResult {
     deposit,
     totalSpent,
     cashLeftover,
+    taxEventDollars: 0,
     totalDriftBefore,
     totalDriftAfter,
     mode,

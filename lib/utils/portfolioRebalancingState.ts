@@ -3,7 +3,13 @@
  * Base64-url encoded JSON, compressed to short keys.
  */
 
-import { RebalanceAsset, RebalanceInputs, RebalanceMode } from '@/lib/calculations/portfolioRebalancing';
+import {
+  DEFAULT_ACCOUNT_TYPE,
+  DEFAULT_ASSET_CLASS,
+  RebalanceAsset,
+  RebalanceInputs,
+  RebalanceMode,
+} from '@/lib/calculations/portfolioRebalancing';
 
 interface CompressedAsset {
   t: string; // ticker
@@ -63,12 +69,16 @@ export function decodeRebalancingFromUrlHash(hash: string): RebalanceInputs | nu
       currentShares: typeof a.s === 'number' ? a.s : 0,
       price: typeof a.p === 'number' ? a.p : 0,
       targetAllocation: typeof a.a === 'number' ? a.a : 0,
+      accountType: DEFAULT_ACCOUNT_TYPE,
+      assetClass: DEFAULT_ASSET_CLASS,
     }));
 
     return {
       assets,
       deposit: typeof compressed.d === 'number' ? compressed.d : 0,
       mode: compressed.m === 'fractional' ? 'fractional' : 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     };
   } catch {
     return null;

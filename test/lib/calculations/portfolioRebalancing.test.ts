@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   rebalancePortfolio,
   validateRebalanceInputs,
+  DEFAULT_ACCOUNT_TYPE,
+  DEFAULT_ASSET_CLASS,
   RebalanceAsset,
   RebalanceInputs,
 } from '@/lib/calculations/portfolioRebalancing';
@@ -13,12 +15,20 @@ function asset(
   price: number,
   targetAllocation: number,
 ): RebalanceAsset {
-  return { id, ticker, currentShares, price, targetAllocation };
+  return {
+    id,
+    ticker,
+    currentShares,
+    price,
+    targetAllocation,
+    accountType: DEFAULT_ACCOUNT_TYPE,
+    assetClass: DEFAULT_ASSET_CLASS,
+  };
 }
 
 describe('validateRebalanceInputs', () => {
   it('requires at least one asset', () => {
-    const errors = validateRebalanceInputs({ assets: [], deposit: 100, mode: 'whole' });
+    const errors = validateRebalanceInputs({ assets: [], deposit: 100, mode: 'whole', allowTaxableSelling: false, showPlacementAdvice: false });
     expect(errors).toHaveLength(1);
     expect(errors[0].field).toBe('assets');
   });
@@ -28,6 +38,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', 1, 10, 1)],
       deposit: -50,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.field === 'deposit')).toBe(true);
   });
@@ -37,6 +49,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', 1, 0, 1)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.field.includes('price'))).toBe(true);
   });
@@ -46,6 +60,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', -1, 10, 1)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.field.includes('shares'))).toBe(true);
   });
@@ -55,6 +71,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', 1, 10, 1.5)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.field.includes('target'))).toBe(true);
   });
@@ -64,6 +82,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', 1, 10, 0.5), asset('b', 'B', 1, 10, 0.4)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.field === 'targetSum')).toBe(true);
   });
@@ -73,6 +93,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', 1, 10, 0.5), asset('b', 'B', 1, 10, 0.5)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors).toHaveLength(0);
   });
@@ -82,6 +104,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', 'A', 1, 10, 1)],
       deposit: Infinity,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.field === 'deposit')).toBe(true);
   });
@@ -91,6 +115,8 @@ describe('validateRebalanceInputs', () => {
       assets: [asset('a', '', 1, 0, 1)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
     expect(errors.some(e => e.message.includes('Asset 1'))).toBe(true);
   });
@@ -105,6 +131,8 @@ describe('rebalancePortfolio — fractional mode', () => {
       ],
       deposit: 100,
       mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // Targets: 50/50 of $300 = $150 each. A needs $50, B needs $50.
@@ -122,6 +150,8 @@ describe('rebalancePortfolio — fractional mode', () => {
       ],
       deposit: 100,
       mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // N = $1100. Targets $550 each. A overweight → deficit 0. B deficit $550.
@@ -140,6 +170,8 @@ describe('rebalancePortfolio — fractional mode', () => {
       ],
       deposit: 5000,
       mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // New total = $6000. Target $3000 each. A deficit = $2000, B deficit = $3000.
@@ -158,6 +190,8 @@ describe('rebalancePortfolio — fractional mode', () => {
       ],
       deposit: 100,
       mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // New total = $1600. Targets $800 each. A overweight by $200 → 0 buy.
@@ -179,6 +213,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 1000,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // V=$2700, N=$3700. Targets A=$2220, B=$1110, C=$370.
@@ -203,6 +239,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 300,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // Deficit = $300 / $500 = 0 whole shares. $300 cash leftover.
@@ -218,6 +256,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     expect(result.totalDriftAfter).toBeLessThanOrEqual(result.totalDriftBefore + 1e-9);
@@ -231,6 +271,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // Pass 1: each gets 1 share ($40). Total = $80. Remaining = $20.
@@ -248,6 +290,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 90,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // Pass 1: each gets 1 share ($30). Spent $60. Remaining $30.
@@ -267,6 +311,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 200,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // N = 200. Targets = $100 each.
@@ -282,6 +328,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       assets: [asset('a', 'A', 5, 10, 1)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // All deposit goes to the single asset.
@@ -298,6 +346,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 0,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     expect(result.totalSpent).toBe(0);
@@ -313,6 +363,8 @@ describe('rebalancePortfolio — whole-share mode', () => {
       ],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // Should target 60/40: 6 shares of A, 4 of B.
@@ -328,6 +380,8 @@ describe('rebalancePortfolio — validation & performance', () => {
       assets: [asset('a', 'A', 1, 10, 0.5)],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     })).toThrow(/Invalid inputs/);
   });
 
@@ -336,7 +390,7 @@ describe('rebalancePortfolio — validation & performance', () => {
     for (let i = 0; i < 20; i++) {
       assets.push(asset(`id-${i}`, `T${i}`, 10 + i, 50 + i, 1 / 20));
     }
-    const inputs: RebalanceInputs = { assets, deposit: 10_000, mode: 'whole' };
+    const inputs: RebalanceInputs = { assets, deposit: 10_000, mode: 'whole', allowTaxableSelling: false, showPlacementAdvice: false };
 
     const start = performance.now();
     const result = rebalancePortfolio(inputs);
@@ -354,6 +408,8 @@ describe('rebalancePortfolio — validation & performance', () => {
       ],
       deposit: 100,
       mode: 'whole',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     expect(result.assets[0].currentAllocation).toBeCloseTo(1, 6);
@@ -367,6 +423,8 @@ describe('rebalancePortfolio — validation & performance', () => {
       assets: [asset('a', 'A', 0, 3, 1)],
       deposit: 10,
       mode: 'fractional',
+      allowTaxableSelling: false,
+      showPlacementAdvice: false,
     });
 
     // 10/3 = 3.333... → 3.3333 at 4-decimal precision.

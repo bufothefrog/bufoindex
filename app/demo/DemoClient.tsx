@@ -81,7 +81,12 @@ import { CalculatorTabs } from '@/components/calculators/shared/CalculatorTabs';
 
 // Portfolio rebalancing composed widgets
 import { AssetRow } from '@/app/tools/portfolio-rebalancing-calculator/components/AssetRow';
-import { RebalanceAsset, RebalanceMode } from '@/lib/calculations/portfolioRebalancing';
+import {
+  DEFAULT_ACCOUNT_TYPE,
+  DEFAULT_ASSET_CLASS,
+  RebalanceAsset,
+  RebalanceMode,
+} from '@/lib/calculations/portfolioRebalancing';
 import { cn } from '@/lib/utils';
 import { Coins, Scissors, Scale } from 'lucide-react';
 
@@ -133,8 +138,24 @@ export function DemoClient() {
     },
     rebalanceDemo: {
       assets: [
-        { id: 'demo-vti', ticker: 'VTI', currentShares: 10, price: 250, targetAllocation: 0.6 },
-        { id: 'demo-bnd', ticker: 'BND', currentShares: 20, price: 70, targetAllocation: 0.4 }
+        {
+          id: 'demo-vti',
+          ticker: 'VTI',
+          currentShares: 10,
+          price: 250,
+          targetAllocation: 0.6,
+          accountType: DEFAULT_ACCOUNT_TYPE,
+          assetClass: 'us-stock',
+        },
+        {
+          id: 'demo-bnd',
+          ticker: 'BND',
+          currentShares: 20,
+          price: 70,
+          targetAllocation: 0.4,
+          accountType: DEFAULT_ACCOUNT_TYPE,
+          assetClass: 'bonds',
+        }
       ],
       mode: 'whole'
     }
