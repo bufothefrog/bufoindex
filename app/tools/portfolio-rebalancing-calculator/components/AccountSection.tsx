@@ -111,7 +111,7 @@ export function AccountSection({
           </div>
         ) : (
           <div className="space-y-2">
-            {holdings.map((holding, holdingIndex) => {
+            {holdings.map(holding => {
               const security = securities.find(s => s.id === holding.securityId) ?? null;
               const globalIndex = allHoldings.findIndex(h => h.id === holding.id);
               return (
