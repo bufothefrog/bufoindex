@@ -7,16 +7,14 @@ import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingSt
 import { cn } from '@/lib/utils';
 
 /**
- * Global calculator settings — purchase mode, selling toggle, placement
- * advice toggle. Deposits live on AccountSection rows.
+ * Global calculator settings — purchase mode and selling toggle. Deposits
+ * live on AccountSection rows; placement advice is always shown.
  */
 export function SettingsCard() {
   const mode = usePortfolioRebalancingStore(s => s.inputs.mode);
   const allowTaxableSelling = usePortfolioRebalancingStore(s => s.inputs.allowTaxableSelling);
-  const showPlacementAdvice = usePortfolioRebalancingStore(s => s.inputs.showPlacementAdvice);
   const setMode = usePortfolioRebalancingStore(s => s.setMode);
   const setAllowTaxableSelling = usePortfolioRebalancingStore(s => s.setAllowTaxableSelling);
-  const setShowPlacementAdvice = usePortfolioRebalancingStore(s => s.setShowPlacementAdvice);
 
   return (
     <InputCard title="Settings" icon={Settings2}>
@@ -43,52 +41,28 @@ export function SettingsCard() {
           </div>
         </div>
 
-        <div className="space-y-3 pt-1 border-t border-border/60">
-          <div className="flex items-start gap-3 pt-3">
-            <input
-              type="checkbox"
-              id="allow-taxable-selling"
-              checked={allowTaxableSelling}
-              onChange={e => setAllowTaxableSelling(e.target.checked)}
-              data-testid="toggle-allow-taxable-selling"
-              className="w-4 h-4 mt-1 accent-sage-600"
-            />
-            <div className="flex-1">
-              <label
-                htmlFor="allow-taxable-selling"
-                className="text-sm font-medium cursor-pointer"
-              >
-                Allow selling in taxable accounts
-              </label>
-              {allowTaxableSelling && (
-                <div className="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
-                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-500 dark:text-orange-400" />
-                  <span>Selling in taxable may trigger capital gains tax.</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              id="show-placement-advice"
-              checked={showPlacementAdvice}
-              onChange={e => setShowPlacementAdvice(e.target.checked)}
-              data-testid="toggle-placement-advice"
-              className="w-4 h-4 mt-1 accent-sage-600"
-            />
-            <div className="flex-1">
-              <label
-                htmlFor="show-placement-advice"
-                className="text-sm font-medium cursor-pointer"
-              >
-                Show tax-efficient placement advice
-              </label>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Suggest which accounts each asset fits best, based on tax drag.
+        <div className="flex items-start gap-3 pt-3 border-t border-border/60">
+          <input
+            type="checkbox"
+            id="allow-taxable-selling"
+            checked={allowTaxableSelling}
+            onChange={e => setAllowTaxableSelling(e.target.checked)}
+            data-testid="toggle-allow-taxable-selling"
+            className="w-4 h-4 mt-1 accent-sage-600"
+          />
+          <div className="flex-1">
+            <label
+              htmlFor="allow-taxable-selling"
+              className="text-sm font-medium cursor-pointer"
+            >
+              Allow selling in taxable accounts
+            </label>
+            {allowTaxableSelling && (
+              <div className="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-500 dark:text-orange-400" />
+                <span>Selling in taxable may trigger capital gains tax.</span>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

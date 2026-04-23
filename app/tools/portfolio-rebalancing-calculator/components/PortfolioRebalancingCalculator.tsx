@@ -10,7 +10,6 @@ import { RebalanceResults } from './RebalanceResults';
 import { PlacementAdviceCard } from './PlacementAdviceCard';
 
 export function PortfolioRebalancingCalculator() {
-  const inputs = usePortfolioRebalancingStore(s => s.inputs);
   const result = usePortfolioRebalancingStore(s => s.result);
   const errors = usePortfolioRebalancingStore(s => s.errors);
   const calculate = usePortfolioRebalancingStore(s => s.calculate);
@@ -44,7 +43,7 @@ export function PortfolioRebalancingCalculator() {
         result ? (
           <div className="space-y-6">
             <RebalanceResults result={result} />
-            {inputs.showPlacementAdvice && <PlacementAdviceCard />}
+            <PlacementAdviceCard />
           </div>
         ) : undefined
       }

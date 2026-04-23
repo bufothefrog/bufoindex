@@ -30,19 +30,40 @@ function makeAccount(name: string, accountType: AccountType = DEFAULT_ACCOUNT_TY
 }
 
 /**
- * The calculation engine and URL codec both consume a `setupMode` field. We
- * always operate in multi-shared semantics (portfolio-wide targets + location
- * preference), so the mode is an implementation detail hidden from the UI.
+ * Worked-example seed state. A cold visitor lands on a realistic three-fund
+ * portfolio split across a Roth IRA and a taxable brokerage, with classic
+ * 60/25/15 targets. Users can edit every field or delete holdings/accounts
+ * outright — the point is that the form is non-empty on arrival so the flow
+ * is self-explanatory.
+ *
+ * Stable string ids keep SSR and hydration consistent; dynamically-added
+ * accounts/holdings/securities still use `makeId` so their ids are unique.
  */
 function defaultInputs(): RebalanceInputsV2 {
   return {
     setupMode: 'multi-shared',
-    securities: [],
-    classTargets: [],
-    accounts: [makeAccount('Brokerage')],
-    holdings: [],
+    securities: [
+      { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
+      { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
+      { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+    ],
+    accounts: [
+      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 500 },
+      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 1500 },
+    ],
+    holdings: [
+      { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
+      { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
+      { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
+      { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+    ],
+    classTargets: [
+      { accountId: null, assetClass: 'us-stock', target: 0.6 },
+      { accountId: null, assetClass: 'intl-stock', target: 0.25 },
+      { accountId: null, assetClass: 'bonds', target: 0.15 },
+    ],
     allowTaxableSelling: false,
-    showPlacementAdvice: false,
+    showPlacementAdvice: true,
     mode: 'whole',
   };
 }
@@ -87,7 +108,6 @@ interface StoreState {
   setClassTarget: (assetClass: AssetClass, target: number) => void;
 
   setAllowTaxableSelling: (value: boolean) => void;
-  setShowPlacementAdvice: (value: boolean) => void;
   setMode: (mode: RebalanceMode) => void;
 
   calculate: () => void;
@@ -287,13 +307,6 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
       setAllowTaxableSelling: (value) => {
         set(state => ({
           inputs: { ...state.inputs, allowTaxableSelling: value },
-        }));
-        postMutate(get);
-      },
-
-      setShowPlacementAdvice: (value) => {
-        set(state => ({
-          inputs: { ...state.inputs, showPlacementAdvice: value },
         }));
         postMutate(get);
       },
