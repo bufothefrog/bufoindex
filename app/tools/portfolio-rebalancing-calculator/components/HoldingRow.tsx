@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { NumberInput } from '@/components/ui/inputs';
+import { TickerCombobox } from '@/components/ui/inputs/TickerCombobox';
 import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import {
   AssetClass,
@@ -16,10 +16,14 @@ import { cn, formatCurrency } from '@/lib/utils';
 interface HoldingRowProps {
   holding: Holding;
   security: Security | null;
+  securities: Security[];
   index: number;
   canRemove: boolean;
   onChangeHolding: (patch: Partial<Omit<Holding, 'id'>>) => void;
-  onChangeSecurity: (patch: Partial<Omit<Security, 'id'>>) => void;
+  /** Edits price / asset class on the paired security. Ticker edits go through the combobox. */
+  onChangeSecurity: (patch: Partial<Omit<Security, 'id' | 'ticker'>>) => void;
+  onSelectSecurity: (securityId: string) => void;
+  onCommitTicker: (ticker: string) => void;
   onRemove: () => void;
   className?: string;
 }
@@ -36,10 +40,13 @@ const ASSET_CLASS_OPTIONS: { value: AssetClass; label: string }[] = [
 export function HoldingRow({
   holding,
   security,
+  securities,
   index,
   canRemove,
   onChangeHolding,
   onChangeSecurity,
+  onSelectSecurity,
+  onCommitTicker,
   onRemove,
   className,
 }: HoldingRowProps) {
@@ -47,6 +54,12 @@ export function HoldingRow({
   const price = security?.price ?? 0;
   const assetClass = security?.assetClass ?? 'other';
   const totalValue = price * holding.shares;
+
+  const tickerOptions = securities.map(s => ({
+    id: s.id,
+    ticker: s.ticker,
+    price: s.price,
+  }));
 
   return (
     <div
@@ -60,14 +73,14 @@ export function HoldingRow({
         <label className="text-sm font-medium" htmlFor={`holding-ticker-${holding.id}`}>
           Ticker
         </label>
-        <Input
+        <TickerCombobox
           id={`holding-ticker-${holding.id}`}
           value={ticker}
-          onChange={e => onChangeSecurity({ ticker: e.target.value.toUpperCase() })}
-          placeholder="VTI"
-          maxLength={10}
-          className="uppercase"
-          data-testid={`holding-ticker-${index}`}
+          options={tickerOptions}
+          currentId={holding.securityId || undefined}
+          onSelectExisting={onSelectSecurity}
+          onCommitNewTicker={onCommitTicker}
+          testId={`holding-ticker-${index}`}
         />
       </div>
 

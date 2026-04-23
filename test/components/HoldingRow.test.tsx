@@ -11,6 +11,13 @@ const security: Security = {
   assetClass: 'us-stock',
 };
 
+const other: Security = {
+  id: 'sec2',
+  ticker: 'BND',
+  price: 75,
+  assetClass: 'bonds',
+};
+
 function makeHolding(overrides: Partial<Holding> = {}): Holding {
   return {
     id: 'h1',
@@ -26,19 +33,29 @@ function inputIn(testId: string): HTMLInputElement {
   return within(wrapper).getByRole('textbox') as HTMLInputElement;
 }
 
+const noops = {
+  onChangeHolding: vi.fn(),
+  onChangeSecurity: vi.fn(),
+  onSelectSecurity: vi.fn(),
+  onCommitTicker: vi.fn(),
+  onRemove: vi.fn(),
+};
+
 describe('HoldingRow', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    Object.values(noops).forEach(fn => fn.mockClear());
+  });
 
   it('renders ticker, price, asset class, and shares inline', () => {
     render(
       <HoldingRow
         holding={makeHolding()}
         security={security}
+        securities={[security, other]}
         index={0}
         canRemove
-        onChangeHolding={vi.fn()}
-        onChangeSecurity={vi.fn()}
-        onRemove={vi.fn()}
+        {...noops}
       />,
     );
     expect((screen.getByTestId('holding-ticker-0') as HTMLInputElement).value).toBe('VTI');
@@ -50,21 +67,73 @@ describe('HoldingRow', () => {
     expect(classSelect.value).toBe('us-stock');
   });
 
-  it('emits ticker updates to the paired security', () => {
-    const onChangeSecurity = vi.fn();
+  it('commits a new ticker on blur', () => {
+    const onCommitTicker = vi.fn();
     render(
       <HoldingRow
         holding={makeHolding()}
         security={security}
+        securities={[security, other]}
         index={0}
         canRemove
-        onChangeHolding={vi.fn()}
-        onChangeSecurity={onChangeSecurity}
-        onRemove={vi.fn()}
+        {...noops}
+        onCommitTicker={onCommitTicker}
       />,
     );
-    fireEvent.change(screen.getByTestId('holding-ticker-0'), { target: { value: 'bnd' } });
-    expect(onChangeSecurity).toHaveBeenCalledWith({ ticker: 'BND' });
+    const ticker = screen.getByTestId('holding-ticker-0') as HTMLInputElement;
+    fireEvent.focus(ticker);
+    fireEvent.change(ticker, { target: { value: 'voo' } });
+    fireEvent.blur(ticker);
+    return new Promise<void>(resolve => {
+      setTimeout(() => {
+        expect(onCommitTicker).toHaveBeenCalledWith('VOO');
+        resolve();
+      }, 150);
+    });
+  });
+
+  it('swaps to an existing security when the user types an existing ticker', () => {
+    const onSelectSecurity = vi.fn();
+    render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={security}
+        securities={[security, other]}
+        index={0}
+        canRemove
+        {...noops}
+        onSelectSecurity={onSelectSecurity}
+      />,
+    );
+    const ticker = screen.getByTestId('holding-ticker-0') as HTMLInputElement;
+    fireEvent.focus(ticker);
+    fireEvent.change(ticker, { target: { value: 'bnd' } });
+    fireEvent.blur(ticker);
+    return new Promise<void>(resolve => {
+      setTimeout(() => {
+        expect(onSelectSecurity).toHaveBeenCalledWith('sec2');
+        resolve();
+      }, 150);
+    });
+  });
+
+  it('selects an existing security when user clicks a dropdown option', () => {
+    const onSelectSecurity = vi.fn();
+    render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={security}
+        securities={[security, other]}
+        index={0}
+        canRemove
+        {...noops}
+        onSelectSecurity={onSelectSecurity}
+      />,
+    );
+    const ticker = screen.getByTestId('holding-ticker-0') as HTMLInputElement;
+    fireEvent.focus(ticker);
+    fireEvent.mouseDown(screen.getByTestId('ticker-option-bnd'));
+    expect(onSelectSecurity).toHaveBeenCalledWith('sec2');
   });
 
   it('emits price and asset-class updates to the paired security', () => {
@@ -73,11 +142,11 @@ describe('HoldingRow', () => {
       <HoldingRow
         holding={makeHolding()}
         security={security}
+        securities={[security]}
         index={0}
         canRemove
-        onChangeHolding={vi.fn()}
+        {...noops}
         onChangeSecurity={onChangeSecurity}
-        onRemove={vi.fn()}
       />,
     );
 
@@ -97,11 +166,11 @@ describe('HoldingRow', () => {
       <HoldingRow
         holding={makeHolding()}
         security={security}
+        securities={[security]}
         index={0}
         canRemove
+        {...noops}
         onChangeHolding={onChangeHolding}
-        onChangeSecurity={vi.fn()}
-        onRemove={vi.fn()}
       />,
     );
     fireEvent.change(inputIn('holding-shares-0'), { target: { value: '42' } });
@@ -114,10 +183,10 @@ describe('HoldingRow', () => {
       <HoldingRow
         holding={makeHolding()}
         security={security}
+        securities={[security]}
         index={3}
         canRemove
-        onChangeHolding={vi.fn()}
-        onChangeSecurity={vi.fn()}
+        {...noops}
         onRemove={onRemove}
       />,
     );
@@ -130,11 +199,10 @@ describe('HoldingRow', () => {
       <HoldingRow
         holding={makeHolding()}
         security={security}
+        securities={[security]}
         index={0}
         canRemove={false}
-        onChangeHolding={vi.fn()}
-        onChangeSecurity={vi.fn()}
-        onRemove={vi.fn()}
+        {...noops}
       />,
     );
     expect(screen.getByTestId('holding-remove-0')).toBeDisabled();
@@ -145,11 +213,10 @@ describe('HoldingRow', () => {
       <HoldingRow
         holding={makeHolding({ shares: 4 })}
         security={security}
+        securities={[security]}
         index={0}
         canRemove
-        onChangeHolding={vi.fn()}
-        onChangeSecurity={vi.fn()}
-        onRemove={vi.fn()}
+        {...noops}
       />,
     );
     const preview = screen.getByTestId('holding-preview-0');
@@ -162,11 +229,10 @@ describe('HoldingRow', () => {
       <HoldingRow
         holding={makeHolding()}
         security={null}
+        securities={[]}
         index={0}
         canRemove
-        onChangeHolding={vi.fn()}
-        onChangeSecurity={vi.fn()}
-        onRemove={vi.fn()}
+        {...noops}
       />,
     );
     expect((screen.getByTestId('holding-ticker-0') as HTMLInputElement).value).toBe('');

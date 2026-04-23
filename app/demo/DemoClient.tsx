@@ -702,11 +702,16 @@ export function DemoClient() {
                       s => s.id === demoState.rebalanceDemo.holding.securityId,
                     ) ?? null
                   }
+                  securities={demoState.rebalanceDemo.securities}
                   index={0}
                   canRemove={false}
                   onChangeHolding={updateRebalanceHolding}
                   onChangeSecurity={updates =>
                     updateRebalanceSecurity(demoState.rebalanceDemo.holding.securityId, updates)
+                  }
+                  onSelectSecurity={securityId => updateRebalanceHolding({ securityId })}
+                  onCommitTicker={ticker =>
+                    updateRebalanceSecurity(demoState.rebalanceDemo.holding.securityId, { ticker })
                   }
                   onRemove={() => {}}
                 />

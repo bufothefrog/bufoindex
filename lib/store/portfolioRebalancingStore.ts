@@ -104,6 +104,14 @@ interface StoreState {
   addHolding: (accountId?: string) => void;
   updateHolding: (id: string, patch: Partial<Omit<Holding, 'id'>>) => void;
   removeHolding: (id: string) => void;
+  /** Swap a holding to a different existing security; GC orphaned security. */
+  linkHoldingToSecurity: (holdingId: string, securityId: string) => void;
+  /**
+   * User typed a ticker. If it matches an existing (other) security, swap.
+   * Otherwise: rename the current security in place when no other holding
+   * references it, or create a new security for this holding.
+   */
+  linkHoldingByTicker: (holdingId: string, ticker: string) => void;
 
   setClassTarget: (assetClass: AssetClass, target: number) => void;
 
@@ -281,6 +289,79 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
               ...state.inputs,
               holdings: remainingHoldings,
               securities,
+            },
+          };
+        });
+        postMutate(get);
+      },
+
+      linkHoldingToSecurity: (holdingId, securityId) => {
+        set(state => {
+          const holding = state.inputs.holdings.find(h => h.id === holdingId);
+          if (!holding || holding.securityId === securityId) return state;
+          const oldSecurityId = holding.securityId;
+          const holdings = state.inputs.holdings.map(h =>
+            h.id === holdingId ? { ...h, securityId } : h,
+          );
+          // GC old security if nothing else references it.
+          const stillReferenced = holdings.some(h => h.securityId === oldSecurityId);
+          const securities = stillReferenced
+            ? state.inputs.securities
+            : state.inputs.securities.filter(s => s.id !== oldSecurityId);
+          return { inputs: { ...state.inputs, holdings, securities } };
+        });
+        postMutate(get);
+      },
+
+      linkHoldingByTicker: (holdingId, ticker) => {
+        const normalized = ticker.trim().toUpperCase();
+        if (!normalized) return;
+        set(state => {
+          const holding = state.inputs.holdings.find(h => h.id === holdingId);
+          if (!holding) return state;
+          const currentSecurityId = holding.securityId;
+          const existing = state.inputs.securities.find(
+            s => s.id !== currentSecurityId && s.ticker.toUpperCase() === normalized,
+          );
+          if (existing) {
+            // Swap to existing; GC old if orphan.
+            const holdings = state.inputs.holdings.map(h =>
+              h.id === holdingId ? { ...h, securityId: existing.id } : h,
+            );
+            const stillReferenced = holdings.some(h => h.securityId === currentSecurityId);
+            const securities = stillReferenced
+              ? state.inputs.securities
+              : state.inputs.securities.filter(s => s.id !== currentSecurityId);
+            return { inputs: { ...state.inputs, holdings, securities } };
+          }
+          // No existing match. If current security has other holdings using
+          // it, don't rename (that would mutate their asset too) — create
+          // a new paired security for this holding instead.
+          const currentIsShared = state.inputs.holdings.some(
+            h => h.id !== holdingId && h.securityId === currentSecurityId,
+          );
+          if (currentIsShared) {
+            const newId = makeId('sec');
+            return {
+              inputs: {
+                ...state.inputs,
+                securities: [
+                  ...state.inputs.securities,
+                  { id: newId, ticker: normalized, price: 0, assetClass: DEFAULT_ASSET_CLASS },
+                ],
+                holdings: state.inputs.holdings.map(h =>
+                  h.id === holdingId ? { ...h, securityId: newId } : h,
+                ),
+              },
+            };
+          }
+          // Orphan (or only this holding references it) — rename in place.
+          return {
+            inputs: {
+              ...state.inputs,
+              securities: state.inputs.securities.map(s =>
+                s.id === currentSecurityId ? { ...s, ticker: normalized } : s,
+              ),
             },
           };
         });

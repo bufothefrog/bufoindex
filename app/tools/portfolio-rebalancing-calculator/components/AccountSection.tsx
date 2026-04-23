@@ -38,6 +38,8 @@ export function AccountSection({
   const updateHolding = usePortfolioRebalancingStore(s => s.updateHolding);
   const removeHolding = usePortfolioRebalancingStore(s => s.removeHolding);
   const updateSecurity = usePortfolioRebalancingStore(s => s.updateSecurity);
+  const linkHoldingToSecurity = usePortfolioRebalancingStore(s => s.linkHoldingToSecurity);
+  const linkHoldingByTicker = usePortfolioRebalancingStore(s => s.linkHoldingByTicker);
 
   const holdings = allHoldings.filter(h => h.accountId === account.id);
 
@@ -119,12 +121,17 @@ export function AccountSection({
                   key={holding.id}
                   holding={holding}
                   security={security}
+                  securities={securities}
                   index={globalIndex}
                   canRemove
                   onChangeHolding={patch => updateHolding(holding.id, patch)}
                   onChangeSecurity={patch =>
                     holding.securityId && updateSecurity(holding.securityId, patch)
                   }
+                  onSelectSecurity={securityId =>
+                    linkHoldingToSecurity(holding.id, securityId)
+                  }
+                  onCommitTicker={ticker => linkHoldingByTicker(holding.id, ticker)}
                   onRemove={() => removeHolding(holding.id)}
                 />
               );
