@@ -334,7 +334,7 @@ function migrateV1OrV2(state: CompressedStateV1V2): RebalanceInputsV2 {
   classTargets.sort((x, y) => y.target - x.target);
 
   return {
-    setupMode: 'single',
+    setupMode: 'multi-shared',
     securities: Array.from(securitiesByTicker.values()),
     classTargets,
     accounts: [account],
@@ -389,7 +389,7 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
     };
   });
 
-  const classTargets: ClassTarget[] = r.ct.map(t => {
+  const rawTargets: ClassTarget[] = r.ct.map(t => {
     const ct = t as Partial<CompressedClassTargetV3>;
     return {
       accountId: typeof ct.a === 'string' ? ct.a : null,
@@ -398,8 +398,14 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
     };
   });
 
+  // The app now always operates in multi-shared semantics (portfolio-wide
+  // targets). Legacy multi-unique hashes — or any v3 hash with per-account
+  // targets — are flattened here: targets are grouped by asset class and
+  // averaged across accounts that declared them.
+  const classTargets = flattenToPortfolioTargets(rawTargets);
+
   return {
-    setupMode: r.sm,
+    setupMode: 'multi-shared',
     securities,
     accounts,
     holdings,
@@ -408,6 +414,29 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
     showPlacementAdvice: r.p === true,
     mode: r.m === 'fractional' ? 'fractional' : 'whole',
   };
+}
+
+function flattenToPortfolioTargets(targets: ClassTarget[]): ClassTarget[] {
+  const hasPerAccount = targets.some(t => t.accountId !== null);
+  if (!hasPerAccount) {
+    // Already portfolio-wide — pass through unchanged (modulo filter on null).
+    return targets.filter(t => t.accountId === null);
+  }
+
+  const sums = new Map<AssetClass, number>();
+  const counts = new Map<AssetClass, number>();
+  for (const t of targets) {
+    sums.set(t.assetClass, (sums.get(t.assetClass) ?? 0) + t.target);
+    counts.set(t.assetClass, (counts.get(t.assetClass) ?? 0) + 1);
+  }
+
+  const flattened: ClassTarget[] = [];
+  for (const [assetClass, total] of sums.entries()) {
+    const count = counts.get(assetClass) ?? 1;
+    flattened.push({ accountId: null, assetClass, target: total / count });
+  }
+  flattened.sort((a, b) => b.target - a.target);
+  return flattened;
 }
 
 // ---------------------------------------------------------------------------

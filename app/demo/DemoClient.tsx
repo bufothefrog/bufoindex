@@ -80,8 +80,9 @@ import { Tooltip as HelpTooltip, HELP_TOOLTIPS } from '@/components/shared/Toolt
 import { CalculatorTabs } from '@/components/calculators/shared/CalculatorTabs';
 
 // Portfolio rebalancing composed widgets
-import { SecurityRow } from '@/app/tools/portfolio-rebalancing-calculator/components/SecurityRow';
+import { HoldingRow } from '@/app/tools/portfolio-rebalancing-calculator/components/HoldingRow';
 import {
+  Holding,
   RebalanceMode,
   Security,
 } from '@/lib/calculations/portfolioRebalancing';
@@ -109,6 +110,7 @@ interface DemoState {
   };
   rebalanceDemo: {
     securities: Security[];
+    holding: Holding;
     mode: RebalanceMode;
   };
 }
@@ -151,6 +153,12 @@ export function DemoClient() {
           assetClass: 'bonds',
         }
       ],
+      holding: {
+        id: 'demo-hld',
+        accountId: 'demo-acc',
+        securityId: 'demo-vti',
+        shares: 12,
+      },
       mode: 'whole'
     }
   });
@@ -225,26 +233,26 @@ export function DemoClient() {
 
   const updateRebalanceSecurity = (
     id: string,
-    updates: Partial<Omit<Security, 'id'>>
+    updates: Partial<Omit<Security, 'id'>>,
   ) => {
     setDemoState(prev => ({
       ...prev,
       rebalanceDemo: {
         ...prev.rebalanceDemo,
         securities: prev.rebalanceDemo.securities.map(s =>
-          s.id === id ? { ...s, ...updates } : s
-        )
-      }
+          s.id === id ? { ...s, ...updates } : s,
+        ),
+      },
     }));
   };
 
-  const removeRebalanceSecurity = (id: string) => {
+  const updateRebalanceHolding = (updates: Partial<Omit<Holding, 'id'>>) => {
     setDemoState(prev => ({
       ...prev,
       rebalanceDemo: {
         ...prev.rebalanceDemo,
-        securities: prev.rebalanceDemo.securities.filter(s => s.id !== id)
-      }
+        holding: { ...prev.rebalanceDemo.holding, ...updates },
+      },
     }));
   };
 
@@ -681,22 +689,27 @@ export function DemoClient() {
         <CardContent>
           <div className="space-y-6">
             <div>
-              <h4 className="text-sm font-medium mb-1">Security Row</h4>
+              <h4 className="text-sm font-medium mb-1">Holding Row</h4>
               <p className="text-xs text-muted-foreground mb-3">
-                Composed row of ticker / name / price / asset-class inputs used by the rebalancing
-                calculator. Pattern for dynamic list rows in future calculators.
+                Composed row of ticker / price / asset-class / shares inputs used by the
+                rebalancing calculator. Pattern for dynamic list rows in future calculators.
               </p>
               <div className="space-y-2">
-                {demoState.rebalanceDemo.securities.map((security, index) => (
-                  <SecurityRow
-                    key={security.id}
-                    security={security}
-                    index={index}
-                    canRemove={demoState.rebalanceDemo.securities.length > 1}
-                    onChange={(updates) => updateRebalanceSecurity(security.id, updates)}
-                    onRemove={() => removeRebalanceSecurity(security.id)}
-                  />
-                ))}
+                <HoldingRow
+                  holding={demoState.rebalanceDemo.holding}
+                  security={
+                    demoState.rebalanceDemo.securities.find(
+                      s => s.id === demoState.rebalanceDemo.holding.securityId,
+                    ) ?? null
+                  }
+                  index={0}
+                  canRemove={false}
+                  onChangeHolding={updateRebalanceHolding}
+                  onChangeSecurity={updates =>
+                    updateRebalanceSecurity(demoState.rebalanceDemo.holding.securityId, updates)
+                  }
+                  onRemove={() => {}}
+                />
               </div>
             </div>
 

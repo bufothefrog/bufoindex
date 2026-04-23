@@ -2,32 +2,13 @@ import React from 'react';
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { HoldingRow } from '@/app/tools/portfolio-rebalancing-calculator/components/HoldingRow';
-import { Account, Holding, Security } from '@/lib/calculations/portfolioRebalancing';
+import { Holding, Security } from '@/lib/calculations/portfolioRebalancing';
 
-const account1: Account = {
-  id: 'acc1',
-  name: 'Fidelity Roth',
-  accountType: 'tax-free',
-  deposit: 0,
-};
-const account2: Account = {
-  id: 'acc2',
-  name: 'Taxable Brokerage',
-  accountType: 'taxable',
-  deposit: 0,
-};
-
-const security1: Security = {
+const security: Security = {
   id: 'sec1',
   ticker: 'VTI',
   price: 250,
   assetClass: 'us-stock',
-};
-const security2: Security = {
-  id: 'sec2',
-  ticker: 'BND',
-  price: 75,
-  assetClass: 'bonds',
 };
 
 function makeHolding(overrides: Partial<Holding> = {}): Holding {
@@ -48,104 +29,83 @@ function inputIn(testId: string): HTMLInputElement {
 describe('HoldingRow', () => {
   afterEach(() => cleanup());
 
-  it('renders security dropdown and shares input', () => {
+  it('renders ticker, price, asset class, and shares inline', () => {
     render(
       <HoldingRow
         holding={makeHolding()}
+        security={security}
         index={0}
-        accounts={[account1, account2]}
-        securities={[security1, security2]}
-        showAccountSelector={true}
-        canRemove={true}
-        onChange={vi.fn()}
+        canRemove
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={vi.fn()}
         onRemove={vi.fn()}
-      />
+      />,
     );
-    const securitySelect = within(screen.getByTestId('holding-security-0')).getByRole(
-      'combobox'
-    ) as HTMLSelectElement;
-    expect(securitySelect.value).toBe('sec1');
+    expect((screen.getByTestId('holding-ticker-0') as HTMLInputElement).value).toBe('VTI');
+    expect(inputIn('holding-price-0').value).toBe('250');
     expect(inputIn('holding-shares-0').value).toBe('10');
+    const classSelect = within(screen.getByTestId('holding-class-0')).getByRole(
+      'combobox',
+    ) as HTMLSelectElement;
+    expect(classSelect.value).toBe('us-stock');
   });
 
-  it('shows the account selector by default and reflects current value', () => {
-    render(
-      <HoldingRow
-        holding={makeHolding({ accountId: 'acc2' })}
-        index={0}
-        accounts={[account1, account2]}
-        securities={[security1]}
-        showAccountSelector={true}
-        canRemove={true}
-        onChange={vi.fn()}
-        onRemove={vi.fn()}
-      />
-    );
-    const accountWrapper = screen.getByTestId('holding-account-0');
-    const select = within(accountWrapper).getByRole('combobox') as HTMLSelectElement;
-    expect(select.value).toBe('acc2');
-  });
-
-  it('hides the account selector when showAccountSelector is false', () => {
+  it('emits ticker updates to the paired security', () => {
+    const onChangeSecurity = vi.fn();
     render(
       <HoldingRow
         holding={makeHolding()}
+        security={security}
         index={0}
-        accounts={[account1]}
-        securities={[security1]}
-        showAccountSelector={false}
-        canRemove={true}
-        onChange={vi.fn()}
+        canRemove
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={onChangeSecurity}
         onRemove={vi.fn()}
-      />
+      />,
     );
-    expect(screen.queryByTestId('holding-account-0')).toBeNull();
+    fireEvent.change(screen.getByTestId('holding-ticker-0'), { target: { value: 'bnd' } });
+    expect(onChangeSecurity).toHaveBeenCalledWith({ ticker: 'BND' });
   });
 
-  it('emits shares updates', () => {
-    const onChange = vi.fn();
+  it('emits price and asset-class updates to the paired security', () => {
+    const onChangeSecurity = vi.fn();
     render(
       <HoldingRow
         holding={makeHolding()}
+        security={security}
         index={0}
-        accounts={[account1]}
-        securities={[security1]}
-        showAccountSelector={true}
-        canRemove={true}
-        onChange={onChange}
+        canRemove
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={onChangeSecurity}
         onRemove={vi.fn()}
-      />
+      />,
+    );
+
+    fireEvent.change(inputIn('holding-price-0'), { target: { value: '300' } });
+    expect(onChangeSecurity).toHaveBeenCalledWith({ price: 300 });
+
+    const classSelect = within(screen.getByTestId('holding-class-0')).getByRole(
+      'combobox',
+    ) as HTMLSelectElement;
+    fireEvent.change(classSelect, { target: { value: 'bonds' } });
+    expect(onChangeSecurity).toHaveBeenCalledWith({ assetClass: 'bonds' });
+  });
+
+  it('emits shares updates to the holding', () => {
+    const onChangeHolding = vi.fn();
+    render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={security}
+        index={0}
+        canRemove
+        onChangeHolding={onChangeHolding}
+        onChangeSecurity={vi.fn()}
+        onRemove={vi.fn()}
+      />,
     );
     fireEvent.change(inputIn('holding-shares-0'), { target: { value: '42' } });
-    expect(onChange).toHaveBeenCalledWith({ shares: 42 });
-  });
-
-  it('emits account and security changes', () => {
-    const onChange = vi.fn();
-    render(
-      <HoldingRow
-        holding={makeHolding()}
-        index={0}
-        accounts={[account1, account2]}
-        securities={[security1, security2]}
-        showAccountSelector={true}
-        canRemove={true}
-        onChange={onChange}
-        onRemove={vi.fn()}
-      />
-    );
-
-    const accSelect = within(screen.getByTestId('holding-account-0')).getByRole(
-      'combobox'
-    ) as HTMLSelectElement;
-    fireEvent.change(accSelect, { target: { value: 'acc2' } });
-    expect(onChange).toHaveBeenCalledWith({ accountId: 'acc2' });
-
-    const secSelect = within(screen.getByTestId('holding-security-0')).getByRole(
-      'combobox'
-    ) as HTMLSelectElement;
-    fireEvent.change(secSelect, { target: { value: 'sec2' } });
-    expect(onChange).toHaveBeenCalledWith({ securityId: 'sec2' });
+    expect(onChangeHolding).toHaveBeenCalledWith({ shares: 42 });
   });
 
   it('fires onRemove when remove button clicked', () => {
@@ -153,14 +113,13 @@ describe('HoldingRow', () => {
     render(
       <HoldingRow
         holding={makeHolding()}
+        security={security}
         index={3}
-        accounts={[account1]}
-        securities={[security1]}
-        showAccountSelector={true}
-        canRemove={true}
-        onChange={vi.fn()}
+        canRemove
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={vi.fn()}
         onRemove={onRemove}
-      />
+      />,
     );
     fireEvent.click(screen.getByTestId('holding-remove-3'));
     expect(onRemove).toHaveBeenCalledTimes(1);
@@ -170,14 +129,13 @@ describe('HoldingRow', () => {
     render(
       <HoldingRow
         holding={makeHolding()}
+        security={security}
         index={0}
-        accounts={[account1]}
-        securities={[security1]}
-        showAccountSelector={true}
         canRemove={false}
-        onChange={vi.fn()}
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={vi.fn()}
         onRemove={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTestId('holding-remove-0')).toBeDisabled();
   });
@@ -186,17 +144,33 @@ describe('HoldingRow', () => {
     render(
       <HoldingRow
         holding={makeHolding({ shares: 4 })}
+        security={security}
         index={0}
-        accounts={[account1]}
-        securities={[security1]}
-        showAccountSelector={true}
-        canRemove={true}
-        onChange={vi.fn()}
+        canRemove
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={vi.fn()}
         onRemove={vi.fn()}
-      />
+      />,
     );
     const preview = screen.getByTestId('holding-preview-0');
     expect(preview.textContent).toContain('VTI');
     expect(preview.textContent).toContain('1,000'); // 250 * 4
+  });
+
+  it('renders gracefully with a missing security', () => {
+    render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={null}
+        index={0}
+        canRemove
+        onChangeHolding={vi.fn()}
+        onChangeSecurity={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+    expect((screen.getByTestId('holding-ticker-0') as HTMLInputElement).value).toBe('');
+    expect(inputIn('holding-price-0').value).toBe('');
+    expect(screen.queryByTestId('holding-preview-0')).toBeNull();
   });
 });
