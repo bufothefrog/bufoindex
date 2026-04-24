@@ -68,20 +68,28 @@ typescript_gate() {
 test_gate() {
     echo -e "${BLUE}🧪 Test Execution Gate${NC}"
     echo "  Running test suite..."
-    
-    # Check if tests can run (critical imports work)
+
+    # Run tests without letting `set -e` abort on non-zero exit so we can
+    # inspect the counts and surface the actual vitest output on failure.
+    set +e
     test_output=$(npm run test:run 2>&1)
     exit_code=$?
-    
+    set -e
+
     # Count failures and passed tests
     failed_count=$(echo "$test_output" | grep -o "[0-9]* failed" | awk '{sum += $1} END {print sum+0}')
     passed_count=$(echo "$test_output" | grep -o "[0-9]* passed" | awk '{sum += $1} END {print sum+0}')
     total_count=$((failed_count + passed_count))
-    
+
+    if [ "$exit_code" -ne 0 ] || [ "$failed_count" -gt 0 ]; then
+        # Print full vitest output so CI logs show what broke.
+        echo "$test_output"
+    fi
+
     if [ $total_count -gt 0 ] && [ $passed_count -gt $failed_count ]; then
         echo -e "${GREEN}✅ Test execution: PASS (${passed_count}/${total_count} tests passing)${NC}"
         if [ $failed_count -gt 0 ]; then
-            echo -e "${YELLOW}  ℹ️  Note: ${failed_count} precision/calculation tests still failing${NC}"
+            echo -e "${YELLOW}  ℹ️  Note: ${failed_count} test(s) failing${NC}"
         fi
         return 0
     elif [ $exit_code -eq 0 ]; then
@@ -89,7 +97,7 @@ test_gate() {
         return 0
     else
         echo -e "${RED}❌ Test execution: FAIL${NC}"
-        echo "  💡 Fix: Run 'npm test' to see detailed failures"
+        echo "  💡 Fix: Run 'npm run test:run' to see detailed failures"
         return 1
     fi
 }

@@ -23,6 +23,14 @@ on:
         - full
         default: standard
 
+# The "Comment PR with performance results" step uses actions/github-script
+# to POST a comment on the PR. Without this permissions block the default
+# GITHUB_TOKEN is read-only for PRs and the step 403s, failing the whole job
+# even when the benchmarks themselves passed.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   performance-monitoring:
     runs-on: ubuntu-latest
