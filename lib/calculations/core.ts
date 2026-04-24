@@ -52,15 +52,16 @@ export function monthlyToPaycheck(monthlyAmount: number, frequency: keyof typeof
  */
 export function updateLegacyIncomeFields(income: IncomeData): IncomeData {
   // Validate paycheck inputs to prevent NaN
-  const grossPaycheck = Number(income.grossPaycheck) || 0;
-  const netPaycheck = Number(income.netPaycheck) || 0;
-  
-  const monthlyGross = paycheckToMonthly(grossPaycheck, income.frequency);
-  const monthlyNet = paycheckToMonthly(netPaycheck, income.frequency);
-  
+  const grossPaycheck = Number(income?.grossPaycheck) || 0;
+  const netPaycheck = Number(income?.netPaycheck) || 0;
+  const frequency = (income?.frequency ?? 'monthly') as keyof typeof FREQUENCY_MULTIPLIERS;
+
+  const monthlyGross = paycheckToMonthly(grossPaycheck, frequency);
+  const monthlyNet = paycheckToMonthly(netPaycheck, frequency);
+
   // Calculate bonus monthly equivalent with validation
   let monthlyBonus = 0;
-  if (income.regularBonus && income.bonusAmount > 0) {
+  if (income?.regularBonus && (income?.bonusAmount ?? 0) > 0) {
     const bonusAmount = Number(income.bonusAmount) || 0;
     switch (income.bonusFrequency) {
       case 'quarterly':
@@ -81,13 +82,16 @@ export function updateLegacyIncomeFields(income: IncomeData): IncomeData {
   const validMonthlyBonus = Number.isFinite(monthlyBonus) ? monthlyBonus : 0;
   
   return {
-    ...income,
+    ...(income ?? {}),
+    grossPaycheck,
+    netPaycheck,
+    frequency,
     monthlyGross: validMonthlyGross,
     monthlyNet: validMonthlyNet,
     gross: validMonthlyGross,
     net: validMonthlyNet,
     bonusExpected: validMonthlyBonus,
-  };
+  } as IncomeData;
 }
 
 /**
@@ -96,22 +100,32 @@ export function updateLegacyIncomeFields(income: IncomeData): IncomeData {
  * Now calculates in per-paycheck amounts to match user mental model
  */
 export function calculateOptimalAllocation(profile: PaycheckProfile): AllocationResult {
+  // Defensively normalize profile so malformed inputs (null fields, missing
+  // sub-objects) don't crash the optimization engine.
+  const safeProfile = (profile ?? {}) as Partial<PaycheckProfile>;
+  const safePreferences = (safeProfile.preferences ?? {}) as PaycheckProfile['preferences'];
+  const safeFunMoney = safePreferences.funMoney ?? { min: 0, max: 0, current: 0 };
+
   // Ensure legacy income fields are updated from paycheck-based inputs
   const updatedProfile = {
-    ...profile,
-    income: updateLegacyIncomeFields(profile.income)
-  };
+    ...safeProfile,
+    income: updateLegacyIncomeFields(safeProfile.income as IncomeData),
+    debts: Array.isArray(safeProfile.debts) ? safeProfile.debts : [],
+    preferences: { ...safePreferences, funMoney: safeFunMoney },
+    benefits: (safeProfile.benefits ?? {}) as PaycheckProfile['benefits'],
+    taxes: (safeProfile.taxes ?? {}) as PaycheckProfile['taxes'],
+  } as PaycheckProfile;
 
   // Calculate per-paycheck amounts (user's actual paycheck scope)
   const netPaycheck = Number(updatedProfile.income.netPaycheck) || 0;
   const frequency = updatedProfile.income.frequency;
-  
+
   // Convert necessary expenses and fun money to per-paycheck amounts
   const necessaryExpensesMonthly = Number(updatedProfile.preferences.necessaryExpenses) || 0;
   const necessaryExpensesPerPaycheck = monthlyToPaycheck(necessaryExpensesMonthly, frequency);
-  
-  const minFunMoneyMonthly = Number(updatedProfile.preferences.funMoney.min) || 0;
-  const maxFunMoneyMonthly = Number(updatedProfile.preferences.funMoney.max) || minFunMoneyMonthly || 0;
+
+  const minFunMoneyMonthly = Number(safeFunMoney.min) || 0;
+  const maxFunMoneyMonthly = Number(safeFunMoney.max) || minFunMoneyMonthly || 0;
   const funMoneyPerPaycheck = monthlyToPaycheck(minFunMoneyMonthly, frequency);
   
   // Available amount per paycheck (this is what the user actually has to allocate)
@@ -149,25 +163,61 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
     // This will be handled by contrarian analysis as optional
   ];
   
-  // Execute allocations in priority order
+  // Execute allocations in priority order. Individual optimization
+  // failures (e.g. missing benefits on a malformed profile) are skipped
+  // rather than crashing the whole calculation.
   for (let i = 0; i < priorityAllocations.length; i++) {
     if (availableAmount <= 0) break;
-    
-    const allocation = priorityAllocations[i]();
+
+    let allocation: AllocationItem | null = null;
+    try {
+      allocation = priorityAllocations[i]();
+    } catch {
+      allocation = null;
+    }
     if (allocation && allocation.amount > 0 && allocation.amount <= availableAmount) {
       allocations.push(allocation);
       availableAmount -= allocation.amount;
     }
   }
-  
+
   // Step 3: Identify optimization opportunities and contrarian advice
-  const skippedItems = identifySkippedOptimizations(updatedProfile);
-  
+  let skippedItems: SkippedItem[] = [];
+  try {
+    skippedItems = identifySkippedOptimizations(updatedProfile);
+  } catch {
+    skippedItems = [];
+  }
+
   // Step 4: Calculate future projections
-  const projections = calculateProjections(updatedProfile, allocations);
-  
+  let projections: AllocationResult['projections'];
+  try {
+    projections = calculateProjections(updatedProfile, allocations);
+  } catch {
+    projections = {
+      currentPath: { tenYear: 0, taxesOwed: 0, fiAge: 0 },
+      optimizedPath: { tenYear: 0, taxesOwed: 0, fiAge: 0 },
+      improvement: { tenYear: 0, annualTaxSavings: 0, fiYearsEarlier: 0 },
+    };
+  }
+
   // Step 5: Calculate optimization score
-  const optimizationScore = calculateOptimizationScore(updatedProfile, allocations, skippedItems);
+  let optimizationScore: AllocationResult['optimizationScore'];
+  try {
+    optimizationScore = calculateOptimizationScore(updatedProfile, allocations, skippedItems);
+  } catch {
+    optimizationScore = {
+      overall: 0,
+      breakdown: {
+        taxEfficiency: 0,
+        employerBenefits: 0,
+        debtStrategy: 0,
+        emergencyFundSize: 0,
+        accountPrioritization: 0,
+      },
+      comparison: 0,
+    };
+  }
   
   return {
     allocations,
@@ -402,10 +452,10 @@ export function calculateCompoundGrowth(principal: number, rate: number, years: 
   const validRate = Number.isFinite(rate) ? rate : 0;
   const validYears = Number.isFinite(years) ? Math.max(0, years) : 0;
   
-  if (validPrincipal <= 0 || validYears <= 0) {
+  if (validPrincipal <= 0) {
     return 0;
   }
-  
+
   const result = validPrincipal * Math.pow(1 + validRate, validYears);
   return Number.isFinite(result) ? result : 0;
 }
