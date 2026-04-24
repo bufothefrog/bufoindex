@@ -155,6 +155,11 @@ junit.xml
 quality-check.log
 philosophy-violations.log
 performance-baseline.json
+performance-report-*.json
+performance-dashboard.json
+.performance-alerts.json
+.performance-baselines.json
+.performance-history.json
 
 # Claude Code local files (keep agents synced)
 .claude/**/*.local

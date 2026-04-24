@@ -90,7 +90,8 @@ describe('FinancialCalculations', () => {
 
     it('should handle negative values', () => {
       expect(FinancialCalculations.futureValue(-10000, 0.07, 10)).toBeCloseToCurrency(-19671.51, 2)
-      expect(FinancialCalculations.futureValue(10000, -0.03, 10)).toBeCloseToCurrency(7440.94, 2)
+      // 10000 * (1 - 0.03)^10 = 10000 * 0.97^10 = 7374.24
+      expect(FinancialCalculations.futureValue(10000, -0.03, 10)).toBeCloseToCurrency(7374.24, 2)
     })
 
     it('should meet performance requirements', () => {
@@ -141,7 +142,8 @@ describe('FinancialCalculations', () => {
       const periods = 10
       
       const payment = FinancialCalculations.calculateRequiredPayment(pv, fv, rate, periods)
-      expect(payment).toBeCloseToCurrency(7238.01, 2) // Known PMT calculation
+      // PMT = FV * r / ((1+r)^n - 1) = 100000 * 0.07 / (1.07^10 - 1) = 7237.75
+      expect(payment).toBeCloseToCurrency(7237.75, 2)
     })
 
     it('should handle zero rate scenario', () => {
@@ -155,18 +157,19 @@ describe('FinancialCalculations', () => {
     })
 
     it('should handle present value scenarios', () => {
-      // Loan payment scenario: Borrow $100,000 at 5% for 30 years
+      // Loan payment scenario: Borrow $100,000 at 5% annual for 30 years
+      // Annual loan PMT = -PV * r * (1+r)^n / ((1+r)^n - 1) = -6505.14
       const payment = FinancialCalculations.calculateRequiredPayment(100000, 0, 0.05, 30)
-      expect(payment).toBeCloseToCurrency(-5374.09, 2) // Negative indicates outflow
+      expect(payment).toBeCloseToCurrency(-6505.14, 2) // Negative indicates outflow
     })
   })
 
   describe('calculateRequiredMonthlyPayment', () => {
     it('should calculate monthly payments with compound frequency conversion', () => {
       const payment = FinancialCalculations.calculateRequiredMonthlyPayment(0, 100000, 0.07, 10)
-      // Monthly compounding should be different from annual
+      // Uses geometric monthly rate ((1.07)^(1/12) - 1) so 120 monthly payments compound to exactly 1.07^10
       expect(payment).toBeGreaterThan(0)
-      expect(payment).toBeCloseToCurrency(580.78, 2)
+      expect(payment).toBeCloseToCurrency(584.62, 2)
     })
 
     it('should handle monthly compounding formula correctly', () => {
@@ -183,7 +186,8 @@ describe('FinancialCalculations', () => {
   describe('inflationAdjustedIncome', () => {
     it('should calculate inflation adjustment correctly', () => {
       const income = FinancialCalculations.inflationAdjustedIncome(50000, 0.03, 10)
-      expect(income).toBeCloseToCurrency(67195.86, 2)
+      // 50000 * 1.03^10 = 67195.82
+      expect(income).toBeCloseToCurrency(67195.82, 2)
     })
 
     it('should handle zero inflation', () => {
@@ -196,7 +200,8 @@ describe('FinancialCalculations', () => {
 
     it('should handle deflation scenarios', () => {
       const income = FinancialCalculations.inflationAdjustedIncome(50000, -0.02, 10)
-      expect(income).toBeCloseToCurrency(40951.28, 2)
+      // 50000 * 0.98^10 = 40853.64
+      expect(income).toBeCloseToCurrency(40853.64, 2)
     })
   })
 

@@ -54,10 +54,10 @@ export function updateLegacyIncomeFields(income: IncomeData): IncomeData {
   // Validate paycheck inputs to prevent NaN
   const grossPaycheck = Number(income.grossPaycheck) || 0;
   const netPaycheck = Number(income.netPaycheck) || 0;
-  
+
   const monthlyGross = paycheckToMonthly(grossPaycheck, income.frequency);
   const monthlyNet = paycheckToMonthly(netPaycheck, income.frequency);
-  
+
   // Calculate bonus monthly equivalent with validation
   let monthlyBonus = 0;
   if (income.regularBonus && income.bonusAmount > 0) {
@@ -74,12 +74,12 @@ export function updateLegacyIncomeFields(income: IncomeData): IncomeData {
         break;
     }
   }
-  
+
   // Ensure all calculated values are valid numbers
   const validMonthlyGross = Number.isFinite(monthlyGross) ? monthlyGross : 0;
   const validMonthlyNet = Number.isFinite(monthlyNet) ? monthlyNet : 0;
   const validMonthlyBonus = Number.isFinite(monthlyBonus) ? monthlyBonus : 0;
-  
+
   return {
     ...income,
     monthlyGross: validMonthlyGross,
@@ -99,17 +99,17 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   // Ensure legacy income fields are updated from paycheck-based inputs
   const updatedProfile = {
     ...profile,
-    income: updateLegacyIncomeFields(profile.income)
+    income: updateLegacyIncomeFields(profile.income),
   };
 
   // Calculate per-paycheck amounts (user's actual paycheck scope)
   const netPaycheck = Number(updatedProfile.income.netPaycheck) || 0;
   const frequency = updatedProfile.income.frequency;
-  
+
   // Convert necessary expenses and fun money to per-paycheck amounts
   const necessaryExpensesMonthly = Number(updatedProfile.preferences.necessaryExpenses) || 0;
   const necessaryExpensesPerPaycheck = monthlyToPaycheck(necessaryExpensesMonthly, frequency);
-  
+
   const minFunMoneyMonthly = Number(updatedProfile.preferences.funMoney.min) || 0;
   const maxFunMoneyMonthly = Number(updatedProfile.preferences.funMoney.max) || minFunMoneyMonthly || 0;
   const funMoneyPerPaycheck = monthlyToPaycheck(minFunMoneyMonthly, frequency);
@@ -152,20 +152,20 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   // Execute allocations in priority order
   for (let i = 0; i < priorityAllocations.length; i++) {
     if (availableAmount <= 0) break;
-    
+
     const allocation = priorityAllocations[i]();
     if (allocation && allocation.amount > 0 && allocation.amount <= availableAmount) {
       allocations.push(allocation);
       availableAmount -= allocation.amount;
     }
   }
-  
+
   // Step 3: Identify optimization opportunities and contrarian advice
   const skippedItems = identifySkippedOptimizations(updatedProfile);
-  
+
   // Step 4: Calculate future projections
   const projections = calculateProjections(updatedProfile, allocations);
-  
+
   // Step 5: Calculate optimization score
   const optimizationScore = calculateOptimizationScore(updatedProfile, allocations, skippedItems);
   
@@ -402,10 +402,10 @@ export function calculateCompoundGrowth(principal: number, rate: number, years: 
   const validRate = Number.isFinite(rate) ? rate : 0;
   const validYears = Number.isFinite(years) ? Math.max(0, years) : 0;
   
-  if (validPrincipal <= 0 || validYears <= 0) {
+  if (validPrincipal <= 0) {
     return 0;
   }
-  
+
   const result = validPrincipal * Math.pow(1 + validRate, validYears);
   return Number.isFinite(result) ? result : 0;
 }
