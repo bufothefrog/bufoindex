@@ -7,7 +7,6 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { BaseInput } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
-import { Percent } from 'lucide-react';
 
 interface PercentInputProps extends BaseInputProps {
   value: number; // 0-1 decimal format (e.g., 0.05 for 5%)
@@ -165,21 +164,9 @@ export function PercentInput({
   };
   
   const sizeClasses = {
-    sm: 'h-8 text-sm pl-7 pr-7',
-    md: 'h-10 text-sm pl-8 pr-8',
-    lg: 'h-12 text-base pl-9 pr-9'
-  };
-  
-  const iconSizes = {
-    sm: 'w-3 h-3',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5'
-  };
-  
-  const iconPositions = {
-    sm: 'left-2.5',
-    md: 'left-3',
-    lg: 'left-3.5'
+    sm: 'h-8 text-sm pl-3 pr-7',
+    md: 'h-10 text-sm pl-3 pr-8',
+    lg: 'h-12 text-base pl-3 pr-9'
   };
   
   const suffixPositions = {
@@ -187,7 +174,7 @@ export function PercentInput({
     md: 'right-3',
     lg: 'right-3.5'
   };
-  
+
   return (
     <BaseInput
       name={name}
@@ -200,12 +187,6 @@ export function PercentInput({
       testId={testId}
     >
       <div className="relative w-full">
-        <span className={cn(
-          "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
-          iconPositions[size]
-        )}>
-          <Percent className={iconSizes[size]} />
-        </span>
         <input
           type="text"
           value={displayValue}
@@ -219,7 +200,7 @@ export function PercentInput({
           step={step * 100}
           className={cn(
             sizeClasses[size],
-            "text-center font-mono",
+            "text-right font-mono tabular-nums",
             "focus:outline-none" // BaseInput handles focus styles
           )}
         />

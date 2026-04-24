@@ -83,7 +83,7 @@ describe('v3 encode/decode roundtrip', () => {
 
   it('omits default flags from the compressed payload but still decodes them', () => {
     const minimal: RebalanceInputsV2 = {
-      setupMode: 'single',
+      setupMode: 'multi-shared',
       securities: [],
       accounts: [],
       holdings: [],
@@ -99,8 +99,8 @@ describe('v3 encode/decode roundtrip', () => {
     expect(decoded).toEqual(minimal);
   });
 
-  it('roundtrips a per-account class target (multi-unique)', () => {
-    const input: RebalanceInputsV2 = {
+  it('flattens a legacy multi-unique hash to portfolio-wide targets', () => {
+    const legacy: RebalanceInputsV2 = {
       setupMode: 'multi-unique',
       securities: [
         { id: 'sec-1', ticker: 'VTI', price: 200, assetClass: 'us-stock' },
@@ -122,8 +122,23 @@ describe('v3 encode/decode roundtrip', () => {
       mode: 'whole',
     };
 
-    const decoded = decodeRebalancingFromUrlHash(encodeRebalancingToUrlHash(input));
-    expect(decoded).toEqual(input);
+    const decoded = decodeRebalancingFromUrlHash(encodeRebalancingToUrlHash(legacy));
+    expect(decoded).not.toBeNull();
+    if (!decoded) return;
+
+    expect(decoded.setupMode).toBe('multi-shared');
+    expect(decoded.accounts).toEqual(legacy.accounts);
+    expect(decoded.holdings).toEqual(legacy.holdings);
+
+    // Per-account targets are averaged per asset class into portfolio-wide
+    // targets: us-stock across two accounts averages to (1.0 + 0.5) / 2 = 0.75,
+    // bonds only appears in one account so averages to 0.5 / 1 = 0.5.
+    const map = new Map(decoded.classTargets.map(t => [t.assetClass, t.target]));
+    expect(map.get('us-stock')).toBeCloseTo(0.75, 6);
+    expect(map.get('bonds')).toBeCloseTo(0.5, 6);
+    decoded.classTargets.forEach(t => {
+      expect(t.accountId).toBeNull();
+    });
   });
 });
 
@@ -147,7 +162,7 @@ describe('v1 → v3 migration', () => {
     expect(decoded).not.toBeNull();
     if (!decoded) return;
 
-    expect(decoded.setupMode).toBe('single');
+    expect(decoded.setupMode).toBe('multi-shared');
 
     // One "Brokerage" taxable account with the v1 deposit.
     expect(decoded.accounts).toHaveLength(1);
@@ -248,7 +263,7 @@ describe('v2 → v3 migration', () => {
     expect(decoded).not.toBeNull();
     if (!decoded) return;
 
-    expect(decoded.setupMode).toBe('single');
+    expect(decoded.setupMode).toBe('multi-shared');
     // Single "Brokerage" account; type taken from the first asset.
     expect(decoded.accounts).toHaveLength(1);
     expect(decoded.accounts[0].name).toBe('Brokerage');
@@ -423,9 +438,9 @@ describe('decode error handling', () => {
 // ---------------------------------------------------------------------------
 
 describe('empty v3 payload', () => {
-  it('decodes a single-mode payload with empty arrays without throwing', () => {
+  it('decodes a portfolio-wide payload with empty arrays without throwing', () => {
     const empty: RebalanceInputsV2 = {
-      setupMode: 'single',
+      setupMode: 'multi-shared',
       securities: [],
       accounts: [],
       holdings: [],

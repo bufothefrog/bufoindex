@@ -151,9 +151,9 @@ export function EnhancedMoneyInput({
   };
   
   const sizeClasses = {
-    sm: 'h-8 text-sm pl-7',
-    md: 'h-10 text-sm pl-8',
-    lg: 'h-12 text-base pl-9'
+    sm: 'h-8 text-sm pl-7 pr-3',
+    md: 'h-10 text-sm pl-8 pr-3',
+    lg: 'h-12 text-base pl-9 pr-3'
   };
   
   const iconSizes = {

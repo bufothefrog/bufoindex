@@ -54,7 +54,6 @@ function formatPercentPoints(decimal: number, signed = false): string {
 
 export function RebalanceResults({ result }: RebalanceResultsProps) {
   const {
-    setupMode,
     accounts,
     totalValueBefore,
     totalValueAfter,
@@ -105,40 +104,22 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
         />
       </div>
 
-      {setupMode === 'multi-unique' ? (
-        // Each account gets its own plan + its own drift table.
-        <div className="space-y-6">
-          {accounts.map(account => (
-            <AccountPlanBlock
-              key={account.accountId}
-              account={account}
-              mode={mode}
-              classDrift={classDrift.filter(d => d.accountId === account.accountId)}
-              showDrift
-            />
-          ))}
-        </div>
-      ) : (
-        // Single + multi-shared: per-account plans, then ONE portfolio-wide drift.
-        <>
-          <div className="space-y-6">
-            {accounts.map(account => (
-              <AccountPlanBlock
-                key={account.accountId}
-                account={account}
-                mode={mode}
-                classDrift={[]}
-                showDrift={false}
-              />
-            ))}
-          </div>
-          {portfolioDrift.length > 0 && (
-            <ClassDriftCard
-              title="Portfolio Drift by Class"
-              drifts={portfolioDrift}
-            />
-          )}
-        </>
+      <div className="space-y-6">
+        {accounts.map(account => (
+          <AccountPlanBlock
+            key={account.accountId}
+            account={account}
+            mode={mode}
+            classDrift={[]}
+            showDrift={false}
+          />
+        ))}
+      </div>
+      {portfolioDrift.length > 0 && (
+        <ClassDriftCard
+          title="Portfolio Drift by Class"
+          drifts={portfolioDrift}
+        />
       )}
 
       <ResultCard title="Drift Reduction" icon={Scale}>
