@@ -13,9 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        # Next.js 16 requires Node >= 20.9 (engines in next/package.json),
-        # so 18.x is not a supported runtime for this project.
-        node-version: [20.x]
+        node-version: [18.x, 20.x]
 
     steps:
     - name: Checkout repository
