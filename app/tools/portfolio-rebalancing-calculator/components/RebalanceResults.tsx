@@ -11,27 +11,20 @@ import {
 import { ResultCard, SummaryCard } from '@/components/ui/cards/BaseCard';
 import {
   AccountType,
-  AssetClass,
   AccountRebalanceSummary,
   ClassDrift,
+  CustomAssetClass,
   HoldingRebalancePlan,
   RebalanceMode,
   RebalanceResultV2,
+  getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
+import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface RebalanceResultsProps {
   result: RebalanceResultV2;
 }
-
-const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
-  'us-stock': 'US Stock',
-  'intl-stock': 'Intl Stock',
-  'bonds': 'Bonds',
-  'reits': 'REITs',
-  'cash': 'Cash',
-  'other': 'Other',
-};
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   'taxable': 'Taxable',
@@ -53,6 +46,9 @@ function formatPercentPoints(decimal: number, signed = false): string {
 }
 
 export function RebalanceResults({ result }: RebalanceResultsProps) {
+  const customAssetClasses = usePortfolioRebalancingStore(
+    s => s.inputs.customAssetClasses ?? [],
+  );
   const {
     accounts,
     totalValueBefore,
@@ -112,6 +108,7 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
             mode={mode}
             classDrift={[]}
             showDrift={false}
+            customAssetClasses={customAssetClasses}
           />
         ))}
       </div>
@@ -119,6 +116,7 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
         <ClassDriftCard
           title="Portfolio Drift by Class"
           drifts={portfolioDrift}
+          customAssetClasses={customAssetClasses}
         />
       )}
 
@@ -171,6 +169,7 @@ interface AccountPlanBlockProps {
   mode: RebalanceMode;
   classDrift: ClassDrift[];
   showDrift: boolean;
+  customAssetClasses: CustomAssetClass[];
 }
 
 function AccountPlanBlock({
@@ -178,6 +177,7 @@ function AccountPlanBlock({
   mode,
   classDrift,
   showDrift,
+  customAssetClasses,
 }: AccountPlanBlockProps) {
   const { accountName, accountType, deposit, depositUsed, depositLeftover, holdings } = account;
 
@@ -223,6 +223,7 @@ function AccountPlanBlock({
                     key={holding.holdingId}
                     holding={holding}
                     mode={mode}
+                    customAssetClasses={customAssetClasses}
                   />
                 ))
               )}
@@ -247,7 +248,10 @@ function AccountPlanBlock({
             <div className="text-xs font-medium uppercase text-muted-foreground mb-2">
               Account Drift
             </div>
-            <ClassDriftTable drifts={classDrift} />
+            <ClassDriftTable
+              drifts={classDrift}
+              customAssetClasses={customAssetClasses}
+            />
           </div>
         )}
       </div>
@@ -258,9 +262,10 @@ function AccountPlanBlock({
 interface HoldingPlanRowProps {
   holding: HoldingRebalancePlan;
   mode: RebalanceMode;
+  customAssetClasses: CustomAssetClass[];
 }
 
-function HoldingPlanRow({ holding, mode }: HoldingPlanRowProps) {
+function HoldingPlanRow({ holding, mode, customAssetClasses }: HoldingPlanRowProps) {
   const { ticker, price, action, sharesToBuy, sharesToSell, dollarsSpent, dollarsReceived, newValue } = holding;
   const isSell = action === 'sell';
   const isBuy = action === 'buy';
@@ -272,7 +277,7 @@ function HoldingPlanRow({ holding, mode }: HoldingPlanRowProps) {
       <td className="py-3 pr-2">
         <div className="font-semibold tabular-nums">{ticker || '—'}</div>
         <div className="text-xs text-muted-foreground">
-          {formatCurrency(price)}/share · {ASSET_CLASS_LABELS[holding.assetClass]}
+          {formatCurrency(price)}/share · {getAssetClassLabel(holding.assetClass, customAssetClasses)}
         </div>
       </td>
       <td
@@ -311,17 +316,23 @@ function HoldingPlanRow({ holding, mode }: HoldingPlanRowProps) {
 interface ClassDriftCardProps {
   title: string;
   drifts: ClassDrift[];
+  customAssetClasses: CustomAssetClass[];
 }
 
-function ClassDriftCard({ title, drifts }: ClassDriftCardProps) {
+function ClassDriftCard({ title, drifts, customAssetClasses }: ClassDriftCardProps) {
   return (
     <ResultCard title={title} icon={Scale}>
-      <ClassDriftTable drifts={drifts} />
+      <ClassDriftTable drifts={drifts} customAssetClasses={customAssetClasses} />
     </ResultCard>
   );
 }
 
-function ClassDriftTable({ drifts }: { drifts: ClassDrift[] }) {
+interface ClassDriftTableProps {
+  drifts: ClassDrift[];
+  customAssetClasses: CustomAssetClass[];
+}
+
+function ClassDriftTable({ drifts, customAssetClasses }: ClassDriftTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm" data-testid="class-drift-table">
@@ -340,7 +351,7 @@ function ClassDriftTable({ drifts }: { drifts: ClassDrift[] }) {
               className="border-b border-border/50 last:border-b-0"
               data-testid={`drift-row-${d.accountId ?? 'portfolio'}-${d.assetClass}`}
             >
-              <td className="py-2 pr-2 font-medium">{ASSET_CLASS_LABELS[d.assetClass]}</td>
+              <td className="py-2 pr-2 font-medium">{getAssetClassLabel(d.assetClass, customAssetClasses)}</td>
               <td className="py-2 px-2 text-right font-mono tabular-nums">
                 {formatPercentPoints(d.target)}
               </td>

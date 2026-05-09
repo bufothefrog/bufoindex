@@ -22,11 +22,12 @@ function asset(accountType: AccountType, assetClass: AssetClass): RebalanceAsset
 }
 
 describe('LOCATION_PREFERENCE', () => {
-  it('has an entry for every asset class', () => {
+  it('has an entry for every built-in asset class', () => {
     const classes: AssetClass[] = ['us-stock', 'intl-stock', 'bonds', 'reits', 'cash', 'other'];
     classes.forEach(c => {
-      expect(LOCATION_PREFERENCE[c]).toBeDefined();
-      expect(LOCATION_PREFERENCE[c].length).toBeGreaterThan(0);
+      const pref = LOCATION_PREFERENCE[c];
+      expect(pref).toBeDefined();
+      expect(pref!.length).toBeGreaterThan(0);
     });
   });
 });

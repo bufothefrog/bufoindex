@@ -4,7 +4,7 @@ import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { EnhancedMoneyInput } from '@/components/ui/inputs';
+import { NumberInput } from '@/components/ui/inputs';
 import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { Account, AccountType } from '@/lib/calculations/portfolioRebalancing';
@@ -80,12 +80,16 @@ export function AccountSection({
         </div>
 
         <div data-testid={`account-deposit-${index}`}>
-          <EnhancedMoneyInput
+          <NumberInput
             name={`account-deposit-input-${account.id}`}
             label="New cash"
             value={account.deposit}
             onChange={value => updateAccount(account.id, { deposit: value })}
-            placeholder="0"
+            placeholder="0.00"
+            min={0}
+            allowDecimals
+            precision={2}
+            prefix="$"
           />
         </div>
 
@@ -93,7 +97,12 @@ export function AccountSection({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => removeAccount(account.id)}
+            onClick={() => {
+              const label = account.name || `account ${index + 1}`;
+              if (window.confirm(`Delete ${label}? Its holdings will be removed too.`)) {
+                removeAccount(account.id);
+              }
+            }}
             disabled={!canRemove}
             aria-label={`Remove ${account.name || `account ${index + 1}`}`}
             data-testid={`account-remove-${index}`}
@@ -132,7 +141,12 @@ export function AccountSection({
                     linkHoldingToSecurity(holding.id, securityId)
                   }
                   onCommitTicker={ticker => linkHoldingByTicker(holding.id, ticker)}
-                  onRemove={() => removeHolding(holding.id)}
+                  onRemove={() => {
+                    const label = security?.ticker || `holding ${globalIndex + 1}`;
+                    if (window.confirm(`Delete ${label}?`)) {
+                      removeHolding(holding.id);
+                    }
+                  }}
                 />
               );
             })}
