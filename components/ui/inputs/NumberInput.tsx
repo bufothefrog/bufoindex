@@ -229,7 +229,7 @@ export function NumberInput({
             paddingLeft,
             paddingRight,
             "font-mono",
-            "focus:outline-none" // BaseInput handles focus styles
+            "focus:outline-hidden" // BaseInput handles focus styles
           )}
         />
 

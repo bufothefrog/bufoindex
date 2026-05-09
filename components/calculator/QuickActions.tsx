@@ -253,7 +253,7 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
       <Card className={cn("transition-all duration-200 hover:shadow-md", urgencyBorderStyles[action.urgency])}>
         <CardContent className="p-4">
           <div className="flex items-start space-x-4">
-            <div className="p-2 rounded-full bg-card shadow-sm">
+            <div className="p-2 rounded-full bg-card shadow-xs">
               <IconComponent className={cn("w-5 h-5", urgencyIconStyles[action.urgency])} aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">

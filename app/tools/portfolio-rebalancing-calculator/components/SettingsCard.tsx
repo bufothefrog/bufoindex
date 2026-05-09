@@ -59,7 +59,7 @@ export function SettingsCard() {
             </label>
             {allowTaxableSelling && (
               <div className="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
-                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-500 dark:text-orange-400" />
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-orange-500 dark:text-orange-400" />
                 <span>Selling in taxable may trigger capital gains tax.</span>
               </div>
             )}
@@ -89,7 +89,7 @@ function ModeButton({ active, onClick, icon, title, description, testId }: ModeB
       data-testid={testId}
       className={cn(
         'text-left p-3 rounded-lg border transition-all',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
+        'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
         active
           ? 'border-sage-400 bg-sage-50 dark:bg-sage-800/50 dark:border-sage-500'
           : 'border-border bg-background hover:border-sage-300 dark:hover:border-sage-600',

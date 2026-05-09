@@ -191,7 +191,7 @@ export function EnhancedMoneyInput({
           className={cn(
             sizeClasses[size],
             "text-right font-mono tabular-nums",
-            "focus:outline-none" // Remove default focus styles since BaseInput handles them
+            "focus:outline-hidden" // Remove default focus styles since BaseInput handles them
           )}
         />
       </div>

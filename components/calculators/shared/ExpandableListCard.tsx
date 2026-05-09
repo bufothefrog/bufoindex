@@ -76,7 +76,7 @@ export function ExpandableListCard({
         >
           <div className="flex items-center space-x-3 min-w-0">
             {Icon && (
-              <Icon className={cn('w-5 h-5 flex-shrink-0', variantIcon[variant])} />
+              <Icon className={cn('w-5 h-5 shrink-0', variantIcon[variant])} />
             )}
             <div className="min-w-0">
               <h4 className="font-semibold text-sm">{title}</h4>
@@ -86,7 +86,7 @@ export function ExpandableListCard({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 flex-shrink-0">
+          <div className="flex items-center space-x-3 shrink-0">
             {headerRight}
             {value !== undefined && (
               <div className="text-right">

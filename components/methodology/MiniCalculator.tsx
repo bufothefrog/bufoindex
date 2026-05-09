@@ -138,7 +138,7 @@ export function MiniCalculator({
                 type="number"
                 value={inputs[variable] || ''}
                 onChange={(e) => handleInputChange(variable, e.target.value)}
-                className="flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-ring"
+                className="flex-1 px-2 py-1 text-sm border rounded focus:outline-hidden focus:ring-2 focus:ring-ring"
                 placeholder={info.unit}
               />
             </div>
@@ -203,7 +203,7 @@ export function MiniCalculator({
                   type="number"
                   value={inputs[variable] || ''}
                   onChange={(e) => handleInputChange(variable, e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring"
                   placeholder={`Enter ${info.description.toLowerCase()}`}
                   step="any"
                 />

@@ -199,7 +199,7 @@ export function InsightCard({
       <ul className="space-y-2">
         {insights.map((insight, index) => (
           <li key={index} className="flex items-start space-x-2">
-            <div className="w-2 h-2 bg-info rounded-full mt-2 flex-shrink-0" />
+            <div className="w-2 h-2 bg-info rounded-full mt-2 shrink-0" />
             <div className="text-sm">{insight}</div>
           </li>
         ))}

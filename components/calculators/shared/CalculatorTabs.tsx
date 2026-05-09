@@ -129,7 +129,7 @@ export function CalculatorTabs({
             id={`tabpanel-${activeTab}`}
             role="tabpanel"
             aria-labelledby={`tab-${activeTab}`}
-            className="focus:outline-none"
+            className="focus:outline-hidden"
           >
             <ActiveComponent
               {...(activeTabConfig?.props || {})}
@@ -158,7 +158,7 @@ export function TabPanel({ id, children, className = '' }: TabPanelProps) {
       id={`tabpanel-${id}`}
       role="tabpanel"
       aria-labelledby={`tab-${id}`}
-      className={`focus:outline-none ${className}`}
+      className={`focus:outline-hidden ${className}`}
     >
       {children}
     </div>

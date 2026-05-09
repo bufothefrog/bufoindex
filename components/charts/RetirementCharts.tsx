@@ -70,8 +70,9 @@ export function RetirementCharts({
     const startTime = performance.now();
     
     // Wrap component to measure render time
-    return React.cloneElement(component, {
-      ...component.props,
+    const typed = component as React.ReactElement<Record<string, unknown>>;
+    return React.cloneElement(typed, {
+      ...typed.props,
       onRenderComplete: () => {
         const endTime = performance.now();
         trackPerformance(chartName, endTime - startTime);
@@ -193,7 +194,7 @@ export function RetirementCharts({
         {/* Withdrawal Timeline - STARTS AT RETIREMENT ONLY */}
         {(activeChart === 'all' || activeChart === 'withdrawal') && (
           <div className="chart-container">
-            <div className="bg-card rounded-lg shadow-sm border border-border p-4">
+            <div className="bg-card rounded-lg shadow-xs border border-border p-4">
               {withPerformanceTracking('withdrawal', chartComponents.withdrawal)}
             </div>
           </div>
@@ -203,7 +204,7 @@ export function RetirementCharts({
         {/* Net Worth Progression */}
         {(activeChart === 'all' || activeChart === 'netWorth') && (
           <div className="chart-container">
-            <div className="bg-card rounded-lg shadow-sm border border-border p-4">
+            <div className="bg-card rounded-lg shadow-xs border border-border p-4">
               {withPerformanceTracking('netWorth', chartComponents.netWorth)}
             </div>
           </div>
@@ -212,7 +213,7 @@ export function RetirementCharts({
         {/* Scenario Comparison */}
         {(activeChart === 'all' || activeChart === 'scenarios') && (
           <div className="chart-container">
-            <div className="bg-card rounded-lg shadow-sm border border-border p-4">
+            <div className="bg-card rounded-lg shadow-xs border border-border p-4">
               {withPerformanceTracking('scenarios', chartComponents.scenarios)}
             </div>
           </div>

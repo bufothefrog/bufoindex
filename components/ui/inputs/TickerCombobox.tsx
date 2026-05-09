@@ -161,7 +161,7 @@ export function TickerCombobox({
         data-testid={testId}
         className={cn(
           'w-full border bg-background rounded-md text-sm transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring',
+          'focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring',
           'border-input hover:border-ring/50',
           'h-10 pl-3 pr-3 uppercase font-mono tabular-nums',
         )}

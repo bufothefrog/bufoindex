@@ -26,7 +26,7 @@ export function ScenarioAnalyzer({ inputs, scenarioAnalysis }: ScenarioAnalyzerP
     return (
       <div className="bg-sage-50 border-l-4 border-sage-500 p-4 rounded-lg dark:bg-sage-800/20 dark:border-sage-400">
         <div className="flex items-start">
-          <CheckCircle className="h-5 w-5 text-sage-500 dark:text-sage-400 mt-0.5 mr-3 flex-shrink-0" />
+          <CheckCircle className="h-5 w-5 text-sage-500 dark:text-sage-400 mt-0.5 mr-3 shrink-0" />
           <div>
             <h3 className="text-lg font-semibold text-sage-800 dark:text-sage-200 mb-2">
               ✅ You&apos;re ahead of schedule!
@@ -70,7 +70,7 @@ export function ScenarioAnalyzer({ inputs, scenarioAnalysis }: ScenarioAnalyzerP
     return (
       <div className="bg-accent/10 border-l-4 border-accent p-4 rounded-lg dark:bg-accent/5">
         <div className="flex items-start">
-          <TrendingUp className="h-5 w-5 text-accent dark:text-accent mt-0.5 mr-3 flex-shrink-0" />
+          <TrendingUp className="h-5 w-5 text-accent dark:text-accent mt-0.5 mr-3 shrink-0" />
           <div>
             <h3 className="text-lg font-semibold text-accent-foreground mb-2">
               ✅ You&apos;re on track for your goals
@@ -112,7 +112,7 @@ export function ScenarioAnalyzer({ inputs, scenarioAnalysis }: ScenarioAnalyzerP
     return (
       <div className="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg dark:bg-orange-800/20 dark:border-orange-400">
         <div className="flex items-start">
-          <AlertTriangle className="h-5 w-5 text-orange-500 dark:text-orange-400 mt-0.5 mr-3 flex-shrink-0" />
+          <AlertTriangle className="h-5 w-5 text-orange-500 dark:text-orange-400 mt-0.5 mr-3 shrink-0" />
           <div>
             <h3 className="text-lg font-semibold text-orange-800 dark:text-orange-200 mb-2">
               ⚠️ Adjustments needed to meet your goals

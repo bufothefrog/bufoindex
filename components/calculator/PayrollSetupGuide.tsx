@@ -120,7 +120,7 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
   const instructions = getInstructions();
   
   return (
-    <Card className="border-green-200 dark:border-green-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+    <Card className="border-green-200 dark:border-green-700 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Building2 className="w-5 h-5 text-green-600 dark:text-green-400" aria-hidden="true" />

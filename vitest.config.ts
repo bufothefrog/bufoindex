@@ -20,18 +20,10 @@ export default defineConfig({
       'public/',
       'docs/',
     ],
-    // Test execution configuration
-    testTimeout: 10000, // 10s for complex calculations
-    hookTimeout: 5000,  // 5s for setup/teardown
-    // Parallel execution with controlled concurrency
+    testTimeout: 10000,
+    hookTimeout: 5000,
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        maxThreads: 4,
-        minThreads: 1,
-        useAtomics: true
-      }
-    },
+    maxWorkers: 4,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

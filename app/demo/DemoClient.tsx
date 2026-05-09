@@ -737,7 +737,7 @@ export function DemoClient() {
                   onClick={() => setRebalanceMode('whole')}
                   className={cn(
                     'text-left p-3 rounded-lg border transition-all',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
+                    'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
                     demoState.rebalanceDemo.mode === 'whole'
                       ? 'border-sage-400 bg-sage-50 dark:bg-sage-800/50 dark:border-sage-500'
                       : 'border-border bg-background hover:border-sage-300 dark:hover:border-sage-600'
@@ -765,7 +765,7 @@ export function DemoClient() {
                   onClick={() => setRebalanceMode('fractional')}
                   className={cn(
                     'text-left p-3 rounded-lg border transition-all',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
+                    'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2',
                     demoState.rebalanceDemo.mode === 'fractional'
                       ? 'border-sage-400 bg-sage-50 dark:bg-sage-800/50 dark:border-sage-500'
                       : 'border-border bg-background hover:border-sage-300 dark:hover:border-sage-600'
@@ -1318,16 +1318,19 @@ export function DemoClient() {
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                    label={({ payload }) => {
+                      const item = payload as AssetAllocationData | undefined;
+                      return item ? `${item.name}: ${item.percentage}%` : '';
+                    }}
                   >
                     {assetAllocationData.map((entry: AssetAllocationData, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string) => [
-                      `$${value.toLocaleString()}`,
-                      name
+                    formatter={(value, name) => [
+                      `$${Number(value).toLocaleString()}`,
+                      String(name)
                     ]}
                   />
                   <Legend />

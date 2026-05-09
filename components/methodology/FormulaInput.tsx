@@ -133,7 +133,7 @@ export function FormulaInput({
             }
             ${disabled 
               ? 'bg-muted cursor-not-allowed' 
-              : 'bg-background focus:outline-none focus:ring-2'
+              : 'bg-background focus:outline-hidden focus:ring-2'
             }
           `}
           placeholder={`Enter ${config.description.toLowerCase()}`}
@@ -292,7 +292,7 @@ export function FormulaSelectInput({
           }
           ${disabled 
             ? 'bg-muted cursor-not-allowed' 
-            : 'bg-background focus:outline-none focus:ring-2'
+            : 'bg-background focus:outline-hidden focus:ring-2'
           }
         `}
       >
