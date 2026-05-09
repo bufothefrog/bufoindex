@@ -50,12 +50,6 @@ export default defineConfig({
         '**/*.d.ts',
       ],
     },
-    // Performance benchmarking
-    benchmark: {
-      include: ['test/**/*.{bench,benchmark}.{js,ts}'],
-      exclude: ['node_modules/', '.next/'],
-      reporters: ['verbose']
-    },
     // Enhanced reporting for CI/CD
     reporters: ['verbose', 'junit', 'json'],
     outputFile: {
