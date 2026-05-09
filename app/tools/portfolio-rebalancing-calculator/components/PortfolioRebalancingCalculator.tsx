@@ -28,7 +28,7 @@ export function PortfolioRebalancingCalculator() {
   return (
     <SimpleCalculatorLayout
       title="Portfolio Rebalancing Calculator"
-      description="Rebalance through deposits, not sales. Set your target allocation, list your accounts and holdings, and we'll figure out how many shares to buy in each account to move closer to your plan."
+      description="Rebalance toward your asset-class targets using new deposits across one or more accounts, with whole or fractional shares and tax-aware placement advice."
       onCalculate={calculate}
       calculateButtonText="Rebalance"
       errors={errorMap}

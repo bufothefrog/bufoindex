@@ -1,194 +1,65 @@
-# Agent Conflict Resolution Procedures
+# Resolving Conflicts Between Parallel Agents
 
-## File Ownership Conflicts
-**SCENARIO:** Two agents attempt to modify the same file
+Short playbook for when two agents (or two engineers) collide while working in parallel. Most conflicts are avoidable with up-front file ownership; this doc is for when that wasn't enough.
 
-**RESOLUTION PROTOCOL:**
-```markdown
-## Conflict Resolution - File Ownership
-**Conflict ID:** [Generate unique ID]
-**Agents Involved:** [Agent-A, Agent-B]
-**File(s) in Conflict:** [List files]
-**Discovery Time:** [Timestamp]
+## File-level conflict
 
-### Conflict Analysis
-1. **Agent-A Intent:** [What Agent-A is trying to accomplish]
-2. **Agent-B Intent:** [What Agent-B is trying to accomplish]  
-3. **Overlap Assessment:** [Where the conflicts occur]
-4. **Priority Assessment:** [Which change is more critical]
+**Symptom:** two agents have edited the same file.
 
-### Resolution Strategy
-**Option 1 - Sequential:** Agent-A completes first, Agent-B integrates changes
-**Option 2 - Parallel:** Split file into modules, assign ownership
-**Option 3 - Merge:** Combine approaches into unified implementation
-**Option 4 - Redesign:** Create new approach that satisfies both requirements
+1. Stop both agents.
+2. Read both diffs end-to-end. Determine whether the changes are:
+   - **Independent** — different functions / sections in the same file. Merge by hand, run `npm run type-check && npm run lint && npm run test:run`.
+   - **Overlapping** — same lines or interdependent logic. Pick one as the base, port the other's intent on top, then re-test.
+   - **Architecturally divergent** — the file has been pulled in incompatible directions. Discard one branch of work and redo it on top of the other, or split the file into two modules.
+3. Document the decision in a short note under `docs/agents/agent-communication/` so it isn't relitigated.
+4. Update the file-ownership plan so this can't happen again in the same session.
 
-### Selected Resolution: [Chosen option]
-### Implementation Steps:
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
+## Interface conflict
 
-### Quality Verification:
-- [ ] No code conflicts remain
-- [ ] Both agents' requirements satisfied
-- [ ] All quality gates pass
-- [ ] Integration testing completed
+**Symptom:** two agents shipped incompatible signatures for a shared type or function (e.g. `lib/types/`, a calculation, or a shared component prop).
+
+1. The agent that owns the definition (or the integrator) picks the final signature.
+2. All call sites are updated to match.
+3. Run `npm run type-check` — TypeScript will surface anything missed.
+4. Re-run the relevant tests.
+
+If neither agent owned the definition, that's the bug. Assign ownership before resuming.
+
+## Test breakage from another agent
+
+**Symptom:** your changes pass locally, but another agent's changes have broken tests you depend on.
+
+1. Don't mask the failure. Read the failing test and the change that broke it.
+2. If the breakage is intentional (the other agent updated a contract), update your code to match.
+3. If the breakage is accidental, flag it — open a quick note in `agent-communication/` and either fix it yourself or hand back to the original agent.
+
+## Build is broken
+
+**Symptom:** `npm run build` or `npm run type-check` fails on `main` (or the integration branch).
+
+1. Pause new feature work in the same branch.
+2. Identify the breaking commit (`git log`, `git bisect` if needed).
+3. Either fix forward (preferred for small fixes) or revert (preferred when the change is large and the fix isn't obvious in minutes).
+4. Re-run the full local quality suite before resuming.
+
+## Avoiding conflicts in the first place
+
+- Carve up work along clear file boundaries. One owner per file per session.
+- If two agents must touch the same file, sequence them — finish one, then start the other.
+- Pin shared types and function signatures **before** spawning parallel agents.
+- Keep parallel sessions short. Long-running parallel work accumulates merge debt fast.
+
+## Note format
+
+A useful conflict note is a few lines, not a checklist with a hundred boxes. Example:
+
+```
+### 2026-05-09: ExampleCard prop conflict
+
+- Agent A added `variant?: 'default' | 'highlighted'` to ExampleCard.
+- Agent B renamed the prop to `emphasis`.
+- Resolution: kept `variant`, removed `emphasis`. Updated three call sites.
+- Tests: passing. Type-check: clean.
 ```
 
-## Architecture Disagreement Resolution
-**SCENARIO:** Agents propose conflicting architectural approaches
-
-**RESOLUTION PROTOCOL:**
-```markdown
-## Architecture Conflict Resolution
-**Conflict Type:** Architectural Disagreement
-**Agents:** [List conflicting agents]
-**Issue:** [Description of architectural conflict]
-
-### Technical Analysis
-1. **Approach A Benefits:** [List advantages]
-2. **Approach A Drawbacks:** [List disadvantages]  
-3. **Approach B Benefits:** [List advantages]
-4. **Approach B Drawbacks:** [List disadvantages]
-
-### Decision Criteria
-1. **Performance Impact:** [Which approach is faster]
-2. **Maintainability:** [Which is easier to maintain]
-3. **BufoIndex Philosophy:** [Which aligns better with principles]
-4. **User Experience:** [Which provides better UX]
-5. **Development Speed:** [Which can be implemented faster]
-
-### Final Decision: [Selected approach with rationale]
-### Implementation Plan: [How to implement the selected approach]
-### Agent Reassignment: [How to redirect conflicting agents]
-```
-
-## Quality Standard Disagreements
-**SCENARIO:** Agents have different interpretations of quality requirements
-
-**RESOLUTION PROTOCOL:**
-```markdown
-## Quality Standards Clarification
-**Issue:** [Description of quality standard disagreement]
-**Agents Affected:** [List of agents with different interpretations]
-
-### Standards Clarification
-1. **BufoIndex Philosophy Requirements:** [Definitive statement]
-2. **Technical Requirements:** [Definitive statement]
-3. **Performance Requirements:** [Definitive statement]
-4. **Testing Requirements:** [Definitive statement]
-
-### Updated Agent Instructions
-- [ ] All agents notified of clarified standards
-- [ ] Agent communication files updated
-- [ ] Quality gates updated if necessary
-- [ ] Verification procedures updated
-
-### Compliance Verification
-- [ ] All agents confirm understanding
-- [ ] Implementation aligns with clarified standards
-- [ ] Quality gates validate compliance
-```
-
-## Quality Enforcement Actions
-
-### Yellow Status (⚠️) - Performance Warning
-**Action:** Continue monitoring, require resolution within 30 minutes
-**Escalation:** If not resolved, move to RED status
-
-### Red Status (❌) - Quality Gate Failure  
-**Action:** IMMEDIATE agent suspension
-**Requirements for Resume:**
-1. Agent must fix all quality gate failures
-2. Agent must document root cause analysis
-3. Agent must implement prevention measures
-4. Project manager must verify fixes
-5. All quality gates must pass before resuming
-
-### Critical Status (🚨) - Build Broken
-**Action:** ALL agents immediately suspended
-**Requirements:**
-1. Identify root cause of build failure
-2. Rollback breaking changes if necessary
-3. Fix build issues completely
-4. Verify all quality gates pass
-5. Only resume agents after full system health check
-
-### Multi-Agent Conflict Resolution
-**Trigger:** Agents modifying same files or conflicting implementations
-**Process:**
-1. Pause all conflicting agents immediately
-2. Document the conflict in agent-communication/
-3. Define resolution approach (merge, choose winner, redesign)
-4. Resume agents with clear file ownership boundaries
-5. Test integration after resolution
-
-## Session Failure Recovery Procedures
-**TRIGGER:** Any mandatory success criteria fails verification
-
-### Immediate Actions
-1. **Stop All Agent Work:** No further changes until issues resolved
-2. **Document Failure:** Record what failed and why
-3. **Root Cause Analysis:** Identify why quality processes failed
-4. **Corrective Action Plan:** Define steps to fix issues
-5. **Process Improvement:** Update procedures to prevent recurrence
-
-### Recovery Process Template
-```markdown
-## Session Recovery - [Date]
-**Failure Type:** [Build/Quality/Process failure]
-**Root Cause:** [Detailed analysis of what went wrong]
-**Impact Assessment:** [What systems/features affected]
-
-### Immediate Fixes Required
-1. [Fix 1 - with assigned responsible party]
-2. [Fix 2 - with assigned responsible party]
-3. [Fix 3 - with assigned responsible party]
-
-### Verification Steps
-- [ ] All fixes implemented
-- [ ] All quality gates pass
-- [ ] Integration testing completed
-- [ ] Documentation updated
-- [ ] Process improvements documented
-
-### Prevention Measures
-- [ ] Updated quality procedures
-- [ ] Enhanced agent monitoring
-- [ ] Improved conflict detection
-- [ ] Better success criteria verification
-```
-
-## Agent Quality Monitoring Template
-```markdown
-# REQUIRED: Create agent-communication/quality-monitoring-[date].md
-
-## Agent Quality Monitoring - [Date]
-
-### Active Agents Status
-| Agent | Type | Start Time | Last Check | Quality Status | Blocker |
-|-------|------|------------|------------|----------------|---------|
-| Agent-A | Calculation | 10:00 AM | 10:30 AM | ✅ GREEN | None |
-| Agent-B | Component | 10:05 AM | 10:35 AM | ⚠️ YELLOW | TypeScript errors |
-| Agent-C | Testing | 10:10 AM | 10:40 AM | ❌ RED | Test failures |
-
-### Quality Gate Compliance Matrix
-| Quality Gate | Agent-A | Agent-B | Agent-C | Status |
-|--------------|---------|---------|---------|---------|
-| TypeScript Clean | ✅ | ❌ | ✅ | 2/3 PASS |
-| Build Success | ✅ | ✅ | ❌ | 2/3 PASS |
-| Tests Pass | ✅ | N/A | ❌ | 1/2 PASS |
-| Philosophy Compliant | ✅ | ✅ | ✅ | 3/3 PASS |
-| Performance Benchmarks | ✅ | ⚠️ | N/A | 1/2 PASS |
-
-### Immediate Actions Required
-- [ ] Agent-B: Fix TypeScript compilation errors
-- [ ] Agent-C: Resolve test infrastructure failures
-- [ ] Agent-B: Performance optimization needed
-
-### Integration Risk Assessment
-- **HIGH RISK:** Agent-B and Agent-C both have quality issues
-- **MEDIUM RISK:** Performance concerns may affect user experience
-- **LOW RISK:** Philosophy compliance is maintained
-```
+That's all that's needed. Skip the elaborate templates.

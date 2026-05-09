@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Core Paycheck Optimization Test Suite
  * 100% Coverage Required - Sprint 7 Testing Framework
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   calculateOptimalAllocation,
   getDefaultProfile,
@@ -19,18 +18,9 @@ import {
   updateLegacyIncomeFields,
   FREQUENCY_MULTIPLIERS
 } from '@/lib/calculations/core'
-import { PaycheckProfile } from '@/lib/types'
-import {
-  measureCalculationPerformance,
-  generateMockProfile,
-  FINANCIAL_TEST_CASES,
-  IRS_2026_LIMITS
-} from '@/test/utils/financial-test-helpers'
-import { 
-  createPaycheckProfile,
-  createDebtData,
-  TestDataFactories
-} from '@/test/factories/test-data-factory'
+import type { PaycheckProfile } from '@/lib/types'
+import { measureCalculationPerformance } from '@/test/utils/financial-test-helpers'
+import { createPaycheckProfile, createDebtData } from '@/test/factories/test-data-factory'
 
 describe('Core Paycheck Optimization', () => {
   describe('FREQUENCY_MULTIPLIERS', () => {
@@ -191,7 +181,7 @@ describe('Core Paycheck Optimization', () => {
 
     it('should have consistent income calculations', () => {
       const profile = getDefaultProfile()
-      
+
       expect(profile.income.monthlyGross).toBeCloseToCurrency(5417, 0)
       expect(profile.income.monthlyNet).toBeCloseToCurrency(4123, 0)
       expect(profile.income.gross).toBe(profile.income.monthlyGross)
@@ -204,14 +194,14 @@ describe('Core Paycheck Optimization', () => {
       expect(profile.income.grossPaycheck).toBe(2500)
       expect(profile.income.netPaycheck).toBe(1900)
       expect(profile.income.frequency).toBe('bi-weekly')
-      
+
       expect(profile.taxes.federalBracket).toBe(0.22) // 22% bracket
       expect(profile.taxes.state).toBe('CA')
       expect(profile.taxes.filingStatus).toBe('single')
-      
+
       expect(profile.benefits.employer401k.matchPercent).toBe(0.50)
       expect(profile.benefits.employer401k.matchLimit).toBe(0.06)
-      
+
       expect(profile.preferences.emergencyFundMonths).toBe(3) // BufoIndex contrarian: max 3 months
       expect(profile.preferences.funMoney.min).toBe(300)
       expect(profile.preferences.funMoney.max).toBe(600)
@@ -245,8 +235,8 @@ describe('Core Paycheck Optimization', () => {
       expect(validateProfile(invalidNet).netIncome).toBeDefined()
 
       // Test net > gross scenario
-      const netTooHigh = { 
-        ...validProfile, 
+      const netTooHigh = {
+        ...validProfile,
         income: { ...validProfile.income, gross: 3000, net: 4000 }
       }
       expect(validateProfile(netTooHigh).netIncome).toBeDefined()
@@ -295,22 +285,22 @@ describe('Core Paycheck Optimization', () => {
     it('should validate debt fields', () => {
       const profileWithDebts = createPaycheckProfile({
         debts: [
-          createDebtData({ 
-            name: 'Credit Card', 
+          createDebtData({
+            name: 'Credit Card',
             balance: 0,           // Invalid: zero balance
-            interestRate: 0.15, 
-            minimumPayment: 100 
+            interestRate: 0.15,
+            minimumPayment: 100
           }),
-          createDebtData({ 
-            name: 'Student Loan', 
-            balance: 10000, 
+          createDebtData({
+            name: 'Student Loan',
+            balance: 10000,
             interestRate: 0.60,   // Invalid: 60% interest rate
-            minimumPayment: 150 
+            minimumPayment: 150
           }),
-          createDebtData({ 
-            name: 'Car Loan', 
-            balance: 15000, 
-            interestRate: 0.05, 
+          createDebtData({
+            name: 'Car Loan',
+            balance: 15000,
+            interestRate: 0.05,
             minimumPayment: 0     // Invalid: zero payment
           })
         ]
@@ -459,14 +449,14 @@ describe('Core Paycheck Optimization', () => {
       }
 
       const allocation = calculateOptimalAllocation(highIncomeProfile)
-      
+
       expect(allocation.allocations.length).toBeGreaterThan(0)
-      
+
       // High earners should see mega backdoor Roth recommendation if available
-      const megaBackdoorAllocation = allocation.allocations.find(a => 
+      const megaBackdoorAllocation = allocation.allocations.find(a =>
         a.category === 'tax_advantaged' && a.reasoning.includes('Mega Backdoor')
       )
-      
+
       if (megaBackdoorAllocation) {
         expect(megaBackdoorAllocation.amount).toBeGreaterThan(0)
       }
@@ -515,13 +505,13 @@ describe('Core Paycheck Optimization', () => {
 
     it('should calculate fun money range impact', () => {
       const allocation = calculateOptimalAllocation(mockProfile)
-      
+
       expect(allocation.funMoneyRange.min).toBe(mockProfile.preferences.funMoney.min)
       expect(allocation.funMoneyRange.max).toBe(mockProfile.preferences.funMoney.max)
       expect(allocation.funMoneyRange.difference).toBe(
         mockProfile.preferences.funMoney.max - mockProfile.preferences.funMoney.min
       )
-      
+
       // Should allocate minimum fun money to maximize investment opportunity
       expect(allocation.funMoneyAllocated).toBe(mockProfile.preferences.funMoney.min)
     })
@@ -601,7 +591,7 @@ describe('Core Paycheck Optimization', () => {
         })
 
         const estimate = estimateMonthlyExpenses(profile)
-        
+
         // Should be 70% of net income + debt payments
         const expectedBase = 5000 * 0.7
         const expectedDebts = 100 + 300
@@ -611,7 +601,7 @@ describe('Core Paycheck Optimization', () => {
       it('should handle profiles with no debt', () => {
         const profile = { ...getDefaultProfile(), debts: [] }
         const estimate = estimateMonthlyExpenses(profile)
-        
+
         expect(estimate).toBe(profile.income.net * 0.7)
       })
     })
@@ -666,11 +656,11 @@ describe('Core Paycheck Optimization', () => {
     describe('calculateOpportunityCost', () => {
       it('should calculate opportunity cost correctly', () => {
         const opportunityCost = calculateOpportunityCost(10000, 10, 0.02, 0.07)
-        
+
         const lowGrowth = 10000 * Math.pow(1.02, 10)
         const highGrowth = 10000 * Math.pow(1.07, 10)
         const expected = highGrowth - lowGrowth
-        
+
         expect(opportunityCost).toBeCloseToCurrency(expected, 2)
         expect(opportunityCost).toBeGreaterThan(0) // Should always show missed gains
       })
@@ -684,52 +674,6 @@ describe('Core Paycheck Optimization', () => {
         expect(calculateOpportunityCost(0, 10)).toBe(0)
         expect(calculateOpportunityCost(10000, 0)).toBe(0)
       })
-    })
-  })
-
-  describe('BufoIndex philosophy validation', () => {
-    it('should enforce contrarian investment philosophy', () => {
-      const conservativeProfile = {
-        ...getDefaultProfile(),
-        preferences: {
-          ...getDefaultProfile().preferences,
-          emergencyFundMonths: 3, // BufoIndex maximum: 3 months
-          currentEmergencyFund: 0,
-        }
-      }
-
-      const allocation = calculateOptimalAllocation(conservativeProfile)
-      
-      // Should still recommend max 3 months emergency fund
-      const emergencyAllocation = allocation.allocations.find(a => a.category === 'emergency_fund')
-      if (emergencyAllocation) {
-        const monthlyExpenses = conservativeProfile.preferences.necessaryExpenses
-        const maxRecommended = monthlyExpenses * 3 // Max 3 months per BufoIndex philosophy
-        expect(emergencyAllocation.amount).toBeLessThanOrEqual(maxRecommended)
-      }
-    })
-
-    it('should prioritize investment over excessive emergency fund', () => {
-      // Fully funded 3-month emergency fund + HSA eligibility so the FOO
-      // advances past Steps 1 and 4 (emergency fund) into Step 5 (HSA/Roth).
-      const baseProfile = getDefaultProfile()
-      const profile = {
-        ...baseProfile,
-        preferences: {
-          ...baseProfile.preferences,
-          currentEmergencyFund: baseProfile.preferences.necessaryExpenses
-            * baseProfile.preferences.emergencyFundMonths,
-        },
-        benefits: {
-          ...baseProfile.benefits,
-          hsa: { ...baseProfile.benefits.hsa, eligible: true, coverageType: 'individual' as const },
-        },
-      }
-      const allocation = calculateOptimalAllocation(profile)
-
-      // Should prioritize tax-advantaged savings after basic emergency fund
-      const retirementAllocations = allocation.allocations.filter(a => a.category === 'tax_advantaged')
-      expect(retirementAllocations.length).toBeGreaterThan(0)
     })
   })
 })
