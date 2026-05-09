@@ -647,21 +647,7 @@ function inputsV2(overrides: Partial<RebalanceInputsV2> = {}): RebalanceInputsV2
 }
 
 describe('validateRebalanceInputsV2', () => {
-  it('requires exactly one account in single mode', () => {
-    const errors = validateRebalanceInputsV2(
-      inputsV2({
-        setupMode: 'single',
-        accounts: [
-          account('a1', 'A', 'taxable', 0),
-          account('a2', 'B', 'taxable', 0),
-        ],
-        classTargets: [classTarget(null, 'us-stock', 1)],
-      }),
-    );
-    expect(errors.some(e => e.field === 'setupMode')).toBe(true);
-  });
-
-  it('requires ≥2 accounts in multi-shared mode', () => {
+  it('accepts a single account in multi-shared mode', () => {
     const errors = validateRebalanceInputsV2(
       inputsV2({
         setupMode: 'multi-shared',
@@ -669,18 +655,7 @@ describe('validateRebalanceInputsV2', () => {
         classTargets: [classTarget(null, 'us-stock', 1)],
       }),
     );
-    expect(errors.some(e => e.field === 'setupMode')).toBe(true);
-  });
-
-  it('requires ≥2 accounts in multi-unique mode', () => {
-    const errors = validateRebalanceInputsV2(
-      inputsV2({
-        setupMode: 'multi-unique',
-        accounts: [account('a1', 'Solo', 'taxable', 0)],
-        classTargets: [classTarget('a1', 'us-stock', 1)],
-      }),
-    );
-    expect(errors.some(e => e.field === 'setupMode')).toBe(true);
+    expect(errors.some(e => e.field === 'setupMode')).toBe(false);
   });
 
   it('flags negative deposits', () => {

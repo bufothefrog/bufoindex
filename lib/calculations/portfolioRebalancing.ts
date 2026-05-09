@@ -902,23 +902,6 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
 export function validateRebalanceInputsV2(inputs: RebalanceInputsV2): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  // Setup mode / accounts count
-  if (inputs.setupMode === 'single' && inputs.accounts.length !== 1) {
-    errors.push({
-      field: 'setupMode',
-      message: 'Single mode requires exactly one account.',
-    });
-  }
-  if (
-    (inputs.setupMode === 'multi-shared' || inputs.setupMode === 'multi-unique') &&
-    inputs.accounts.length < 2
-  ) {
-    errors.push({
-      field: 'setupMode',
-      message: 'Multi-account modes require at least two accounts.',
-    });
-  }
-
   // Account fields
   inputs.accounts.forEach((a, i) => {
     if (a.deposit < 0) {
