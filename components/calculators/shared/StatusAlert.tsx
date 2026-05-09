@@ -35,7 +35,7 @@ export function StatusAlert({
     >
       <div className="flex items-start space-x-2">
         {Icon && (
-          <Icon className={cn('w-4 h-4 mt-0.5 flex-shrink-0', variantText[variant])} />
+          <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', variantText[variant])} />
         )}
         <div className="min-w-0">
           {title && (

@@ -36,7 +36,7 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
             <select
               value={income.frequency}
               onChange={(e) => onUpdate({ frequency: e.target.value as 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly' })}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 dark:focus-visible:ring-sage-600 focus-visible:ring-offset-2 hover:border-sage-300 dark:hover:border-sage-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 dark:focus-visible:ring-sage-600 focus-visible:ring-offset-2 hover:border-sage-300 dark:hover:border-sage-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
             >
               <option value="weekly">Weekly</option>
               <option value="bi-weekly">Bi-Weekly</option>
@@ -82,7 +82,7 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
                 <select
                   value={income.bonusFrequency}
                   onChange={(e) => onUpdate({ bonusFrequency: e.target.value as 'quarterly' | 'annual' | 'irregular' })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 dark:focus-visible:ring-sage-600 focus-visible:ring-offset-2 hover:border-sage-300 dark:hover:border-sage-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 dark:focus-visible:ring-sage-600 focus-visible:ring-offset-2 hover:border-sage-300 dark:hover:border-sage-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                 >
                   <option value="quarterly">Quarterly</option>
                   <option value="annual">Annual</option>

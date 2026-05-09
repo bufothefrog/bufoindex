@@ -201,7 +201,7 @@ export function PercentInput({
           className={cn(
             sizeClasses[size],
             "text-right font-mono tabular-nums",
-            "focus:outline-none" // BaseInput handles focus styles
+            "focus:outline-hidden" // BaseInput handles focus styles
           )}
         />
         <span className={cn(

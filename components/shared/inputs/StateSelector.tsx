@@ -256,7 +256,7 @@ export function StateSelector({
           placeholder={placeholder}
           className={cn(
             "w-full h-10 pl-10 pr-10 py-2 border border-input bg-background rounded-md text-sm",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
+            "focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring",
             "hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
             error && "border-destructive focus-visible:ring-destructive"
           )}
@@ -275,7 +275,7 @@ export function StateSelector({
 
       {isOpen && (
         <div
-          className="absolute w-full mt-1 bg-popover border border-border rounded shadow-lg max-h-60 overflow-auto z-[9999]"
+          className="absolute w-full mt-1 bg-popover border border-border rounded shadow-lg max-h-60 overflow-auto z-9999"
           onMouseDown={(e) => {
             // Prevent input blur when clicking dropdown
             e.preventDefault();
@@ -288,7 +288,7 @@ export function StateSelector({
                   key={state.code}
                   type="button"
                   className={cn(
-                    "w-full px-3 py-2 text-left text-sm hover:bg-sage-50 focus:bg-sage-50 focus:outline-none flex items-center justify-between transition-colors",
+                    "w-full px-3 py-2 text-left text-sm hover:bg-sage-50 focus:bg-sage-50 focus:outline-hidden flex items-center justify-between transition-colors",
                     index === highlightedIndex && "bg-sage-100",
                     selectedState?.code === state.code && "bg-sage-200 text-sage-900 font-medium"
                   )}

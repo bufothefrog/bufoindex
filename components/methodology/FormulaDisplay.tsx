@@ -241,7 +241,7 @@ export function FormulaDisplay({
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   {formula.assumptions.map((assumption, index) => (
                     <li key={index} className="flex items-start">
-                      <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground mt-1.5 mr-2 flex-shrink-0"></span>
+                      <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground mt-1.5 mr-2 shrink-0"></span>
                       {assumption}
                     </li>
                   ))}
@@ -271,7 +271,7 @@ export function FormulaDisplay({
                 <ul className="space-y-1 text-sm text-orange-600">
                   {formula.limitations.map((limitation, index) => (
                     <li key={index} className="flex items-start">
-                      <span className="inline-block w-2 h-2 rounded-full bg-orange-600 mt-1.5 mr-2 flex-shrink-0"></span>
+                      <span className="inline-block w-2 h-2 rounded-full bg-orange-600 mt-1.5 mr-2 shrink-0"></span>
                       {limitation}
                     </li>
                   ))}

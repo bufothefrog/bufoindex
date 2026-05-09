@@ -180,7 +180,7 @@ export function MethodologyLayout({
               placeholder="Search formulas, variables, or concepts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring"
             />
           </div>
 
@@ -190,7 +190,7 @@ export function MethodologyLayout({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value as FormulaCategory | 'all')}
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+              className="border rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring"
             >
               <option value="all">All Categories</option>
               {Object.entries(CATEGORY_INFO)

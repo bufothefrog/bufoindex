@@ -52,7 +52,7 @@ export function WealthGoalSelector({ value, onChange, className }: WealthGoalSel
               onClick={() => onChange(goal.type)}
               className={cn(
                 "relative p-3 border rounded-lg text-left transition-all text-xs",
-                "hover:bg-sage-50 dark:hover:bg-sage-900/50 focus:outline-none focus:ring-2 focus:ring-sage-500",
+                "hover:bg-sage-50 dark:hover:bg-sage-900/50 focus:outline-hidden focus:ring-2 focus:ring-sage-500",
                 isSelected 
                   ? "border-sage-500 bg-sage-50 dark:bg-sage-900/50 text-sage-900 dark:text-sage-100" 
                   : "border-border bg-card text-foreground"

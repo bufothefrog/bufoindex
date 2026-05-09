@@ -160,11 +160,11 @@ export function BaseCard({
  */
 function getGradientClasses(color: ComponentColor): string {
   const gradients = {
-    sage: 'bg-gradient-to-r from-sage-50 to-sage-100 dark:from-sage-800 dark:to-sage-700 border-sage-200 dark:border-sage-600',
-    success: 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-800 dark:to-emerald-800 border-green-200 dark:border-green-600',
-    warning: 'bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-800 dark:to-yellow-800 border-orange-200 dark:border-orange-600',
-    error: 'bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-800 dark:to-rose-800 border-red-200 dark:border-red-600',
-    info: 'bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-800 dark:to-sky-800 border-blue-200 dark:border-blue-600'
+    sage: 'bg-linear-to-r from-sage-50 to-sage-100 dark:from-sage-800 dark:to-sage-700 border-sage-200 dark:border-sage-600',
+    success: 'bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-800 dark:to-emerald-800 border-green-200 dark:border-green-600',
+    warning: 'bg-linear-to-r from-orange-50 to-yellow-50 dark:from-orange-800 dark:to-yellow-800 border-orange-200 dark:border-orange-600',
+    error: 'bg-linear-to-r from-red-50 to-rose-50 dark:from-red-800 dark:to-rose-800 border-red-200 dark:border-red-600',
+    info: 'bg-linear-to-r from-blue-50 to-sky-50 dark:from-blue-800 dark:to-sky-800 border-blue-200 dark:border-blue-600'
   };
   
   return gradients[color];

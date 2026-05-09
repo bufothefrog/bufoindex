@@ -73,7 +73,7 @@ export function TabPanel({
       className={`
         ${active ? 'block' : 'hidden'}
         ${className}
-        focus:outline-none
+        focus:outline-hidden
       `}
       tabIndex={active ? 0 : -1}
     >

@@ -117,7 +117,7 @@ export function FormulaCategory({
                 placeholder="Search formulas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-background/70 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                className="w-full pl-10 pr-3 py-2 bg-background/70 border border-border rounded-md focus:outline-hidden focus:ring-2 focus:ring-ring placeholder-muted-foreground"
               />
             </div>
             
@@ -126,7 +126,7 @@ export function FormulaCategory({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'name' | 'complexity')}
-                className="bg-background/70 border border-border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="bg-background/70 border border-border rounded-md px-2 py-1 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
               >
                 <option value="name">Sort by Name</option>
                 <option value="complexity">Sort by Complexity</option>

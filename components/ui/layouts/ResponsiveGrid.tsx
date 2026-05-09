@@ -129,7 +129,7 @@ export function EmptyStateSection({
 }: EmptyStateSectionProps) {
   return (
     <div className={cn("lg:col-span-1", className)}>
-      <div className="h-full bg-card border border-border rounded-lg shadow-sm">
+      <div className="h-full bg-card border border-border rounded-lg shadow-xs">
         <div className="p-8 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
           {Icon && (
             <div className="w-20 h-20 bg-sage-100 rounded-full flex items-center justify-center mb-6">

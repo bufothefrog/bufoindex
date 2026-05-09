@@ -81,7 +81,7 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
           data-testid="tax-event-warning"
           className="flex items-start gap-3 rounded-lg border border-orange-300 bg-orange-50 dark:border-orange-600 dark:bg-orange-900/30 p-3 text-sm"
         >
-          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-600 dark:text-orange-300" />
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-orange-600 dark:text-orange-300" />
           <div className="text-orange-800 dark:text-orange-100">
             This plan sells {formatCurrency(taxEventDollars)} in taxable accounts.
             Review your cost basis to estimate the tax impact.
@@ -131,7 +131,7 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
                 {formatPercentPoints(totalDriftBefore)}
               </div>
             </div>
-            <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+            <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
             <div className="text-right">
               <div className="text-sm text-muted-foreground">Total drift after</div>
               <div className="text-xl font-mono tabular-nums text-sage-600 dark:text-sage-300">

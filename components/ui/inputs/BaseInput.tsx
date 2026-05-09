@@ -61,7 +61,7 @@ export function BaseInput({
                 'aria-invalid': hasError,
                 className: cn(
                   "w-full border bg-background rounded-md text-sm transition-colors",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
+                  "focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring",
                   hasError
                     ? "border-destructive focus:border-destructive focus:ring-destructive/20"
                     : "border-input hover:border-ring/50",
