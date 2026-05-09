@@ -1,22 +1,38 @@
 # BufoIndex Developer Guide
 
-BufoIndex is a personal-finance calculator suite. Stack: **Next.js 16 (App Router) + React 18 + TypeScript + Tailwind CSS + Vitest**. Calculators live under `app/tools/`, financial logic under `lib/calculations/`, shared UI under `components/`. The app is deployed to Vercel — there is no static-site generator and no GitHub Pages deploy.
+BufoIndex is a personal-finance calculator suite. Stack: **Next.js 16 (App Router) + React 19 + TypeScript 6 + Tailwind CSS 4 + Vitest 4**. Calculators live under `app/tools/`, financial logic under `lib/calculations/`, shared UI under `components/`. The app is deployed to Vercel — there is no static-site generator and no GitHub Pages deploy.
 
 For multi-agent or repo-process notes, see `docs/agents.md`.
+
+## What this project is
+
+Interactive calculators for people who want to pressure-test financial decisions with math instead of folk wisdom. The audience is comfortable with percentages, opportunity cost, and tax-bracket reasoning. The tone is sober and quantitative; calculators show their work.
+
+Current calculators:
+- **Paycheck Allocator** (`app/tools/paycheck-allocator/`) — monthly allocation across fixed costs, tax-advantaged accounts, and flex spending.
+- **Retirement Calculator** (`app/tools/retirement-calculator/`) — Monte Carlo retirement modeling with Social Security, healthcare, and scenario comparison.
+- **Portfolio Rebalancer** (`app/tools/portfolio-rebalancing-calculator/`) — multi-account rebalancing with custom asset classes and placement advice.
+
+State is held client-side; URLs encode scenarios via compressed hash state so they're shareable without a backend.
 
 ## Project layout
 
 ```
 app/                     # Next.js App Router routes
-  tools/                 # Calculator pages (paycheck-allocator, retirement-calculator, ...)
+  tools/                 # Calculator pages (paycheck-allocator, retirement-calculator,
+                         #   portfolio-rebalancing-calculator)
   demo/                  # Component gallery (dev only)
 components/
-  ui/                    # Primitive UI: button, card, input, slider, ThemeToggle
-  shared/                # Cross-cutting UI: Navigation, Tooltip, inputs/, layout/, cards/
+  ui/                    # Primitives: button, card, input, slider, ThemeToggle,
+                         #   inputs/ (BaseInput, EnhancedMoneyInput, PercentInput,
+                         #   NumberInput, TickerCombobox), cards/ (BaseCard +
+                         #   InputCard/ResultCard/SummaryCard), layouts/
+  shared/                # Cross-cutting UI: Navigation, Tooltip, UtilityBar,
+                         #   inputs/, layout/, cards/
   charts/                # Recharts wrappers; must use getChartTheme()
-  calculators/, retirement/, calculator/, methodology/, examples/
+  calculator/, calculators/, retirement/, methodology/, examples/
 lib/
-  calculations/          # Pure financial logic (retirement, monte-carlo, optimization, ...)
+  calculations/          # Pure financial logic (retirement, monte-carlo, optimization, …)
   formulas/, constants/, store/, types/, utils/
   chart-theme.ts         # Theme-aware chart colors
   design-system/, demo/
@@ -47,11 +63,14 @@ The `/demo` page is the visual catalog of every reusable component. Skim it befo
 
 ### Component hierarchy (use the highest level that fits)
 
-1. **Primitives** — `@/components/ui/*` (`Button`, `Input`, `Card`, `Slider`, `EnhancedMoneyInput`, `PercentInput`, `NumberInput`, `InputCard`, `ResultCard`, `SummaryCard`)
-2. **Specialized inputs** — `@/components/shared/inputs/*` (`StateSelector`, `SelectInput`, `MoneyInput`, `PercentageInput`, `BenefitsSelector`, `DebtInput`)
+1. **Primitives** — `@/components/ui/*`
+   - `button`, `card`, `input`, `slider`, `ThemeToggle`
+   - `inputs/`: `BaseInput`, `EnhancedMoneyInput` (re-exported as `MoneyInput`), `PercentInput`, `NumberInput`, `TickerCombobox`
+   - `cards/`: `BaseCard`, `InputCard`, `ResultCard`, `SummaryCard`
+2. **Specialized inputs** — `@/components/shared/inputs/*` (`StateSelector`, `SelectInput`, `MoneyInput`, `NumberInput`, `PercentageSlider`, `BenefitsSelector`, `DebtInput`)
 3. **Charts** — `@/components/charts/*` (`RetirementCharts`, `NetWorthProgression`, `WithdrawalTimeline`, `ScenarioComparisonChart`). Charts MUST call `getChartTheme()` from `@/lib/chart-theme` so they adapt to light/dark mode.
 4. **Interactive** — `Tooltip` + `HELP_TOOLTIPS` from `@/components/shared/Tooltip`, `CalculatorTabs` + `TabPanel` from `@/components/calculators/shared/CalculatorTabs`, `ThemeToggle` from `@/components/ui/ThemeToggle`.
-5. **Layouts** — `@/components/ui/layouts/CalculatorLayout` (`CalculatorLayout`, `SimpleCalculatorLayout`, `AdvancedCalculatorLayout`) and `@/components/shared/layout/*` (`InputRow`, `FieldGroup`, `ResponsiveGrid`).
+5. **Layouts** — `@/components/ui/layouts/*` (`CalculatorLayout`, `SimpleCalculatorLayout`, `AdvancedCalculatorLayout`, `ComparisonCalculatorLayout`, `ResponsiveGrid`, `InputSection`, `ResultSection`) and `@/components/shared/layout/*` (`InputRow`, `FieldGroup`).
 
 ### Theming — non-negotiable
 
@@ -79,6 +98,8 @@ const chartTheme = getChartTheme();
 
 The sage scale (`sage-50`–`sage-900`) is the brand palette and has light/dark variants.
 
+Tailwind 4 is configured via `@tailwindcss/postcss`; theme tokens live in `app/globals.css` (`@theme`) rather than a separate `tailwind.config.js`.
+
 ### Before adding a component
 
 1. Check `/demo` — does this already exist?
@@ -88,7 +109,7 @@ The sage scale (`sage-50`–`sage-900`) is the brand palette and has light/dark 
 
 ### Forbidden
 
-- Hardcoded color literals (`#fff`, `bg-blue-500`, `text-gray-600`, ...).
+- Hardcoded color literals (`#fff`, `bg-blue-500`, `text-gray-600`, …).
 - Charts without `getChartTheme()`.
 - Custom CSS when a Tailwind utility exists.
 - Duplicate components — extend or compose existing ones.
@@ -96,13 +117,14 @@ The sage scale (`sage-50`–`sage-900`) is the brand palette and has light/dark 
 ## Where things live
 
 - **Financial logic:** `lib/calculations/` (pure TS, no React). Each module has a matching `test/lib/calculations/*.test.ts`.
-- **Shared mock builders:** `test/factories/test-data-factory.ts`. Three test files depend on it; if you change a factory signature, update all callers.
+- **Shared mock builders:** `test/factories/test-data-factory.ts`. Multiple test files depend on it; if you change a factory signature, update all callers.
 - **Constants / types:** `lib/constants/`, `lib/types/`.
 - **Path alias:** `@/` maps to repo root (see `tsconfig.json` and `vitest.config.ts`).
 
 ## Conventions
 
 - TypeScript strict; no `any` unless justified inline.
-- Pure functions in `lib/calculations/`; keep React out of them.
+- Pure functions in `lib/calculations/`; keep React, the DOM, and storage out of them so they stay easy to test.
 - Components: typed props, named export of the type, default export of the component.
 - Prefer composition over new abstractions. If a component already exists in `/demo`, use it.
+- No editorial copy in calculators that asserts a single "right answer." Show the math; let the reader judge.

@@ -1,122 +1,60 @@
-# BufoIndex - Personal Finance Optimization Platform
+# BufoIndex
 
-**For Those Who Want Financial Control, Not Financial Comfort**
+Interactive personal-finance calculators for people who'd rather pressure-test decisions with math than rely on folk wisdom. Everything runs in the browser; scenarios are sharable via URL hash and no data leaves your machine.
 
-A modern Next.js application providing interactive financial calculators that challenge conventional wisdom with math-driven strategies for aggressive wealth accumulation.
+## Calculators
 
-## 🚀 Features
+- **Paycheck Allocator** (`/tools/paycheck-allocator`) — monthly allocation across fixed costs, tax-advantaged accounts, and flex spending, with bracket-aware tax modeling.
+- **Retirement Calculator** (`/tools/retirement-calculator`) — Monte Carlo retirement modeling with Social Security, healthcare, and side-by-side scenario comparison.
+- **Portfolio Rebalancer** (`/tools/portfolio-rebalancing-calculator`) — multi-account rebalancing with custom asset classes and tax-aware placement advice.
 
-### **Paycheck Allocator**
-- Smart monthly allocation optimization
-- Tax bracket optimization
-- Account prioritization algorithm  
-- Contrarian recommendations (emergency fund, debt strategy)
-- Real-time calculation with instant results
-- URL sharing via compressed hash state
+## Stack
 
-### **Retirement Calculator**  
-- Comprehensive retirement planning
-- Monte Carlo simulations for success probability
-- Multiple retirement age scenarios
-- Social Security benefit calculations
-- Healthcare cost modeling
-- Interactive visualizations
-- URL sharing for scenario planning
+- **Framework:** Next.js 16 (App Router) on Vercel
+- **Language:** TypeScript 6 (strict)
+- **UI:** React 19 + Tailwind CSS 4
+- **State:** Zustand
+- **Charts:** Recharts 3
+- **Tests:** Vitest 4 + Testing Library + jsdom
 
-## 🛠 Technology Stack
+## Getting started
 
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript for type safety
-- **Styling**: Tailwind CSS with shadcn/ui components
-- **State Management**: Zustand
-- **Charts**: Chart.js with react-chartjs-2
-- **Deployment**: Vercel
-
-## 🏗 Architecture
-
-```
-site-rework/
-├── app/                          # Next.js App Router
-│   ├── globals.css
-│   ├── layout.tsx               # Root layout
-│   ├── page.tsx                 # Homepage
-│   └── tools/
-│       ├── paycheck-allocator/
-│       └── retirement-calculator/
-├── components/
-│   ├── calculator/              # Paycheck allocator components
-│   ├── retirement/              # Retirement calculator components
-│   ├── shared/                  # Reusable components
-│   └── ui/                      # shadcn/ui components
-├── lib/
-│   ├── calculations/            # Calculation engines
-│   ├── constants/               # Financial constants
-│   ├── types/                   # TypeScript definitions
-│   └── utils/                   # Helper functions
-└── hooks/                       # Custom React hooks
-```
-
-## 🎯 Key Principles
-
-1. **Transparency** - Show actual strategies being used
-2. **Sophistication** - Go beyond basic financial advice  
-3. **Accessibility** - Explain complex concepts clearly
-4. **Practicality** - Focus on actionable strategies
-5. **Optimization** - Mathematical over emotional decisions
-
-## 💻 Development
-
-### Prerequisites
-- Node.js 18+ 
-- npm
-
-### Setup
 ```bash
 npm install
-npm run dev
+npm run dev   # http://localhost:3000
 ```
 
-Visit `http://localhost:3000` to see the application.
+## Scripts
 
-### Build
-```bash
-npm run build
-npm start
+| Script              | What it does                                    |
+| ------------------- | ----------------------------------------------- |
+| `npm run dev`       | Next.js dev server                              |
+| `npm run build`     | Production build                                |
+| `npm run start`     | Run the production build locally                |
+| `npm run lint`      | ESLint                                          |
+| `npm run type-check`| `tsc --noEmit`                                  |
+| `npm run test`      | Vitest watch                                    |
+| `npm run test:run`  | Vitest one-shot                                 |
+| `npm run test:coverage` | Vitest + v8 coverage                        |
+
+Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI runs type-check, lint, tests, coverage, and a production build.
+
+## Project layout
+
+```
+app/                     # Next.js App Router routes
+  tools/                 # Calculator pages
+  demo/                  # Component gallery (dev only)
+components/              # ui/ primitives, shared/ cross-cutting, charts/, calculator-specific
+lib/
+  calculations/          # Pure financial logic (no React)
+  chart-theme.ts         # Theme-aware chart colors
+  constants/, types/, utils/, store/, formulas/, design-system/
+test/                    # Vitest tests + factories + setup
 ```
 
-## 📱 Features
+For contributor conventions and the design-system rules, see [`CLAUDE.md`](./CLAUDE.md). For multi-agent / process notes, see [`docs/agents.md`](./docs/agents.md).
 
-### **URL State Sharing**
-Both calculators support sharing scenarios via compressed URL hashes:
-- Automatic URL updates as you change inputs
-- Share button copies shareable link
-- Bookmarkable scenarios
-- No data transmission - complete client-side privacy
-
-### **Mobile Optimized**
-- Touch-friendly interfaces
-- Responsive design
-- Progressive enhancement
-- Works without JavaScript frameworks
-
-### **Contrarian Insights**
-- Challenge conventional "safe" financial advice
-- Show opportunity costs of conservative strategies
-- Mathematical optimization over emotional comfort
-- Educational explanations for non-traditional recommendations
-
-## 🚀 Deployment
-
-Optimized for Vercel deployment with:
-- Static generation for performance
-- CDN delivery
-- Automatic HTTPS
-- Custom domain support
-
-## 📄 License
+## License
 
 Educational use only. Not financial advice.
-
----
-
-*Built for financial optimizers who want control, not comfort.*
