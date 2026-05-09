@@ -1318,16 +1318,19 @@ export function DemoClient() {
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                    label={({ payload }) => {
+                      const item = payload as AssetAllocationData | undefined;
+                      return item ? `${item.name}: ${item.percentage}%` : '';
+                    }}
                   >
                     {assetAllocationData.map((entry: AssetAllocationData, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string) => [
-                      `$${value.toLocaleString()}`,
-                      name
+                    formatter={(value, name) => [
+                      `$${Number(value).toLocaleString()}`,
+                      String(name)
                     ]}
                   />
                   <Legend />
