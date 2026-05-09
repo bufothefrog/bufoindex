@@ -230,7 +230,7 @@ export function decodeFromUrlHash(hash: string): unknown | null {
  */
 function compressCalculatorData(data: unknown): unknown {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { profile, result } = data as { profile?: Record<string, any>; result?: unknown; }
+  const { profile } = data as { profile?: Record<string, any> }
   
   // Only include non-default values
   const compressed: Record<string, unknown> = {

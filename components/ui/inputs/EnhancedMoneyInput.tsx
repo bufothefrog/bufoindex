@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn, formatCurrency, formatNumberWithCommas } from '@/lib/utils';
 import { BaseInput } from './BaseInput';
-import { BaseInputProps, FormatOptions } from '@/lib/design-system/types';
+import { BaseInputProps } from '@/lib/design-system/types';
 import { DollarSign } from 'lucide-react';
 
 interface EnhancedMoneyInputProps extends BaseInputProps {

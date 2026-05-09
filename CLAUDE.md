@@ -67,7 +67,7 @@ The `/demo` page is the visual catalog of every reusable component. Skim it befo
    - `button`, `card`, `input`, `slider`, `ThemeToggle`
    - `inputs/`: `BaseInput`, `EnhancedMoneyInput` (re-exported as `MoneyInput`), `PercentInput`, `NumberInput`, `TickerCombobox`
    - `cards/`: `BaseCard`, `InputCard`, `ResultCard`, `SummaryCard`
-2. **Specialized inputs** — `@/components/shared/inputs/*` (`StateSelector`, `SelectInput`, `MoneyInput`, `NumberInput`, `PercentageSlider`, `BenefitsSelector`, `DebtInput`)
+2. **Specialized inputs** — `@/components/shared/inputs/*` (`StateSelector`, `SelectInput`, `MoneyInput`, `NumberInput`, `PercentageSlider`, `DebtInput`)
 3. **Charts** — `@/components/charts/*` (`RetirementCharts`, `NetWorthProgression`, `WithdrawalTimeline`, `ScenarioComparisonChart`). Charts MUST call `getChartTheme()` from `@/lib/chart-theme` so they adapt to light/dark mode.
 4. **Interactive** — `Tooltip` + `HELP_TOOLTIPS` from `@/components/shared/Tooltip`, `CalculatorTabs` + `TabPanel` from `@/components/calculators/shared/CalculatorTabs`, `ThemeToggle` from `@/components/ui/ThemeToggle`.
 5. **Layouts** — `@/components/ui/layouts/*` (`CalculatorLayout`, `SimpleCalculatorLayout`, `AdvancedCalculatorLayout`, `ComparisonCalculatorLayout`, `ResponsiveGrid`, `InputSection`, `ResultSection`) and `@/components/shared/layout/*` (`InputRow`, `FieldGroup`).

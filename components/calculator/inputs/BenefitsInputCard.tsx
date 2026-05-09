@@ -6,15 +6,14 @@ import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
 import { PercentageSlider } from '@/components/shared/inputs/PercentageSlider';
 import { Building } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import type { BenefitsData, IncomeData } from '@/lib/types';
+import type { BenefitsData } from '@/lib/types';
 
 interface BenefitsInputCardProps {
   benefits: BenefitsData;
-  income: IncomeData;
   onUpdate: (benefits: Partial<BenefitsData>) => void;
 }
 
-export function BenefitsInputCard({ benefits, income, onUpdate }: BenefitsInputCardProps) {
+export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps) {
   return (
     <Card>
       <CardHeader>

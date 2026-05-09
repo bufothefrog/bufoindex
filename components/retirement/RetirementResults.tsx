@@ -28,16 +28,9 @@ interface RetirementResultsProps {
 export function RetirementResults({ inputs, results, onShare }: RetirementResultsProps) {
   const [showCharts, setShowCharts] = useState(false);
   const [showDetailedInsights, setShowDetailedInsights] = useState(false);
-  const [renderTime, setRenderTime] = useState<number | null>(null);
 
   // Calculate scenario analysis
-  const scenarioAnalysis = useMemo(() => {
-    const start = performance.now();
-    const analysis = analyzeRetirementScenarios(inputs);
-    const end = performance.now();
-    setRenderTime(end - start);
-    return analysis;
-  }, [inputs]);
+  const scenarioAnalysis = useMemo(() => analyzeRetirementScenarios(inputs), [inputs]);
 
   // Calculate inflation-adjusted values for insights
   const inflationAdjustedValues = useMemo(() => {
@@ -101,13 +94,6 @@ export function RetirementResults({ inputs, results, onShare }: RetirementResult
               <div className="text-sm text-muted-foreground">Projected Annual Income</div>
             </div>
           </div>
-
-          {/* Performance indicator */}
-          {renderTime && (
-            <div className="text-xs text-slate-500 text-center font-mono tabular-nums">
-              Analysis completed in {renderTime.toFixed(1)}ms
-            </div>
-          )}
         </div>
       </InputCard>
 

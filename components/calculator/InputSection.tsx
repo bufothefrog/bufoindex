@@ -37,7 +37,6 @@ export function InputSection() {
       <TaxInputCard taxes={profile.taxes} onUpdate={updateTaxes} />
       <BenefitsInputCard
         benefits={profile.benefits}
-        income={profile.income}
         onUpdate={updateBenefits}
       />
       <DebtsInputCard

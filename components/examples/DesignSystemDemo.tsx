@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
 import { StateSelector } from '@/components/shared/inputs/StateSelector';
-import { User, DollarSign, MapPin, Calculator, TrendingUp, Loader2 } from 'lucide-react';
+import { User, DollarSign, Calculator, TrendingUp, Loader2 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { AllocationResult } from '@/lib/types';
 

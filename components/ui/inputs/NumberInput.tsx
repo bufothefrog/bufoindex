@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { BaseInput } from './BaseInput';
-import { BaseInputProps, FormatOptions } from '@/lib/design-system/types';
+import { BaseInputProps } from '@/lib/design-system/types';
 
 interface NumberInputProps extends BaseInputProps {
   value: number;

@@ -124,9 +124,8 @@ function calculateInflationBreakeven(inputs: RetirementInputs, yearsToRetirement
     additionalMonthlySavings = additionalCorpusNeeded / monthsToRetirement;
   }
   
-  const currentSavingsRate = (inputs.monthlySavings * 12) / inputs.currentIncome;
   const additionalSavingsRate = (additionalMonthlySavings * 12) / inputs.currentIncome;
-  
+
   return {
     investmentReturnNeeded,
     savingsRateAdjustment: additionalSavingsRate
@@ -168,29 +167,6 @@ export function calculatePurchasingPowerEquivalent(
   years: number
 ): number {
   return futureAmount / Math.pow(1 + inflationRate, years);
-}
-
-/**
- * Calculate inflation-protected savings requirement
- */
-export function calculateInflationProtectedSavings(
-  targetRealIncome: number,
-  currentAge: number,
-  retirementAge: number,
-  inflationRate: number,
-  realReturn: number
-): number {
-  const yearsToRetirement = retirementAge - currentAge;
-  
-  // Calculate nominal income needed at retirement
-  const nominalIncomeAtRetirement = targetRealIncome * Math.pow(1 + inflationRate, yearsToRetirement);
-  
-  // Calculate corpus needed for inflation-protected withdrawals
-  // This accounts for the fact that withdrawals need to increase with inflation
-  const realWithdrawalRate = 0.04; // Assuming 4% real withdrawal rate
-  const corpusNeeded = nominalIncomeAtRetirement / realWithdrawalRate;
-  
-  return corpusNeeded;
 }
 
 /**

@@ -55,7 +55,7 @@ export function MiniCalculator({
       // This is a simplified calculation engine
       // In production, you'd want to integrate with the actual formula functions
       return calculateFormulaResult(formula, inputs);
-    } catch (error) {
+    } catch {
       return null;
     }
   }, [formula, inputs]);

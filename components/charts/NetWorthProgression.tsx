@@ -14,7 +14,7 @@ import {
   Legend,
 } from 'recharts';
 import { RetirementInputs, RetirementResults, calculateProjectedBalance } from '@/lib/calculations/retirement';
-import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 
 export interface NetWorthData {
   age: number;
@@ -45,14 +45,11 @@ export function NetWorthProgression({
   responsive = true 
 }: NetWorthProgressionProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-  const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
-  const sageVariants = getSageVariants();
 
   // Subscribe to theme changes
   useEffect(() => {
     const unsubscribe = subscribeToThemeChanges(() => {
       setChartTheme(getChartTheme());
-      setRechartsTheme(getRechartsTheme());
     });
     return unsubscribe;
   }, []);

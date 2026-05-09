@@ -40,9 +40,6 @@ export function PercentageSlider({
   
   // If specific options are provided, use discrete values
   if (options) {
-    const currentIndex = options.findIndex(option => Math.abs(option - value) < 0.001);
-    const selectedIndex = currentIndex >= 0 ? currentIndex : 0;
-    
     return (
       <div className={cn("space-y-3", className)}>
         <div className="flex items-center justify-between">

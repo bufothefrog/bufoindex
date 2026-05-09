@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   BookOpen, 
   Calculator, 
@@ -21,7 +21,6 @@ import { FormulaRegistryEntry, FormulaCategory } from '@/lib/formulas/types';
 import { FormulaCategory as FormulaCategoryComponent, CategorySummary } from './FormulaCategory';
 
 export interface MethodologyLayoutProps {
-  calculatorName: string;
   title: string;
   description?: string;
   formulas: {
@@ -51,7 +50,6 @@ const CATEGORY_INFO: Record<FormulaCategory, { title: string; order: number }> =
 };
 
 export function MethodologyLayout({
-  calculatorName,
   title,
   description,
   formulas,

@@ -13,7 +13,7 @@ import {
   ComposedChart,
 } from 'recharts';
 import { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
-import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 
 export interface WithdrawalData {
   age: number;
@@ -44,14 +44,11 @@ export function WithdrawalTimeline({
   responsive = true 
 }: WithdrawalTimelineProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-  const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
-  const sageVariants = getSageVariants();
 
   // Subscribe to theme changes
   useEffect(() => {
     const unsubscribe = subscribeToThemeChanges(() => {
       setChartTheme(getChartTheme());
-      setRechartsTheme(getRechartsTheme());
     });
     return unsubscribe;
   }, []);

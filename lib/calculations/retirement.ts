@@ -55,20 +55,6 @@ function calculateTDFReturnForAge(age: number): number {
   return (allocation.stocks * stockReturn) + (allocation.bonds * bondReturn);
 }
 
-/**
- * Calculate TDF blended volatility for a specific age
- */
-function calculateTDFVolatilityForAge(age: number): number {
-  const allocation = calculateTDFAllocation(age);
-  const stockVolatility = 0.18; // 18% stock volatility
-  const bondVolatility = 0.06; // 6% bond volatility
-  
-  return Math.sqrt(
-    Math.pow(allocation.stocks * stockVolatility, 2) + 
-    Math.pow(allocation.bonds * bondVolatility, 2)
-  );
-}
-
 export type IncomePeriod = 'hourly' | 'biweekly' | 'semimonthly' | 'monthly' | 'yearly';
 
 export const INCOME_PERIOD_MULTIPLIERS: Record<IncomePeriod, number> = {
@@ -827,14 +813,6 @@ function generateSophisticatedScenarios(
 }
 
 /**
- * Find the earliest retirement age possible with current plan
- */
-function findEarlierRetirementAge(inputs: RetirementInputs): number {
-  const projectedBalance = calculateProjectedBalance(inputs);
-  return findEarlierRetirementAgeWithBalance(projectedBalance, inputs.targetIncome, inputs);
-}
-
-/**
  * Find earliest retirement age given a specific balance
  */
 function findEarlierRetirementAgeWithBalance(balance: number, targetIncome: number, inputs?: RetirementInputs): number {
@@ -905,38 +883,3 @@ function calculateMinimumSavingsNeeded(inputs: RetirementInputs, requiredBalance
   return Math.min(requiredMonthlySavings, maxReasonableSavings);
 }
 
-/**
- * Calculate halfway savings between current +500 and full amount needed
- */
-function calculateHalfwaySavings(inputs: RetirementInputs, requiredBalance: number): number {
-  const fullAmountNeeded = calculateMinimumSavingsNeeded(inputs, requiredBalance);
-  const currentSavings = inputs.monthlySavings;
-  const plus500 = currentSavings + 500;
-  
-  // Find retirement age with +$500/month
-  const plus500Inputs = { ...inputs, monthlySavings: plus500 };
-  const plus500Balance = calculateProjectedBalance(plus500Inputs);
-  
-  if (plus500Balance >= requiredBalance) {
-    // +$500 is enough, so halfway is between current and +$500
-    return currentSavings + 250;
-  }
-  
-  // Halfway between +$500 and full amount needed
-  const additionalNeeded = fullAmountNeeded - currentSavings;
-  const halfwayAdditional = (500 + additionalNeeded) / 2;
-  return Math.round(halfwayAdditional);
-}
-
-/**
- * Apply conservative assumptions for risk management scenarios
- */
-function applyConservativeAssumptions(inputs: RetirementInputs): RetirementInputs {
-  return {
-    ...inputs,
-    accumulationReturn: inputs.accumulationReturn - 0.01, // 1% lower returns
-    retirementReturn: inputs.retirementReturn - 0.01,
-    inflationRate: inputs.inflationRate + 0.005, // 0.5% higher inflation
-    volatility: inputs.volatility + 0.02 // Higher volatility
-  };
-}

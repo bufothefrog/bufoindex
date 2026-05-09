@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, Shield, Zap, Settings, Calendar } from 'lucide-react';
+import { Settings, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface RiskProfile {

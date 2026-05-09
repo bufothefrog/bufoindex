@@ -31,7 +31,6 @@ export default function RetirementMethodologyPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <MethodologyLayout
-        calculatorName="retirement-calculator"
         title="Retirement Calculator Methodology"
         description="Explore the mathematical formulas, assumptions, and data sources behind our retirement planning calculations. This methodology ensures transparency and enables you to verify the accuracy of your retirement projections."
         formulas={groupedFormulas}

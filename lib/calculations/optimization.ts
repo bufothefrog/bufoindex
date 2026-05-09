@@ -144,7 +144,7 @@ export function calculateEmployerMatch(
 /**
  * Determine high-interest debt threshold (simplified 7% rule)
  */
-function getHighInterestThreshold(age: number): number {
+function getHighInterestThreshold(_age: number): number {
   return 0.07; // Fixed 7% threshold for all ages
 }
 
@@ -360,8 +360,7 @@ export function calculateRothIRA(
   }
   
   const currentBracket = profile.taxes.federalBracket;
-  const expectedRetirementBracket = profile.preferences.expectedRetirementBracket || (currentBracket * 0.8);
-  
+
   let reasoning = '';
   if (recommendation === 'roth') {
     if (profile.preferences.age < 30 && !profile.preferences.isPeakEarnings) {
@@ -540,11 +539,9 @@ export function calculateLowInterestDebtAnalysis(profile: PaycheckProfile): Skip
   if (lowInterestDebts.length === 0) return null;
   
   const totalBalance = lowInterestDebts.reduce((sum, debt) => sum + debt.balance, 0);
-  const weightedRate = lowInterestDebts.reduce((sum, debt) => 
+  const weightedRate = lowInterestDebts.reduce((sum, debt) =>
     sum + (debt.interestRate * debt.balance), 0) / totalBalance;
-  
-  const monthlyPayments = lowInterestDebts.reduce((sum, debt) => sum + debt.minimumPayment, 0);
-  
+
   // Calculate opportunity cost of paying off early vs investing
   const marketReturn = 0.07; // 7% expected market return
   const opportunityCostRate = marketReturn - weightedRate;

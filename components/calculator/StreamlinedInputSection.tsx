@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
 import { StateSelector } from '@/components/shared/inputs/StateSelector';
 import { Input } from '@/components/ui/input';
-import { formatCurrency } from '@/lib/utils';
-import { 
+import {
   DollarSign, 
   MapPin, 
   Settings, 
@@ -54,7 +53,6 @@ export function StreamlinedInputSection() {
               onChange={(value) => updateIncome({ gross: value })}
               placeholder="$6,000"
               required
-              recordable
             />
             
             <MoneyInput
@@ -64,7 +62,6 @@ export function StreamlinedInputSection() {
               onChange={(value) => updateIncome({ net: value })}
               placeholder="$4,200"
               required
-              recordable
             />
           </div>
           
@@ -77,7 +74,6 @@ export function StreamlinedInputSection() {
             placeholder="$2,500"
             help="Rent, utilities, groceries, minimum debt payments, insurance, etc."
             required
-            recordable
           />
 
           {/* Emergency Fund Details */}
@@ -89,7 +85,6 @@ export function StreamlinedInputSection() {
               onChange={(value) => updatePreferences({ currentEmergencyFund: value })}
               placeholder="$5,000"
               help="Current balance in savings/emergency accounts"
-              recordable
             />
             
             <div className="space-y-2">
@@ -142,7 +137,6 @@ export function StreamlinedInputSection() {
                   funMoney: { ...profile.preferences.funMoney, min: value }
                 })}
                 placeholder="$300"
-                recordable
               />
               <MoneyInput
                 name="funMoneyMax"
@@ -152,7 +146,6 @@ export function StreamlinedInputSection() {
                   funMoney: { ...profile.preferences.funMoney, max: value }
                 })}
                 placeholder="$600"
-                recordable
               />
             </div>
             <p className="text-xs text-muted-foreground">

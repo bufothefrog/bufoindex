@@ -5,7 +5,7 @@ import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
 import { StepStatus } from '@/lib/constants/financialSteps';
 import { PaycheckProfile } from '@/lib/types';
-import { formatCurrency, formatPercent } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 interface FinancialStepCardProps {
   step: StepStatus;

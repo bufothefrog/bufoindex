@@ -10,7 +10,6 @@ interface MoneyInputProps {
   className?: string;
   placeholder?: string;
   required?: boolean;
-  recordable?: boolean; // Future data recording capability
   help?: string; // Help text displayed below the input
 }
 
@@ -22,7 +21,6 @@ export function MoneyInput({
   className,
   placeholder = "$0",
   required = false,
-  recordable = false,
   help,
 }: MoneyInputProps) {
   const [displayValue, setDisplayValue] = React.useState(

@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Copy, ExternalLink, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, BookOpen } from 'lucide-react';
 import { FormulaRegistryEntry, ExampleData } from '@/lib/formulas/types';
 import { DisplayLatex, InlineLatex } from './LatexRenderer';
 

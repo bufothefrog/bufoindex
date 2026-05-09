@@ -16,8 +16,6 @@ interface DebtInputProps {
 }
 
 export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: DebtInputProps) {
-  const [isAddingDebt, setIsAddingDebt] = React.useState(false);
-  
   const addNewDebt = () => {
     const newDebt: DebtData = {
       id: `debt-${Date.now()}`,
@@ -29,7 +27,6 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
       taxDeductible: false,
     };
     onAddDebt(newDebt);
-    setIsAddingDebt(false);
   };
 
   const getDebtStatus = (interestRate: number) => {

@@ -93,7 +93,7 @@ export function RetirementCalculator() {
           text: 'Check out my retirement planning scenario',
           url: url
         });
-      } catch (error) {
+      } catch {
         // Fall back to clipboard
         await navigator.clipboard.writeText(url);
         alert('Link copied to clipboard!');
@@ -120,9 +120,6 @@ export function RetirementCalculator() {
       setIsCalculating(false);
     }
   };
-
-  const savingsRate = (inputs.monthlySavings * 12) / inputs.currentIncome;
-  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
 
   const renderInputSections = () => (
     <div className="space-y-6">

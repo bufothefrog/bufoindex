@@ -7,7 +7,6 @@
  */
 
 import { RetirementInputs, calculateProjectedBalance, calculateRequiredBalance } from './retirement';
-import { adjustForInflation, calculateInflatedIncome } from './inflationAdjustment';
 import { calculateCoastFire } from './coastFire';
 
 export interface ScenarioAnalysis {
@@ -180,7 +179,7 @@ function buildCurrentScenario(
 /**
  * Build extra savings scenario data
  */
-function buildExtraScenario(projection: ScenarioProjection, status: 'exceeding' | 'onTrack' | 'falling') {
+function buildExtraScenario(projection: ScenarioProjection, _status: 'exceeding' | 'onTrack' | 'falling') {
   const base = { projectedBalance: projection.projectedBalance };
   
   if (projection.balanceRatio >= 1.0) {

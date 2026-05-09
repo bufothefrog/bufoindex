@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import { RetirementInputs, calculateRequiredBalance } from '@/lib/calculations/retirement';
 import { analyzeRetirementScenarios, ScenarioAnalysis } from '@/lib/calculations/scenarioAnalysis';
-import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 
 export interface ScenarioData {
   name: string;
@@ -47,14 +47,11 @@ export function ScenarioComparisonChart({
   responsive = true 
 }: ScenarioComparisonProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-  const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
-  const sageVariants = getSageVariants();
 
   // Subscribe to theme changes
   useEffect(() => {
     const unsubscribe = subscribeToThemeChanges(() => {
       setChartTheme(getChartTheme());
-      setRechartsTheme(getRechartsTheme());
     });
     return unsubscribe;
   }, []);

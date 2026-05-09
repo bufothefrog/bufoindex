@@ -1,24 +1,19 @@
-import { 
-  PaycheckProfile, 
-  AllocationResult, 
-  AllocationItem, 
-  SkippedItem,
+import {
+  PaycheckProfile,
+  AllocationResult,
+  AllocationItem,
   IncomeData,
-  TAX_BRACKETS,
-  CONTRIBUTION_LIMITS
 } from '../types';
-import { 
+import {
   calculate1MonthEmergency,
   calculateEmployerMatch,
   calculateHSAOptimal,
-  calculateTaxBracketOptimization,
   calculateHighInterestDebt,
   calculateEmergencyFundCompletion,
   calculateRothIRA,
   calculateAdditional401k,
   calculateMegaBackdoorRoth,
   calculateTaxableInvestment,
-  hasHighInterestDebt
 } from './optimization';
 import { identifySkippedOptimizations } from './analysis';
 import { calculateProjections, calculateOptimizationScore } from './projections';
