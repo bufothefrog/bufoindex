@@ -12,7 +12,7 @@ export function AccountsCard() {
   const addAccount = usePortfolioRebalancingStore(s => s.addAccount);
 
   return (
-    <InputCard title="Accounts & Holdings" icon={Wallet}>
+    <InputCard title="Accounts" icon={Wallet}>
       <div className="space-y-4">
         {accounts.map((account, index) => (
           <AccountSection

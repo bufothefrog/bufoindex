@@ -22,6 +22,7 @@ import {
   AssetClass,
   Account,
   ClassTarget,
+  CustomAssetClass,
   DEFAULT_ACCOUNT_TYPE,
   DEFAULT_ASSET_CLASS,
   Holding,
@@ -85,6 +86,11 @@ interface CompressedClassTargetV3 {
   t: number;
 }
 
+interface CompressedCustomAssetClassV3 {
+  i: string; // id
+  l: string; // label
+}
+
 interface CompressedStateV3 {
   v: 3;
   sm: SetupMode;
@@ -92,20 +98,13 @@ interface CompressedStateV3 {
   ac: CompressedAccountV3[];
   ho: CompressedHoldingV3[];
   ct: CompressedClassTargetV3[];
+  cac?: CompressedCustomAssetClassV3[]; // custom asset classes (omitted when empty)
   s?: boolean; // allowTaxableSelling (omitted when false)
   p?: boolean; // showPlacementAdvice (omitted when false)
   m?: RebalanceMode; // omitted when 'whole'
 }
 
 const VALID_ACCOUNT_TYPES: ReadonlyArray<AccountType> = ['taxable', 'tax-deferred', 'tax-free'];
-const VALID_ASSET_CLASSES: ReadonlyArray<AssetClass> = [
-  'us-stock',
-  'intl-stock',
-  'bonds',
-  'reits',
-  'cash',
-  'other',
-];
 const VALID_SETUP_MODES: ReadonlyArray<SetupMode> = ['single', 'multi-shared', 'multi-unique'];
 
 function coerceAccountType(value: unknown): AccountType {
@@ -115,9 +114,9 @@ function coerceAccountType(value: unknown): AccountType {
 }
 
 function coerceAssetClass(value: unknown): AssetClass {
-  return VALID_ASSET_CLASSES.includes(value as AssetClass)
-    ? (value as AssetClass)
-    : DEFAULT_ASSET_CLASS;
+  if (typeof value !== 'string') return DEFAULT_ASSET_CLASS;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : DEFAULT_ASSET_CLASS;
 }
 
 function isValidSetupMode(value: unknown): value is SetupMode {
@@ -187,6 +186,9 @@ export function encodeRebalancingToUrlHash(inputs: RebalanceInputsV2): string {
         t: t.target,
       })),
     };
+    if (inputs.customAssetClasses && inputs.customAssetClasses.length > 0) {
+      compressed.cac = inputs.customAssetClasses.map(c => ({ i: c.id, l: c.label }));
+    }
     if (inputs.allowTaxableSelling) compressed.s = true;
     if (inputs.showPlacementAdvice) compressed.p = true;
     if (inputs.mode !== 'whole') compressed.m = inputs.mode;
@@ -404,7 +406,19 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
   // averaged across accounts that declared them.
   const classTargets = flattenToPortfolioTargets(rawTargets);
 
-  return {
+  const customAssetClasses: CustomAssetClass[] = Array.isArray(r.cac)
+    ? r.cac
+        .map((c, idx) => {
+          const cc = c as Partial<CompressedCustomAssetClassV3>;
+          return {
+            id: typeof cc.i === 'string' && cc.i.length > 0 ? cc.i : `cac-${idx}`,
+            label: typeof cc.l === 'string' ? cc.l : '',
+          };
+        })
+        .filter(c => c.label.trim().length > 0)
+    : [];
+
+  const out: RebalanceInputsV2 = {
     setupMode: 'multi-shared',
     securities,
     accounts,
@@ -414,6 +428,10 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
     showPlacementAdvice: r.p === true,
     mode: r.m === 'fractional' ? 'fractional' : 'whole',
   };
+  if (customAssetClasses.length > 0) {
+    out.customAssetClasses = customAssetClasses;
+  }
+  return out;
 }
 
 function flattenToPortfolioTargets(targets: ClassTarget[]): ClassTarget[] {

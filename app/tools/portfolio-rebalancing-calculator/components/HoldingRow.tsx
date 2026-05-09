@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NumberInput } from '@/components/ui/inputs';
@@ -8,9 +8,12 @@ import { TickerCombobox } from '@/components/ui/inputs/TickerCombobox';
 import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import {
   AssetClass,
+  BUILTIN_ASSET_CLASSES,
   Holding,
   Security,
+  getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
+import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface HoldingRowProps {
@@ -28,15 +31,6 @@ interface HoldingRowProps {
   className?: string;
 }
 
-const ASSET_CLASS_OPTIONS: { value: AssetClass; label: string }[] = [
-  { value: 'us-stock', label: 'US Stock' },
-  { value: 'intl-stock', label: 'Intl Stock' },
-  { value: 'bonds', label: 'Bonds' },
-  { value: 'reits', label: 'REITs' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'other', label: 'Other' },
-];
-
 export function HoldingRow({
   holding,
   security,
@@ -50,10 +44,45 @@ export function HoldingRow({
   onRemove,
   className,
 }: HoldingRowProps) {
+  const classTargets = usePortfolioRebalancingStore(s => s.inputs.classTargets);
+  const customAssetClasses = usePortfolioRebalancingStore(
+    s => s.inputs.customAssetClasses ?? [],
+  );
+
   const ticker = security?.ticker ?? '';
   const price = security?.price ?? 0;
   const assetClass = security?.assetClass ?? 'other';
   const totalValue = price * holding.shares;
+
+  /**
+   * The Asset class dropdown mirrors the active set from the Target Allocation
+   * card: every class with a portfolio-wide target row, plus every registered
+   * custom class. The current security's class is included even when it has
+   * no target row, so the user never sees an empty selection.
+   */
+  const assetClassOptions = useMemo<{ value: AssetClass; label: string }[]>(() => {
+    const ids = new Set<AssetClass>();
+    classTargets.forEach(t => {
+      if (t.accountId === null) ids.add(t.assetClass);
+    });
+    customAssetClasses.forEach(c => ids.add(c.id));
+    if (assetClass) ids.add(assetClass);
+
+    const ordered: AssetClass[] = [];
+    for (const c of BUILTIN_ASSET_CLASSES) {
+      if (ids.has(c)) ordered.push(c);
+    }
+    for (const c of customAssetClasses) {
+      if (ids.has(c.id) && !ordered.includes(c.id)) ordered.push(c.id);
+    }
+    for (const id of ids) {
+      if (!ordered.includes(id)) ordered.push(id);
+    }
+    return ordered.map(id => ({
+      value: id,
+      label: getAssetClassLabel(id, customAssetClasses),
+    }));
+  }, [classTargets, customAssetClasses, assetClass]);
 
   const tickerOptions = securities.map(s => ({
     id: s.id,
@@ -103,7 +132,7 @@ export function HoldingRow({
           label="Asset class"
           value={assetClass}
           onChange={value => onChangeSecurity({ assetClass: value as AssetClass })}
-          options={ASSET_CLASS_OPTIONS}
+          options={assetClassOptions}
         />
       </div>
 

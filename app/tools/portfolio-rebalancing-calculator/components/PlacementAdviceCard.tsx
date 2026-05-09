@@ -8,17 +8,9 @@ import {
   AccountType,
   AssetClass,
   RebalanceAsset,
+  getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
-
-const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
-  'us-stock': 'US Stock',
-  'intl-stock': 'Intl Stock',
-  'bonds': 'Bonds',
-  'reits': 'REITs',
-  'cash': 'Cash',
-  'other': 'Other',
-};
 
 const ACCOUNT_LABELS: Record<AccountType, string> = {
   'taxable': 'taxable',
@@ -38,6 +30,9 @@ export function PlacementAdviceCard() {
   const securities = usePortfolioRebalancingStore(s => s.inputs.securities);
   const accounts = usePortfolioRebalancingStore(s => s.inputs.accounts);
   const holdings = usePortfolioRebalancingStore(s => s.inputs.holdings);
+  const customAssetClasses = usePortfolioRebalancingStore(
+    s => s.inputs.customAssetClasses ?? [],
+  );
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();
@@ -104,7 +99,7 @@ export function PlacementAdviceCard() {
                   <span className="font-semibold">{s.ticker || '—'}</span>
                   <span className="text-muted-foreground">
                     {' '}
-                    ({ASSET_CLASS_LABELS[s.assetClass]}, in {ACCOUNT_LABELS[s.accountType]})
+                    ({getAssetClassLabel(s.assetClass, customAssetClasses)}, in {ACCOUNT_LABELS[s.accountType]})
                   </span>{' '}
                   → consider moving to {ACCOUNT_LABELS[s.advice.preferredAccount]}.
                 </div>

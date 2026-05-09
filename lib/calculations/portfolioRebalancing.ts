@@ -34,18 +34,58 @@ export type AccountType = 'taxable' | 'tax-deferred' | 'tax-free';
 
 /**
  * Broad asset class used for placement advice and (in Phase 2) portfolio-wide
- * target allocations.
+ * target allocations. Built-in IDs (us-stock, intl-stock, bonds, reits, cash,
+ * other) get default labels and placement preferences; custom IDs flow through
+ * the calculator with no opinion on placement.
  */
-export type AssetClass =
-  | 'us-stock'
-  | 'intl-stock'
-  | 'bonds'
-  | 'reits'
-  | 'cash'
-  | 'other';
+export type AssetClass = string;
+
+export const BUILTIN_ASSET_CLASSES = [
+  'us-stock',
+  'intl-stock',
+  'bonds',
+  'reits',
+  'cash',
+  'other',
+] as const;
+
+export type BuiltinAssetClass = (typeof BUILTIN_ASSET_CLASSES)[number];
 
 export const DEFAULT_ACCOUNT_TYPE: AccountType = 'taxable';
 export const DEFAULT_ASSET_CLASS: AssetClass = 'other';
+
+/** A user-defined asset class, identified by a stable id and a display label. */
+export interface CustomAssetClass {
+  id: string;
+  label: string;
+}
+
+/** Display labels for the built-in asset classes. */
+export const BUILTIN_ASSET_CLASS_LABELS: Record<BuiltinAssetClass, string> = {
+  'us-stock': 'US Stock',
+  'intl-stock': 'Intl Stock',
+  'bonds': 'Bonds',
+  'reits': 'REITs',
+  'cash': 'Cash',
+  'other': 'Other',
+};
+
+export function isBuiltinAssetClass(cls: AssetClass): cls is BuiltinAssetClass {
+  return (BUILTIN_ASSET_CLASSES as readonly string[]).includes(cls);
+}
+
+/**
+ * Resolve the display label for any asset class id — built-in or custom.
+ * Falls back to the id itself when neither matches (e.g. legacy hashes).
+ */
+export function getAssetClassLabel(
+  cls: AssetClass,
+  customs: CustomAssetClass[] = [],
+): string {
+  if (isBuiltinAssetClass(cls)) return BUILTIN_ASSET_CLASS_LABELS[cls];
+  const custom = customs.find(c => c.id === cls);
+  return custom?.label ?? cls;
+}
 
 export interface RebalanceAsset {
   /** Stable id (client-generated) for React keys */
@@ -447,6 +487,8 @@ export interface RebalanceInputsV2 {
   /** Ignored in multi-unique mode. */
   showPlacementAdvice: boolean;
   mode: RebalanceMode;
+  /** User-defined asset classes shown alongside the built-ins. */
+  customAssetClasses?: CustomAssetClass[];
 }
 
 /** Per-holding plan inside a v2 result. */
@@ -522,14 +564,6 @@ export interface RebalanceResultV2 {
 // Phase 2 algorithm — rebalancePortfolioV2
 // ----------------------------------------------------------------------------
 
-const ASSET_CLASSES: AssetClass[] = [
-  'us-stock',
-  'intl-stock',
-  'bonds',
-  'reits',
-  'cash',
-  'other',
-];
 
 interface WorkingHolding {
   id: string;
@@ -618,8 +652,13 @@ function runRebalancePass(
       sumBy(holdings, h => h.shares * h.price) +
       sumBy(Array.from(accountsInGroup), a => cashByAccount.get(a) ?? 0);
 
+    const classesInGroup = new Set<AssetClass>([
+      ...holdings.map(h => h.assetClass),
+      ...targets.keys(),
+    ]);
+
     // Sell phase: handle overweight classes
-    for (const cls of ASSET_CLASSES) {
+    for (const cls of classesInGroup) {
       const target = targets.get(cls) ?? 0;
       if (target <= 0) continue;
       const classHoldings = holdings.filter(h => h.assetClass === cls);
@@ -669,7 +708,7 @@ function runRebalancePass(
     }
 
     // Buy phase: handle underweight classes
-    for (const cls of ASSET_CLASSES) {
+    for (const cls of classesInGroup) {
       const target = targets.get(cls) ?? 0;
       if (target <= 0) continue;
       const classHoldings = holdings.filter(h => h.assetClass === cls);
@@ -738,6 +777,7 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
   const accountOrderForBuy = (cls: AssetClass): string[] => {
     if (inputs.setupMode === 'multi-shared') {
       const pref = LOCATION_PREFERENCE[cls];
+      if (!pref) return inputs.accounts.map(a => a.id);
       // accounts whose type matches preferred types, in order
       return pref.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
     }
@@ -746,8 +786,10 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
   };
   const accountOrderForSell = (cls: AssetClass): string[] => {
     if (inputs.setupMode === 'multi-shared') {
-      const pref = [...LOCATION_PREFERENCE[cls]].reverse();
-      return pref.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
+      const pref = LOCATION_PREFERENCE[cls];
+      if (!pref) return inputs.accounts.map(a => a.id);
+      const reversed = [...pref].reverse();
+      return reversed.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
     }
     return inputs.accounts.map(a => a.id);
   };
@@ -844,7 +886,11 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
     const combinedAfter = groupNewValue +
       sumBy(Array.from(groupAccountIds), id => cashByAccount.get(id) ?? 0);
     const targets = classTargetsByGroup.get(gk) ?? new Map();
-    for (const cls of ASSET_CLASSES) {
+    const driftClasses = new Set<AssetClass>([
+      ...groupHoldings.map(h => h.assetClass),
+      ...targets.keys(),
+    ]);
+    for (const cls of driftClasses) {
       const target = targets.get(cls) ?? 0;
       if (target <= 0) {
         // skip classes with no target AND no holdings

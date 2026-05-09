@@ -12,8 +12,11 @@ import { AccountType, AssetClass, RebalanceAsset } from './portfolioRebalancing'
 /**
  * Lower index = stronger preference. Accounts within the same preference
  * position are substitutable — the suggestion always returns the top pick.
+ *
+ * Only built-in asset classes have an opinion here. Custom (user-defined)
+ * classes return `undefined` and bypass placement advice.
  */
-export const LOCATION_PREFERENCE: Record<AssetClass, AccountType[]> = {
+export const LOCATION_PREFERENCE: Partial<Record<AssetClass, AccountType[]>> = {
   'bonds':       ['tax-deferred', 'tax-free', 'taxable'],
   'reits':       ['tax-deferred', 'tax-free', 'taxable'],
   'us-stock':    ['tax-free', 'taxable', 'tax-deferred'],

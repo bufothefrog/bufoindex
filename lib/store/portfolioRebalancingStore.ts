@@ -5,6 +5,7 @@ import {
   AccountType,
   AssetClass,
   ClassTarget,
+  CustomAssetClass,
   DEFAULT_ACCOUNT_TYPE,
   DEFAULT_ASSET_CLASS,
   Holding,
@@ -21,7 +22,7 @@ import {
   encodeRebalancingToUrlHash,
 } from '@/lib/utils/portfolioRebalancingState';
 
-function makeId(prefix: 'sec' | 'acc' | 'hld'): string {
+function makeId(prefix: 'sec' | 'acc' | 'hld' | 'cac'): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -61,7 +62,9 @@ function defaultInputs(): RebalanceInputsV2 {
       { accountId: null, assetClass: 'us-stock', target: 0.6 },
       { accountId: null, assetClass: 'intl-stock', target: 0.25 },
       { accountId: null, assetClass: 'bonds', target: 0.15 },
+      { accountId: null, assetClass: 'cash', target: 0 },
     ],
+    customAssetClasses: [],
     allowTaxableSelling: false,
     showPlacementAdvice: true,
     mode: 'whole',
@@ -114,6 +117,19 @@ interface StoreState {
   linkHoldingByTicker: (holdingId: string, ticker: string) => void;
 
   setClassTarget: (assetClass: AssetClass, target: number) => void;
+  /**
+   * Make `assetClass` visible in the targets list with a 0% target if it's
+   * not already present. Used by the "Add asset class" UI for built-in
+   * classes. No-op if the class already has a portfolio-wide target row.
+   */
+  ensureAssetClassVisible: (assetClass: AssetClass) => void;
+  /** Hide an asset class from the targets list and drop its target row. */
+  removeAssetClass: (assetClass: AssetClass) => void;
+  /**
+   * Create a new custom asset class with `label`, register it, and add a
+   * 0% target row so it shows up in the targets list. Returns the new id.
+   */
+  addCustomAssetClass: (label: string) => string;
 
   setAllowTaxableSelling: (value: boolean) => void;
   setMode: (mode: RebalanceMode) => void;
@@ -385,6 +401,74 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
         postMutate(get);
       },
 
+      ensureAssetClassVisible: (assetClass) => {
+        set(state => {
+          const exists = state.inputs.classTargets.some(
+            t => t.accountId === null && t.assetClass === assetClass,
+          );
+          if (exists) return state;
+          return {
+            inputs: {
+              ...state.inputs,
+              classTargets: [
+                ...state.inputs.classTargets,
+                { accountId: null, assetClass, target: 0 },
+              ],
+            },
+          };
+        });
+        postMutate(get);
+      },
+
+      removeAssetClass: (assetClass) => {
+        set(state => {
+          const isCustom = (state.inputs.customAssetClasses ?? []).some(
+            c => c.id === assetClass,
+          );
+          return {
+            inputs: {
+              ...state.inputs,
+              classTargets: state.inputs.classTargets.filter(
+                t => !(t.accountId === null && t.assetClass === assetClass),
+              ),
+              customAssetClasses: isCustom
+                ? (state.inputs.customAssetClasses ?? []).filter(c => c.id !== assetClass)
+                : state.inputs.customAssetClasses,
+            },
+          };
+        });
+        postMutate(get);
+      },
+
+      addCustomAssetClass: (label) => {
+        const trimmed = label.trim();
+        if (!trimmed) return '';
+        // Reuse an existing custom class if the label matches (case-insensitive).
+        const existing = get().inputs.customAssetClasses?.find(
+          c => c.label.toLowerCase() === trimmed.toLowerCase(),
+        );
+        if (existing) {
+          get().ensureAssetClassVisible(existing.id);
+          return existing.id;
+        }
+        const id = makeId('cac');
+        set(state => ({
+          inputs: {
+            ...state.inputs,
+            customAssetClasses: [
+              ...(state.inputs.customAssetClasses ?? []),
+              { id, label: trimmed },
+            ],
+            classTargets: [
+              ...state.inputs.classTargets,
+              { accountId: null, assetClass: id, target: 0 },
+            ],
+          },
+        }));
+        postMutate(get);
+        return id;
+      },
+
       setAllowTaxableSelling: (value) => {
         set(state => ({
           inputs: { ...state.inputs, allowTaxableSelling: value },
@@ -453,4 +537,12 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
   ),
 );
 
-export type { RebalanceInputsV2, RebalanceResultV2, Security, Account, Holding, ClassTarget };
+export type {
+  RebalanceInputsV2,
+  RebalanceResultV2,
+  Security,
+  Account,
+  Holding,
+  ClassTarget,
+  CustomAssetClass,
+};
