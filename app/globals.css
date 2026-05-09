@@ -3,7 +3,19 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *));
+/*
+  The `dark:` utility variant respects the closest theme-class ancestor.
+  Two cases:
+    1. Element is a descendant of `.dark` with no `.light` between them and the
+       root → standard dark-mode page or dark wrapper.
+    2. Element sits inside `<.light> ... <.dark> ...`, e.g. the demo's "Dark"
+       column rendered on a light page → the wrapper should override the page.
+  Without the second rule, `<html class="light"><div class="dark">...</div>`
+  would render with light-page `dark:` utilities (none) since `:not(.light *)`
+  alone would exclude them. Companion `.light` / `.dark` blocks in `@layer
+  base` set the matching CSS variables so semantic tokens cascade correctly.
+*/
+@custom-variant dark (&:where(.dark *):not(.light *), &:is(.light .dark *));
 
 @utility container {
   margin-inline: auto;
@@ -108,7 +120,8 @@
 }
 
 @layer base {
-  :root {
+  :root,
+  .light {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
