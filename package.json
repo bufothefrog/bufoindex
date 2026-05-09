@@ -13,11 +13,14 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
-    "quality:gates": "bash scripts/quality-gates.sh",
-    "quality:version": "bash scripts/version-check.sh",
-    "quality:cache": "bash scripts/quality-gates.sh cache",
-    "health-check": "npm run quality:version && npm run quality:cache && npm run type-check",
     "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "bash -c 'npm run type-check'"
+    ],
+    "*.{js,jsx,mjs}": "eslint --fix"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",

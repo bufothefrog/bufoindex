@@ -1,233 +1,129 @@
-# Mandatory Export/Import Patterns
+# TypeScript / React Patterns
 
-## TypeScript Export Requirements
+Reference patterns for code in this repo. Follow these unless you have a specific reason not to.
 
-**CRITICAL:** All agent-generated TypeScript code must follow these export patterns exactly:
+## Calculation modules (`lib/calculations/`)
 
-### Financial Calculation Exports
-```typescript
-// REQUIRED: lib/calculations/[calculator-name].ts
-// All calculation functions must be properly typed and exported
+Pure TypeScript. No React, no DOM, no I/O. Anything that needs those belongs in a component or a hook.
 
-// Interface definitions (REQUIRED)
-export interface CalculatorInputs {
-  // All input parameters with proper types
+```ts
+// lib/calculations/example.ts
+
+export interface ExampleInputs {
   amount: number;
   interestRate: number;
-  timeHorizon: number;
+  years: number;
 }
 
-export interface CalculatorOutputs {
-  // All output values with proper types  
+export interface ExampleOutputs {
   futureValue: number;
   totalReturn: number;
-  opportunityCost: number; // MANDATORY: All calculations must include opportunity cost
 }
 
-// Calculation function (REQUIRED)
-export function calculateFinancialResult(inputs: CalculatorInputs): CalculatorOutputs {
-  // Implementation must include:
-  // 1. Input validation
-  // 2. Mathematical calculations
-  // 3. Opportunity cost analysis
-  // 4. Error handling
-  
+export function calculateExample(inputs: ExampleInputs): ExampleOutputs {
+  const { amount, interestRate, years } = inputs;
+  const futureValue = amount * (1 + interestRate) ** years;
   return {
-    futureValue: /* calculation */,
-    totalReturn: /* calculation */,
-    opportunityCost: /* calculation */
+    futureValue,
+    totalReturn: futureValue - amount,
   };
 }
 
-// Validation functions (REQUIRED)
-export function validateInputs(inputs: Partial<CalculatorInputs>): string[] {
-  // Return array of validation errors, empty if valid
-}
-
-// Performance benchmarking (REQUIRED)
-export function benchmarkCalculation(): { executionTime: number; memoryUsage: number } {
-  // Return performance metrics
+// Validation is optional but useful when inputs come straight from a form.
+export function validateExampleInputs(inputs: Partial<ExampleInputs>): string[] {
+  const errors: string[] = [];
+  if ((inputs.amount ?? 0) < 0) errors.push('amount must be non-negative');
+  if ((inputs.years ?? 0) < 0) errors.push('years must be non-negative');
+  return errors;
 }
 ```
 
-### React Component Exports  
-```typescript
-// REQUIRED: app/components/[component-name].tsx
-import React from 'react';
+Notes:
 
-// Props interface (REQUIRED)
-interface ComponentProps {
-  // All props with proper types and documentation
-  /** The primary value to display */
+- Export named types alongside named functions.
+- Avoid wildcard exports (`export *`) — they make tree-shaking and refactors harder.
+- If a calculation has multiple sub-steps, factor them into named helpers in the same module rather than inlining or splitting across files.
+
+## React components
+
+```tsx
+// components/example/ExampleCard.tsx
+import * as React from 'react';
+
+export interface ExampleCardProps {
+  /** Primary value to display. */
   value: number;
-  /** Callback when value changes */
-  onChange: (value: number) => void;
-  /** Optional className for styling */
+  /** Called when the user changes the value. */
+  onChange: (next: number) => void;
   className?: string;
 }
 
-// Main component (REQUIRED)
-export default function ComponentName({ value, onChange, className }: ComponentProps) {
-  // Implementation requirements:
-  // 1. WCAG 2.1 AA compliance
-  // 2. Mobile responsive design
-  // 3. Error state handling
-  // 4. Loading state handling
-  // 5. Keyboard navigation support
-  
-  return (
-    // JSX implementation
-  );
+export function ExampleCard({ value, onChange, className }: ExampleCardProps) {
+  // ...
+  return <div className={className}>{/* ... */}</div>;
 }
-
-// Named exports for testing (REQUIRED)
-export { ComponentName };
-export type { ComponentProps };
 ```
 
-### Test File Exports
-```typescript
-// REQUIRED: test/[feature].test.ts
+Conventions:
+
+- Named export of the component **and** the props type.
+- Props interfaces use JSDoc on each prop so editor hover shows useful info.
+- Theming uses semantic Tailwind classes (`bg-background`, `text-muted-foreground`, `border-border`, `bg-sage-*`) — see `CLAUDE.md`.
+- Charts pull colors from `getChartTheme()` in `@/lib/chart-theme`. Never hardcode chart colors.
+- Keep components free of business logic — call into `lib/calculations/` instead.
+
+## Imports
+
+```ts
+// Calculations: import named functions and types explicitly.
+import {
+  calculateExample,
+  validateExampleInputs,
+  type ExampleInputs,
+  type ExampleOutputs,
+} from '@/lib/calculations/example';
+
+// Components: named imports for both component and types.
+import { ExampleCard, type ExampleCardProps } from '@/components/example/ExampleCard';
+
+// UI primitives via barrels where they exist.
+import { Button } from '@/components/ui/button';
+```
+
+The `@/` alias resolves to the repo root (configured in `tsconfig.json` and `vitest.config.ts`).
+
+## Tests
+
+```ts
+// test/lib/calculations/example.test.ts
 import { describe, it, expect } from 'vitest';
+import { calculateExample } from '@/lib/calculations/example';
 
-// Test utilities (REQUIRED if creating custom utilities)
-export function createMockData(): TestDataType {
-  // Must include all required fields
-  // Must be valid according to interfaces
-}
-
-export function setupTestEnvironment(): void {
-  // Environment setup for tests
-}
-
-// Test suites must be properly structured
-describe('Feature Name', () => {
-  it('should handle basic functionality', () => {
-    // Test implementation
+describe('calculateExample', () => {
+  it('compounds correctly over a single year', () => {
+    const result = calculateExample({ amount: 1000, interestRate: 0.07, years: 1 });
+    expect(result.futureValue).toBeCloseTo(1070);
+    expect(result.totalReturn).toBeCloseTo(70);
   });
-  
-  it('should handle edge cases', () => {
-    // Edge case testing
-  });
-  
-  it('should meet performance requirements', () => {
-    // Performance testing
+
+  it('handles zero years as a no-op', () => {
+    const result = calculateExample({ amount: 1000, interestRate: 0.07, years: 0 });
+    expect(result.futureValue).toBe(1000);
+    expect(result.totalReturn).toBe(0);
   });
 });
 ```
 
-## Import Pattern Requirements
+Notes:
 
-### Calculation Imports
-```typescript
-// REQUIRED: When using calculation functions
-import { 
-  calculateFinancialResult,
-  validateInputs,
-  type CalculatorInputs,
-  type CalculatorOutputs 
-} from '@/lib/calculations/[calculator-name]';
+- Use `toBeCloseTo` for floating-point comparisons.
+- Reuse mock builders from `test/factories/test-data-factory.ts` for complex profile-shaped inputs.
+- Component tests go under `test/components/` using `@testing-library/react`. Setup is in `test/setup.ts`.
 
-// FORBIDDEN: Don't use wildcard imports for calculations
-// import * from '@/lib/calculations/[calculator-name]'; ❌
-```
+## Anti-patterns to avoid
 
-### Component Imports
-```typescript
-// REQUIRED: When importing components
-import ComponentName from '@/components/ComponentName';
-import { type ComponentProps } from '@/components/ComponentName';
-
-// REQUIRED: For multiple related components
-import {
-  Button,
-  Input,
-  type ButtonProps,
-  type InputProps
-} from '@/components/ui';
-```
-
-## Integration with Quality Gates
-
-### Pre-Commit Hooks Integration
-```bash
-# REQUIRED: .husky/pre-commit must include these checks
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-# Quality Gates (MANDATORY)
-echo "🔍 Running quality gates..."
-
-# TypeScript compilation
-npm run type-check || {
-  echo "❌ TypeScript errors detected"
-  echo "Fix all TypeScript errors before committing"
-  exit 1
-}
-
-# Build verification
-npm run build || {
-  echo "❌ Build failed"
-  echo "Fix build errors before committing"
-  exit 1
-}
-
-# Test execution
-npm test || {
-  echo "❌ Tests failed"  
-  echo "Fix failing tests before committing"
-  exit 1
-}
-
-# Philosophy compliance
-philosophy_violations=$(grep -ri "money guys\|dave ramsey\|conventional wisdom\|6 months emergency" lib/ app/ components/ 2>/dev/null || true)
-if [ -n "$philosophy_violations" ]; then
-  echo "❌ Philosophy violations detected:"
-  echo "$philosophy_violations"
-  echo "Remove conventional wisdom language before committing"
-  exit 1
-fi
-
-echo "✅ All quality gates passed"
-```
-
-### CI/CD Integration Requirements
-```yaml
-# REQUIRED: .github/workflows/quality-gates.yml
-name: Quality Gates
-on: [push, pull_request]
-
-jobs:
-  quality-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          
-      # MANDATORY: All quality gates must pass
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: TypeScript Check
-        run: npm run type-check
-        
-      - name: Build Check  
-        run: npm run build
-        
-      - name: Test Suite
-        run: npm test
-        
-      - name: Philosophy Compliance
-        run: |
-          violations=$(grep -ri "money guys\|dave ramsey\|conventional wisdom\|6 months emergency" lib/ app/ components/ || true)
-          if [ -n "$violations" ]; then
-            echo "Philosophy violations detected:"
-            echo "$violations"
-            exit 1
-          fi
-          
-      - name: Performance Benchmarks
-        run: npm run test:performance
-```
+- React state living inside calculation modules.
+- `as any` to silence type errors — tighten the types instead.
+- Hardcoded color literals in components (`#fff`, `text-gray-600`, `bg-blue-500`). Use semantic Tailwind classes or `getChartTheme()`.
+- Duplicate components when one already exists in `/demo` or `components/ui/`. Compose, don't fork.
+- Calling `npm run build` from CI workflows you've added without confirming you actually need a separate job; the existing CI already runs build.
