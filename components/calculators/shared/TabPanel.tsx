@@ -103,9 +103,9 @@ export function TabPanels({
     <div className={`tab-panels ${className}`}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type === TabPanel) {
-          return React.cloneElement(child as React.ReactElement<TabPanelProps>, {
-            active: child.props.id === activeTab,
-            // Keep all panels in DOM if preserveAllPanels is true
+          const panel = child as React.ReactElement<TabPanelProps>;
+          return React.cloneElement(panel, {
+            active: panel.props.id === activeTab,
             lazy: !preserveAllPanels
           });
         }

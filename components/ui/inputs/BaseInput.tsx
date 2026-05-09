@@ -48,33 +48,35 @@ export function BaseInput({
       
       {/* Input Container */}
       <div className="relative">
-        {React.cloneElement(children as React.ReactElement, {
-          children: React.Children.map((children as React.ReactElement).props.children, (child, index) => {
-            // If it's an input element, apply the props and styling
-            if (React.isValidElement(child) && child.type === 'input') {
-              return React.cloneElement(child as React.ReactElement, {
-                id: inputId,
-                name,
-                disabled,
-                required,
-                'aria-describedby': [helpId, errorId].filter(Boolean).join(' ') || undefined,
-                'aria-invalid': hasError,
-                className: cn(
-                  "w-full border bg-background rounded-md text-sm transition-colors",
-                  "focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring",
-                  hasError
-                    ? "border-destructive focus:border-destructive focus:ring-destructive/20"
-                    : "border-input hover:border-ring/50",
-                  disabled && "opacity-50 cursor-not-allowed",
-                  (child as React.ReactElement).props.className
-                ),
-                ...ariaProps
-              });
-            }
-            // Return other children (like prefix/suffix spans) unchanged
-            return child;
-          })
-        })}
+        {(() => {
+          const wrapper = children as React.ReactElement<{ children?: React.ReactNode }>;
+          return React.cloneElement(wrapper, {
+            children: React.Children.map(wrapper.props.children, (child) => {
+              if (React.isValidElement(child) && child.type === 'input') {
+                const input = child as React.ReactElement<React.InputHTMLAttributes<HTMLInputElement>>;
+                return React.cloneElement(input, {
+                  id: inputId,
+                  name,
+                  disabled,
+                  required,
+                  'aria-describedby': [helpId, errorId].filter(Boolean).join(' ') || undefined,
+                  'aria-invalid': hasError,
+                  className: cn(
+                    "w-full border bg-background rounded-md text-sm transition-colors",
+                    "focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring",
+                    hasError
+                      ? "border-destructive focus:border-destructive focus:ring-destructive/20"
+                      : "border-input hover:border-ring/50",
+                    disabled && "opacity-50 cursor-not-allowed",
+                    input.props.className
+                  ),
+                  ...ariaProps
+                });
+              }
+              return child;
+            })
+          });
+        })()}
       </div>
       
       {/* Help Text */}

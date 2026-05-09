@@ -70,8 +70,9 @@ export function RetirementCharts({
     const startTime = performance.now();
     
     // Wrap component to measure render time
-    return React.cloneElement(component, {
-      ...component.props,
+    const typed = component as React.ReactElement<Record<string, unknown>>;
+    return React.cloneElement(typed, {
+      ...typed.props,
       onRenderComplete: () => {
         const endTime = performance.now();
         trackPerformance(chartName, endTime - startTime);
