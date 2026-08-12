@@ -41,8 +41,6 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "test/patterns/**/*",
-    "test/utils/**/*"
+    "node_modules"
   ]
 }

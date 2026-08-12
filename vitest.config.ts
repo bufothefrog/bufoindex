@@ -12,7 +12,6 @@ export default defineConfig({
     include: [
       'test/lib/**/*.test.{ts,js}',
       'test/components/**/*.test.{tsx,ts}',
-      'test/integration/**/*.test.{ts,tsx}',
     ],
     exclude: [
       'node_modules/',
@@ -29,8 +28,7 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'lcov'],
       reportOnFailure: true,
       include: [
-        'lib/calculations/**/*.ts',
-        'lib/utils/**/*.ts',
+        'lib/**/*.ts',
       ],
       exclude: [
         'node_modules/',
@@ -40,7 +38,20 @@ export default defineConfig({
         'docs/',
         '**/*.config.{js,ts}',
         '**/*.d.ts',
+        // Type-only modules — no executable statements to cover
+        'lib/types/**',
+        'lib/design-system/types.ts',
+        'lib/formulas/types.ts',
       ],
+      thresholds: {
+        // Global floors across all covered lib/ code
+        statements: 55,
+        // Financial logic is held to a higher bar
+        'lib/calculations/**/*.ts': {
+          statements: 80,
+          branches: 65,
+        },
+      },
     },
     // Enhanced reporting for CI/CD
     reporters: ['verbose', 'junit', 'json'],

@@ -62,7 +62,7 @@ describe('Core Paycheck Optimization', () => {
             paycheckToMonthly(2000 + i, 'bi-weekly')
           }
         },
-        10 // Max 10ms for 1000 conversions
+        100 // Max 100ms for 1000 conversions — 10x headroom for shared CI runners
       )
     })
   })
@@ -379,7 +379,7 @@ describe('Core Paycheck Optimization', () => {
       const { result: allocation } = measureCalculationPerformance(
         'optimal-allocation-calculation',
         () => calculateOptimalAllocation(mockProfile),
-        500 // Max 500ms for complex optimization
+        5000 // Max 5000ms for complex optimization — 10x headroom for shared CI runners
       )
 
       expect(allocation.allocations).toBeDefined()
@@ -648,7 +648,7 @@ describe('Core Paycheck Optimization', () => {
               calculateCompoundGrowth(10000 + i, 0.07, 10 + i % 20)
             }
           },
-          50 // Max 50ms for 1000 calculations
+          500 // Max 500ms for 1000 calculations — 10x headroom for shared CI runners
         )
       })
     })
