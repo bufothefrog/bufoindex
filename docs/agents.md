@@ -22,7 +22,7 @@ npm run test:run      # vitest run
 npm run build         # next build (catches a different class of issues)
 ```
 
-Pre-commit (husky → lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI re-runs type-check, lint (max 200 warnings), test, coverage, and a production build on Node 20 + 22.
+Pre-commit (husky → lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI re-runs type-check, lint (max 200 warnings), and tests on a Node 20 + 22 matrix (coverage on Node 20), then runs a production build and an `npm audit --audit-level=high` scan as separate jobs.
 
 A change is ready when:
 
@@ -88,6 +88,7 @@ Reuse existing inputs from `components/ui/inputs/` and `components/shared/inputs
 ## Quick references
 
 - Design system, component hierarchy, theming rules: `CLAUDE.md`.
+- Calculation layer, Monte Carlo engine, URL-hash state, theming architecture: `docs/architecture.md`.
 - TypeScript / React conventions: `docs/agents/code-patterns.md`.
 - Resolving conflicts between parallel agents: `docs/agents/conflict-resolution.md`.
 

@@ -252,7 +252,7 @@ function calculateActualIncomeAtTargetAge(projectedBalance: number): number {
 }
 
 /**
- * Generate BufoIndex contrarian recommendations
+ * Generate scenario recommendations
  */
 function generateScenarioRecommendations(
   inputs: RetirementInputs,

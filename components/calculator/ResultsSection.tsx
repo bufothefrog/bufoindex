@@ -68,19 +68,20 @@ export const ResultsSection = React.memo(function ResultsSection() {
         skippedItems={result.skippedItems}
       />
       
-      {/* Contrarian Advice / Skipped Items */}
+      {/* Notes on this allocation / Skipped Items */}
       {result.skippedItems.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-foreground flex items-center space-x-2">
               <AlertTriangle className="w-5 h-5 text-warning" aria-hidden="true" />
-              <span>Contrarian Recommendations</span>
+              <span>Notes on This Allocation</span>
             </h3>
           </div>
-          
-          <StatusAlert variant="warning" icon={AlertTriangle} title="Reject financial myths">
-            These recommendations go against traditional financial advice but are mathematically
-            optimized for your situation. Review the math and make informed decisions.
+
+          <StatusAlert variant="warning" icon={AlertTriangle} title="Items this allocation deprioritized">
+            Based on your inputs, these items ranked below the allocations above on
+            expected after-tax return. Each note shows the opportunity cost so you can
+            weigh it against your own risk preferences.
           </StatusAlert>
           
           {visibleSkippedItems.map((skippedItem) => (
@@ -111,7 +112,7 @@ export const ResultsSection = React.memo(function ResultsSection() {
               ) : (
                 <>
                   <ChevronDown className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Show {result.skippedItems.length - 2} More Recommendations
+                  Show {result.skippedItems.length - 2} More Notes
                 </>
               )}
             </Button>

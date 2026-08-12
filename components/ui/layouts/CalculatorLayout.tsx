@@ -245,7 +245,7 @@ export function AdvancedCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emp
         features: [
           { color: '#10B981', text: 'Mathematical optimization' },
           { color: '#3B82F6', text: 'Tax efficiency analysis' },
-          { color: '#F59E0B', text: 'Contrarian insights' },
+          { color: '#F59E0B', text: 'Opportunity analysis' },
           { color: '#EF4444', text: 'Risk assessment' }
         ]
       }}

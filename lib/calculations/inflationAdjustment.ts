@@ -194,7 +194,7 @@ export function calculateInflationProtectedSavings(
 }
 
 /**
- * Generate inflation-focused insights with BufoIndex contrarian perspective
+ * Generate inflation-focused insights
  */
 function generateInflationInsights(
   inputs: RetirementInputs,

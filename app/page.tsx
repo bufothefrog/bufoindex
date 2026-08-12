@@ -7,11 +7,12 @@ export default function HomePage() {
       {/* Hero Strip */}
       <section className="text-center space-y-3 pt-8">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-          Bufo Index
+          BufoIndex
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Math-driven calculators that replace conventional financial wisdom with
-          strategies optimized for maximum lifetime wealth.
+          Calculators for paycheck allocation, retirement modeling, and portfolio
+          rebalancing. Everything runs client-side, scenarios are shareable by URL,
+          and each tool shows the formulas behind its numbers.
         </p>
       </section>
 
@@ -31,12 +32,12 @@ export default function HomePage() {
           </div>
 
           <p className="text-sm text-muted-foreground mb-4">
-            Smart monthly allocation that maximizes tax efficiency
-            and long-term wealth building with a clear priority list.
+            Bracket-aware monthly allocation across fixed costs, tax-advantaged
+            accounts, and flexible spending, ordered by after-tax return.
           </p>
 
           <div className="flex items-center text-sm text-sage-600 dark:text-sage-300 font-medium group-hover:text-sage-700 dark:group-hover:text-sage-200 transition-colors">
-            Start Optimizing <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
+            Allocate a Paycheck <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
 
@@ -54,8 +55,8 @@ export default function HomePage() {
           </div>
 
           <p className="text-sm text-muted-foreground mb-4">
-            Monte Carlo simulations, multiple scenarios, and tax-aware
-            projections to optimize for early financial independence.
+            Monte Carlo retirement modeling with Social Security, healthcare
+            costs, and side-by-side scenario comparison.
           </p>
 
           <div className="flex items-center text-sm text-sage-600 dark:text-sage-300 font-medium group-hover:text-sage-700 dark:group-hover:text-sage-200 transition-colors">

@@ -145,7 +145,7 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
     () => calculateTaxableInvestment(updatedProfile, availableAmount),
     
     // Step 8: Low-Interest Debt (under 7%) - rarely pay off early
-    // This will be handled by contrarian analysis as optional
+    // Handled by the opportunity analysis as optional
   ];
   
   // Execute allocations in priority order
@@ -159,7 +159,7 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
     }
   }
 
-  // Step 3: Identify optimization opportunities and contrarian advice
+  // Step 3: Identify optimization opportunities and deprioritized items
   const skippedItems = identifySkippedOptimizations(updatedProfile);
 
   // Step 4: Calculate future projections

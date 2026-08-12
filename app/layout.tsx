@@ -7,8 +7,21 @@ import { UtilityBar } from '@/components/shared/UtilityBar'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Bufo Index - Personal Finance Optimization',
-  description: 'For Those Who Want Financial Control, Not Financial Comfort',
+  metadataBase: new URL('https://bufoindex.com'),
+  title: {
+    template: '%s | BufoIndex',
+    default: 'BufoIndex',
+  },
+  description:
+    'Interactive personal-finance calculators: paycheck allocation, Monte Carlo retirement modeling, and portfolio rebalancing. Client-side, shareable by URL.',
+  openGraph: {
+    siteName: 'BufoIndex',
+    type: 'website',
+    url: 'https://bufoindex.com',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
 }
 
 export default function RootLayout({

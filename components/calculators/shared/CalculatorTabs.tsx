@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calculator, BookOpen, BarChart3, Settings } from 'lucide-react';
+import { Calculator, BookOpen } from 'lucide-react';
 
 export interface TabConfig {
   id: string;
@@ -174,11 +174,9 @@ export function createCalculatorTabConfig(
   options: {
     calculatorProps?: Record<string, unknown>;
     methodologyProps?: Record<string, unknown>;
-    includeAnalysis?: boolean;
-    includeSettings?: boolean;
   } = {}
 ): TabConfig[] {
-  const tabs: TabConfig[] = [
+  return [
     {
       id: 'calculator',
       label: 'Calculator',
@@ -196,28 +194,6 @@ export function createCalculatorTabConfig(
       props: options.methodologyProps || {}
     }
   ];
-
-  if (options.includeAnalysis) {
-    tabs.push({
-      id: 'analysis',
-      label: 'Analysis',
-      icon: <BarChart3 className="w-4 h-4" />,
-      component: () => <div>Analysis feature coming soon...</div>,
-      enabled: false
-    });
-  }
-
-  if (options.includeSettings) {
-    tabs.push({
-      id: 'settings',
-      label: 'Settings',
-      icon: <Settings className="w-4 h-4" />,
-      component: () => <div>Settings feature coming soon...</div>,
-      enabled: false
-    });
-  }
-
-  return tabs;
 }
 
 /**

@@ -9,8 +9,13 @@
       "permanent": true
     },
     {
-      "source": "/retirement-calculator", 
+      "source": "/retirement-calculator",
       "destination": "/tools/retirement-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/portfolio-rebalancing-calculator",
+      "destination": "/tools/portfolio-rebalancing-calculator",
       "permanent": true
     }
   ]

@@ -30,7 +30,7 @@ export function PaycheckAllocator() {
   return (
     <ResponsiveCalculatorLayout
       title="Paycheck Allocator Calculator"
-      description="Smart monthly allocation for your next paycheck. Get a clear priority list that maximizes tax efficiency and exposes financial industry myths."
+      description="Allocates your monthly paycheck across fixed costs, tax-advantaged accounts, and flexible spending, in priority order by after-tax return. Each step shows the math behind its placement."
       inputSection={<InputSection />}
       resultsSection={<ResultsSection />}
       isCalculating={isCalculating}

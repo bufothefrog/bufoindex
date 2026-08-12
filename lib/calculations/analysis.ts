@@ -3,7 +3,7 @@ import { formatCurrency, formatPercent, calculateOpportunityCost } from './core'
 import { calculateIncomeTaxRate } from '../utils';
 
 /**
- * Identify optimization opportunities and provide contrarian advice
+ * Identify optimization opportunities and surface deprioritized items
  */
 export function identifySkippedOptimizations(profile: PaycheckProfile): SkippedItem[] {
   const skippedItems: SkippedItem[] = [];
@@ -290,7 +290,7 @@ export function analyzeInvestmentFees(
 }
 
 /**
- * Analyze Roth vs Traditional strategy for contrarian recommendations
+ * Analyze Roth vs Traditional strategy
  */
 function analyzeRothVsTraditionalStrategy(profile: PaycheckProfile): SkippedItem | null {
   const age = profile.preferences.age;

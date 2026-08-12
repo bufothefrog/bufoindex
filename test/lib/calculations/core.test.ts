@@ -202,7 +202,7 @@ describe('Core Paycheck Optimization', () => {
       expect(profile.benefits.employer401k.matchPercent).toBe(0.50)
       expect(profile.benefits.employer401k.matchLimit).toBe(0.06)
 
-      expect(profile.preferences.emergencyFundMonths).toBe(3) // BufoIndex contrarian: max 3 months
+      expect(profile.preferences.emergencyFundMonths).toBe(3) // default profile caps the emergency fund at 3 months
       expect(profile.preferences.funMoney.min).toBe(300)
       expect(profile.preferences.funMoney.max).toBe(600)
     })

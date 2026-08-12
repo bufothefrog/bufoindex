@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useRetirementStore } from '@/lib/store/retirementStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
@@ -51,18 +52,29 @@ export function RetirementCalculator() {
   };
   
   return (
-    <ResponsiveCalculatorLayout
-      title="Retirement Planning Calculator"
-      description="Comprehensive retirement planning with Monte Carlo simulations and advanced financial modeling. Compare multiple retirement scenarios and get personalized insights."
-      inputSection={<InputSection />}
-      resultsSection={<ResultsSection />}
-      isCalculating={isCalculating}
-      hasResults={!!results}
-      onCalculate={handleCalculate}
-      onShare={handleShare}
-      calculateButtonText="Calculate Retirement Plan" 
-      calculatingText="Running Monte Carlo Analysis..."
-      errors={errors}
-    />
+    <>
+      <ResponsiveCalculatorLayout
+        title="Retirement Planning Calculator"
+        description="Comprehensive retirement planning with Monte Carlo simulations and advanced financial modeling. Compare multiple retirement scenarios and get personalized insights."
+        inputSection={<InputSection />}
+        resultsSection={<ResultsSection />}
+        isCalculating={isCalculating}
+        hasResults={!!results}
+        onCalculate={handleCalculate}
+        onShare={handleShare}
+        calculateButtonText="Calculate Retirement Plan"
+        calculatingText="Running Monte Carlo Analysis..."
+        errors={errors}
+      />
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        How these numbers are computed —{' '}
+        <Link
+          href="/tools/retirement-calculator/methodology"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          Methodology
+        </Link>
+      </p>
+    </>
   );
 }

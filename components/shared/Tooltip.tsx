@@ -34,9 +34,9 @@ export function Tooltip({ content, children, className = '' }: TooltipProps) {
 
 // Pre-defined tooltips for common help content
 export const HELP_TOOLTIPS = {
-  riskTolerance: "Conservative follows traditional financial advice prioritizing safety. Moderate balances safety with optimization. Optimizer maximizes mathematical efficiency and rejects financial industry myths like large emergency funds.",
+  riskTolerance: "Conservative holds a larger cash buffer and prioritizes guaranteed outcomes. Moderate balances cash reserves against expected investment returns. Optimizer minimizes idle cash — for example, a smaller emergency fund — which assumes stable income and access to credit, in exchange for higher expected long-term returns.",
   
-  optimizationGoal: "Balanced optimizes for both tax savings and long-term wealth (recommended). Tax Minimization prioritizes reducing your current year tax bill. Wealth Maximization focuses on long-term growth potential.",
+  optimizationGoal: "Balanced weighs current-year tax savings and long-term growth equally. Tax Minimization prioritizes reducing this year's tax bill. Wealth Maximization prioritizes expected long-term growth, even at a higher current tax cost.",
   
   employerMatch: "The percentage your employer contributes for each dollar you put in. For example, 50% means they give 50¢ for every $1 you contribute, up to the match limit.",
   

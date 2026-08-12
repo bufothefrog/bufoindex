@@ -415,7 +415,7 @@ export function ScenarioComparisonChart({
         </div>
       </div>
       
-      {/* BufoIndex contrarian insight */}
+      {/* Scenario insight */}
       <div className="mt-4 bg-amber-50 border-l-4 border-amber-400 p-4">
         <div className="flex">
           <div className="shrink-0">

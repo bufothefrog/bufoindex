@@ -236,7 +236,7 @@ export function registerRetirementFormulas() {
       functionName,
       {
         ...formulaMeta,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: '2026-08-12'
       },
       'retirement'
     );

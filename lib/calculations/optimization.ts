@@ -536,7 +536,7 @@ export function hasLowInterestDebt(profile: PaycheckProfile): boolean {
 }
 
 /**
- * Calculate low-interest debt analysis (Step 8 - contrarian advice)
+ * Calculate low-interest debt analysis (Step 8 — usually better invested)
  * This is typically NOT recommended in favor of investing
  */
 export function calculateLowInterestDebtAnalysis(profile: PaycheckProfile): SkippedItem | null {

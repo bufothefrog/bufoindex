@@ -21,7 +21,7 @@ export default function RetirementMethodologyPage() {
 
   const metadata = {
     totalFormulas: retirementFormulas.length,
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: '2026-08-12',
     validationStatus: {
       validated: retirementFormulas.filter(f => f.validated).length,
       total: retirementFormulas.length
@@ -42,7 +42,6 @@ export default function RetirementMethodologyPage() {
 }
 
 export const metadata = {
-  title: 'Retirement Calculator Methodology | BufoIndex',
+  title: 'Retirement Calculator Methodology',
   description: 'Mathematical formulas and assumptions used in retirement planning calculations. Transparent methodology with interactive examples and source citations.',
-  keywords: 'retirement calculator methodology, financial formulas, compound interest, safe withdrawal rate, retirement planning math',
 };

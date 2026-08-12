@@ -35,7 +35,7 @@ class FormulaRegistryImpl implements FormulaRegistry {
       functionName,
       filePath: this.getCallerFilePath(),
       validated: false,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: '2026-08-12',
       ...metadata
     };
 
