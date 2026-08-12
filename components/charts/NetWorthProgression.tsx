@@ -15,6 +15,11 @@ import {
 } from 'recharts';
 import { RetirementInputs, RetirementResults, calculateProjectedBalance } from '@/lib/calculations/retirement';
 import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import {
+  DollarDisplayMode,
+  DEFAULT_DOLLAR_DISPLAY_MODE,
+  displayDollars,
+} from '@/lib/utils/displayDollars';
 
 export interface NetWorthData {
   age: number;
@@ -29,6 +34,8 @@ export interface NetWorthData {
 export interface NetWorthProgressionProps {
   inputs: RetirementInputs;
   results: RetirementResults;
+  /** Display-only: deflates nominal dollar series when set to 'today' */
+  displayMode?: DollarDisplayMode;
   width?: number;
   height?: number;
   responsive?: boolean;
@@ -37,12 +44,13 @@ export interface NetWorthProgressionProps {
 /**
  * NetWorthProgression Chart - Shows accumulation and withdrawal phases clearly
  */
-export function NetWorthProgression({ 
-  inputs, 
-  results, 
-  width = 800, 
-  height = 500, 
-  responsive = true 
+export function NetWorthProgression({
+  inputs,
+  results,
+  displayMode = DEFAULT_DOLLAR_DISPLAY_MODE,
+  width = 800,
+  height = 500,
+  responsive = true
 }: NetWorthProgressionProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
   const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
@@ -128,8 +136,26 @@ export function NetWorthProgression({
     return data;
   }, [inputs, results]);
 
+  // Display-only conversion: netWorth/contributions/growth are nominal; in
+  // 'today' mode deflate each by the years elapsed since the starting age.
+  // realValue is already today's dollars by construction.
+  const displayData = useMemo(() => {
+    if (displayMode !== 'today') return netWorthData;
+    return netWorthData.map((d) => {
+      const yearsFromStart = d.age - inputs.startingAge;
+      return {
+        ...d,
+        netWorth: displayDollars(d.netWorth, displayMode, inputs.inflationRate, yearsFromStart),
+        contributions: displayDollars(d.contributions, displayMode, inputs.inflationRate, yearsFromStart),
+        growth: displayDollars(d.growth, displayMode, inputs.inflationRate, yearsFromStart),
+      };
+    });
+  }, [netWorthData, displayMode, inputs.inflationRate, inputs.startingAge]);
+
+  const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
+
   // Find phase transition point
-  const retirementPoint = netWorthData.find(d => d.age === inputs.retirementAge);
+  const retirementPoint = displayData.find(d => d.age === inputs.retirementAge);
 
   // Custom tooltip
   interface TooltipProps {
@@ -156,10 +182,12 @@ export function NetWorthProgression({
               <span style={{ color: chartTheme.accent }}>Net Worth:</span>{' '}
               ${data.netWorth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
-              ${data.realValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
+            {displayMode === 'nominal' && (
+              <p className="text-muted-foreground">
+                <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
+                ${data.realValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            )}
             <p className="text-muted-foreground">
               <span style={{ color: chartTheme.accent }}>Contributions:</span>{' '}
               ${data.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -184,7 +212,7 @@ export function NetWorthProgression({
   // Chart content
   const chartContent = (
     <ComposedChart
-      data={netWorthData}
+      data={displayData}
       margin={{
         top: 20,
         right: 30,
@@ -225,9 +253,9 @@ export function NetWorthProgression({
         fontFamily="IBM Plex Mono, monospace"
         tick={{ fill: chartTheme.muted }}
         tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
-        label={{ 
-          value: 'Net Worth', 
-          angle: -90, 
+        label={{
+          value: `Net Worth${modeAxisSuffix}`,
+          angle: -90,
           position: 'insideLeft',
           style: { textAnchor: 'middle', fill: chartTheme.muted }
         }}
@@ -275,16 +303,18 @@ export function NetWorthProgression({
         name="Total Net Worth"
       />
       
-      {/* Real value line (inflation-adjusted) */}
-      <Line
-        type="monotone"
-        dataKey="realValue"
-        stroke={chartTheme.secondary}
-        strokeWidth={2}
-        strokeDasharray="5 5"
-        dot={false}
-        name="Real Value (Today's $)"
-      />
+      {/* Real value line — redundant when the main line is already in today's dollars */}
+      {displayMode === 'nominal' && (
+        <Line
+          type="monotone"
+          dataKey="realValue"
+          stroke={chartTheme.secondary}
+          strokeWidth={2}
+          strokeDasharray="5 5"
+          dot={false}
+          name="Real Value (Today's $)"
+        />
+      )}
     </ComposedChart>
   );
 
@@ -303,8 +333,11 @@ export function NetWorthProgression({
           Net Worth Progression Through Life
         </h3>
         <p className="text-sm text-sage-600 font-mono">
-          Portfolio growth during accumulation phase (age {inputs.startingAge}-{inputs.retirementAge}) and 
+          Portfolio growth during accumulation phase (age {inputs.startingAge}-{inputs.retirementAge}) and
           decline during withdrawal phase (age {inputs.retirementAge}-{inputs.lifeExpectancy})
+        </p>
+        <p className="text-xs text-muted-foreground font-mono mt-1">
+          {displayMode === 'today' ? "Values shown in today's dollars." : 'Values shown in future dollars.'}
         </p>
       </div>
       
@@ -320,7 +353,7 @@ export function NetWorthProgression({
             Ages {inputs.startingAge} - {inputs.retirementAge} ({inputs.retirementAge - inputs.startingAge} years)
           </div>
           <div className="text-sage-500">
-            Peak: ${retirementPoint?.netWorth.toLocaleString() || 0}
+            Peak: ${Math.round(retirementPoint?.netWorth || 0).toLocaleString()}
           </div>
         </div>
         
@@ -343,12 +376,13 @@ export function NetWorthProgression({
             }
           </div>
           <div className="text-sage-500">
-            From ${retirementPoint?.contributions.toLocaleString() || 0} contributions
+            From ${Math.round(retirementPoint?.contributions || 0).toLocaleString()} contributions
           </div>
         </div>
       </div>
       
-      {/* Inflation impact notice */}
+      {/* Inflation impact notice — references the dashed real-value line, which only renders in nominal mode */}
+      {displayMode === 'nominal' && (
       <div className="mt-4 bg-amber-50 border-l-4 border-amber-400 p-4">
         <div className="flex">
           <div className="shrink-0">
@@ -368,6 +402,7 @@ export function NetWorthProgression({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

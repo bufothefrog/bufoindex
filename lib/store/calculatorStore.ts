@@ -3,17 +3,19 @@ import { devtools, persist } from 'zustand/middleware';
 import { PaycheckProfile, AllocationResult, ExportableData } from '../types';
 import { calculateOptimalAllocation, getDefaultProfile, updateLegacyIncomeFields } from '../calculations/core';
 import { encodeToUrlHash, decodeFromUrlHash } from '../utils';
+import { DollarDisplayMode, DEFAULT_DOLLAR_DISPLAY_MODE } from '../utils/displayDollars';
 
 interface CalculatorState {
   // Current calculation data
   profile: PaycheckProfile;
   result: AllocationResult | null;
-  
+
   // UI state
   isCalculating: boolean;
   activeSection: string;
   showAdvanced: boolean;
-  
+  displayMode: DollarDisplayMode; // Display-only: today's vs nominal dollars for projections
+
   // Error handling
   errors: Record<string, string>;
   
@@ -30,6 +32,7 @@ interface CalculatorState {
   calculate: () => Promise<void>;
   setActiveSection: (section: string) => void;
   setShowAdvanced: (show: boolean) => void;
+  setDisplayMode: (mode: DollarDisplayMode) => void;
   reset: () => void;
   setErrors: (errors: Record<string, string>) => void;
   clearErrors: () => void;
@@ -53,8 +56,9 @@ export const useCalculatorStore = create<CalculatorState>()(
         isCalculating: false,
         activeSection: 'income',
         showAdvanced: false,
+        displayMode: DEFAULT_DOLLAR_DISPLAY_MODE,
         errors: {},
-        
+
         // Profile update actions
         updateProfile: (updates) =>
           set((state) => ({
@@ -170,6 +174,7 @@ export const useCalculatorStore = create<CalculatorState>()(
         // UI actions
         setActiveSection: (section) => set({ activeSection: section }),
         setShowAdvanced: (show) => set({ showAdvanced: show }),
+        setDisplayMode: (mode) => set({ displayMode: mode }),
         
         // Error handling
         setErrors: (errors) => set({ errors }),
@@ -182,6 +187,7 @@ export const useCalculatorStore = create<CalculatorState>()(
           isCalculating: false,
           activeSection: 'income',
           showAdvanced: false,
+          displayMode: DEFAULT_DOLLAR_DISPLAY_MODE,
           errors: {},
         }),
         
@@ -212,8 +218,8 @@ export const useCalculatorStore = create<CalculatorState>()(
         
         // URL sharing functionality
         generateShareUrl: () => {
-          const { profile, result } = get();
-          const shareData = { profile, result };
+          const { profile, result, displayMode } = get();
+          const shareData = { profile, result, displayMode };
           const hash = encodeToUrlHash(shareData);
           
           if (hash) {
@@ -231,9 +237,11 @@ export const useCalculatorStore = create<CalculatorState>()(
             if (hash) {
               const decodedData = decodeFromUrlHash(hash);
               if (decodedData && (decodedData as Record<string, unknown>).profile) {
+                const decodedMode = (decodedData as Record<string, unknown>).displayMode;
                 set({
                   profile: Object.assign({}, (decodedData as Record<string, unknown>).profile, { source: 'shared', lastUpdated: Date.now() }) as PaycheckProfile,
                   result: null, // Will need to recalculate
+                  displayMode: decodedMode === 'nominal' ? 'nominal' : DEFAULT_DOLLAR_DISPLAY_MODE,
                   errors: {},
                 });
                 
@@ -256,6 +264,9 @@ export const useCalculatorStore = create<CalculatorState>()(
           profile: state.profile,
           showAdvanced: state.showAdvanced,
           activeSection: state.activeSection,
+          // Missing in older persisted payloads — persist's shallow merge
+          // falls back to the default ('today').
+          displayMode: state.displayMode,
         }),
       }
     ),
@@ -270,3 +281,4 @@ export const useIsCalculating = () => useCalculatorStore((state) => state.isCalc
 export const useErrors = () => useCalculatorStore((state) => state.errors);
 export const useActiveSection = () => useCalculatorStore((state) => state.activeSection);
 export const useShowAdvanced = () => useCalculatorStore((state) => state.showAdvanced);
+export const useDisplayMode = () => useCalculatorStore((state) => state.displayMode);

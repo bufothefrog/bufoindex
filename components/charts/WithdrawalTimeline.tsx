@@ -14,6 +14,11 @@ import {
 } from 'recharts';
 import { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
 import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import {
+  DollarDisplayMode,
+  DEFAULT_DOLLAR_DISPLAY_MODE,
+  displayDollars,
+} from '@/lib/utils/displayDollars';
 
 export interface WithdrawalData {
   age: number;
@@ -27,6 +32,8 @@ export interface WithdrawalData {
 export interface WithdrawalTimelineProps {
   inputs: RetirementInputs;
   results: RetirementResults;
+  /** Display-only: deflates nominal dollar series when set to 'today' */
+  displayMode?: DollarDisplayMode;
   width?: number;
   height?: number;
   responsive?: boolean;
@@ -36,12 +43,13 @@ export interface WithdrawalTimelineProps {
  * WithdrawalTimeline Chart - Shows withdrawal timeline starting at retirement age only
  * CRITICAL: This chart MUST start at retirement age, not before
  */
-export function WithdrawalTimeline({ 
-  inputs, 
-  results, 
-  width = 800, 
-  height = 400, 
-  responsive = true 
+export function WithdrawalTimeline({
+  inputs,
+  results,
+  displayMode = DEFAULT_DOLLAR_DISPLAY_MODE,
+  width = 800,
+  height = 400,
+  responsive = true
 }: WithdrawalTimelineProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
   const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
@@ -90,6 +98,20 @@ export function WithdrawalTimeline({
     return data;
   }, [inputs, results]);
 
+  // Display-only conversion: the withdrawal and balance series are nominal;
+  // in 'today' mode deflate each by the years elapsed since the starting age.
+  // withdrawalAmount/currentDollars are already expressed in today's dollars.
+  const displayData = useMemo(() => {
+    if (displayMode !== 'today') return withdrawalData;
+    return withdrawalData.map((d) => ({
+      ...d,
+      inflatedAmount: displayDollars(d.inflatedAmount, displayMode, inputs.inflationRate, d.age - inputs.startingAge),
+      portfolioBalance: displayDollars(d.portfolioBalance, displayMode, inputs.inflationRate, d.age - inputs.startingAge),
+    }));
+  }, [withdrawalData, displayMode, inputs.inflationRate, inputs.startingAge]);
+
+  const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
+
   // Custom tooltip formatter
   interface TooltipProps {
     active?: boolean;
@@ -113,10 +135,12 @@ export function WithdrawalTimeline({
               <span style={{ color: chartTheme.accent }}>Withdrawal:</span>{' '}
               ${data.inflatedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
-              ${data.currentDollars.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
+            {displayMode === 'nominal' && (
+              <p className="text-muted-foreground">
+                <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
+                ${data.currentDollars.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            )}
             <p className="text-muted-foreground">
               <span style={{ color: chartTheme.accent }}>Portfolio:</span>{' '}
               ${data.portfolioBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -131,7 +155,7 @@ export function WithdrawalTimeline({
   // Responsive container content
   const chartContent = (
     <ComposedChart
-      data={withdrawalData}
+      data={displayData}
       margin={{
         top: 20,
         right: 30,
@@ -160,9 +184,9 @@ export function WithdrawalTimeline({
         fontFamily="IBM Plex Mono, monospace"
         tick={{ fill: chartTheme.muted }}
         tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-        label={{ 
-          value: 'Annual Amount', 
-          angle: -90, 
+        label={{
+          value: `Annual Amount${modeAxisSuffix}`,
+          angle: -90,
           position: 'insideLeft',
           style: { textAnchor: 'middle', fill: chartTheme.muted }
         }}
@@ -175,9 +199,9 @@ export function WithdrawalTimeline({
         fontFamily="IBM Plex Mono, monospace"
         tick={{ fill: chartTheme.secondary }}
         tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-        label={{ 
-          value: 'Portfolio Balance', 
-          angle: 90, 
+        label={{
+          value: `Portfolio Balance${modeAxisSuffix}`,
+          angle: 90,
           position: 'insideRight',
           style: { textAnchor: 'middle', fill: chartTheme.secondary }
         }}
@@ -204,7 +228,7 @@ export function WithdrawalTimeline({
         name="Portfolio Balance"
       />
       
-      {/* Inflation-adjusted withdrawal line */}
+      {/* Withdrawal line (deflated to today's dollars in 'today' mode) */}
       <Line
         yAxisId="left"
         type="monotone"
@@ -212,21 +236,23 @@ export function WithdrawalTimeline({
         stroke={chartTheme.primary}
         strokeWidth={3}
         dot={{ fill: chartTheme.primary, strokeWidth: 2, r: 4 }}
-        name="Annual Withdrawal (Future $)"
+        name={displayMode === 'today' ? "Annual Withdrawal (Today's $)" : 'Annual Withdrawal (Future $)'}
       />
-      
-      {/* Current dollars line for reference */}
-      <Line
-        yAxisId="left"
-        type="monotone"
-        dataKey="currentDollars"
-        stroke={chartTheme.secondary}
-        strokeWidth={2}
-        strokeDasharray="5 5"
-        dot={false}
-        name="Equivalent Today's $"
-      />
-      
+
+      {/* Current dollars reference line — redundant when everything is already in today's dollars */}
+      {displayMode === 'nominal' && (
+        <Line
+          yAxisId="left"
+          type="monotone"
+          dataKey="currentDollars"
+          stroke={chartTheme.secondary}
+          strokeWidth={2}
+          strokeDasharray="5 5"
+          dot={false}
+          name="Equivalent Today's $"
+        />
+      )}
+
       {/* Portfolio balance line */}
       <Line
         yAxisId="right"
@@ -255,8 +281,11 @@ export function WithdrawalTimeline({
           Withdrawal Timeline (Retirement Years Only)
         </h3>
         <p className="text-sm text-sage-600 font-mono">
-          Annual withdrawals from age {inputs.retirementAge} to {inputs.lifeExpectancy}, 
+          Annual withdrawals from age {inputs.retirementAge} to {inputs.lifeExpectancy},
           adjusted for inflation. Portfolio balance shows expected decline over time.
+        </p>
+        <p className="text-xs text-muted-foreground font-mono mt-1">
+          {displayMode === 'today' ? "Values shown in today's dollars." : 'Values shown in future dollars.'}
         </p>
       </div>
       
@@ -269,30 +298,34 @@ export function WithdrawalTimeline({
         <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-400">
           <div className="text-sage-700 font-semibold">First Year Withdrawal</div>
           <div className="text-sage-900">
-            ${withdrawalData[0]?.inflatedAmount.toLocaleString() || 0}
+            ${Math.round(displayData[0]?.inflatedAmount || 0).toLocaleString()}
           </div>
           <div className="text-sage-500">
-            (${withdrawalData[0]?.currentDollars.toLocaleString() || 0} today)
+            {displayMode === 'nominal'
+              ? `($${displayData[0]?.currentDollars.toLocaleString() || 0} today)`
+              : "in today's dollars"}
           </div>
         </div>
-        
+
         <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-500">
           <div className="text-sage-700 font-semibold">Final Year Withdrawal</div>
           <div className="text-sage-900">
-            ${withdrawalData[withdrawalData.length - 1]?.inflatedAmount.toLocaleString() || 0}
+            ${Math.round(displayData[displayData.length - 1]?.inflatedAmount || 0).toLocaleString()}
           </div>
           <div className="text-sage-500">
-            ({Math.pow(1 + inputs.inflationRate, withdrawalData.length - 1).toFixed(1)}x inflation)
+            {displayMode === 'nominal'
+              ? `(${Math.pow(1 + inputs.inflationRate, displayData.length - 1).toFixed(1)}x inflation)`
+              : "in today's dollars"}
           </div>
         </div>
-        
+
         <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-600">
           <div className="text-sage-700 font-semibold">Portfolio Depletion</div>
           <div className="text-sage-900">
             {withdrawalData[withdrawalData.length - 1]?.portfolioBalance > 10000 ? 'Preserved' : 'Depleted'}
           </div>
           <div className="text-sage-500">
-            Final: ${Math.max(0, withdrawalData[withdrawalData.length - 1]?.portfolioBalance || 0).toLocaleString()}
+            Final: ${Math.round(Math.max(0, displayData[displayData.length - 1]?.portfolioBalance || 0)).toLocaleString()}
           </div>
         </div>
       </div>

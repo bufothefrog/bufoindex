@@ -16,6 +16,11 @@ import {
 import { RetirementInputs, calculateRequiredBalance } from '@/lib/calculations/retirement';
 import { analyzeRetirementScenarios, ScenarioAnalysis } from '@/lib/calculations/scenarioAnalysis';
 import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import {
+  DollarDisplayMode,
+  DEFAULT_DOLLAR_DISPLAY_MODE,
+  displayDollars,
+} from '@/lib/utils/displayDollars';
 
 export interface ScenarioData {
   name: string;
@@ -31,6 +36,8 @@ export interface ScenarioData {
 export interface ScenarioComparisonProps {
   inputs: RetirementInputs;
   scenarioAnalysis?: ScenarioAnalysis;
+  /** Display-only: deflates nominal dollar figures when set to 'today' */
+  displayMode?: DollarDisplayMode;
   width?: number;
   height?: number;
   responsive?: boolean;
@@ -39,12 +46,13 @@ export interface ScenarioComparisonProps {
 /**
  * ScenarioComparisonChart - Compare current vs +$500 vs +$1000 scenarios
  */
-export function ScenarioComparisonChart({ 
+export function ScenarioComparisonChart({
   inputs,
   scenarioAnalysis,
-  width = 800, 
-  height = 400, 
-  responsive = true 
+  displayMode = DEFAULT_DOLLAR_DISPLAY_MODE,
+  width = 800,
+  height = 400,
+  responsive = true
 }: ScenarioComparisonProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
   const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
@@ -123,6 +131,27 @@ export function ScenarioComparisonChart({
     return data;
   }, [inputs, scenarioAnalysis]);
 
+  // Display-only conversion. Every projected/required balance here is a
+  // balance at the target retirement age, so a single deflation horizon
+  // applies: retirementAge - startingAge. additionalIncome is an annual
+  // amount as of the same year. monthlyContribution is current-year money
+  // and is never converted.
+  const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
+  const toDisplay = (nominalAmount: number) =>
+    displayDollars(nominalAmount, displayMode, inputs.inflationRate, yearsToRetirement);
+
+  const displayScenarioData = useMemo(() => {
+    if (displayMode !== 'today') return scenarioData;
+    return scenarioData.map((d) => ({
+      ...d,
+      projectedBalance: displayDollars(d.projectedBalance, displayMode, inputs.inflationRate, yearsToRetirement),
+      additionalIncome: displayDollars(d.additionalIncome, displayMode, inputs.inflationRate, yearsToRetirement),
+      surplusShortfall: displayDollars(d.surplusShortfall, displayMode, inputs.inflationRate, yearsToRetirement),
+    }));
+  }, [scenarioData, displayMode, inputs.inflationRate, yearsToRetirement]);
+
+  const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
+
   // Custom tooltip
   interface TooltipProps {
     active?: boolean;
@@ -183,7 +212,7 @@ export function ScenarioComparisonChart({
   // Chart content
   const chartContent = (
     <ComposedChart
-      data={scenarioData}
+      data={displayScenarioData}
       margin={{
         top: 20,
         right: 30,
@@ -212,9 +241,9 @@ export function ScenarioComparisonChart({
         fontFamily="IBM Plex Mono, monospace"
         tick={{ fill: chartTheme.muted }}
         tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
-        label={{ 
-          value: 'Projected Balance', 
-          angle: -90, 
+        label={{
+          value: `Projected Balance${modeAxisSuffix}`,
+          angle: -90,
           position: 'insideLeft',
           style: { textAnchor: 'middle', fill: chartTheme.muted }
         }}
@@ -245,9 +274,9 @@ export function ScenarioComparisonChart({
       />
       
       {/* Target balance reference line */}
-      <ReferenceLine 
+      <ReferenceLine
         yAxisId="left"
-        y={calculateRequiredBalance(inputs.targetIncome)} 
+        y={toDisplay(calculateRequiredBalance(inputs.targetIncome))}
         stroke={chartTheme.grid} 
         strokeDasharray="5 5" 
         label={{ 
@@ -309,6 +338,9 @@ export function ScenarioComparisonChart({
         </h3>
         <p className="text-sm text-sage-600 font-mono">
           Impact of increasing monthly contributions by $500 and $1,000 on retirement age and income potential
+        </p>
+        <p className="text-xs text-muted-foreground font-mono mt-1">
+          {displayMode === 'today' ? "Balances shown in today's dollars." : 'Balances shown in future dollars.'}
         </p>
       </div>
       

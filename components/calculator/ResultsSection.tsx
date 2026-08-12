@@ -11,7 +11,9 @@ import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { PayrollSetupGuide } from './PayrollSetupGuide';
 import { PaycheckBreakdown } from './PaycheckBreakdown';
 import { QuickActions } from './QuickActions';
+import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { formatCurrency, formatYearsAndMonths } from '@/lib/utils';
+import { displayDollars, DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
 import {
   TrendingUp,
   ChevronDown,
@@ -23,6 +25,8 @@ import {
 export const ResultsSection = React.memo(function ResultsSection() {
   const result = useResult();
   const profile = useProfile();
+  const displayMode = useCalculatorStore((state) => state.displayMode);
+  const setDisplayMode = useCalculatorStore((state) => state.setDisplayMode);
   const [expandedAllocation, setExpandedAllocation] = React.useState<string | null>(null);
   const [expandedSkipped, setExpandedSkipped] = React.useState<string | null>(null);
   const [showAllSkipped, setShowAllSkipped] = React.useState(false);
@@ -36,9 +40,13 @@ export const ResultsSection = React.memo(function ResultsSection() {
   }, [result]);
   
   if (!result) return null;
-  
-  
-  const visibleSkippedItems = showAllSkipped 
+
+  // Display-only conversion for multi-year projections: per-paycheck
+  // allocation amounts are current-year money and are never converted.
+  const toDisplayTenYear = (nominalAmount: number) =>
+    displayDollars(nominalAmount, displayMode, DISPLAY_INFLATION_ASSUMPTION, 10);
+
+  const visibleSkippedItems = showAllSkipped
     ? result.skippedItems 
     : result.skippedItems.slice(0, 2);
   
@@ -121,26 +129,34 @@ export const ResultsSection = React.memo(function ResultsSection() {
       {/* Future Projections */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-primary" aria-hidden="true" />
-            <span>Long-Term Impact</span>
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="w-5 h-5 text-primary" aria-hidden="true" />
+              <span>Long-Term Impact</span>
+            </CardTitle>
+            <DollarModeToggle value={displayMode} onChange={setDisplayMode} />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            {displayMode === 'today'
+              ? "adjusted to today's dollars (assumes 3% inflation)"
+              : 'in future dollars'}
+          </p>
           <div className="space-y-3">
             <BreakdownRow
               label="Current Path (10 years)"
-              value={formatCurrency(result.projections.currentPath.tenYear)}
+              value={formatCurrency(toDisplayTenYear(result.projections.currentPath.tenYear))}
             />
             <BreakdownRow
               label="Optimized Path (10 years)"
-              value={formatCurrency(result.projections.optimizedPath.tenYear)}
+              value={formatCurrency(toDisplayTenYear(result.projections.optimizedPath.tenYear))}
               variant="success"
             />
             <hr className="border" />
             <BreakdownRow
               label="Improvement"
-              value={formatCurrency(result.projections.improvement.tenYear)}
+              value={formatCurrency(toDisplayTenYear(result.projections.improvement.tenYear))}
               prefix="+"
               variant="success"
             />

@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
 import { ScenarioAnalysis } from '@/lib/calculations/scenarioAnalysis';
+import { DollarDisplayMode, DEFAULT_DOLLAR_DISPLAY_MODE } from '@/lib/utils/displayDollars';
 
 // Import individual chart components
 import WithdrawalTimeline from './WithdrawalTimeline';
@@ -13,6 +14,8 @@ export interface RetirementChartsProps {
   inputs: RetirementInputs;
   results: RetirementResults;
   scenarioAnalysis?: ScenarioAnalysis;
+  /** Display-only: today's vs future dollars, forwarded to every chart */
+  displayMode?: DollarDisplayMode;
   className?: string;
 }
 
@@ -22,10 +25,11 @@ type ChartType = 'withdrawal' | 'netWorth' | 'scenarios' | 'all';
  * Main RetirementCharts component - Orchestrates all retirement visualization charts
  * Provides responsive, mobile-friendly interface with chart selection
  */
-export function RetirementCharts({ 
-  inputs, 
-  results, 
+export function RetirementCharts({
+  inputs,
+  results,
   scenarioAnalysis,
+  displayMode = DEFAULT_DOLLAR_DISPLAY_MODE,
   className = ''
 }: RetirementChartsProps) {
   
@@ -86,6 +90,7 @@ export function RetirementCharts({
       <WithdrawalTimeline
         inputs={inputs}
         results={results}
+        displayMode={displayMode}
         responsive={true}
         height={400}
       />
@@ -94,6 +99,7 @@ export function RetirementCharts({
       <NetWorthProgression
         inputs={inputs}
         results={results}
+        displayMode={displayMode}
         responsive={true}
         height={500}
       />
@@ -102,11 +108,12 @@ export function RetirementCharts({
       <ScenarioComparisonChart
         inputs={inputs}
         scenarioAnalysis={scenarioAnalysis}
+        displayMode={displayMode}
         responsive={true}
         height={400}
       />
     )
-  }), [inputs, results, scenarioAnalysis]);
+  }), [inputs, results, scenarioAnalysis, displayMode]);
 
   // Mobile-first chart selector
   const ChartSelector = () => (
@@ -267,10 +274,11 @@ export default RetirementCharts;
 
 // Performance optimization: Memoized chart wrapper for expensive calculations
 export const MemoizedRetirementCharts = React.memo(RetirementCharts, (prevProps, nextProps) => {
-  // Only re-render if inputs or results actually changed
+  // Only re-render if inputs, results, or display mode actually changed
   return (
     JSON.stringify(prevProps.inputs) === JSON.stringify(nextProps.inputs) &&
     JSON.stringify(prevProps.results) === JSON.stringify(nextProps.results) &&
-    JSON.stringify(prevProps.scenarioAnalysis) === JSON.stringify(nextProps.scenarioAnalysis)
+    JSON.stringify(prevProps.scenarioAnalysis) === JSON.stringify(nextProps.scenarioAnalysis) &&
+    prevProps.displayMode === nextProps.displayMode
   );
 });

@@ -4,6 +4,7 @@ import { RetirementInputs, RetirementResults, annualizeIncome } from '../calcula
 import { calculateRetirementAnalysis, RetirementInputValidationError } from '../calculations/retirement';
 import { RetirementConstants } from '../constants/retirement';
 import { encodeRetirementToUrlHash, decodeRetirementFromUrlHash } from '../utils/retirementState';
+import { DollarDisplayMode, DEFAULT_DOLLAR_DISPLAY_MODE } from '../utils/displayDollars';
 
 // Module-level timeout references to prevent debounce leaks (BUG-13)
 let recalculateTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -26,10 +27,11 @@ interface RetirementState {
   activeSection: string;
   showAdvanced: boolean;
   hasCalculatedOnce: boolean; // Track if user has manually calculated at least once
-  
+  displayMode: DollarDisplayMode; // Display-only: today's vs nominal dollars
+
   // Error handling
   errors: Record<string, string>;
-  
+
   // Actions
   updateInputs: (updates: Partial<RetirementInputs>) => void;
   calculate: () => Promise<void>;
@@ -38,6 +40,7 @@ interface RetirementState {
   clearErrors: () => void;
   setActiveSection: (section: string) => void;
   toggleAdvanced: () => void;
+  setDisplayMode: (mode: DollarDisplayMode) => void;
 }
 
 const getDefaultInputs = (): RetirementInputs => ({
@@ -76,6 +79,7 @@ export const useRetirementStore = create<RetirementState>()(
         activeSection: 'basic',
         showAdvanced: false,
         hasCalculatedOnce: false,
+        displayMode: DEFAULT_DOLLAR_DISPLAY_MODE,
         errors: {},
 
         // Actions
@@ -95,11 +99,11 @@ export const useRetirementStore = create<RetirementState>()(
             // Clear previous timeout to prevent debounce leak (BUG-13)
             if (recalculateTimeout) clearTimeout(recalculateTimeout);
             recalculateTimeout = setTimeout(async () => {
-              const { inputs } = get();
+              const { inputs, displayMode } = get();
 
               // Update URL hash
               try {
-                const hash = encodeRetirementToUrlHash(inputs);
+                const hash = encodeRetirementToUrlHash(inputs, displayMode);
                 if (typeof window !== 'undefined') {
                   window.history.replaceState(null, '', `#${hash}`);
                 }
@@ -121,9 +125,9 @@ export const useRetirementStore = create<RetirementState>()(
             // Clear previous timeout to prevent debounce leak (BUG-13)
             if (hashUpdateTimeout) clearTimeout(hashUpdateTimeout);
             hashUpdateTimeout = setTimeout(() => {
-              const { inputs } = get();
+              const { inputs, displayMode } = get();
               try {
-                const hash = encodeRetirementToUrlHash(inputs);
+                const hash = encodeRetirementToUrlHash(inputs, displayMode);
                 if (typeof window !== 'undefined') {
                   window.history.replaceState(null, '', `#${hash}`);
                 }
@@ -162,25 +166,28 @@ export const useRetirementStore = create<RetirementState>()(
             
             const hash = window.location.hash.slice(1);
             if (hash) {
-              const urlInputs = decodeRetirementFromUrlHash(hash);
-              if (urlInputs) {
+              const decoded = decodeRetirementFromUrlHash(hash);
+              if (decoded) {
+                const urlInputs = decoded.inputs;
                 // Migrate old risk profile values to simplified options
                 if (urlInputs.riskProfile && !['tdf', 'custom'].includes(urlInputs.riskProfile)) {
                   urlInputs.riskProfile = 'custom'; // Convert old profiles to custom
                 }
-                
+
                 // Calculate results immediately when loading from URL and mark as calculated
                 try {
                   const calculationResults = calculateRetirementAnalysis(urlInputs);
-                  set({ 
-                    inputs: urlInputs, 
+                  set({
+                    inputs: urlInputs,
                     results: calculationResults,
+                    displayMode: decoded.displayMode,
                     hasCalculatedOnce: true // URL load counts as initial calculation
                   });
                 } catch (error) {
                   console.error('URL calculation error:', error);
                   set({
                     inputs: urlInputs,
+                    displayMode: decoded.displayMode,
                     errors: toErrorMap(error)
                   });
                 }
@@ -192,9 +199,9 @@ export const useRetirementStore = create<RetirementState>()(
         },
 
         generateShareUrl: () => {
-          const { inputs } = get();
+          const { inputs, displayMode } = get();
           try {
-            const hash = encodeRetirementToUrlHash(inputs);
+            const hash = encodeRetirementToUrlHash(inputs, displayMode);
             const baseUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
             return `${baseUrl}#${hash}`;
           } catch (error) {
@@ -204,10 +211,24 @@ export const useRetirementStore = create<RetirementState>()(
         },
 
         clearErrors: () => set({ errors: {} }),
-        
+
         setActiveSection: (section: string) => set({ activeSection: section }),
-        
-        toggleAdvanced: () => set((state) => ({ showAdvanced: !state.showAdvanced }))
+
+        toggleAdvanced: () => set((state) => ({ showAdvanced: !state.showAdvanced })),
+
+        setDisplayMode: (mode: DollarDisplayMode) => {
+          set({ displayMode: mode });
+          // Display mode is part of shareable URL state — reflect it immediately
+          try {
+            const { inputs } = get();
+            const hash = encodeRetirementToUrlHash(inputs, mode);
+            if (typeof window !== 'undefined') {
+              window.history.replaceState(null, '', `#${hash}`);
+            }
+          } catch (error) {
+            console.warn('Failed to update URL hash:', error);
+          }
+        }
       }),
       {
         name: 'retirement-calculator',
@@ -215,7 +236,10 @@ export const useRetirementStore = create<RetirementState>()(
         partialize: (state) => ({
           inputs: state.inputs,
           showAdvanced: state.showAdvanced,
-          hasCalculatedOnce: state.hasCalculatedOnce
+          hasCalculatedOnce: state.hasCalculatedOnce,
+          // Missing in older persisted payloads — persist's shallow merge
+          // falls back to the default ('today'), so no version bump needed.
+          displayMode: state.displayMode
         }),
         migrate: (persistedState: unknown, version: number) => {
           if (typeof persistedState === 'object' && persistedState !== null && 'inputs' in persistedState) {
@@ -243,5 +267,6 @@ export const useRetirementStore = create<RetirementState>()(
 // Selector hooks for specific parts of state
 export const useRetirementInputs = () => useRetirementStore(state => state.inputs);
 export const useRetirementResults = () => useRetirementStore(state => state.results);
+export const useRetirementDisplayMode = () => useRetirementStore(state => state.displayMode);
 export const useRetirementCalculating = () => useRetirementStore(state => state.isCalculating);
 export const useRetirementErrors = () => useRetirementStore(state => state.errors);

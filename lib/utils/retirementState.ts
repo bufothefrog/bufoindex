@@ -5,6 +5,10 @@
 
 import { RetirementInputs } from '@/lib/calculations/retirement';
 import { RetirementConstants } from '@/lib/constants/retirement';
+import {
+  DollarDisplayMode,
+  DEFAULT_DOLLAR_DISPLAY_MODE,
+} from '@/lib/utils/displayDollars';
 
 // Compressed data structure for URL serialization
 interface CompressedRetirementData {
@@ -19,16 +23,28 @@ interface CompressedRetirementData {
   ip?: string; // incomePeriod
   st?: string; // state
   rp?: string; // riskProfile
+  dm?: string; // dollar display mode (v2+; elided when 'today')
   [key: string]: unknown; // other compressed fields
 }
 
 /**
- * Encode retirement inputs to URL hash
+ * Decoded URL-hash payload: the calculator inputs plus display-only state.
  */
-export function encodeRetirementToUrlHash(inputs: RetirementInputs): string {
+export interface DecodedRetirementState {
+  inputs: RetirementInputs;
+  displayMode: DollarDisplayMode;
+}
+
+/**
+ * Encode retirement inputs (and display-only state) to URL hash
+ */
+export function encodeRetirementToUrlHash(
+  inputs: RetirementInputs,
+  displayMode: DollarDisplayMode = DEFAULT_DOLLAR_DISPLAY_MODE
+): string {
   try {
     // Compress the data by removing default values
-    const compressed = compressRetirementData(inputs);
+    const compressed = compressRetirementData(inputs, displayMode);
     
     // Convert to JSON string and encode
     const jsonString = JSON.stringify(compressed);
@@ -45,7 +61,7 @@ export function encodeRetirementToUrlHash(inputs: RetirementInputs): string {
 /**
  * Decode retirement inputs from URL hash
  */
-export function decodeRetirementFromUrlHash(hash: string): RetirementInputs | null {
+export function decodeRetirementFromUrlHash(hash: string): DecodedRetirementState | null {
   try {
     // Remove the # if present
     const cleanHash = hash.replace(/^#/, '');
@@ -82,11 +98,14 @@ export function decodeRetirementFromUrlHash(hash: string): RetirementInputs | nu
 /**
  * Compress retirement data by removing defaults and reducing size
  */
-function compressRetirementData(inputs: RetirementInputs): CompressedRetirementData {
+function compressRetirementData(
+  inputs: RetirementInputs,
+  displayMode: DollarDisplayMode
+): CompressedRetirementData {
   const compressed: CompressedRetirementData = {
-    v: 1, // version
+    v: 2, // version (v2: adds dm — dollar display mode)
   };
-  
+
   // Only include non-default values
   if (inputs.startingAge !== 25) compressed.sa = inputs.startingAge;
   if (inputs.retirementAge !== 60) compressed.ra = inputs.retirementAge;
@@ -119,20 +138,23 @@ function compressRetirementData(inputs: RetirementInputs): CompressedRetirementD
   if (inputs.riskProfile !== 'tdf') compressed.rp = inputs.riskProfile;
   if (inputs.effectiveTaxRate !== null && inputs.effectiveTaxRate !== undefined) compressed.etr = inputs.effectiveTaxRate;
   if (inputs.estimatedAnnualHealthcareCost !== null && inputs.estimatedAnnualHealthcareCost !== undefined) compressed.eahc = inputs.estimatedAnnualHealthcareCost;
+  if (displayMode !== DEFAULT_DOLLAR_DISPLAY_MODE) compressed.dm = displayMode;
 
   return compressed;
 }
 
 /**
- * Decompress retirement data by restoring defaults
+ * Decompress retirement data by restoring defaults.
+ * Accepts v1 (pre-dm) and v2 payloads; v1 payloads decode with the default
+ * display mode ('today').
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function decompressRetirementData(compressed: any): RetirementInputs {
-  if (compressed.v !== 1) {
+function decompressRetirementData(compressed: any): DecodedRetirementState {
+  if (compressed.v !== 1 && compressed.v !== 2) {
     throw new Error('Unsupported retirement data version');
   }
-  
-  return {
+
+  const inputs: RetirementInputs = {
     startingAge: compressed.sa || 25,
     retirementAge: compressed.ra || 60,
     lifeExpectancy: compressed.le || 85,
@@ -156,13 +178,23 @@ function decompressRetirementData(compressed: any): RetirementInputs {
     effectiveTaxRate: compressed.etr !== undefined ? compressed.etr : null,
     estimatedAnnualHealthcareCost: compressed.eahc !== undefined ? compressed.eahc : null,
   };
+
+  // Explicit nullish handling (not ||): a missing dm — including every v1
+  // payload — decodes to the default, and only a valid value is honored.
+  const displayMode: DollarDisplayMode =
+    compressed.dm === 'nominal' ? 'nominal' : DEFAULT_DOLLAR_DISPLAY_MODE;
+
+  return { inputs, displayMode };
 }
 
 /**
  * Update URL hash with current retirement state
  */
-export function updateRetirementUrlHash(inputs: RetirementInputs): void {
-  const hash = encodeRetirementToUrlHash(inputs);
+export function updateRetirementUrlHash(
+  inputs: RetirementInputs,
+  displayMode: DollarDisplayMode = DEFAULT_DOLLAR_DISPLAY_MODE
+): void {
+  const hash = encodeRetirementToUrlHash(inputs, displayMode);
   if (hash) {
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', `#${hash}`);
@@ -173,7 +205,7 @@ export function updateRetirementUrlHash(inputs: RetirementInputs): void {
 /**
  * Load retirement state from URL hash on page load
  */
-export function loadRetirementFromUrl(): RetirementInputs | null {
+export function loadRetirementFromUrl(): DecodedRetirementState | null {
   if (typeof window === 'undefined') return null;
   
   const hash = window.location.hash;

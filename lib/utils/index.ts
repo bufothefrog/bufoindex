@@ -262,15 +262,18 @@ export function decodeFromUrlHash(hash: string): unknown | null {
  */
 function compressCalculatorData(data: unknown): unknown {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { profile, result } = data as { profile?: Record<string, any>; result?: unknown; }
-  
+  const { profile, displayMode } = data as { profile?: Record<string, any>; result?: unknown; displayMode?: string; }
+
   // Only include non-default values
   const compressed: Record<string, unknown> = {
-    v: 1, // version
+    v: 2, // version (v2: adds dm — dollar display mode)
     p: {}, // profile
   }
   const p = compressed.p as Record<string, unknown>
-  
+
+  // Dollar display mode, elided when 'today' (the default)
+  if (displayMode === 'nominal') compressed.dm = displayMode
+
   if (!profile) return compressed
   
   // Income (only if different from defaults)
@@ -334,17 +337,22 @@ function compressCalculatorData(data: unknown): unknown {
 }
 
 /**
- * Decompress calculator data by restoring defaults
+ * Decompress calculator data by restoring defaults.
+ * Accepts v1 (pre-dm) and v2 payloads; v1 payloads decode with the default
+ * display mode ('today').
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function decompressCalculatorData(compressed: any): any {
-  if (compressed.v !== 1) {
+  if (compressed.v !== 1 && compressed.v !== 2) {
     throw new Error('Unsupported data version')
   }
-  
+
   const p = compressed.p || {}
-  
+
   return {
+    // Explicit nullish handling: missing dm (every v1 payload) decodes to
+    // the default 'today'; only a valid 'nominal' flips the mode.
+    displayMode: compressed.dm === 'nominal' ? 'nominal' : 'today',
     profile: {
       income: {
         gross: p.ig || 0,

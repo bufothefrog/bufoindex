@@ -14,14 +14,25 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
 import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { DollarDisplayMode, displayDollars } from '@/lib/utils/displayDollars';
 
 interface MonteCarloChartProps {
   netWorthByAge: { [age: number]: number };
   withdrawalsByAge: { [age: number]: number };
+  /** Display-only: deflates nominal simulation output when set to 'today' */
+  displayMode: DollarDisplayMode;
+  inflationRate: number;
+  startingAge: number;
 }
 
 
-export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloChartProps) {
+export function MonteCarloChart({
+  netWorthByAge,
+  withdrawalsByAge,
+  displayMode,
+  inflationRate,
+  startingAge
+}: MonteCarloChartProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
 
   // Update theme when it changes
@@ -43,17 +54,25 @@ export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloC
     }
   };
 
-  // Convert data to Recharts format
+  // Convert data to Recharts format. Simulation output is nominal; in 'today'
+  // mode each age-keyed value is deflated by the years elapsed since start.
   const chartData = useMemo(() => {
     const ages = Object.keys(netWorthByAge).map(Number).sort((a, b) => a - b);
 
-    return ages.map(age => ({
-      age,
-      netWorth: netWorthByAge[age],
-      // Only show withdrawals when they actually start (not null/undefined)
-      withdrawals: withdrawalsByAge[age] !== undefined ? withdrawalsByAge[age] : null
-    }));
-  }, [netWorthByAge, withdrawalsByAge]);
+    return ages.map(age => {
+      const yearsFromNow = age - startingAge;
+      return {
+        age,
+        netWorth: displayDollars(netWorthByAge[age], displayMode, inflationRate, yearsFromNow),
+        // Only show withdrawals when they actually start (not null/undefined)
+        withdrawals: withdrawalsByAge[age] !== undefined
+          ? displayDollars(withdrawalsByAge[age], displayMode, inflationRate, yearsFromNow)
+          : null
+      };
+    });
+  }, [netWorthByAge, withdrawalsByAge, displayMode, inflationRate, startingAge]);
+
+  const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
 
   // Custom tooltip component
   interface TooltipProps {
@@ -89,7 +108,11 @@ export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloC
   };
 
   return (
-    <div className="h-96">
+    <div>
+      <p className="text-xs text-muted-foreground text-right">
+        {displayMode === 'today' ? "in today's dollars" : 'in future dollars'}
+      </p>
+      <div className="h-96">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={chartData}
@@ -122,7 +145,7 @@ export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloC
             tick={{ fill: chartTheme.muted }}
             tickFormatter={formatAxisCurrency}
             label={{
-              value: 'Net Worth',
+              value: `Net Worth${modeAxisSuffix}`,
               angle: -90,
               position: 'insideLeft',
               style: { textAnchor: 'middle', fill: chartTheme.muted }
@@ -137,7 +160,7 @@ export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloC
             tick={{ fill: chartTheme.success }}
             tickFormatter={formatAxisCurrency}
             label={{
-              value: 'Annual Withdrawals',
+              value: `Annual Withdrawals${modeAxisSuffix}`,
               angle: 90,
               position: 'insideRight',
               style: { textAnchor: 'middle', fill: chartTheme.success }
@@ -178,6 +201,7 @@ export function MonteCarloChart({ netWorthByAge, withdrawalsByAge }: MonteCarloC
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

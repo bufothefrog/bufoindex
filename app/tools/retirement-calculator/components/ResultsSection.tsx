@@ -1,11 +1,13 @@
 'use client';
 
 import React from 'react';
-import { useRetirementResults } from '@/lib/store/retirementStore';
+import { useRetirementResults, useRetirementStore } from '@/lib/store/retirementStore';
 import { ResultCard, MetricCard } from '@/components/calculators/shared/ResultCard';
 import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
+import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { formatCurrency, formatPercent } from '@/lib/utils';
+import { displayDollars } from '@/lib/utils/displayDollars';
 import {
   TrendingUp,
   Calculator,
@@ -39,15 +41,31 @@ function getScenarioIcon(successProbability: number) {
 export function ResultsSection() {
   const results = useRetirementResults();
   const inputs = useRetirementInputs();
+  const displayMode = useRetirementStore(state => state.displayMode);
+  const setDisplayMode = useRetirementStore(state => state.setDisplayMode);
   const [expandedScenario, setExpandedScenario] = React.useState<string | null>(null);
 
   if (!results) {
     return null;
   }
 
+  // Display-only conversion: deflate a nominal future-dollar amount back to
+  // today's purchasing power when the 'today' mode is active.
+  const toDisplay = (nominalAmount: number, yearsFromNow: number) =>
+    displayDollars(nominalAmount, displayMode, inputs.inflationRate, yearsFromNow);
 
   return (
     <div className="space-y-4">
+      {/* Results Header - Dollar display mode */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {displayMode === 'today'
+            ? "Amounts adjusted to today's dollars using your inflation rate"
+            : 'Amounts in future dollars, as of the year they occur'}
+        </p>
+        <DollarModeToggle value={displayMode} onChange={setDisplayMode} />
+      </div>
+
       {/* Results Header - Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <MetricCard
@@ -75,6 +93,9 @@ export function ResultsSection() {
         {results.scenarios.map((scenario) => {
           const variant = mapProbabilityToVariant(scenario.successProbability);
           const icon = getScenarioIcon(scenario.successProbability);
+          // Balance-at-retirement figures are nominal as of this scenario's
+          // retirement year.
+          const yearsToRetirement = scenario.retirementAge - inputs.startingAge;
 
           return (
             <ExpandableListCard
@@ -91,11 +112,11 @@ export function ResultsSection() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <div className="text-muted-foreground">Required Balance</div>
-                  <div className="font-semibold">{formatCurrency(scenario.requiredBalance)}</div>
+                  <div className="font-semibold">{formatCurrency(toDisplay(scenario.requiredBalance, yearsToRetirement))}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Projected Balance</div>
-                  <div className="font-semibold">{formatCurrency(scenario.projectedBalance)}</div>
+                  <div className="font-semibold">{formatCurrency(toDisplay(scenario.projectedBalance, yearsToRetirement))}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Years of Income</div>
@@ -129,9 +150,12 @@ export function ResultsSection() {
         title="Portfolio Projections" 
         icon={TrendingUp}
       >
-        <MonteCarloChart 
+        <MonteCarloChart
           netWorthByAge={results.netWorthByAge}
           withdrawalsByAge={results.withdrawalsByAge}
+          displayMode={displayMode}
+          inflationRate={inputs.inflationRate}
+          startingAge={inputs.startingAge}
         />
       </ResultCard>
 
