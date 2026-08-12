@@ -46,8 +46,8 @@ export function TaxInputCard({ taxes, onUpdate }: TaxInputCardProps) {
           </div>
         </div>
 
-        <div className="p-3 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-200 dark:border-blue-700">
-          <div className="text-sm text-blue-800 dark:text-blue-200">
+        <div className="p-3 bg-info/10 rounded-md border border-info/30">
+          <div className="text-sm text-info">
             <strong>Tax brackets are calculated automatically</strong> based on your income and state.
             The calculator uses current federal and state tax brackets to optimize your allocation.
           </div>

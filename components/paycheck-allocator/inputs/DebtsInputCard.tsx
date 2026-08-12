@@ -18,7 +18,7 @@ export function DebtsInputCard({ debts, onAdd, onUpdate, onRemove }: DebtsInputC
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <Building className="w-5 h-5 text-red-600" />
+          <Building className="w-5 h-5 text-destructive" />
           <span>Current Debts</span>
         </CardTitle>
       </CardHeader>

@@ -59,7 +59,7 @@ export function SettingsCard() {
             </label>
             {allowTaxableSelling && (
               <div className="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
-                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-orange-500 dark:text-orange-400" />
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-warning" />
                 <span>Selling in taxable may trigger capital gains tax.</span>
               </div>
             )}

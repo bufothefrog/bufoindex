@@ -12,6 +12,7 @@
     "url": "https://github.com/bufothefrog/bufoindex/issues"
   },
   "author": "bufothefrog",
+  "license": "AGPL-3.0-only",
   "keywords": [
     "personal-finance",
     "retirement-calculator",

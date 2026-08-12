@@ -136,7 +136,7 @@ export function MethodologyLayout({
               
               {metadata?.validationStatus && (
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <CheckCircle className="w-4 h-4 text-success" />
                   <span>
                     {metadata.validationStatus.validated}/{metadata.validationStatus.total} validated
                   </span>

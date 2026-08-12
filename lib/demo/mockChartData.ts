@@ -308,13 +308,4 @@ export const DEMO_CONSTANTS = {
   INFLATION_RATE: 0.03,
   WITHDRAWAL_RATE: 0.04,
   MONTE_CARLO_RUNS: 50, // Reduced for demo performance
-  CHART_COLORS: {
-    primary: '#4a6d3c',
-    secondary: '#7fb069',
-    tertiary: '#9fb09f',
-    accent: '#5e8b4e',
-    success: '#10B981',
-    warning: '#F59E0B',
-    danger: '#EF4444'
-  }
 } as const;

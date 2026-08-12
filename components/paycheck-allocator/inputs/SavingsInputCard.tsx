@@ -211,7 +211,7 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
                   help="Monthly investments to taxable accounts"
                 />
 
-                <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 p-3 rounded-md">
+                <div className="text-xs text-info bg-info/10 p-3 rounded-md">
                   <p><strong>Taxable accounts:</strong> Most flexible for investing after maximizing tax-advantaged accounts.</p>
                   <p>Consider low-cost index funds (VTI, VXUS) for tax efficiency.</p>
                 </div>

@@ -152,8 +152,8 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
                       step={0.01}
                     />
 
-                    <div className="p-2 bg-blue-50 rounded-md border border-blue-200">
-                      <div className="text-xs text-blue-800">
+                    <div className="p-2 bg-info/10 rounded-md border border-info/30">
+                      <div className="text-xs text-info">
                         <strong>Total Contribution:</strong> {((benefits.employer401k.traditionalContribution + benefits.employer401k.rothContribution) * 100).toFixed(1)}%
                       </div>
                     </div>
@@ -253,19 +253,19 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
                   </label>
                 </div>
 
-                <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 p-3 rounded-md">
+                <div className="text-xs text-info bg-info/10 p-3 rounded-md">
                   <p><strong>Triple tax advantage:</strong> Deductible contributions + tax-free growth + tax-free medical withdrawals</p>
                   <p><strong>Max monthly:</strong> {formatCurrency(benefits.hsa.coverageType === 'family' ? 692 : 346)}</p>
                 </div>
 
-                <div className="text-xs text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900 p-3 rounded-md border border-purple-200 dark:border-purple-700">
+                <div className="text-xs text-primary bg-primary/10 p-3 rounded-md border border-primary/30">
                   <p><strong>⚠️ Critical HSA Strategy:</strong> Never withdraw from your HSA for current medical expenses if possible.</p>
                   <p>Pay out-of-pocket and let your HSA compound tax-free. You can reimburse yourself decades later using saved receipts.</p>
-                  <p><a href="#" className="text-purple-600 underline hover:text-purple-800">Learn the optimal HSA strategy →</a></p>
+                  <p><a href="#" className="text-primary underline hover:text-primary/80">Learn the optimal HSA strategy →</a></p>
                 </div>
 
                 {benefits.hsa.investmentStrategy ? (
-                  <div className="text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900 p-3 rounded-md">
+                  <div className="text-xs text-success bg-success/10 p-3 rounded-md">
                     <p><strong>HSA Investment Strategy:</strong> With this approach, HSA beats Roth IRA due to triple tax advantage.</p>
                     <p>• Pay medical expenses out-of-pocket</p>
                     <p>• Save receipts indefinitely</p>
@@ -273,7 +273,7 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
                     <p>• Withdraw tax-free against saved receipts in retirement</p>
                   </div>
                 ) : (
-                  <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900 p-3 rounded-md">
+                  <div className="text-xs text-warning bg-warning/10 p-3 rounded-md">
                     <p><strong>HSA vs Roth IRA Priority:</strong> If using HSA for current medical expenses, prioritize Roth IRA for better flexibility.</p>
                     <p>HSA is only superior when maximized as a long-term investment account.</p>
                   </div>
