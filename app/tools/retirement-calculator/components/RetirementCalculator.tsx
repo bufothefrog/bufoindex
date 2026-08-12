@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRetirementStore } from '@/lib/store/retirementStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
-import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import { CalculatorLayout, type ShareResult } from '@/components/ui/layouts/CalculatorLayout';
 
 // Main retirement calculator component
 export function RetirementCalculator() {
@@ -29,25 +29,32 @@ export function RetirementCalculator() {
     await calculate();
   };
 
-  const handleShare = async () => {
+  const handleShare = async (): Promise<ShareResult | void> => {
     const url = generateShareUrl();
-    
-    if (navigator.share) {
+
+    if (typeof navigator.share === 'function') {
       try {
         await navigator.share({
           title: 'BufoIndex Retirement Calculator',
           text: 'Check out my retirement planning scenario',
           url: url
         });
-      } catch {
-        // Fall back to clipboard
-        await navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard!');
+        return { status: 'shared' };
+      } catch (error) {
+        // User dismissed the share sheet — nothing to report
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        // Otherwise fall through to the clipboard fallback
       }
-    } else {
-      // Fall back to clipboard
+    }
+
+    try {
       await navigator.clipboard.writeText(url);
-      alert('Link copied to clipboard!');
+      return { status: 'copied' };
+    } catch {
+      // Clipboard unavailable (insecure context, permissions) — offer manual copy
+      return { status: 'error', url };
     }
   };
   

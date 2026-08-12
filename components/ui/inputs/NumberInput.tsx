@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { BaseInput } from './BaseInput';
-import { BaseInputProps, FormatOptions } from '@/lib/design-system/types';
+import { BaseInputProps } from '@/lib/design-system/types';
 
 interface NumberInputProps extends BaseInputProps {
   value: number;
@@ -72,19 +72,14 @@ export function NumberInput({
   const [displayValue, setDisplayValue] = React.useState(
     value !== 0 ? format(value) : ''
   );
-  
-  // Sync with external value changes
-  React.useEffect(() => {
-    if (value === 0 && displayValue !== '') {
-      setDisplayValue('');
-    } else if (value !== 0) {
-      const formatted = format(value);
-      if (displayValue !== formatted && document.activeElement?.getAttribute('name') !== name) {
-        setDisplayValue(formatted);
-      }
-    }
-  }, [value, displayValue, name, format]);
-  
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  // The rendered text is derived instead of synced in an effect
+  // (https://react.dev/learn/you-might-not-need-an-effect): while the field
+  // is being edited the user's raw text wins; otherwise the committed value
+  // is authoritative. A committed value of 0 always shows an empty field.
+  const shownValue = value === 0 ? '' : isFocused ? displayValue : format(value);
+
   const validateAndUpdate = (newValue: number) => {
     // Apply min/max constraints
     let constrainedValue = newValue;
@@ -155,6 +150,7 @@ export function NumberInput({
   };
   
   const handleBlur = () => {
+    setIsFocused(false);
     // Format the final value
     if (displayValue.trim() !== '') {
       const numericValue = parse(displayValue);
@@ -167,9 +163,12 @@ export function NumberInput({
   };
   
   const handleFocus = () => {
+    setIsFocused(true);
     // Show raw value for easier editing
     if (value !== 0) {
       setDisplayValue(value.toString());
+    } else {
+      setDisplayValue('');
     }
   };
   
@@ -213,7 +212,7 @@ export function NumberInput({
         <input
           type="text"
           inputMode={allowDecimals ? 'decimal' : 'numeric'}
-          value={displayValue}
+          value={shownValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}

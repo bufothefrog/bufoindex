@@ -3,12 +3,26 @@
  * Standardized layout for all BufoIndex calculators
  */
 
-import React from 'react';
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calculator, Loader2, Share2 } from 'lucide-react';
 import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Container, type FeatureDotColor } from './ResponsiveGrid';
 import { BaseCard } from '../cards/BaseCard';
+
+/**
+ * Result of a share handler. Returning `copied` shows a transient inline
+ * "Link copied" confirmation; `error` surfaces the URL for manual copying.
+ * Handlers may also return nothing (e.g. the native share sheet handled it).
+ */
+export type ShareResult =
+  | { status: 'shared' }
+  | { status: 'copied' }
+  | { status: 'error'; url: string };
+
+type ShareHandler = () => void | ShareResult | Promise<void | ShareResult>;
 
 interface CalculatorLayoutProps {
   title: string;
@@ -17,7 +31,7 @@ interface CalculatorLayoutProps {
   resultSection?: React.ReactNode;
   isCalculating?: boolean;
   onCalculate?: () => void;
-  onShare?: () => void;
+  onShare?: ShareHandler;
   calculateButtonText?: string;
   calculatingText?: string;
   errors?: Record<string, string>;
@@ -118,9 +132,9 @@ interface CalculatorHeaderProps {
 export function CalculatorHeader({ title, description, className }: CalculatorHeaderProps) {
   return (
     <div className={cn("mb-8 text-center", className)}>
-      <h2 className="text-3xl font-bold text-foreground mb-2">
+      <h1 className="text-3xl font-bold text-foreground mb-2">
         {title}
-      </h2>
+      </h1>
       <p className="text-muted-foreground max-w-2xl mx-auto">
         {description}
       </p>
@@ -138,7 +152,7 @@ interface CalculateButtonProps {
   loadingText?: string;
   errors?: Record<string, string>;
   disabled?: boolean;
-  onShare?: () => void;
+  onShare?: ShareHandler;
   className?: string;
 }
 
@@ -153,6 +167,30 @@ export function CalculateButton({
   className
 }: CalculateButtonProps) {
   const hasErrors = Object.keys(errors).length > 0;
+  const [shareFeedback, setShareFeedback] = useState<ShareResult | null>(null);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
+  }, []);
+
+  const handleShareClick = async () => {
+    if (!onShare) return;
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+
+    const result = await onShare();
+
+    if (result && result.status === 'copied') {
+      setShareFeedback(result);
+      clearTimerRef.current = setTimeout(() => setShareFeedback(null), 2500);
+    } else if (result && result.status === 'error') {
+      setShareFeedback(result);
+    } else {
+      setShareFeedback(null);
+    }
+  };
 
   return (
     <BaseCard className={className}>
@@ -177,15 +215,36 @@ export function CalculateButton({
 
       {/* Share Action */}
       {onShare && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onShare}
-          className="w-full mt-4"
-        >
-          <Share2 className="w-4 h-4 mr-2" />
-          Share
-        </Button>
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShareClick}
+            className="w-full mt-4"
+          >
+            <Share2 className="w-4 h-4 mr-2" />
+            Share
+          </Button>
+          <div aria-live="polite">
+            {shareFeedback?.status === 'copied' && (
+              <p className="mt-2 text-center text-sm text-muted-foreground">
+                Link copied to clipboard
+              </p>
+            )}
+            {shareFeedback?.status === 'error' && (
+              <div className="mt-2 text-sm text-muted-foreground">
+                <p className="mb-1">Couldn&apos;t copy automatically. Copy this link:</p>
+                <input
+                  readOnly
+                  value={shareFeedback.url}
+                  onFocus={(event) => event.currentTarget.select()}
+                  aria-label="Shareable link"
+                  className="w-full rounded-md border-input bg-background px-2 py-1 text-xs text-foreground"
+                />
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Error Display */}

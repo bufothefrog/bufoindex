@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calculator, Play, RotateCcw, Copy, Check } from 'lucide-react';
 import { FormulaRegistryEntry } from '@/lib/formulas/types';
 import { DisplayLatex } from './LatexRenderer';
@@ -25,17 +25,9 @@ export function MiniCalculator({
   showSteps = false,
   compact = false
 }: MiniCalculatorProps) {
-  const [inputs, setInputs] = useState<Record<string, number>>({});
-  const [result, setResult] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  // Initialize inputs with default values or example values
-  useEffect(() => {
+  // Seed inputs with provided defaults first, then example values.
+  const buildInitialInputs = () => {
     const initialInputs: Record<string, number> = {};
-    
-    // Use provided defaults first
     Object.keys(formula.variables).forEach(variable => {
       if (defaultValues[variable] !== undefined) {
         initialInputs[variable] = defaultValues[variable];
@@ -45,9 +37,22 @@ export function MiniCalculator({
         initialInputs[variable] = 0;
       }
     });
+    return initialInputs;
+  };
 
-    setInputs(initialInputs);
-  }, [formula, defaultValues]);
+  const [inputs, setInputs] = useState<Record<string, number>>(buildInitialInputs);
+  const [result, setResult] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Re-seed the inputs when a different formula is shown (state adjusted
+  // during render — https://react.dev/learn/you-might-not-need-an-effect).
+  const [prevFormula, setPrevFormula] = useState(formula);
+  if (formula !== prevFormula) {
+    setPrevFormula(formula);
+    setInputs(buildInitialInputs());
+  }
 
   // Calculate result when inputs change
   const calculatedResult = useMemo(() => {
@@ -55,7 +60,7 @@ export function MiniCalculator({
       // This is a simplified calculation engine
       // In production, you'd want to integrate with the actual formula functions
       return calculateFormulaResult(formula, inputs);
-    } catch (error) {
+    } catch {
       return null;
     }
   }, [formula, inputs]);

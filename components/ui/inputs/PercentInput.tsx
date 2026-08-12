@@ -45,20 +45,32 @@ export function PercentInput({
   const [displayValue, setDisplayValue] = React.useState(
     percentValue > 0 ? percentValue.toFixed(precision) : ''
   );
-  
-  // Sync with external value changes
-  React.useEffect(() => {
-    const newPercentValue = value * 100;
-    if (value === 0 && displayValue !== '') {
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  // The rendered text is derived instead of synced in an effect
+  // (https://react.dev/learn/you-might-not-need-an-effect): while the field
+  // is being edited the user's raw text wins; otherwise a positive committed
+  // value is authoritative (negative values keep the raw text, matching the
+  // long-standing sync behavior). A committed value of 0 always shows an
+  // empty field — including mid-edit, when a keystroke fails the min/max
+  // gate and the committed value stays 0.
+  const shownValue =
+    value === 0
+      ? ''
+      : !isFocused && value > 0
+        ? (value * 100).toFixed(precision)
+        : displayValue;
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    // Adopt the derived text so edits start from exactly what is shown.
+    if (value > 0) {
+      setDisplayValue((value * 100).toFixed(precision));
+    } else if (value === 0) {
       setDisplayValue('');
-    } else if (value > 0) {
-      const formatted = newPercentValue.toFixed(precision);
-      if (displayValue !== formatted && document.activeElement?.getAttribute('name') !== name) {
-        setDisplayValue(formatted);
-      }
     }
-  }, [value, displayValue, name, precision]);
-  
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     
@@ -154,6 +166,7 @@ export function PercentInput({
   };
   
   const handleBlur = () => {
+    setIsFocused(false);
     if (displayValue) {
       const cleanValue = displayValue.replace(/[^\d.-]/g, '');
       const numericPercent = parseFloat(cleanValue) || 0;
@@ -192,10 +205,11 @@ export function PercentInput({
       <div className="relative w-full">
         <input
           type="text"
-          value={displayValue}
+          value={shownValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onFocus={handleFocus}
           onBlur={handleBlur}
           placeholder={placeholder}
           min={min * 100}

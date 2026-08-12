@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { Calculator, BookOpen } from 'lucide-react';
 
 export interface TabConfig {
@@ -25,6 +25,18 @@ export interface CalculatorTabsProps {
   className?: string;
 }
 
+// The URL hash is an external store; reading it through useSyncExternalStore
+// keeps server rendering and hydration consistent (the server sees no hash).
+function subscribeToHashChange(callback: () => void) {
+  window.addEventListener('hashchange', callback);
+  return () => window.removeEventListener('hashchange', callback);
+}
+
+function getHashTab(): string | null {
+  const match = window.location.hash.match(/tab=([^&]+)/);
+  return match?.[1] ?? null;
+}
+
 export function CalculatorTabs({
   tabs,
   defaultTab,
@@ -32,22 +44,31 @@ export function CalculatorTabs({
   preserveState = true,
   className = ''
 }: CalculatorTabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id || '');
+  const hashTab = useSyncExternalStore(subscribeToHashChange, getHashTab, () => null);
+  const validHashTab =
+    hashTab && tabs.find(tab => tab.id === hashTab) ? hashTab : null;
+
+  // The user's explicit selection wins; until then the active tab is derived
+  // from the URL hash (deep linking), the defaultTab prop, or the first tab.
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [tabStates, setTabStates] = useState<Record<string, unknown>>({});
 
-  // Handle tab changes
-  useEffect(() => {
-    if (defaultTab && defaultTab !== activeTab) {
-      setActiveTab(defaultTab);
-    }
-  }, [defaultTab, activeTab]);
+  // When the defaultTab prop changes, defer to it again (state adjusted
+  // during render — https://react.dev/learn/you-might-not-need-an-effect).
+  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
+  if (defaultTab !== prevDefaultTab) {
+    setPrevDefaultTab(defaultTab);
+    setSelectedTab(null);
+  }
+
+  const activeTab = selectedTab ?? validHashTab ?? (defaultTab || tabs[0]?.id || '');
 
   const handleTabClick = (tabId: string) => {
     if (tabs.find(tab => tab.id === tabId && tab.enabled === false)) {
       return; // Don't switch to disabled tabs
     }
 
-    setActiveTab(tabId);
+    setSelectedTab(tabId);
     onTabChange?.(tabId);
 
     // Update URL hash for deep linking
@@ -57,20 +78,6 @@ export function CalculatorTabs({
       window.history.replaceState({}, '', url.toString());
     }
   };
-
-  // Restore tab from URL on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash;
-      const match = hash.match(/tab=([^&]+)/);
-      if (match && match[1]) {
-        const tabId = match[1];
-        if (tabs.find(tab => tab.id === tabId)) {
-          setActiveTab(tabId);
-        }
-      }
-    }
-  }, [tabs]);
 
   // Save tab state when switching
   const handleTabStateChange = (tabId: string, state: unknown) => {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { RetirementInputs, RetirementResults, annualizeIncome } from '../calculations/retirement';
 import { calculateRetirementAnalysis, RetirementInputValidationError } from '../calculations/retirement';
+import type { RetirementWorkerRequest, RetirementWorkerResponse } from '../workers/retirementWorker';
 import { RetirementConstants } from '../constants/retirement';
 import { encodeRetirementToUrlHash, decodeRetirementFromUrlHash } from '../utils/retirementState';
 import { DollarDisplayMode, DEFAULT_DOLLAR_DISPLAY_MODE } from '../utils/displayDollars';
@@ -17,11 +18,113 @@ const toErrorMap = (error: unknown): Record<string, string> =>
     ? error.fieldErrors
     : { calculation: error instanceof Error ? error.message : 'Calculation failed' };
 
+// ---------------------------------------------------------------------------
+// Off-thread analysis plumbing
+// ---------------------------------------------------------------------------
+// The ~6-scenario × 1000-path Monte Carlo batch runs in a dedicated Web
+// Worker so it never blocks the main thread. The worker is created lazily on
+// the first calculation (SSR-safe) and reused across runs. Environments
+// without Worker support (SSR, jsdom) or where construction throws fall back
+// to a synchronous in-thread call wrapped in a promise, so every caller
+// shares one async code path.
+
+let retirementWorker: Worker | null = null;
+let workerUnavailable = false;
+
+/** Monotonic id for calculation runs; the store applies only the newest. */
+let calculationSeq = 0;
+
+const pendingRequests = new Map<
+  number,
+  { resolve: (results: RetirementResults) => void; reject: (error: unknown) => void }
+>();
+
+const getRetirementWorker = (): Worker | null => {
+  if (workerUnavailable || typeof window === 'undefined' || typeof Worker === 'undefined') {
+    return null;
+  }
+  if (retirementWorker) return retirementWorker;
+
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL('../workers/retirementWorker.ts', import.meta.url));
+  } catch {
+    // Construction failed (unsupported environment) — remember and stay on
+    // the synchronous fallback from now on.
+    workerUnavailable = true;
+    return null;
+  }
+
+  worker.onmessage = (event: MessageEvent<RetirementWorkerResponse>) => {
+    const response = event.data;
+    const pending = pendingRequests.get(response.id);
+    if (!pending) return;
+    pendingRequests.delete(response.id);
+    if (response.ok) {
+      pending.resolve(response.results);
+    } else if (response.fieldErrors) {
+      // Rehydrate the typed validation error so toErrorMap surfaces the
+      // per-field messages exactly as the direct-call path does.
+      pending.reject(new RetirementInputValidationError(response.fieldErrors));
+    } else {
+      pending.reject(new Error(response.message ?? 'Calculation failed'));
+    }
+  };
+  worker.onerror = () => {
+    // The worker itself broke (e.g. its script failed to load). Fail the
+    // in-flight runs and permanently fall back to the synchronous path.
+    const error = new Error('Retirement calculation worker failed');
+    for (const { reject } of pendingRequests.values()) reject(error);
+    pendingRequests.clear();
+    worker.terminate();
+    if (retirementWorker === worker) retirementWorker = null;
+    workerUnavailable = true;
+  };
+
+  retirementWorker = worker;
+  return worker;
+};
+
+/**
+ * Run the retirement analysis off-thread when possible. Falls back to a
+ * synchronous in-thread call (wrapped in a promise) when no worker is
+ * available, so SSR guards and test environments share the browser code path.
+ */
+const runRetirementAnalysis = (inputs: RetirementInputs, id: number): Promise<RetirementResults> => {
+  const worker = getRetirementWorker();
+  if (worker) {
+    return new Promise<RetirementResults>((resolve, reject) => {
+      pendingRequests.set(id, { resolve, reject });
+      const request: RetirementWorkerRequest = { id, inputs };
+      worker.postMessage(request);
+    });
+  }
+  try {
+    return Promise.resolve(calculateRetirementAnalysis(inputs));
+  } catch (error) {
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Hash of the calculation-relevant inputs. Identical inputs (display-mode
+ * toggles, focus churn re-emitting the same values) hit the memo cache in
+ * the store and skip the Monte Carlo batch entirely. The simulation is
+ * seeded, so identical inputs always produce identical results.
+ */
+const hashInputs = (inputs: RetirementInputs): string => JSON.stringify(inputs);
+
 interface RetirementState {
   // Current calculation data
   inputs: RetirementInputs;
   results: RetirementResults | null;
-  
+  /**
+   * Hash of the inputs that produced `results` — the memoization key that
+   * lets identical inputs skip a recompute. Internal; never persisted
+   * (excluded from partialize). Null when results are absent or stale.
+   */
+  lastCalculationHash: string | null;
+
   // UI state
   isCalculating: boolean;
   activeSection: string;
@@ -75,6 +178,7 @@ export const useRetirementStore = create<RetirementState>()(
         // Initial state - no immediate calculation
         inputs: getDefaultInputs(),
         results: null,
+        lastCalculationHash: null,
         isCalculating: false,
         activeSection: 'basic',
         showAdvanced: false,
@@ -98,8 +202,9 @@ export const useRetirementStore = create<RetirementState>()(
           if (hasCalculatedOnce) {
             // Clear previous timeout to prevent debounce leak (BUG-13)
             if (recalculateTimeout) clearTimeout(recalculateTimeout);
-            recalculateTimeout = setTimeout(async () => {
-              const { inputs, displayMode } = get();
+            recalculateTimeout = setTimeout(() => {
+              recalculateTimeout = null;
+              const { inputs, displayMode, results, lastCalculationHash } = get();
 
               // Update URL hash
               try {
@@ -111,15 +216,22 @@ export const useRetirementStore = create<RetirementState>()(
                 console.warn('Failed to update URL hash:', error);
               }
 
-              // Auto-calculate with minimal delay
-              try {
-                const calculationResults = calculateRetirementAnalysis(inputs);
-                set({ results: calculationResults });
-              } catch (error) {
-                console.error('Auto-calculation error:', error);
-                set({ errors: toErrorMap(error) });
-              }
-              recalculateTimeout = null;
+              // Auto-recalculate off-thread; skip entirely when the inputs
+              // are unchanged (focus churn re-emitting identical values).
+              const inputsHash = hashInputs(inputs);
+              if (results !== null && inputsHash === lastCalculationHash) return;
+
+              const runId = ++calculationSeq;
+              runRetirementAnalysis(inputs, runId)
+                .then((calculationResults) => {
+                  if (runId !== calculationSeq) return; // superseded — drop stale result
+                  set({ results: calculationResults, lastCalculationHash: inputsHash });
+                })
+                .catch((error: unknown) => {
+                  if (runId !== calculationSeq) return; // superseded — drop stale failure
+                  console.error('Auto-calculation error:', error);
+                  set({ errors: toErrorMap(error), lastCalculationHash: null });
+                });
             }, 300); // Shorter debounce for better UX
           } else {
             // Clear previous timeout to prevent debounce leak (BUG-13)
@@ -140,21 +252,35 @@ export const useRetirementStore = create<RetirementState>()(
         },
 
         calculate: async () => {
+          const { inputs, results, lastCalculationHash } = get();
+          const inputsHash = hashInputs(inputs);
+
+          // Memo hit: these exact inputs already produced `results` — skip
+          // the Monte Carlo batch entirely.
+          if (results !== null && inputsHash === lastCalculationHash) {
+            set({ errors: {}, isCalculating: false, hasCalculatedOnce: true });
+            return;
+          }
+
           set({ isCalculating: true, errors: {} });
+          const runId = ++calculationSeq;
 
           try {
-            const { inputs } = get();
-            const calculationResults = calculateRetirementAnalysis(inputs);
+            const calculationResults = await runRetirementAnalysis(inputs, runId);
+            if (runId !== calculationSeq) return; // superseded — drop stale result
 
             set({
               results: calculationResults,
+              lastCalculationHash: inputsHash,
               isCalculating: false,
               hasCalculatedOnce: true // Mark that user has calculated once
             });
           } catch (error) {
+            if (runId !== calculationSeq) return; // superseded — drop stale failure
             console.error('Retirement calculation error:', error);
             set({
               errors: toErrorMap(error),
+              lastCalculationHash: null,
               isCalculating: false
             });
           }
@@ -163,36 +289,60 @@ export const useRetirementStore = create<RetirementState>()(
         loadFromUrl: () => {
           try {
             if (typeof window === 'undefined') return;
-            
-            const hash = window.location.hash.slice(1);
-            if (hash) {
-              const decoded = decodeRetirementFromUrlHash(hash);
-              if (decoded) {
-                const urlInputs = decoded.inputs;
-                // Migrate old risk profile values to simplified options
-                if (urlInputs.riskProfile && !['tdf', 'custom'].includes(urlInputs.riskProfile)) {
-                  urlInputs.riskProfile = 'custom'; // Convert old profiles to custom
-                }
 
-                // Calculate results immediately when loading from URL and mark as calculated
-                try {
-                  const calculationResults = calculateRetirementAnalysis(urlInputs);
-                  set({
-                    inputs: urlInputs,
-                    results: calculationResults,
-                    displayMode: decoded.displayMode,
-                    hasCalculatedOnce: true // URL load counts as initial calculation
-                  });
-                } catch (error) {
-                  console.error('URL calculation error:', error);
-                  set({
-                    inputs: urlInputs,
-                    displayMode: decoded.displayMode,
-                    errors: toErrorMap(error)
-                  });
-                }
-              }
+            const hash = window.location.hash.slice(1);
+            if (!hash) return;
+            const decoded = decodeRetirementFromUrlHash(hash);
+            if (!decoded) return;
+
+            const urlInputs = decoded.inputs;
+            // Migrate old risk profile values to simplified options
+            if (urlInputs.riskProfile && !['tdf', 'custom'].includes(urlInputs.riskProfile)) {
+              urlInputs.riskProfile = 'custom'; // Convert old profiles to custom
             }
+
+            const inputsHash = hashInputs(urlInputs);
+            const { results, lastCalculationHash } = get();
+            if (results !== null && inputsHash === lastCalculationHash) {
+              // Memo hit — the current results already match the shared link.
+              set({
+                inputs: urlInputs,
+                displayMode: decoded.displayMode,
+                hasCalculatedOnce: true
+              });
+              return;
+            }
+
+            // Adopt the shared inputs synchronously so first paint isn't
+            // blocked, then run the analysis through the same async path as
+            // calculate().
+            set({
+              inputs: urlInputs,
+              displayMode: decoded.displayMode,
+              hasCalculatedOnce: true, // URL load counts as initial calculation
+              isCalculating: true,
+              errors: {}
+            });
+
+            const runId = ++calculationSeq;
+            runRetirementAnalysis(urlInputs, runId)
+              .then((calculationResults) => {
+                if (runId !== calculationSeq) return; // superseded — drop stale result
+                set({
+                  results: calculationResults,
+                  lastCalculationHash: inputsHash,
+                  isCalculating: false
+                });
+              })
+              .catch((error: unknown) => {
+                if (runId !== calculationSeq) return; // superseded — drop stale failure
+                console.error('URL calculation error:', error);
+                set({
+                  errors: toErrorMap(error),
+                  lastCalculationHash: null,
+                  isCalculating: false
+                });
+              });
           } catch (error) {
             console.warn('Failed to load from URL:', error);
           }

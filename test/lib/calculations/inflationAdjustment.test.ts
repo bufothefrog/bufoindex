@@ -146,14 +146,14 @@ describe('calculateInflationProtectedSavings', () => {
   it('computes the corpus for an inflated income under the 4% rule', () => {
     // nominal income at retirement = 60000 * 1.03^35 = 60000 * 2.8138625 = $168,831.75
     // corpus = 168831.75 / 0.04 = $4,220,793.68
-    expect(calculateInflationProtectedSavings(60000, 30, 65, 0.03, 0.04)).toBeCloseToCurrency(
+    expect(calculateInflationProtectedSavings(60000, 30, 65, 0.03)).toBeCloseToCurrency(
       4220793.68
     )
   })
 
   it('reduces to targetIncome / 0.04 with zero years to retirement', () => {
     // 60000 / 0.04 = $1,500,000
-    expect(calculateInflationProtectedSavings(60000, 65, 65, 0.03, 0.04)).toBeCloseToCurrency(
+    expect(calculateInflationProtectedSavings(60000, 65, 65, 0.03)).toBeCloseToCurrency(
       1500000
     )
   })

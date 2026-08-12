@@ -48,19 +48,31 @@ export function EnhancedMoneyInput({
   const [displayValue, setDisplayValue] = React.useState(
     value > 0 ? formatCurrency(value).replace('$', '') : ''
   );
-  
-  // Sync with external value changes
-  React.useEffect(() => {
-    if (value === 0 && displayValue !== '') {
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  // The rendered text is derived instead of synced in an effect
+  // (https://react.dev/learn/you-might-not-need-an-effect): while the field
+  // is being edited the user's raw text wins; otherwise the committed value
+  // is authoritative. A committed value of 0 always shows an empty field —
+  // including mid-edit, when a keystroke fails the min/max gate and the
+  // committed value stays 0.
+  const shownValue =
+    value === 0
+      ? ''
+      : !isFocused && value > 0
+        ? formatCurrency(value).replace('$', '')
+        : displayValue;
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    // Adopt the derived text so edits start from exactly what is shown.
+    if (value > 0) {
+      setDisplayValue(formatCurrency(value).replace('$', ''));
+    } else if (value === 0) {
       setDisplayValue('');
-    } else if (value > 0) {
-      const formatted = formatCurrency(value).replace('$', '');
-      if (displayValue !== formatted && document.activeElement?.getAttribute('name') !== name) {
-        setDisplayValue(formatted);
-      }
     }
-  }, [value, displayValue, name]);
-  
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     
@@ -143,6 +155,7 @@ export function EnhancedMoneyInput({
   };
   
   const handleBlur = () => {
+    setIsFocused(false);
     if (displayValue) {
       const cleanValue = displayValue.replace(/[^\d.]/g, '');
       const numericValue = allowDecimals 
@@ -190,10 +203,11 @@ export function EnhancedMoneyInput({
         </span>
         <input
           type="text"
-          value={displayValue}
+          value={shownValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onFocus={handleFocus}
           onBlur={handleBlur}
           placeholder={placeholder}
           className={cn(

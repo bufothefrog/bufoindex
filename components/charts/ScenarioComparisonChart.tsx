@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import { RetirementInputs, calculateRequiredBalance } from '@/lib/calculations/retirement';
 import { analyzeRetirementScenarios, ScenarioAnalysis } from '@/lib/calculations/scenarioAnalysis';
-import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 import {
   DollarDisplayMode,
   DEFAULT_DOLLAR_DISPLAY_MODE,
@@ -43,6 +43,67 @@ export interface ScenarioComparisonProps {
   responsive?: boolean;
 }
 
+// Custom tooltip (module-scoped so it is not re-created per render;
+// chart-specific context arrives via props on the content element)
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload?: ScenarioData;
+  }>;
+  chartTheme?: ReturnType<typeof getChartTheme>;
+  retirementAge?: number;
+  currentIncome?: number;
+}
+
+const CustomTooltip = ({ active, payload, chartTheme, retirementAge, currentIncome }: TooltipProps) => {
+  if (active && payload && payload.length && chartTheme && retirementAge !== undefined && currentIncome !== undefined) {
+    const data = payload[0]?.payload as ScenarioData;
+    if (!data) return null;
+
+    const yearsEarlier = retirementAge - data.retirementAge;
+    const savingsRate = ((data.monthlyContribution * 12) / currentIncome * 100);
+
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
+        <p className="text-foreground font-mono text-sm mb-2">
+          {data.name} Scenario
+        </p>
+        <div className="space-y-1 text-xs">
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Monthly:</span>{' '}
+            ${data.monthlyContribution.toLocaleString()}
+          </p>
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Savings Rate:</span>{' '}
+            {savingsRate.toFixed(1)}%
+          </p>
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Projected Balance:</span>{' '}
+            ${data.projectedBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Retirement Age:</span>{' '}
+            {data.retirementAge}
+            {yearsEarlier > 0 && (
+              <span className="text-muted-foreground"> ({yearsEarlier} yrs earlier)</span>
+            )}
+          </p>
+          {data.additionalIncome > 0 && (
+            <p className="text-muted-foreground">
+              <span style={{ color: chartTheme.secondary }}>Extra Income:</span>{' '}
+              +${data.additionalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}/year
+            </p>
+          )}
+          <div className={`text-xs ${data.feasible ? 'text-success' : 'text-destructive'}`}>
+            {data.feasible ? '✓ Meets target' : '⚠ Below target'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 /**
  * ScenarioComparisonChart - Compare current vs +$500 vs +$1000 scenarios
  */
@@ -55,14 +116,11 @@ export function ScenarioComparisonChart({
   responsive = true
 }: ScenarioComparisonProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-  const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
-  const sageVariants = getSageVariants();
 
   // Subscribe to theme changes
   useEffect(() => {
     const unsubscribe = subscribeToThemeChanges(() => {
       setChartTheme(getChartTheme());
-      setRechartsTheme(getRechartsTheme());
     });
     return unsubscribe;
   }, []);
@@ -152,63 +210,6 @@ export function ScenarioComparisonChart({
 
   const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
 
-  // Custom tooltip
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      payload?: ScenarioData;
-    }>;
-  }
-  
-  const CustomTooltip = ({ active, payload }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload as ScenarioData;
-      if (!data) return null;
-
-      const yearsEarlier = inputs.retirementAge - data.retirementAge;
-      const savingsRate = ((data.monthlyContribution * 12) / inputs.currentIncome * 100);
-
-      return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
-          <p className="text-foreground font-mono text-sm mb-2">
-            {data.name} Scenario
-          </p>
-          <div className="space-y-1 text-xs">
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Monthly:</span>{' '}
-              ${data.monthlyContribution.toLocaleString()}
-            </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Savings Rate:</span>{' '}
-              {savingsRate.toFixed(1)}%
-            </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Projected Balance:</span>{' '}
-              ${data.projectedBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Retirement Age:</span>{' '}
-              {data.retirementAge}
-              {yearsEarlier > 0 && (
-                <span className="text-muted-foreground"> ({yearsEarlier} yrs earlier)</span>
-              )}
-            </p>
-            {data.additionalIncome > 0 && (
-              <p className="text-muted-foreground">
-                <span style={{ color: chartTheme.secondary }}>Extra Income:</span>{' '}
-                +${data.additionalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}/year
-              </p>
-            )}
-            <div className={`text-xs ${data.feasible ? 'text-success' : 'text-destructive'}`}>
-              {data.feasible ? '✓ Meets target' : '⚠ Below target'}
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // Chart content
   const chartContent = (
     <ComposedChart
@@ -263,7 +264,15 @@ export function ScenarioComparisonChart({
           style: { textAnchor: 'middle', fill: chartTheme.secondary }
         }}
       />
-      <Tooltip content={<CustomTooltip />} />
+      <Tooltip
+        content={
+          <CustomTooltip
+            chartTheme={chartTheme}
+            retirementAge={inputs.retirementAge}
+            currentIncome={inputs.currentIncome}
+          />
+        }
+      />
       <Legend 
         wrapperStyle={{ 
           paddingTop: '20px',

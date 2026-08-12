@@ -85,7 +85,7 @@ export function analyzeInflationImpact(inputs: RetirementInputs): InflationAnaly
   const breakeven = calculateInflationBreakeven(inputs, yearsToRetirement);
   
   // Generate insights
-  const insights = generateInflationInsights(inputs, targetIncomeInflated, totalInflationImpact, breakeven);
+  const insights = generateInflationInsights(inputs, targetIncomeInflated, totalInflationImpact);
   
   return {
     targetIncomeInflated,
@@ -124,7 +124,6 @@ function calculateInflationBreakeven(inputs: RetirementInputs, yearsToRetirement
     additionalMonthlySavings = additionalCorpusNeeded / monthsToRetirement;
   }
   
-  const currentSavingsRate = (inputs.monthlySavings * 12) / inputs.currentIncome;
   const additionalSavingsRate = (additionalMonthlySavings * 12) / inputs.currentIncome;
   
   return {
@@ -177,8 +176,7 @@ export function calculateInflationProtectedSavings(
   targetRealIncome: number,
   currentAge: number,
   retirementAge: number,
-  inflationRate: number,
-  realReturn: number
+  inflationRate: number
 ): number {
   const yearsToRetirement = retirementAge - currentAge;
   
@@ -199,8 +197,7 @@ export function calculateInflationProtectedSavings(
 function generateInflationInsights(
   inputs: RetirementInputs,
   targetIncomeInflated: InflationAdjustedValues,
-  totalInflationImpact: number,
-  _breakeven: { investmentReturnNeeded: number; savingsRateAdjustment: number; }
+  totalInflationImpact: number
 ): string[] {
   // Only return 1 most critical inflation insight
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;

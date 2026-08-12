@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -12,74 +12,88 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => {
-    // Initialize with system preference if available
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light'; // fallback for SSR
-  });
+/**
+ * Persisted theme preference, exposed as an external store so React can
+ * subscribe without setState-in-effect cascades. The same localStorage key
+ * is read by the pre-paint inline script in app/layout.tsx — keep in sync.
+ */
+export const THEME_STORAGE_KEY = 'bufo-theme';
 
-  // Initialize theme from localStorage or system preference
-  useEffect(() => {
-    const stored = localStorage.getItem('bufo-theme') as Theme;
-    if (stored && ['light', 'dark', 'system'].includes(stored)) {
-      setThemeState(stored);
+const themeListeners = new Set<() => void>();
+
+function readStoredTheme(): Theme {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
     }
-    
-    // Set initial theme class on document
-    const initialResolved = stored === 'system' || !stored 
-      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      : stored;
-    
+  } catch {
+    // localStorage unavailable (privacy mode, etc.) — fall back to system
+  }
+  return 'system';
+}
+
+function getServerTheme(): Theme {
+  return 'system';
+}
+
+function subscribeStoredTheme(onChange: () => void): () => void {
+  themeListeners.add(onChange);
+  // Sync across tabs as well
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === THEME_STORAGE_KEY) onChange();
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    themeListeners.delete(onChange);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function writeStoredTheme(theme: Theme): void {
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Persisting failed; still notify so the in-memory theme updates
+  }
+  themeListeners.forEach((listener) => listener());
+}
+
+function subscribeSystemTheme(onChange: () => void): () => void {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  mediaQuery.addEventListener('change', onChange);
+  return () => mediaQuery.removeEventListener('change', onChange);
+}
+
+function getSystemPrefersDark(): boolean {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function getServerSystemPrefersDark(): boolean {
+  return false;
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const theme = useSyncExternalStore(subscribeStoredTheme, readStoredTheme, getServerTheme);
+  const systemPrefersDark = useSyncExternalStore(
+    subscribeSystemTheme,
+    getSystemPrefersDark,
+    getServerSystemPrefersDark
+  );
+
+  const resolvedTheme: 'light' | 'dark' =
+    theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme;
+
+  // Keep the document class in sync (the inline script in app/layout.tsx
+  // handles the very first paint before hydration).
+  useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
-    root.classList.add(initialResolved);
-    setResolvedTheme(initialResolved as 'light' | 'dark');
-  }, []);
-
-  // Update resolved theme based on current theme setting
-  useEffect(() => {
-    const updateResolvedTheme = () => {
-      let resolved: 'light' | 'dark';
-      
-      if (theme === 'system') {
-        resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      } else {
-        resolved = theme;
-      }
-      
-      setResolvedTheme(resolved);
-      
-      // Apply theme to document
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(resolved);
-    };
-
-    updateResolvedTheme();
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (theme === 'system') {
-        updateResolvedTheme();
-      }
-    };
-    
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, [theme]);
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem('bufo-theme', newTheme);
-  };
+    root.classList.add(resolvedTheme);
+  }, [resolvedTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme: writeStoredTheme, resolvedTheme }}>
       {children}
     </ThemeContext.Provider>
   );

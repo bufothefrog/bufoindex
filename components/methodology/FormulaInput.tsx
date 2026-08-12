@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AlertCircle, Info, DollarSign, Percent, Calendar } from 'lucide-react';
 import { FormulaVariable } from '@/lib/formulas/types';
 
@@ -31,12 +31,9 @@ export function FormulaInput({
   const [displayValue, setDisplayValue] = useState(value.toString());
   const [focused, setFocused] = useState(false);
 
-  // Update display value when prop value changes
-  useEffect(() => {
-    if (!focused) {
-      setDisplayValue(formatDisplayValue(value, config.unit));
-    }
-  }, [value, config.unit, focused]);
+  // While focused the user's raw text wins; otherwise the display is derived
+  // from the committed value (no sync effect needed).
+  const shownValue = focused ? displayValue : formatDisplayValue(value, config.unit);
 
   const handleInputChange = (inputValue: string) => {
     setDisplayValue(inputValue);
@@ -118,7 +115,7 @@ export function FormulaInput({
         
         <input
           type="number"
-          value={displayValue}
+          value={shownValue}
           onChange={(e) => handleInputChange(e.target.value)}
           onFocus={handleFocus}
           onBlur={handleBlur}

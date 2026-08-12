@@ -304,8 +304,7 @@ function analyzeRothVsTraditionalStrategy(profile: PaycheckProfile): SkippedItem
     const currentTaxSavings = annualContribution * currentBracket;
     const investedTaxSavings = currentTaxSavings * Math.pow(1.07, 10); // 10-year growth
     const rothBenefit = annualContribution * Math.pow(1.07, 10) - annualContribution; // Tax-free growth
-    const traditionalValue = annualContribution * Math.pow(1.07, 10) * (1 - expectedRetirementBracket);
-    
+
     if (investedTaxSavings > rothBenefit * 0.8) { // Allow some buffer
       return {
         id: 'roth-vs-traditional',

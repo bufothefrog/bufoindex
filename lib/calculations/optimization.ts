@@ -142,7 +142,7 @@ export function calculateEmployerMatch(
 /**
  * Determine high-interest debt threshold (simplified 7% rule)
  */
-function getHighInterestThreshold(age: number): number {
+function getHighInterestThreshold(): number {
   return 0.07; // Fixed 7% threshold for all ages
 }
 
@@ -150,7 +150,7 @@ function getHighInterestThreshold(age: number): number {
  * Check if profile has high-interest debt based on age-adjusted thresholds
  */
 export function hasHighInterestDebt(profile: PaycheckProfile): boolean {
-  const threshold = getHighInterestThreshold(profile.preferences.age);
+  const threshold = getHighInterestThreshold();
   
   return profile.debts.some(debt => {
     // All debt uses the 7% threshold consistently
@@ -165,7 +165,7 @@ export function calculateHighInterestDebt(
   profile: PaycheckProfile, 
   availableAmount: number
 ): AllocationItem | null {
-  const threshold = getHighInterestThreshold(profile.preferences.age);
+  const threshold = getHighInterestThreshold();
   
   const highInterestDebts = profile.debts.filter(debt => {
     // All debt over 7% is considered high-interest
@@ -342,8 +342,7 @@ export function calculateRothIRA(
   }
   
   const currentBracket = profile.taxes.federalBracket;
-  const expectedRetirementBracket = profile.preferences.expectedRetirementBracket || (currentBracket * 0.8);
-  
+
   let reasoning = '';
   if (recommendation === 'roth') {
     if (profile.preferences.age < 30 && !profile.preferences.isPeakEarnings) {
@@ -549,8 +548,6 @@ export function calculateLowInterestDebtAnalysis(profile: PaycheckProfile): Skip
   const totalBalance = lowInterestDebts.reduce((sum, debt) => sum + debt.balance, 0);
   const weightedRate = lowInterestDebts.reduce((sum, debt) => 
     sum + (debt.interestRate * debt.balance), 0) / totalBalance;
-  
-  const monthlyPayments = lowInterestDebts.reduce((sum, debt) => sum + debt.minimumPayment, 0);
   
   // Calculate opportunity cost of paying off early vs investing
   const marketReturn = 0.07; // 7% expected market return

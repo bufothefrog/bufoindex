@@ -101,7 +101,7 @@ export function calculateCoastFireAnalysis(inputs: RetirementInputs): CoastFireA
     aggressive: calculateCoastFire(aggressiveInputs)
   };
   
-  const insights = generateCoastFireInsights(inputs, current, scenarios);
+  const insights = generateCoastFireInsights(inputs, current);
   
   return {
     current,
@@ -256,8 +256,7 @@ export function calculateTimeToCoastFire(inputs: RetirementInputs): {
  */
 function generateCoastFireInsights(
   inputs: RetirementInputs,
-  current: CoastFireResult,
-  _scenarios: { conservative: CoastFireResult; moderate: CoastFireResult; aggressive: CoastFireResult; }
+  current: CoastFireResult
 ): string[] {
   // Only return 1 most relevant Coast FIRE insight
   

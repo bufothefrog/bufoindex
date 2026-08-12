@@ -28,21 +28,22 @@ export function PercentageSlider({
   recordable = false,
 }: PercentageSliderProps) {
   const [sliderValue, setSliderValue] = React.useState([value * 100]); // Convert to percentage for slider
-  
-  React.useEffect(() => {
+
+  // Follow external value changes (state adjusted during render —
+  // https://react.dev/learn/you-might-not-need-an-effect).
+  const [prevValue, setPrevValue] = React.useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setSliderValue([value * 100]);
-  }, [value]);
-  
+  }
+
   const handleSliderChange = (newValue: number[]) => {
     setSliderValue(newValue);
     onChange(newValue[0] / 100); // Convert back to decimal
   };
-  
+
   // If specific options are provided, use discrete values
   if (options) {
-    const currentIndex = options.findIndex(option => Math.abs(option - value) < 0.001);
-    const selectedIndex = currentIndex >= 0 ? currentIndex : 0;
-    
     return (
       <div className={cn("space-y-3", className)}>
         <div className="flex items-center justify-between">

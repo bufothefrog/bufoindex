@@ -25,6 +25,45 @@ interface SavingsRateData {
   requiredMonthlySavings: number;
 }
 
+// Custom tooltip component (module-scoped so it is not re-created per render;
+// chart-specific context arrives via props on the content element)
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    value: number;
+    color: string;
+  }>;
+  label?: number;
+  savingsData?: SavingsRateData[];
+  accentColor?: string;
+}
+
+const CustomTooltip = ({ active, payload, label, savingsData, accentColor }: TooltipProps) => {
+  if (active && payload && payload.length && savingsData) {
+    const dataPoint = savingsData.find(d => d.retirementAge === label);
+    if (!dataPoint) return null;
+
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
+        <p className="text-foreground font-mono text-sm mb-2">
+          Retirement Age {label}
+        </p>
+        <div className="space-y-1 text-xs">
+          <p className="text-muted-foreground">
+            <span style={{ color: accentColor }}>Required Savings Rate:</span>{' '}
+            {dataPoint.requiredSavingsRate.toFixed(1)}%
+          </p>
+          <p className="text-muted-foreground">
+            <span style={{ color: accentColor }}>Monthly Savings:</span>{' '}
+            {formatCurrency(dataPoint.requiredMonthlySavings)}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function SavingsRateChart({ inputs }: SavingsRateChartProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
 
@@ -94,42 +133,6 @@ export function SavingsRateChart({ inputs }: SavingsRateChartProps) {
     return data;
   }, [inputs]);
 
-  // Custom tooltip component
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      value: number;
-      color: string;
-    }>;
-    label?: number;
-  }
-
-  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      const dataPoint = savingsData.find(d => d.retirementAge === label);
-      if (!dataPoint) return null;
-
-      return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
-          <p className="text-foreground font-mono text-sm mb-2">
-            Retirement Age {label}
-          </p>
-          <div className="space-y-1 text-xs">
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.tertiary }}>Required Savings Rate:</span>{' '}
-              {dataPoint.requiredSavingsRate.toFixed(1)}%
-            </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.tertiary }}>Monthly Savings:</span>{' '}
-              {formatCurrency(dataPoint.requiredMonthlySavings)}
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div className="h-96">
       <ResponsiveContainer width="100%" height="100%">
@@ -169,7 +172,9 @@ export function SavingsRateChart({ inputs }: SavingsRateChartProps) {
               style: { textAnchor: 'middle', fill: chartTheme.muted }
             }}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip
+            content={<CustomTooltip savingsData={savingsData} accentColor={chartTheme.tertiary} />}
+          />
 
           {/* Savings Rate area with gradient fill */}
           <Area

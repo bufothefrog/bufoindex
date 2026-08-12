@@ -6,6 +6,10 @@ import { UtilityBar } from '@/components/shared/UtilityBar'
 
 const inter = Inter({ subsets: ['latin'] })
 
+// Applies the persisted theme (same localStorage key as contexts/ThemeContext.tsx)
+// before first paint so dark-preference users don't get a white flash.
+const themeInitScript = `(function(){try{var t=localStorage.getItem('bufo-theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var c=document.documentElement.classList;c.remove('light','dark');c.add(d?'dark':'light');}catch(e){}})();`
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://bufoindex.com'),
   title: {
@@ -30,15 +34,22 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring"
+        >
+          Skip to content
+        </a>
         <ThemeProvider>
           <div className="min-h-screen bg-background">
             <div className="container mx-auto px-4 pt-3">
               <UtilityBar />
             </div>
 
-            <main className="container mx-auto px-4 pt-2 pb-8">
+            <main id="main-content" className="container mx-auto px-4 pt-2 pb-8">
               {children}
             </main>
           </div>

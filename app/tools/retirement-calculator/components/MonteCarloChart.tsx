@@ -25,6 +25,39 @@ interface MonteCarloChartProps {
   startingAge: number;
 }
 
+// Custom tooltip component (module-scoped so it is not re-created per render)
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    dataKey: string;
+    value: number;
+    color: string;
+    name: string;
+  }>;
+  label?: number;
+}
+
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
+        <p className="text-foreground font-mono text-sm mb-2">
+          Age {label}
+        </p>
+        <div className="space-y-1 text-xs">
+          {payload.map((entry, index) => (
+            <p key={index} className="text-muted-foreground">
+              <span style={{ color: entry.color }}>{entry.name}:</span>{' '}
+              {entry.value !== null ? formatCurrency(entry.value) : 'N/A'}
+            </p>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 
 export function MonteCarloChart({
   netWorthByAge,
@@ -73,39 +106,6 @@ export function MonteCarloChart({
   }, [netWorthByAge, withdrawalsByAge, displayMode, inflationRate, startingAge]);
 
   const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
-
-  // Custom tooltip component
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      dataKey: string;
-      value: number;
-      color: string;
-      name: string;
-    }>;
-    label?: number;
-  }
-
-  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
-          <p className="text-foreground font-mono text-sm mb-2">
-            Age {label}
-          </p>
-          <div className="space-y-1 text-xs">
-            {payload.map((entry, index) => (
-              <p key={index} className="text-muted-foreground">
-                <span style={{ color: entry.color }}>{entry.name}:</span>{' '}
-                {entry.value !== null ? formatCurrency(entry.value) : 'N/A'}
-              </p>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div>

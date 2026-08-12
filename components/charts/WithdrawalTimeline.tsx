@@ -13,7 +13,7 @@ import {
   ComposedChart,
 } from 'recharts';
 import { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
-import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 import {
   DollarDisplayMode,
   DEFAULT_DOLLAR_DISPLAY_MODE,
@@ -39,6 +39,49 @@ export interface WithdrawalTimelineProps {
   responsive?: boolean;
 }
 
+// Custom tooltip (module-scoped so it is not re-created per render;
+// chart-specific context arrives via props on the content element)
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload?: WithdrawalData;
+  }>;
+  chartTheme?: ReturnType<typeof getChartTheme>;
+  displayMode?: DollarDisplayMode;
+}
+
+const CustomTooltip = ({ active, payload, chartTheme, displayMode }: TooltipProps) => {
+  if (active && payload && payload.length && chartTheme) {
+    const data = payload[0]?.payload as WithdrawalData;
+    if (!data) return null;
+
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
+        <p className="text-foreground font-mono text-sm mb-2">
+          Age {data.age} ({data.year})
+        </p>
+        <div className="space-y-1 text-xs">
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Withdrawal:</span>{' '}
+            ${data.inflatedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+          {displayMode === 'nominal' && (
+            <p className="text-muted-foreground">
+              <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
+              ${data.currentDollars.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </p>
+          )}
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Portfolio:</span>{' '}
+            ${data.portfolioBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 /**
  * WithdrawalTimeline Chart - Shows withdrawal timeline starting at retirement age only
  * CRITICAL: This chart MUST start at retirement age, not before
@@ -52,14 +95,11 @@ export function WithdrawalTimeline({
   responsive = true
 }: WithdrawalTimelineProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-  const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
-  const sageVariants = getSageVariants();
 
   // Subscribe to theme changes
   useEffect(() => {
     const unsubscribe = subscribeToThemeChanges(() => {
       setChartTheme(getChartTheme());
-      setRechartsTheme(getRechartsTheme());
     });
     return unsubscribe;
   }, []);
@@ -111,46 +151,6 @@ export function WithdrawalTimeline({
   }, [withdrawalData, displayMode, inputs.inflationRate, inputs.startingAge]);
 
   const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
-
-  // Custom tooltip formatter
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      payload?: WithdrawalData;
-    }>;
-  }
-  
-  const CustomTooltip = ({ active, payload }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload as WithdrawalData;
-      if (!data) return null;
-
-      return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
-          <p className="text-foreground font-mono text-sm mb-2">
-            Age {data.age} ({data.year})
-          </p>
-          <div className="space-y-1 text-xs">
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Withdrawal:</span>{' '}
-              ${data.inflatedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-            {displayMode === 'nominal' && (
-              <p className="text-muted-foreground">
-                <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
-                ${data.currentDollars.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-            )}
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Portfolio:</span>{' '}
-              ${data.portfolioBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Responsive container content
   const chartContent = (
@@ -206,7 +206,7 @@ export function WithdrawalTimeline({
           style: { textAnchor: 'middle', fill: chartTheme.secondary }
         }}
       />
-      <Tooltip content={<CustomTooltip />} />
+      <Tooltip content={<CustomTooltip chartTheme={chartTheme} displayMode={displayMode} />} />
       <Legend 
         wrapperStyle={{ 
           paddingTop: '20px',

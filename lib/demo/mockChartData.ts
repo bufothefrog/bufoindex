@@ -3,7 +3,7 @@
  * Generates realistic financial data for demonstrating chart components
  */
 
-import { getChartTheme, getSageVariants } from '@/lib/chart-theme';
+import { getSageVariants } from '@/lib/chart-theme';
 
 export interface PortfolioGrowthData {
   year: number;

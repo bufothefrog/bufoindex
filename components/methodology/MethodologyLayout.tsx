@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   BookOpen, 
   Calculator, 
@@ -51,7 +51,6 @@ const CATEGORY_INFO: Record<FormulaCategory, { title: string; order: number }> =
 };
 
 export function MethodologyLayout({
-  calculatorName,
   title,
   description,
   formulas,

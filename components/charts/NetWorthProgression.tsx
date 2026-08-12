@@ -14,7 +14,7 @@ import {
   Legend,
 } from 'recharts';
 import { RetirementInputs, RetirementResults, calculateProjectedBalance } from '@/lib/calculations/retirement';
-import { getChartTheme, getRechartsTheme, getSageVariants, subscribeToThemeChanges } from '@/lib/chart-theme';
+import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
 import {
   DollarDisplayMode,
   DEFAULT_DOLLAR_DISPLAY_MODE,
@@ -41,6 +41,61 @@ export interface NetWorthProgressionProps {
   responsive?: boolean;
 }
 
+// Custom tooltip (module-scoped so it is not re-created per render;
+// chart-specific context arrives via props on the content element)
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload?: NetWorthData;
+  }>;
+  chartTheme?: ReturnType<typeof getChartTheme>;
+  displayMode?: DollarDisplayMode;
+}
+
+const CustomTooltip = ({ active, payload, chartTheme, displayMode }: TooltipProps) => {
+  if (active && payload && payload.length && chartTheme) {
+    const data = payload[0]?.payload as NetWorthData;
+    if (!data) return null;
+
+    const totalReturn = data.netWorth > 0 ? ((data.netWorth / data.contributions - 1) * 100) : 0;
+
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
+        <p className="text-foreground font-mono text-sm mb-2">
+          Age {data.age} ({data.year}) - {data.phase.charAt(0).toUpperCase() + data.phase.slice(1)}
+        </p>
+        <div className="space-y-1 text-xs">
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Net Worth:</span>{' '}
+            ${data.netWorth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+          {displayMode === 'nominal' && (
+            <p className="text-muted-foreground">
+              <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
+              ${data.realValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </p>
+          )}
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Contributions:</span>{' '}
+            ${data.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+          <p className="text-muted-foreground">
+            <span style={{ color: chartTheme.accent }}>Growth:</span>{' '}
+            ${data.growth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+          {data.phase === 'accumulation' && (
+            <p className="text-muted-foreground">
+              <span style={{ color: chartTheme.secondary }}>Total Return:</span>{' '}
+              {totalReturn.toFixed(1)}%
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 /**
  * NetWorthProgression Chart - Shows accumulation and withdrawal phases clearly
  */
@@ -53,14 +108,11 @@ export function NetWorthProgression({
   responsive = true
 }: NetWorthProgressionProps) {
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-  const [rechartsTheme, setRechartsTheme] = useState(() => getRechartsTheme());
-  const sageVariants = getSageVariants();
 
   // Subscribe to theme changes
   useEffect(() => {
     const unsubscribe = subscribeToThemeChanges(() => {
       setChartTheme(getChartTheme());
-      setRechartsTheme(getRechartsTheme());
     });
     return unsubscribe;
   }, []);
@@ -157,58 +209,6 @@ export function NetWorthProgression({
   // Find phase transition point
   const retirementPoint = displayData.find(d => d.age === inputs.retirementAge);
 
-  // Custom tooltip
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      payload?: NetWorthData;
-    }>;
-  }
-  
-  const CustomTooltip = ({ active, payload }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload as NetWorthData;
-      if (!data) return null;
-
-      const totalReturn = data.netWorth > 0 ? ((data.netWorth / data.contributions - 1) * 100) : 0;
-
-      return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
-          <p className="text-foreground font-mono text-sm mb-2">
-            Age {data.age} ({data.year}) - {data.phase.charAt(0).toUpperCase() + data.phase.slice(1)}
-          </p>
-          <div className="space-y-1 text-xs">
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Net Worth:</span>{' '}
-              ${data.netWorth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-            {displayMode === 'nominal' && (
-              <p className="text-muted-foreground">
-                <span style={{ color: chartTheme.secondary }}>Today&apos;s Value:</span>{' '}
-                ${data.realValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-            )}
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Contributions:</span>{' '}
-              ${data.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-            <p className="text-muted-foreground">
-              <span style={{ color: chartTheme.accent }}>Growth:</span>{' '}
-              ${data.growth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-            {data.phase === 'accumulation' && (
-              <p className="text-muted-foreground">
-                <span style={{ color: chartTheme.secondary }}>Total Return:</span>{' '}
-                {totalReturn.toFixed(1)}%
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // Chart content
   const chartContent = (
     <ComposedChart
@@ -260,7 +260,7 @@ export function NetWorthProgression({
           style: { textAnchor: 'middle', fill: chartTheme.muted }
         }}
       />
-      <Tooltip content={<CustomTooltip />} />
+      <Tooltip content={<CustomTooltip chartTheme={chartTheme} displayMode={displayMode} />} />
       <Legend 
         wrapperStyle={{ 
           paddingTop: '20px',

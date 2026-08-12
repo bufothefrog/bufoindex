@@ -3,12 +3,11 @@
  * Central registry for all calculation formulas with metadata
  */
 
-import { 
-  FormulaRegistry, 
-  FormulaRegistryEntry, 
-  FormulaCategory, 
-  RegisteredFormula,
-  FormulaFunction
+import {
+  FormulaRegistry,
+  FormulaRegistryEntry,
+  FormulaCategory,
+  RegisteredFormula
 } from './types';
 
 class FormulaRegistryImpl implements FormulaRegistry {

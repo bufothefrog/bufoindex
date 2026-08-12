@@ -115,8 +115,9 @@ export function RetirementCharts({
     )
   }), [inputs, results, scenarioAnalysis, displayMode]);
 
-  // Mobile-first chart selector
-  const ChartSelector = () => (
+  // Mobile-first chart selector (a plain element, not a component created
+  // during render, so React state is preserved across re-renders)
+  const chartSelector = (
     <div className="mb-6">
       <div className="flex flex-wrap gap-2 mb-4">
         <button
@@ -153,29 +154,24 @@ export function RetirementCharts({
     </div>
   );
 
-  // Performance indicator
-  const PerformanceIndicator = () => {
-    const totalRenderTime = Object.values(performanceMetrics).reduce((sum, time) => sum + time, 0);
-    
-    if (totalRenderTime === 0) return null;
-    
-    return (
-      <div className="mt-4 p-2 bg-muted rounded text-xs font-mono text-muted-foreground">
-        <div className="flex justify-between items-center">
-          <span>Chart Performance:</span>
-          <span className={totalRenderTime < 500 ? 'text-success' : 'text-warning'}>
-            {totalRenderTime.toFixed(1)}ms total
-          </span>
-        </div>
-        {Object.entries(performanceMetrics).map(([chart, time]) => (
-          <div key={chart} className="flex justify-between text-xs opacity-75">
-            <span>{chart}:</span>
-            <span>{time.toFixed(1)}ms</span>
-          </div>
-        ))}
+  // Performance indicator (plain element for the same reason)
+  const totalRenderTime = Object.values(performanceMetrics).reduce((sum, time) => sum + time, 0);
+  const performanceIndicator = totalRenderTime === 0 ? null : (
+    <div className="mt-4 p-2 bg-muted rounded text-xs font-mono text-muted-foreground">
+      <div className="flex justify-between items-center">
+        <span>Chart Performance:</span>
+        <span className={totalRenderTime < 500 ? 'text-success' : 'text-warning'}>
+          {totalRenderTime.toFixed(1)}ms total
+        </span>
       </div>
-    );
-  };
+      {Object.entries(performanceMetrics).map(([chart, time]) => (
+        <div key={chart} className="flex justify-between text-xs opacity-75">
+          <span>{chart}:</span>
+          <span>{time.toFixed(1)}ms</span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className={`retirement-charts ${className}`}>
@@ -192,7 +188,7 @@ export function RetirementCharts({
 
       {/* Chart selector for mobile */}
       <div className="block md:hidden">
-        <ChartSelector />
+        {chartSelector}
       </div>
 
       {/* Chart grid */}
@@ -230,11 +226,11 @@ export function RetirementCharts({
 
       {/* Desktop chart selector */}
       <div className="hidden md:block mt-6">
-        <ChartSelector />
+        {chartSelector}
       </div>
 
       {/* Performance metrics (dev mode) */}
-      {process.env.NODE_ENV === 'development' && <PerformanceIndicator />}
+      {process.env.NODE_ENV === 'development' && performanceIndicator}
 
       {/* Chart usage instructions */}
       <div className="mt-6 bg-sage-50 dark:bg-sage-900/30 p-4 rounded-lg">

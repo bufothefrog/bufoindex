@@ -122,6 +122,7 @@
 @layer base {
   :root,
   .light {
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -143,14 +144,15 @@
     --ring: 106 29% 32%; /* sage-600 ring */
     --radius: 0.375rem; /* rounded-md */
     --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 0 0% 10%; /* dark ink: white on this green is ~3.0:1, below WCAG AA */
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 0 0% 10%; /* dark ink: white on amber is ~2.2:1, below WCAG AA */
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
   }
 
   .dark {
+    color-scheme: dark;
     --background: 0 0% 8%;
     --foreground: 0 0% 98%;
     --card: 0 0% 10%;

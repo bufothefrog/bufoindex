@@ -296,7 +296,6 @@ function calculateDebtStrategyScore(profile: PaycheckProfile, skippedItems: Skip
   if (profile.debts.length === 0) return 100; // No debt = perfect score
   
   const highInterestDebt = profile.debts.filter(debt => debt.interestRate > 0.07);
-  const lowInterestDebt = profile.debts.filter(debt => debt.interestRate <= 0.05);
   const suboptimalDebtStrategy = skippedItems.filter(item => item.item.includes('Payment'));
   
   let score = 60; // Base score
