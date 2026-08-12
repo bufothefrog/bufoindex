@@ -17,7 +17,7 @@ export default function HomePage() {
       </section>
 
       {/* Calculator Cards */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid gap-6">
         <Link
           href="/tools/paycheck-allocator"
           className="group block p-6 bg-card border rounded-xl hover:shadow-lg transition-all duration-200 hover:border-sage-400 dark:hover:border-sage-500"
