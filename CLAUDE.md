@@ -26,13 +26,13 @@ components/
                          #   cards/ (BaseCard, InputCard, ResultCard, SummaryCard),
                          #   layouts/ (CalculatorLayout variants, ResponsiveGrid, sections)
   shared/                # Navigation, Tooltip, UtilityBar, DollarModeToggle,
-                         #   inputs/ (StateSelector, SelectInput, MoneyInput, NumberInput,
-                         #   PercentageSlider, DebtInput), layout/ (InputRow, FieldGroup),
+                         #   inputs/ (StateSelector, SelectInput, PercentageSlider,
+                         #   DebtInput), layout/ (InputRow, FieldGroup),
                          #   cards/ (AllocationCard, OpportunityCostCard)
   charts/                # Recharts wrappers (RetirementCharts, NetWorthProgression,
                          #   WithdrawalTimeline, ScenarioComparisonChart) — must use getChartTheme()
-  calculator/            # Paycheck-allocator UI
-  calculators/shared/    # CalculatorTabs, ResultCard, StatusAlert, …
+  paycheck-allocator/    # Paycheck-allocator UI
+  calculators/shared/    # CalculatorTabs, ExpandableListCard, StatusAlert, BreakdownRow
   retirement/            # RiskProfileSelector
   methodology/           # Formula display + KaTeX rendering
 contexts/                # ThemeContext.tsx

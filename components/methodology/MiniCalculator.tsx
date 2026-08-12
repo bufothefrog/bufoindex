@@ -208,7 +208,7 @@ export function MiniCalculator({
                   step="any"
                 />
                 {info.constraints && (
-                  <p className="text-xs text-orange-600">{info.constraints}</p>
+                  <p className="text-xs text-warning">{info.constraints}</p>
                 )}
               </div>
             ))}
@@ -241,22 +241,22 @@ export function MiniCalculator({
         {(result !== null || error) && (
           <div className="border-t pt-4">
             {error ? (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-md">
                 <div className="text-destructive font-medium">Error</div>
                 <div className="text-destructive text-sm">{error}</div>
               </div>
             ) : result !== null ? (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="p-4 bg-success/10 border border-success/30 rounded-md">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-green-800 font-medium">Result</div>
-                    <div className="text-2xl font-bold text-green-900 mt-1">
+                    <div className="text-success font-medium">Result</div>
+                    <div className="text-2xl font-bold text-success mt-1">
                       {result.toLocaleString()}
                     </div>
                   </div>
                   <button
                     onClick={handleCopyResult}
-                    className="flex items-center space-x-2 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    className="flex items-center space-x-2 px-3 py-2 text-sm bg-success text-success-foreground rounded hover:bg-success/90 transition-colors"
                   >
                     {copied ? (
                       <>
@@ -273,11 +273,11 @@ export function MiniCalculator({
                 </div>
                 
                 {showSteps && (
-                  <div className="mt-3 pt-3 border-t border-green-200">
-                    <div className="text-green-800 text-sm font-medium mb-2">
+                  <div className="mt-3 pt-3 border-t border-success/30">
+                    <div className="text-success text-sm font-medium mb-2">
                       Calculation Steps:
                     </div>
-                    <div className="space-y-1 text-sm text-green-700">
+                    <div className="space-y-1 text-sm text-success">
                       {generateCalculationSteps(formula, inputs, result).map((step, index) => (
                         <div key={index} className="flex">
                           <span className="w-6">{index + 1}.</span>

@@ -120,10 +120,10 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
   const instructions = getInstructions();
   
   return (
-    <Card className="border-green-200 dark:border-green-700 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+    <Card className="border-success/30 bg-linear-to-r from-success/10 to-success/5">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <Building2 className="w-5 h-5 text-green-600 dark:text-green-400" aria-hidden="true" />
+          <Building2 className="w-5 h-5 text-success" aria-hidden="true" />
           <span>Payroll Configuration Guide</span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
@@ -139,11 +139,11 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
               <span className="text-muted-foreground">Take-Home Pay:</span>
               <span className="font-medium">{formatCurrency(paycheckAmount)}</span>
             </div>
-            <div className="flex items-center justify-between text-green-700 dark:text-green-400">
+            <div className="flex items-center justify-between text-success">
               <span>Expenses + Fun Money:</span>
               <span className="font-medium">{formatCurrency(expensesAndFunMoney)}</span>
             </div>
-            <div className="flex items-center justify-between text-blue-700 dark:text-blue-400">
+            <div className="flex items-center justify-between text-info">
               <span>Priority Investments:</span>
               <span className="font-medium">{formatCurrency(paycheckAmount - expensesAndFunMoney)}</span>
             </div>
@@ -166,17 +166,17 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
                   aria-selected={selectedTier === tier}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     selectedTier === tier
-                      ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                      ? 'border-success bg-success/10'
                       : 'border-border hover:border-border'
                   }`}
                 >
                   <div className="flex items-center space-x-2 mb-1">
-                    <Icon className={`w-4 h-4 ${selectedTier === tier ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} aria-hidden="true" />
-                    <span className={`text-sm font-medium capitalize ${selectedTier === tier ? 'text-green-900 dark:text-green-100' : 'text-muted-foreground'}`}>
+                    <Icon className={`w-4 h-4 ${selectedTier === tier ? 'text-success' : 'text-muted-foreground'}`} aria-hidden="true" />
+                    <span className={`text-sm font-medium capitalize ${selectedTier === tier ? 'text-success' : 'text-muted-foreground'}`}>
                       {tier}
                     </span>
                   </div>
-                  <p className={`text-xs ${selectedTier === tier ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground'}`}>
+                  <p className={`text-xs ${selectedTier === tier ? 'text-success' : 'text-muted-foreground'}`}>
                     {tier === 'basic' && 'Manual transfers'}
                     {tier === 'intermediate' && '2-account split'}
                     {tier === 'advanced' && 'Multi-account split'}
@@ -200,7 +200,7 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
             >
               {copiedInstructions ? (
                 <>
-                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" aria-hidden="true" />
+                  <CheckCircle className="w-4 h-4 text-success" aria-hidden="true" />
                   <span>Copied!</span>
                 </>
               ) : (
@@ -227,10 +227,10 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
           {/* Pros/Cons */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <h5 className="text-sm font-medium text-green-800 dark:text-green-300">Pros:</h5>
+              <h5 className="text-sm font-medium text-success">Pros:</h5>
               <ul className="space-y-1">
                 {instructions.pros.map((pro, index) => (
-                  <li key={index} className="text-xs text-green-700 dark:text-green-400 flex items-center space-x-2">
+                  <li key={index} className="text-xs text-success flex items-center space-x-2">
                     <CheckCircle className="w-3 h-3" aria-hidden="true" />
                     <span>{pro}</span>
                   </li>
@@ -238,10 +238,10 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
               </ul>
             </div>
             <div className="space-y-2">
-              <h5 className="text-sm font-medium text-amber-800 dark:text-amber-300">Cons:</h5>
+              <h5 className="text-sm font-medium text-warning">Cons:</h5>
               <ul className="space-y-1">
                 {instructions.cons.map((con, index) => (
-                  <li key={index} className="text-xs text-amber-700 dark:text-amber-400 flex items-center space-x-2">
+                  <li key={index} className="text-xs text-warning flex items-center space-x-2">
                     <Info className="w-3 h-3" aria-hidden="true" />
                     <span>{con}</span>
                   </li>
@@ -252,9 +252,9 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
         </div>
         
         {/* Implementation Tips */}
-        <div className="p-4 bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700">
-          <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Implementation Tips:</h5>
-          <ul className="space-y-1 text-xs text-blue-700 dark:text-blue-300">
+        <div className="p-4 bg-info/10 rounded-lg border border-info/30">
+          <h5 className="text-sm font-medium text-info mb-2">Implementation Tips:</h5>
+          <ul className="space-y-1 text-xs text-info">
             <li>• Contact your HR/Payroll department with the account routing information</li>
             <li>• Changes typically take 1-2 pay periods to take effect</li>
             <li>• Keep backup transfers set up during the transition period</li>

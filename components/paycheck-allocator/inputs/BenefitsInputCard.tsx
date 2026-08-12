@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
+import { MoneyInput } from '@/components/ui/inputs';
 import { PercentageSlider } from '@/components/shared/inputs/PercentageSlider';
 import { Building } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -14,7 +14,7 @@ interface BenefitsInputCardProps {
   onUpdate: (benefits: Partial<BenefitsData>) => void;
 }
 
-export function BenefitsInputCard({ benefits, income, onUpdate }: BenefitsInputCardProps) {
+export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -232,7 +232,7 @@ export function BenefitsInputCard({ benefits, income, onUpdate }: BenefitsInputC
                   onChange={(value) => onUpdate({
                     hsa: { ...benefits.hsa, currentContribution: value }
                   })}
-                  placeholder="$0"
+                  placeholder="0"
                 />
 
               </div>

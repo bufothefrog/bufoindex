@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn, formatCurrency, formatNumberWithCommas } from '@/lib/utils';
 import { BaseInput } from './BaseInput';
-import { BaseInputProps, FormatOptions } from '@/lib/design-system/types';
+import { BaseInputProps } from '@/lib/design-system/types';
 import { DollarSign } from 'lucide-react';
 
 interface EnhancedMoneyInputProps extends BaseInputProps {
@@ -18,6 +18,12 @@ interface EnhancedMoneyInputProps extends BaseInputProps {
   min?: number;
   max?: number;
   size?: 'sm' | 'md' | 'lg';
+  /**
+   * Accessible name for the input when no visible label text is rendered
+   * (e.g. label="" in a composite row that draws its own label). Never pass
+   * label="" without also passing ariaLabel.
+   */
+  ariaLabel?: string;
 }
 
 export function EnhancedMoneyInput({
@@ -37,6 +43,7 @@ export function EnhancedMoneyInput({
   max,
   size = 'md',
   testId,
+  ariaLabel,
 }: EnhancedMoneyInputProps) {
   const [displayValue, setDisplayValue] = React.useState(
     value > 0 ? formatCurrency(value).replace('$', '') : ''
@@ -172,6 +179,7 @@ export function EnhancedMoneyInput({
       disabled={disabled}
       className={className}
       testId={testId}
+      aria-label={ariaLabel}
     >
       <div className="relative w-full">
         <span className={cn(

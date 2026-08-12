@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRetirementResults, useRetirementStore } from '@/lib/store/retirementStore';
-import { ResultCard, MetricCard } from '@/components/calculators/shared/ResultCard';
+import { ResultCard, SummaryCard } from '@/components/ui/cards';
 import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
@@ -26,10 +26,10 @@ function mapProbabilityToVariant(successProbability: number): CardVariant {
 
 // Grade the plan's implied withdrawal rate against the 4% guideline: at or
 // below it is comfortable, within one point is marginal, beyond that is risky.
-function mapWithdrawalRateToVariant(rate: number): CardVariant {
+function mapWithdrawalRateToColor(rate: number): 'success' | 'warning' | 'error' {
   if (rate <= 0.04) return 'success';
   if (rate <= 0.05) return 'warning';
-  return 'danger';
+  return 'error';
 }
 
 function getScenarioIcon(successProbability: number) {
@@ -68,23 +68,25 @@ export function ResultsSection() {
 
       {/* Results Header - Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <MetricCard
-          label="Implied Withdrawal Rate"
+        <SummaryCard
+          title="Implied Withdrawal Rate"
           value={formatPercent(results.initialWithdrawalRate)}
           icon={Target}
-          variant={mapWithdrawalRateToVariant(results.initialWithdrawalRate)}
-          subtext={
+          variant="bordered"
+          color={mapWithdrawalRateToColor(results.initialWithdrawalRate)}
+          label={
             results.initialWithdrawalRate <= 0.04
               ? 'at or below the 4% guideline'
               : 'above the 4% guideline'
           }
         />
-        <MetricCard
-          label="Scenarios Analyzed"
+        <SummaryCard
+          title="Scenarios Analyzed"
           value={results.scenarios.length.toString()}
           icon={Calculator}
-          variant="info"
-          subtext="retirement options"
+          variant="bordered"
+          color="info"
+          label="retirement options"
         />
       </div>
 

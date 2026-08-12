@@ -20,6 +20,11 @@ interface SelectInputProps {
   help?: string;
   error?: string;
   disabled?: boolean;
+  /**
+   * Accessible name for the select when no visible label text is rendered
+   * (e.g. label="" in a composite row that draws its own label).
+   */
+  ariaLabel?: string;
 }
 
 export function SelectInput({
@@ -34,6 +39,7 @@ export function SelectInput({
   help,
   error,
   disabled = false,
+  ariaLabel,
 }: SelectInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onChange(e.target.value);
@@ -54,6 +60,7 @@ export function SelectInput({
           onChange={handleChange}
           disabled={disabled}
           required={required}
+          aria-label={ariaLabel}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
             "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",

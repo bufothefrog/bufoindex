@@ -619,21 +619,21 @@ export function DemoClient() {
       <div className="space-y-4">
         <ResultCard title="Success Result" status="success" highlight={true}>
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
+            <CheckCircle className="w-5 h-5 text-success" />
             <span>Your optimization strategy is performing excellently!</span>
           </div>
         </ResultCard>
 
         <ResultCard title="Warning Result" status="warning">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            <AlertTriangle className="w-5 h-5 text-warning" />
             <span>Consider increasing your emergency fund to 3 months of expenses.</span>
           </div>
         </ResultCard>
 
         <ResultCard title="Information Result">
           <div className="flex items-center gap-2">
-            <Info className="w-5 h-5 text-blue-600" />
+            <Info className="w-5 h-5 text-info" />
             <span>This calculation assumes a 7% annual return rate.</span>
           </div>
         </ResultCard>
@@ -1316,7 +1316,7 @@ export function DemoClient() {
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    fill="#8884d8"
+                    fill={chartTheme.primary}
                     dataKey="value"
                     label={({ payload }) => {
                       const item = payload as AssetAllocationData | undefined;

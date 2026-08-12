@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
+import { MoneyInput } from '@/components/ui/inputs';
 import { Input } from '@/components/ui/input';
 import { Heart } from 'lucide-react';
 import type { UserPreferences } from '@/lib/types';
@@ -29,7 +29,7 @@ export function ExpensesInputCard({ preferences, onUpdate }: ExpensesInputCardPr
             label="Necessary Monthly Expenses"
             value={preferences.necessaryExpenses}
             onChange={(value) => onUpdate({ necessaryExpenses: value })}
-            placeholder="$2,500"
+            placeholder="2,500"
             help="Rent, utilities, groceries, minimum debt payments, insurance, etc."
             required
           />
@@ -67,7 +67,7 @@ export function ExpensesInputCard({ preferences, onUpdate }: ExpensesInputCardPr
               onChange={(value) => onUpdate({
                 funMoney: { ...preferences.funMoney, min: value }
               })}
-              placeholder="$500"
+              placeholder="500"
             />
 
             <MoneyInput
@@ -77,7 +77,7 @@ export function ExpensesInputCard({ preferences, onUpdate }: ExpensesInputCardPr
               onChange={(value) => onUpdate({
                 funMoney: { ...preferences.funMoney, max: value }
               })}
-              placeholder="$1,000"
+              placeholder="1,000"
             />
           </div>
         </div>

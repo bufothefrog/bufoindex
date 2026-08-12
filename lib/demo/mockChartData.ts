@@ -3,6 +3,8 @@
  * Generates realistic financial data for demonstrating chart components
  */
 
+import { getChartTheme, getSageVariants } from '@/lib/chart-theme';
+
 export interface PortfolioGrowthData {
   year: number;
   age: number;
@@ -127,36 +129,37 @@ export function generateIncomeExpenses(months: number = 12): IncomeExpenseData[]
  * Generate asset allocation data for pie charts
  */
 export function generateAssetAllocation(): AssetAllocationData[] {
+  const sage = getSageVariants();
   return [
     {
       name: 'Total Stock Market (VTI)',
       value: 45000,
       percentage: 60,
-      color: '#4a6d3c'
+      color: sage.sage600
     },
     {
       name: 'International (VTIAX)',
       value: 15000,
       percentage: 20,
-      color: '#7fb069'
+      color: sage.sage400
     },
     {
       name: 'Bonds (VBTLX)',
       value: 7500,
       percentage: 10,
-      color: '#9fb09f'
+      color: sage.sage300
     },
     {
       name: 'REITs (VGSLX)',
       value: 4500,
       percentage: 6,
-      color: '#5e8b4e'
+      color: sage.sage500
     },
     {
       name: 'Cash/Emergency Fund',
       value: 3000,
       percentage: 4,
-      color: '#c7d1c7'
+      color: sage.sage200
     }
   ];
 }

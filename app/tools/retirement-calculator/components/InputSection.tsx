@@ -4,13 +4,11 @@ import React from 'react';
 import { useRetirementStore, useRetirementInputs } from '@/lib/store/retirementStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
-import { NumberInput } from '@/components/shared/inputs/NumberInput';
+import { MoneyInput, NumberInput, PercentInput } from '@/components/ui/inputs';
 import { StateSelector } from '@/components/shared/inputs/StateSelector';
 import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { PrimarySecondaryRow, EqualRow } from '@/components/shared/layout/InputRow';
 import { TwoColumnFields, SingleColumnFields, ThreeColumnFields } from '@/components/shared/layout/FieldGroup';
-import { PercentageInput } from '@/components/calculators/shared/PercentageInput';
 import { RiskProfileSelector } from '@/components/retirement/RiskProfileSelector';
 import { formatPercent, formatCurrency } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
@@ -56,6 +54,7 @@ export function InputSection() {
                   <MoneyInput
                     name="incomeAmount"
                     label=""
+                    ariaLabel="Current Income"
                     value={inputs.incomeAmount}
                     onChange={(value) => handleInputChange('incomeAmount', value)}
                     placeholder="100,000"
@@ -65,6 +64,7 @@ export function InputSection() {
                   <SelectInput
                     name="incomePeriod"
                     label=""
+                    ariaLabel="Income period"
                     value={inputs.incomePeriod}
                     onChange={(value) => handleInputChange('incomePeriod', value)}
                     options={[
@@ -92,6 +92,7 @@ export function InputSection() {
               onChange={(value) => handleInputChange('startingAge', value)}
               min={0}
               max={100}
+              allowDecimals={false}
               help="Your current age"
             />
           }
@@ -117,6 +118,7 @@ export function InputSection() {
               onChange={(value) => handleInputChange('retirementAge', value)}
               min={0}
               max={100}
+              allowDecimals={false}
               help="When you want to retire"
             />
           }
@@ -219,46 +221,54 @@ export function InputSection() {
             </SingleColumnFields>
 
             <TwoColumnFields>
-              <PercentageInput
+              <PercentInput
+                name="accumulationReturn"
                 label="Accumulation Return"
                 value={inputs.accumulationReturn}
                 onChange={(value) => handleInputChange('accumulationReturn', value)}
                 min={0}
                 max={0.25}
                 step={0.001}
-                displayMode="both"
+                precision={2}
+                showSlider
               />
 
-              <PercentageInput
+              <PercentInput
+                name="retirementReturn"
                 label="Retirement Return"
                 value={inputs.retirementReturn}
                 onChange={(value) => handleInputChange('retirementReturn', value)}
                 min={0}
                 max={0.25}
                 step={0.001}
-                displayMode="both"
+                precision={2}
+                showSlider
               />
             </TwoColumnFields>
 
             <TwoColumnFields>
-              <PercentageInput
+              <PercentInput
+                name="inflationRate"
                 label="Inflation Rate"
                 value={inputs.inflationRate}
                 onChange={(value) => handleInputChange('inflationRate', value)}
                 min={0.01}
                 max={0.05}
                 step={0.001}
-                displayMode="both"
+                precision={2}
+                showSlider
               />
 
-              <PercentageInput
+              <PercentInput
+                name="volatility"
                 label="Portfolio Volatility"
                 value={inputs.volatility}
                 onChange={(value) => handleInputChange('volatility', value)}
                 min={0.05}
                 max={0.25}
                 step={0.005}
-                displayMode="both"
+                precision={2}
+                showSlider
               />
             </TwoColumnFields>
 
@@ -270,6 +280,7 @@ export function InputSection() {
                 onChange={(value) => handleInputChange('socialSecurityAge', value)}
                 min={0}
                 max={100}
+                allowDecimals={false}
                 help="When to claim benefits"
               />
 
@@ -280,6 +291,7 @@ export function InputSection() {
                 onChange={(value) => handleInputChange('lifeExpectancy', value)}
                 min={0}
                 max={100}
+                allowDecimals={false}
                 suffix="years"
                 help="Age you expect to live to"
               />
@@ -312,14 +324,16 @@ export function InputSection() {
             </div>
 
             <TwoColumnFields>
-              <PercentageInput
+              <PercentInput
+                name="effectiveTaxRate"
                 label="Effective Tax Rate"
                 value={inputs.effectiveTaxRate ?? 0.15}
                 onChange={(value) => handleInputChange('effectiveTaxRate', value)}
                 min={0}
                 max={0.40}
                 step={0.01}
-                displayMode="both"
+                precision={2}
+                showSlider
               />
               <MoneyInput
                 name="estimatedAnnualHealthcareCost"

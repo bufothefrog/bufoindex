@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Slider } from '@/components/ui/slider';
 import { BaseInput } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 
@@ -17,6 +18,7 @@ interface PercentInputProps extends BaseInputProps {
   precision?: number; // Decimal places to show (default: 1)
   size?: 'sm' | 'md' | 'lg';
   step?: number; // Step size in decimal format
+  showSlider?: boolean; // Render a range slider below the input
 }
 
 export function PercentInput({
@@ -36,6 +38,7 @@ export function PercentInput({
   size = 'md',
   step = 0.001,
   testId,
+  showSlider = false,
 }: PercentInputProps) {
   // Convert decimal to percentage for display
   const percentValue = value * 100;
@@ -175,7 +178,7 @@ export function PercentInput({
     lg: 'right-3.5'
   };
 
-  return (
+  const inputField = (
     <BaseInput
       name={name}
       label={label}
@@ -183,8 +186,8 @@ export function PercentInput({
       help={help}
       error={error}
       disabled={disabled}
-      className={className}
-      testId={testId}
+      className={showSlider ? undefined : className}
+      testId={showSlider ? undefined : testId}
     >
       <div className="relative w-full">
         <input
@@ -212,6 +215,38 @@ export function PercentInput({
         </span>
       </div>
     </BaseInput>
+  );
+
+  if (!showSlider) {
+    return inputField;
+  }
+
+  const handleSliderChange = ([percent]: number[]) => {
+    // Round to avoid floating point precision issues (4 decimal places)
+    onChange(Math.round(percent * 100) / 10000);
+  };
+
+  return (
+    <div className={cn('space-y-2', className)} data-testid={testId}>
+      {inputField}
+      <div className="px-3">
+        <Slider
+          value={[value * 100]}
+          onValueChange={handleSliderChange}
+          min={min * 100}
+          max={max * 100}
+          step={step * 100}
+          disabled={disabled}
+          className="w-full"
+          aria-label={label || undefined}
+        />
+        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+          <span>{formatPercent(min)}</span>
+          <span className="font-medium">{formatPercent(value)}</span>
+          <span>{formatPercent(max)}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

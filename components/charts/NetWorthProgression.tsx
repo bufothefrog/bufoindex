@@ -357,7 +357,7 @@ export function NetWorthProgression({
           </div>
         </div>
         
-        <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-500">
+        <div className="bg-muted p-3 rounded border-l-4 border-sage-500">
           <div className="text-sage-700 font-semibold">Withdrawal Phase</div>
           <div className="text-sage-900">
             Ages {inputs.retirementAge} - {inputs.lifeExpectancy} ({inputs.lifeExpectancy - inputs.retirementAge} years)
@@ -367,7 +367,7 @@ export function NetWorthProgression({
           </div>
         </div>
         
-        <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-600">
+        <div className="bg-muted p-3 rounded border-l-4 border-sage-600">
           <div className="text-sage-700 font-semibold">Total Growth</div>
           <div className="text-sage-900">
             {retirementPoint ? 
@@ -383,18 +383,18 @@ export function NetWorthProgression({
       
       {/* Inflation impact notice — references the dashed real-value line, which only renders in nominal mode */}
       {displayMode === 'nominal' && (
-      <div className="mt-4 bg-amber-50 border-l-4 border-amber-400 p-4">
+      <div className="mt-4 bg-warning/10 border-l-4 border-warning p-4">
         <div className="flex">
           <div className="shrink-0">
-            <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-warning" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
           </div>
           <div className="ml-3">
-            <h4 className="text-sm font-mono font-semibold text-amber-800">
+            <h4 className="text-sm font-mono font-semibold text-warning">
               Inflation Impact
             </h4>
-            <p className="text-xs font-mono text-amber-700 mt-1">
+            <p className="text-xs font-mono text-muted-foreground mt-1">
               The dashed line shows purchasing power in today&apos;s dollars. 
               At {(inputs.inflationRate * 100).toFixed(1)}% inflation, $1M in {inputs.retirementAge + 20} years 
               equals ~${(1000000 / Math.pow(1 + inputs.inflationRate, 20)).toLocaleString()} today.

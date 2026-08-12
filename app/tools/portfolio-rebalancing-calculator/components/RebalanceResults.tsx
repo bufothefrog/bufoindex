@@ -75,10 +75,10 @@ export function RebalanceResults({ result }: RebalanceResultsProps) {
         <div
           role="alert"
           data-testid="tax-event-warning"
-          className="flex items-start gap-3 rounded-lg border border-orange-300 bg-orange-50 dark:border-orange-600 dark:bg-orange-900/30 p-3 text-sm"
+          className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm"
         >
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-orange-600 dark:text-orange-300" />
-          <div className="text-orange-800 dark:text-orange-100">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
+          <div className="text-foreground">
             This plan sells {formatCurrency(taxEventDollars)} in taxable accounts.
             Review your cost basis to estimate the tax impact.
           </div>
@@ -284,7 +284,7 @@ function HoldingPlanRow({ holding, mode, customAssetClasses }: HoldingPlanRowPro
         className={cn(
           'py-3 px-2 text-right font-mono tabular-nums',
           isBuy && 'text-sage-700 dark:text-sage-300',
-          isSell && 'text-orange-700 dark:text-orange-300',
+          isSell && 'text-warning',
           !isBuy && !isSell && 'text-muted-foreground'
         )}
       >
@@ -297,7 +297,7 @@ function HoldingPlanRow({ holding, mode, customAssetClasses }: HoldingPlanRowPro
       <td
         className={cn(
           'py-3 px-2 text-right font-mono tabular-nums',
-          isSell && 'text-orange-700 dark:text-orange-300'
+          isSell && 'text-warning'
         )}
       >
         {isSell
@@ -378,7 +378,7 @@ function ClassDriftTable({ drifts, customAssetClasses }: ClassDriftTableProps) {
                     Math.abs(d.driftAfter) < 0.001
                       ? 'text-sage-600 dark:text-sage-300'
                       : d.driftAfter > 0
-                      ? 'text-orange-600 dark:text-orange-300'
+                      ? 'text-warning'
                       : 'text-muted-foreground'
                   )}
                 >

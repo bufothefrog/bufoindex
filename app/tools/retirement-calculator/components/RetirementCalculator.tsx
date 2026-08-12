@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRetirementStore } from '@/lib/store/retirementStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
-import { ResponsiveCalculatorLayout } from '@/components/calculators/shared/CalculatorLayout';
+import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 
 // Main retirement calculator component
 export function RetirementCalculator() {
@@ -53,18 +53,22 @@ export function RetirementCalculator() {
   
   return (
     <>
-      <ResponsiveCalculatorLayout
+      <CalculatorLayout
         title="Retirement Planning Calculator"
         description="Comprehensive retirement planning with Monte Carlo simulations and advanced financial modeling. Compare multiple retirement scenarios and get personalized insights."
-        inputSection={<InputSection />}
-        resultsSection={<ResultsSection />}
+        inputSections={<InputSection />}
+        resultSection={results ? <ResultsSection /> : undefined}
         isCalculating={isCalculating}
-        hasResults={!!results}
         onCalculate={handleCalculate}
         onShare={handleShare}
         calculateButtonText="Calculate Retirement Plan"
         calculatingText="Running Monte Carlo Analysis..."
         errors={errors}
+        emptyStateConfig={{
+          title: 'Ready to Calculate',
+          description: 'Review your inputs and run the analysis',
+          features: []
+        }}
       />
       <p className="mt-6 text-center text-sm text-muted-foreground">
         How these numbers are computed —{' '}

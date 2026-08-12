@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
+import { MoneyInput } from '@/components/ui/inputs';
 import { DollarSign } from 'lucide-react';
 import type { IncomeData } from '@/lib/types';
 
@@ -27,7 +27,7 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
             label="Gross Paycheck Amount"
             value={income.grossPaycheck}
             onChange={(value) => onUpdate({ grossPaycheck: value })}
-            placeholder="$2,500"
+            placeholder="2,500"
             required
           />
 
@@ -51,7 +51,7 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
           label="Take-Home Per Paycheck"
           value={income.netPaycheck}
           onChange={(value) => onUpdate({ netPaycheck: value })}
-          placeholder="$1,900"
+          placeholder="1,900"
           required
         />
 
@@ -74,7 +74,7 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
                 label="Average Bonus Amount"
                 value={income.bonusAmount}
                 onChange={(value) => onUpdate({ bonusAmount: value })}
-                placeholder="$2,000"
+                placeholder="2,000"
               />
 
               <div className="space-y-2">

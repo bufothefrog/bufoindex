@@ -4,7 +4,7 @@ import React from 'react';
 import { useCalculatorStore } from '@/lib/store/calculatorStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
-import { ResponsiveCalculatorLayout } from '@/components/calculators/shared/CalculatorLayout';
+import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 
 export function PaycheckAllocator() {
   const { 
@@ -28,17 +28,21 @@ export function PaycheckAllocator() {
 
   
   return (
-    <ResponsiveCalculatorLayout
+    <CalculatorLayout
       title="Paycheck Allocator Calculator"
       description="Allocates your monthly paycheck across fixed costs, tax-advantaged accounts, and flexible spending, in priority order by after-tax return. Each step shows the math behind its placement."
-      inputSection={<InputSection />}
-      resultsSection={<ResultsSection />}
+      inputSections={<InputSection />}
+      resultSection={result ? <ResultsSection /> : undefined}
       isCalculating={isCalculating}
-      hasResults={!!result}
       onCalculate={handleCalculate}
       calculateButtonText="Calculate My Allocation"
       calculatingText="Calculating Optimal Allocation..."
       errors={errors}
+      emptyStateConfig={{
+        title: 'Ready to Calculate',
+        description: 'Review your inputs and run the analysis',
+        features: []
+      }}
     />
   );
 }

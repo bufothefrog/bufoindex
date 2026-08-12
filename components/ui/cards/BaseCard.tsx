@@ -161,10 +161,10 @@ export function BaseCard({
 function getGradientClasses(color: ComponentColor): string {
   const gradients = {
     sage: 'bg-linear-to-r from-sage-50 to-sage-100 dark:from-sage-800 dark:to-sage-700 border-sage-200 dark:border-sage-600',
-    success: 'bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-800 dark:to-emerald-800 border-green-200 dark:border-green-600',
-    warning: 'bg-linear-to-r from-orange-50 to-yellow-50 dark:from-orange-800 dark:to-yellow-800 border-orange-200 dark:border-orange-600',
-    error: 'bg-linear-to-r from-red-50 to-rose-50 dark:from-red-800 dark:to-rose-800 border-red-200 dark:border-red-600',
-    info: 'bg-linear-to-r from-blue-50 to-sky-50 dark:from-blue-800 dark:to-sky-800 border-blue-200 dark:border-blue-600'
+    success: 'bg-linear-to-r from-success/10 to-success/20 border-success/30',
+    warning: 'bg-linear-to-r from-warning/10 to-warning/20 border-warning/30',
+    error: 'bg-linear-to-r from-destructive/10 to-destructive/20 border-destructive/30',
+    info: 'bg-linear-to-r from-info/10 to-info/20 border-info/30'
   };
   
   return gradients[color];
@@ -176,10 +176,10 @@ function getGradientClasses(color: ComponentColor): string {
 function getBorderedClasses(color: ComponentColor): string {
   const borders = {
     sage: 'border-2 border-sage-200 dark:border-sage-600 hover:border-sage-300 dark:hover:border-sage-500',
-    success: 'border-2 border-green-200 dark:border-green-600 hover:border-green-300 dark:hover:border-green-500',
-    warning: 'border-2 border-orange-200 dark:border-orange-600 hover:border-orange-300 dark:hover:border-orange-500',
-    error: 'border-2 border-red-200 dark:border-red-600 hover:border-red-300 dark:hover:border-red-500',
-    info: 'border-2 border-blue-200 dark:border-blue-600 hover:border-blue-300 dark:hover:border-blue-500'
+    success: 'border-2 border-success/30 hover:border-success/50',
+    warning: 'border-2 border-warning/30 hover:border-warning/50',
+    error: 'border-2 border-destructive/30 hover:border-destructive/50',
+    info: 'border-2 border-info/30 hover:border-info/50'
   };
   
   return borders[color];
@@ -196,24 +196,24 @@ function getColorClasses(color: ComponentColor, element: 'text' | 'icon' | 'butt
       button: 'hover:bg-sage-100 dark:hover:bg-sage-700 text-sage-600 dark:text-sage-300'
     },
     success: {
-      text: 'text-green-700 dark:text-green-200',
-      icon: 'text-green-500 dark:text-green-400',
-      button: 'hover:bg-green-100 dark:hover:bg-green-700 text-green-600 dark:text-green-300'
+      text: 'text-success',
+      icon: 'text-success',
+      button: 'hover:bg-success/10 text-success'
     },
     warning: {
-      text: 'text-orange-700 dark:text-orange-200',
-      icon: 'text-orange-500 dark:text-orange-400',
-      button: 'hover:bg-orange-100 dark:hover:bg-orange-700 text-orange-600 dark:text-orange-300'
+      text: 'text-warning',
+      icon: 'text-warning',
+      button: 'hover:bg-warning/10 text-warning'
     },
     error: {
-      text: 'text-red-700 dark:text-red-200',
-      icon: 'text-red-500 dark:text-red-400',
-      button: 'hover:bg-red-100 dark:hover:bg-red-700 text-red-600 dark:text-red-300'
+      text: 'text-destructive',
+      icon: 'text-destructive',
+      button: 'hover:bg-destructive/10 text-destructive'
     },
     info: {
-      text: 'text-blue-700 dark:text-blue-200',
-      icon: 'text-blue-500 dark:text-blue-400',
-      button: 'hover:bg-blue-100 dark:hover:bg-blue-700 text-blue-600 dark:text-blue-300'
+      text: 'text-info',
+      icon: 'text-info',
+      button: 'hover:bg-info/10 text-info'
     }
   };
   
@@ -240,7 +240,7 @@ export function InputCard({
       title={displayTitle}
       variant="default"
       titleClassName={cn(
-        required && 'after:content-[""] after:text-red-500 dark:after:text-red-300',
+        required && 'after:content-[""] after:text-destructive',
         props.titleClassName
       )}
     />
@@ -304,8 +304,8 @@ export function SummaryCard({
         {change && (
           <div className={cn(
             "text-xs flex items-center justify-center space-x-1",
-            change.direction === 'up' && "text-green-600 dark:text-green-300",
-            change.direction === 'down' && "text-red-600 dark:text-red-300",
+            change.direction === 'up' && "text-success",
+            change.direction === 'down' && "text-destructive",
             change.direction === 'neutral' && "text-muted-foreground"
           )}>
             {change.direction !== 'neutral' && (

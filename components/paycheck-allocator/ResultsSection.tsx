@@ -4,7 +4,6 @@ import React from 'react';
 import { useResult, useProfile, useCalculatorStore } from '@/lib/store/calculatorStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AllocationCard } from '@/components/shared/cards/AllocationCard';
 import { OpportunityCostCard } from '@/components/shared/cards/OpportunityCostCard';
 import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
@@ -18,7 +17,6 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronUp,
-  Calculator,
   AlertTriangle
 } from 'lucide-react';
 
@@ -27,7 +25,6 @@ export const ResultsSection = React.memo(function ResultsSection() {
   const profile = useProfile();
   const displayMode = useCalculatorStore((state) => state.displayMode);
   const setDisplayMode = useCalculatorStore((state) => state.setDisplayMode);
-  const [expandedAllocation, setExpandedAllocation] = React.useState<string | null>(null);
   const [expandedSkipped, setExpandedSkipped] = React.useState<string | null>(null);
   const [showAllSkipped, setShowAllSkipped] = React.useState(false);
   

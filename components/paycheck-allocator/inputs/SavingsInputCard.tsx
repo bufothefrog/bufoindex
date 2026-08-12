@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoneyInput } from '@/components/shared/inputs/MoneyInput';
+import { MoneyInput } from '@/components/ui/inputs';
 import { Input } from '@/components/ui/input';
 import { PiggyBank } from 'lucide-react';
 import type { UserPreferences, BenefitsData } from '@/lib/types';
@@ -33,7 +33,7 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
               label="Current Balance"
               value={preferences.currentEmergencyFund}
               onChange={(value) => onUpdatePreferences({ currentEmergencyFund: value })}
-              placeholder="$10,000"
+              placeholder="10,000"
               help="Current balance in savings/emergency accounts"
             />
 
@@ -159,7 +159,7 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
                           }
                         }
                       })}
-                      placeholder="$500"
+                      placeholder="500"
                     />
                   )}
 
@@ -177,7 +177,7 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
                           }
                         }
                       })}
-                      placeholder="$500"
+                      placeholder="500"
                     />
                   )}
                 </div>
@@ -207,7 +207,7 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
                   label="Monthly Contribution"
                   value={preferences.taxableAccountContribution}
                   onChange={(value) => onUpdatePreferences({ taxableAccountContribution: value })}
-                  placeholder="$500"
+                  placeholder="500"
                   help="Monthly investments to taxable accounts"
                 />
 

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from './MoneyInput';
+import { MoneyInput } from '@/components/ui/inputs';
 import { DebtData } from '@/lib/types';
 import { formatPercent, formatCurrency } from '@/lib/utils';
 import { Plus, Trash2, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react';
@@ -16,8 +16,6 @@ interface DebtInputProps {
 }
 
 export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: DebtInputProps) {
-  const [isAddingDebt, setIsAddingDebt] = React.useState(false);
-  
   const addNewDebt = () => {
     const newDebt: DebtData = {
       id: `debt-${Date.now()}`,
@@ -29,7 +27,6 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
       taxDeductible: false,
     };
     onAddDebt(newDebt);
-    setIsAddingDebt(false);
   };
 
   const getDebtStatus = (interestRate: number) => {
@@ -92,9 +89,10 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         <MoneyInput
                           name={`debt-balance-${index}`}
                           label=""
+                          ariaLabel="Balance"
                           value={debt.balance}
                           onChange={(value) => onUpdateDebt(index, { balance: value })}
-                          placeholder="$10,000"
+                          placeholder="10,000"
                           className="mt-1"
                         />
                       </div>
@@ -119,9 +117,10 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         <MoneyInput
                           name={`debt-minimum-${index}`}
                           label=""
+                          ariaLabel="Minimum Payment"
                           value={debt.minimumPayment}
                           onChange={(value) => onUpdateDebt(index, { minimumPayment: value })}
-                          placeholder="$200"
+                          placeholder="200"
                           className="mt-1"
                         />
                       </div>
@@ -130,9 +129,10 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         <MoneyInput
                           name={`debt-extra-${index}`}
                           label=""
+                          ariaLabel="Extra Payment (optional)"
                           value={debt.extraPayment}
                           onChange={(value) => onUpdateDebt(index, { extraPayment: value })}
-                          placeholder="$0"
+                          placeholder="0"
                           className="mt-1"
                         />
                       </div>

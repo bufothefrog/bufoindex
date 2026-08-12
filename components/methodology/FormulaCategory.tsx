@@ -29,10 +29,10 @@ const CATEGORY_DESCRIPTIONS: Record<FormulaCategory, string> = {
 };
 
 const CATEGORY_COLORS: Record<FormulaCategory, string> = {
-  core: 'bg-blue-50 border-blue-200 text-blue-800',
-  intermediate: 'bg-green-50 border-green-200 text-green-800',
-  advanced: 'bg-purple-50 border-purple-200 text-purple-800',
-  assumptions: 'bg-orange-50 border-orange-200 text-orange-800'
+  core: 'bg-info/10 border-info/30 text-info',
+  intermediate: 'bg-success/10 border-success/30 text-success',
+  advanced: 'bg-primary/10 border-primary/30 text-primary',
+  assumptions: 'bg-warning/10 border-warning/30 text-warning'
 };
 
 export function FormulaCategory({

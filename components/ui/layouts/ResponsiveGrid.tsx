@@ -109,12 +109,22 @@ export function ResultSection({ children, className, span }: GridSectionProps) {
 /**
  * Empty State Section
  */
+export type FeatureDotColor = 'success' | 'info' | 'warning' | 'destructive' | 'primary';
+
+const featureDotClasses: Record<FeatureDotColor, string> = {
+  success: 'bg-success',
+  info: 'bg-info',
+  warning: 'bg-warning',
+  destructive: 'bg-destructive',
+  primary: 'bg-primary'
+};
+
 interface EmptyStateSectionProps {
   title: string;
   description: string;
   icon?: React.ComponentType<{ className?: string }>;
   features?: Array<{
-    color: string;
+    color: FeatureDotColor;
     text: string;
   }>;
   className?: string;
@@ -149,9 +159,8 @@ export function EmptyStateSection({
             <div className="text-sm text-muted-foreground space-y-2">
               {features.map((feature, index) => (
                 <div key={index} className="flex items-center justify-center space-x-2">
-                  <div 
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: feature.color }}
+                  <div
+                    className={cn("w-2 h-2 rounded-full", featureDotClasses[feature.color])}
                   />
                   <span>{feature.text}</span>
                 </div>

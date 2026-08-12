@@ -160,10 +160,10 @@ export function RetirementCharts({
     if (totalRenderTime === 0) return null;
     
     return (
-      <div className="mt-4 p-2 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono text-slate-600 dark:text-slate-400">
+      <div className="mt-4 p-2 bg-muted rounded text-xs font-mono text-muted-foreground">
         <div className="flex justify-between items-center">
           <span>Chart Performance:</span>
-          <span className={totalRenderTime < 500 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+          <span className={totalRenderTime < 500 ? 'text-success' : 'text-warning'}>
             {totalRenderTime.toFixed(1)}ms total
           </span>
         </div>
@@ -262,7 +262,7 @@ export function RetirementCharts({
       </div>
 
       {/* Chart data freshness indicator */}
-      <div className="mt-4 text-xs text-slate-500 dark:text-slate-400 font-mono text-center">
+      <div className="mt-4 text-xs text-muted-foreground font-mono text-center">
         Charts generated at {new Date().toLocaleTimeString()} using current inputs.
         Update inputs to refresh visualizations.
       </div>

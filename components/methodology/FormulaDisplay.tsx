@@ -160,7 +160,7 @@ export function FormulaDisplay({
                     <span className="text-muted-foreground">({variable.unit})</span>
                   )}
                   {variable.constraints && (
-                    <span className="text-xs text-orange-600 italic">
+                    <span className="text-xs text-warning italic">
                       {variable.constraints}
                     </span>
                   )}
@@ -268,10 +268,10 @@ export function FormulaDisplay({
             
             {expandedSections.limitations && (
               <div className="mt-2">
-                <ul className="space-y-1 text-sm text-orange-600">
+                <ul className="space-y-1 text-sm text-warning">
                   {formula.limitations.map((limitation, index) => (
                     <li key={index} className="flex items-start">
-                      <span className="inline-block w-2 h-2 rounded-full bg-orange-600 mt-1.5 mr-2 shrink-0"></span>
+                      <span className="inline-block w-2 h-2 rounded-full bg-warning mt-1.5 mr-2 shrink-0"></span>
                       {limitation}
                     </li>
                   ))}

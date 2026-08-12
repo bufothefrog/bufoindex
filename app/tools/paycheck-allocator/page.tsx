@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { PaycheckAllocator } from '@/components/calculator/PaycheckAllocator'
+import { PaycheckAllocator } from '@/components/paycheck-allocator/PaycheckAllocator'
 
 export const metadata: Metadata = {
   title: 'Paycheck Allocator',

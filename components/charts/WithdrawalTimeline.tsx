@@ -295,7 +295,7 @@ export function WithdrawalTimeline({
       
       {/* Summary statistics */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-        <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-400">
+        <div className="bg-muted p-3 rounded border-l-4 border-sage-400">
           <div className="text-sage-700 font-semibold">First Year Withdrawal</div>
           <div className="text-sage-900">
             ${Math.round(displayData[0]?.inflatedAmount || 0).toLocaleString()}
@@ -307,7 +307,7 @@ export function WithdrawalTimeline({
           </div>
         </div>
 
-        <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-500">
+        <div className="bg-muted p-3 rounded border-l-4 border-sage-500">
           <div className="text-sage-700 font-semibold">Final Year Withdrawal</div>
           <div className="text-sage-900">
             ${Math.round(displayData[displayData.length - 1]?.inflatedAmount || 0).toLocaleString()}
@@ -319,7 +319,7 @@ export function WithdrawalTimeline({
           </div>
         </div>
 
-        <div className="bg-slate-50 p-3 rounded border-l-4 border-sage-600">
+        <div className="bg-muted p-3 rounded border-l-4 border-sage-600">
           <div className="text-sage-700 font-semibold">Portfolio Depletion</div>
           <div className="text-sage-900">
             {withdrawalData[withdrawalData.length - 1]?.portfolioBalance > 10000 ? 'Preserved' : 'Depleted'}

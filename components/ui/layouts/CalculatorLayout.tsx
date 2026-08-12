@@ -6,8 +6,8 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Calculator, Loader2 } from 'lucide-react';
-import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Container } from './ResponsiveGrid';
+import { Calculator, Loader2, Share2 } from 'lucide-react';
+import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Container, type FeatureDotColor } from './ResponsiveGrid';
 import { BaseCard } from '../cards/BaseCard';
 
 interface CalculatorLayoutProps {
@@ -17,6 +17,7 @@ interface CalculatorLayoutProps {
   resultSection?: React.ReactNode;
   isCalculating?: boolean;
   onCalculate?: () => void;
+  onShare?: () => void;
   calculateButtonText?: string;
   calculatingText?: string;
   errors?: Record<string, string>;
@@ -24,7 +25,7 @@ interface CalculatorLayoutProps {
     title?: string;
     description?: string;
     features?: Array<{
-      color: string;
+      color: FeatureDotColor;
       text: string;
     }>;
   };
@@ -40,6 +41,7 @@ export function CalculatorLayout({
   resultSection,
   isCalculating = false,
   onCalculate,
+  onShare,
   calculateButtonText = "Calculate",
   calculatingText,
   errors = {},
@@ -75,6 +77,7 @@ export function CalculatorLayout({
               loadingText={calculatingText || `${calculateButtonText}...`}
               errors={errors}
               disabled={!onCalculate || hasErrors}
+              onShare={onShare}
             />
           </InputSection>
           
@@ -135,6 +138,7 @@ interface CalculateButtonProps {
   loadingText?: string;
   errors?: Record<string, string>;
   disabled?: boolean;
+  onShare?: () => void;
   className?: string;
 }
 
@@ -145,10 +149,11 @@ export function CalculateButton({
   loadingText = "Calculating...",
   errors = {},
   disabled = false,
+  onShare,
   className
 }: CalculateButtonProps) {
   const hasErrors = Object.keys(errors).length > 0;
-  
+
   return (
     <BaseCard className={className}>
       <Button
@@ -169,7 +174,20 @@ export function CalculateButton({
           </>
         )}
       </Button>
-      
+
+      {/* Share Action */}
+      {onShare && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onShare}
+          className="w-full mt-4"
+        >
+          <Share2 className="w-4 h-4 mr-2" />
+          Share
+        </Button>
+      )}
+
       {/* Error Display */}
       {hasErrors && (
         <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
@@ -223,9 +241,9 @@ export function SimpleCalculatorLayout(props: Omit<CalculatorLayoutProps, 'empty
         title: "Ready to Calculate?",
         description: "Enter your information and click Calculate to see your results.",
         features: [
-          { color: '#10B981', text: 'Instant calculations' },
-          { color: '#3B82F6', text: 'Educational insights' },
-          { color: '#F59E0B', text: 'Personalized results' }
+          { color: 'success', text: 'Instant calculations' },
+          { color: 'info', text: 'Educational insights' },
+          { color: 'warning', text: 'Personalized results' }
         ]
       }}
     />
@@ -243,10 +261,10 @@ export function AdvancedCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emp
         title: "Ready to Optimize?",
         description: "Complete your financial profile to get mathematically optimized recommendations.",
         features: [
-          { color: '#10B981', text: 'Mathematical optimization' },
-          { color: '#3B82F6', text: 'Tax efficiency analysis' },
-          { color: '#F59E0B', text: 'Opportunity analysis' },
-          { color: '#EF4444', text: 'Risk assessment' }
+          { color: 'success', text: 'Mathematical optimization' },
+          { color: 'info', text: 'Tax efficiency analysis' },
+          { color: 'warning', text: 'Opportunity analysis' },
+          { color: 'destructive', text: 'Risk assessment' }
         ]
       }}
     />
@@ -264,10 +282,10 @@ export function ComparisonCalculatorLayout(props: Omit<CalculatorLayoutProps, 'e
         title: "Ready to Compare?",
         description: "Set up your scenarios to compare different strategies and outcomes.",
         features: [
-          { color: '#10B981', text: 'Scenario comparison' },
-          { color: '#3B82F6', text: 'Monte Carlo analysis' },
-          { color: '#F59E0B', text: 'Probability modeling' },
-          { color: '#8B5CF6', text: 'Long-term projections' }
+          { color: 'success', text: 'Scenario comparison' },
+          { color: 'info', text: 'Monte Carlo analysis' },
+          { color: 'warning', text: 'Probability modeling' },
+          { color: 'primary', text: 'Long-term projections' }
         ]
       }}
     />

@@ -53,8 +53,7 @@ export function LatexRenderer({
       // Fallback to plain text
       if (containerRef.current) {
         containerRef.current.textContent = latex;
-        containerRef.current.style.color = '#ef4444'; // Tailwind red-500
-        containerRef.current.style.fontFamily = 'monospace';
+        containerRef.current.classList.add('text-destructive', 'font-mono');
       }
 
       onRenderError?.(error as Error);
