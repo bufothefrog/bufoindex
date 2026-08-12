@@ -1,12 +1,13 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { STATE_TAX_RATES } from '../types'
+import { STATE_TAX_RATES } from '../constants/states-2026'
 import {
   SS_WAGE_BASE_2026,
   FICA_RATE,
   MEDICARE_RATE,
   ADDITIONAL_MEDICARE_RATE,
   ADDITIONAL_MEDICARE_THRESHOLD,
+  type FilingStatusInput,
 } from '../constants/irs-2026'
 
 /**
@@ -95,17 +96,43 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Get the applicable FICA rate based on gross annual income.
- * Constants imported from lib/constants/irs-2026.ts (single source of truth).
+ * Additional Medicare Tax (0.9% surtax) liability thresholds by filing status.
+ * IRC 3101(b)(2): $250,000 MFJ / $125,000 MFS / $200,000 all others.
+ * Statutory amounts, not inflation-indexed.
  */
-export function getFICARate(grossAnnualIncome: number): number {
-  if (grossAnnualIncome <= SS_WAGE_BASE_2026) {
-    return FICA_RATE;
-  } else if (grossAnnualIncome <= ADDITIONAL_MEDICARE_THRESHOLD) {
-    return MEDICARE_RATE;
-  } else {
-    return ADDITIONAL_MEDICARE_RATE;
+function getAdditionalMedicareThreshold(filingStatus: FilingStatusInput): number {
+  switch (filingStatus) {
+    case 'marriedJoint':
+    case 'marriedFilingJointly':
+      return 250000;
+    case 'marriedSeparate':
+    case 'marriedFilingSeparately':
+      return 125000;
+    default:
+      return ADDITIONAL_MEDICARE_THRESHOLD; // $200k: single, head of household
   }
+}
+
+/**
+ * Get the applicable marginal FICA rate based on gross annual income and
+ * filing status. Constants imported from lib/constants/irs-2026.ts
+ * (single source of truth); Additional Medicare Tax thresholds per
+ * IRC 3101(b)(2) above.
+ */
+export function getFICARate(
+  grossAnnualIncome: number,
+  filingStatus: FilingStatusInput = 'single'
+): number {
+  const surtaxApplies = grossAnnualIncome > getAdditionalMedicareThreshold(filingStatus);
+  // ADDITIONAL_MEDICARE_RATE - MEDICARE_RATE isolates the 0.9% surtax so it
+  // can stack on the full FICA rate when the threshold sits below the SS wage
+  // base (MFS: $125k threshold < $184.5k wage base).
+  if (grossAnnualIncome <= SS_WAGE_BASE_2026) {
+    return surtaxApplies
+      ? FICA_RATE + (ADDITIONAL_MEDICARE_RATE - MEDICARE_RATE)
+      : FICA_RATE;
+  }
+  return surtaxApplies ? ADDITIONAL_MEDICARE_RATE : MEDICARE_RATE;
 }
 
 /**
@@ -126,8 +153,13 @@ export function calculateIncomeTaxRate(federalRate: number, stateCode: string): 
  * HSA payroll deductions are exempt from FICA per IRC 3121(a)(2)(B),
  * so the full FICA rate is a genuine tax saving.
  */
-export function calculateHSATaxRate(federalRate: number, stateCode: string, grossAnnualIncome: number): number {
-  return calculateIncomeTaxRate(federalRate, stateCode) + getFICARate(grossAnnualIncome);
+export function calculateHSATaxRate(
+  federalRate: number,
+  stateCode: string,
+  grossAnnualIncome: number,
+  filingStatus: FilingStatusInput = 'single'
+): number {
+  return calculateIncomeTaxRate(federalRate, stateCode) + getFICARate(grossAnnualIncome, filingStatus);
 }
 
 /**

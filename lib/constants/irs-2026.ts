@@ -39,7 +39,70 @@ export const FEDERAL_TAX_BRACKETS_2026 = {
     { min: 512450, max: 768700, rate: 0.35 },
     { min: 768700, max: Infinity, rate: 0.37 },
   ],
+  // Rev. Proc. 2025-32 (as amended by OBBBA). MFS thresholds are exactly half
+  // of the MFJ thresholds under IRC 1(j), including the 37% threshold.
+  marriedFilingSeparately: [
+    { min: 0, max: 12400, rate: 0.10 },
+    { min: 12400, max: 50400, rate: 0.12 },
+    { min: 50400, max: 105700, rate: 0.22 },
+    { min: 105700, max: 201775, rate: 0.24 },
+    { min: 201775, max: 256225, rate: 0.32 },
+    { min: 256225, max: 384350, rate: 0.35 },
+    { min: 384350, max: Infinity, rate: 0.37 },
+  ],
+  // Rev. Proc. 2025-32 (as amended by OBBBA), head-of-household table.
+  headOfHousehold: [
+    { min: 0, max: 17700, rate: 0.10 },
+    { min: 17700, max: 67450, rate: 0.12 },
+    { min: 67450, max: 105700, rate: 0.22 },
+    { min: 105700, max: 201775, rate: 0.24 },
+    { min: 201775, max: 256200, rate: 0.32 }, // verify: HoH 32% ceiling ($256,200; single is $256,225)
+    { min: 256200, max: 640600, rate: 0.35 },
+    { min: 640600, max: Infinity, rate: 0.37 },
+  ],
 } as const;
+
+/**
+ * Filing status as stored on user profiles (lib/types TaxData) or as the
+ * bracket-table keys above. Both spellings resolve to the same tables.
+ */
+export type FilingStatusInput =
+  | 'single'
+  | 'marriedJoint'
+  | 'marriedFilingJointly'
+  | 'marriedSeparate'
+  | 'marriedFilingSeparately'
+  | 'headOfHousehold';
+
+export function getBracketsForStatus(status: FilingStatusInput): readonly TaxBracket[] {
+  switch (status) {
+    case 'marriedJoint':
+    case 'marriedFilingJointly':
+      return FEDERAL_TAX_BRACKETS_2026.marriedFilingJointly;
+    case 'marriedSeparate':
+    case 'marriedFilingSeparately':
+      return FEDERAL_TAX_BRACKETS_2026.marriedFilingSeparately;
+    case 'headOfHousehold':
+      return FEDERAL_TAX_BRACKETS_2026.headOfHousehold;
+    default:
+      return FEDERAL_TAX_BRACKETS_2026.single;
+  }
+}
+
+export function getStandardDeductionForStatus(status: FilingStatusInput): number {
+  switch (status) {
+    case 'marriedJoint':
+    case 'marriedFilingJointly':
+      return STANDARD_DEDUCTIONS_2026.marriedFilingJointly;
+    case 'marriedSeparate':
+    case 'marriedFilingSeparately':
+      return STANDARD_DEDUCTIONS_2026.marriedFilingSeparately;
+    case 'headOfHousehold':
+      return STANDARD_DEDUCTIONS_2026.headOfHousehold;
+    default:
+      return STANDARD_DEDUCTIONS_2026.single;
+  }
+}
 
 // ── Standard Deductions ─────────────────────────────────────────────────────
 

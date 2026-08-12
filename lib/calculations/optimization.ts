@@ -1,11 +1,9 @@
 import {
   PaycheckProfile,
   AllocationItem,
-  SkippedItem,
-  TAX_BRACKETS,
-  CONTRIBUTION_LIMITS
+  SkippedItem
 } from '../types';
-import { ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '../constants/irs-2026';
+import { CONTRIBUTION_LIMITS_2026, ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '../constants/irs-2026';
 import { calculateIncomeTaxRate, calculateHSATaxRate } from '../utils';
 import { formatCurrency, formatPercent, paycheckToMonthly, monthlyToPaycheck } from './core';
 
@@ -175,33 +173,38 @@ export function calculateHighInterestDebt(
   });
   
   if (highInterestDebts.length === 0) return null;
-  
+
   // Sort by interest rate, highest first
   highInterestDebts.sort((a, b) => b.interestRate - a.interestRate);
   const highestRateDebt = highInterestDebts[0];
-  
-  // Calculate recommended payment (minimum plus available amount)
+
+  const frequency = profile.income.frequency;
+  // Minimum payments are stored monthly; availableAmount is per paycheck
+  const minimumPaymentPerPaycheck = monthlyToPaycheck(highestRateDebt.minimumPayment, frequency);
   const recommendedPayment = Math.min(availableAmount, highestRateDebt.balance);
-  
-  if (recommendedPayment <= highestRateDebt.minimumPayment) return null;
-  
-  const extraPayment = recommendedPayment - highestRateDebt.minimumPayment;
+
+  if (recommendedPayment <= minimumPaymentPerPaycheck) return null;
+
+  const extraPayment = recommendedPayment - minimumPaymentPerPaycheck;
+  const monthlyEquivalent = paycheckToMonthly(extraPayment, frequency);
   // Average-balance correction: payments reduce balance over the year,
   // so average effective time is ~6 months, not 12
-  const annualSavings = extraPayment * 12 * highestRateDebt.interestRate * 0.5;
-  
+  const annualSavings = monthlyEquivalent * 12 * highestRateDebt.interestRate * 0.5;
+
   const reasoning = `Debt over 7% = guaranteed ${formatPercent(highestRateDebt.interestRate)} return. Prioritize before investing.`;
-  
+
   return {
     id: 'high-interest-debt',
     account: `${highestRateDebt.name} (${formatPercent(highestRateDebt.interestRate)})`,
     amount: extraPayment,
-    percentage: extraPayment / profile.income.net,
+    percentage: extraPayment / profile.income.netPaycheck,
     priority: 3,
     reasoning: reasoning,
     taxImpact: 0, // Debt payments are not tax-deductible for most consumer debt
     category: 'debt_payoff',
-    implementation: `Pay extra ${formatCurrency(extraPayment)}/month toward ${highestRateDebt.name} (saves ${formatCurrency(annualSavings)}/year in interest)`,
+    monthlyEquivalent,
+    annualEquivalent: monthlyEquivalent * 12,
+    implementation: `Pay extra ${formatCurrency(extraPayment)} per paycheck toward ${highestRateDebt.name} (saves ${formatCurrency(annualSavings)}/year in interest)`,
   };
 }
 
@@ -214,76 +217,40 @@ export function calculateHSAOptimal(
 ): AllocationItem | null {
   const hsa = profile.benefits.hsa;
   if (!hsa.eligible) return null;
-  
-  const annualLimit = hsa.coverageType === 'family' 
-    ? CONTRIBUTION_LIMITS[2026].hsa.family 
-    : CONTRIBUTION_LIMITS[2026].hsa.individual;
-    
-  const monthlyLimit = annualLimit / 12;
-  const additionalContribution = monthlyLimit - hsa.currentContribution;
-  
-  if (additionalContribution <= 0) return null;
-  
-  const recommendedContribution = Math.min(additionalContribution, availableAmount);
-  
+
+  const annualLimit = hsa.coverageType === 'family'
+    ? CONTRIBUTION_LIMITS_2026.hsa.family
+    : CONTRIBUTION_LIMITS_2026.hsa.individual;
+
+  // Employer contributions count against the combined IRS cap (IRC 223(b)(4)(B));
+  // employerContribution is annual, currentContribution is monthly
+  const remainingAnnualRoom = annualLimit - hsa.employerContribution - hsa.currentContribution * 12;
+
+  if (remainingAnnualRoom <= 0) return null;
+
+  const frequency = profile.income.frequency;
+  const roomPerPaycheck = monthlyToPaycheck(remainingAnnualRoom / 12, frequency);
+  const recommendedContribution = Math.min(roomPerPaycheck, availableAmount);
+
+  if (recommendedContribution <= 0) return null;
+
   // HSA payroll deductions are FICA-exempt (IRC 3121), so include FICA in savings
   const annualGross = profile.income.gross * 12;
-  const taxSavings = recommendedContribution * calculateHSATaxRate(profile.taxes.federalBracket, profile.taxes.state, annualGross);
-  
+  const taxSavings = recommendedContribution * calculateHSATaxRate(profile.taxes.federalBracket, profile.taxes.state, annualGross, profile.taxes.filingStatus);
+  const monthlyEquivalent = paycheckToMonthly(recommendedContribution, frequency);
+
   return {
     id: 'hsa-contribution',
     account: 'HSA Contribution',
     amount: recommendedContribution,
-    percentage: recommendedContribution / profile.income.net,
+    percentage: recommendedContribution / profile.income.netPaycheck,
     priority: hsa.currentContribution === 0 ? 2 : 3,
     reasoning: 'Triple tax advantage: deductible contributions, tax-free growth, tax-free medical withdrawals',
     taxImpact: -taxSavings,
     category: 'tax_advantaged',
-    implementation: `Increase HSA to ${formatCurrency(hsa.currentContribution + recommendedContribution)}/month (${formatPercent((hsa.currentContribution + recommendedContribution) / profile.income.gross)} of gross income)`,
-  };
-}
-
-/**
- * Calculate tax bracket optimization opportunities
- */
-export function calculateTaxBracketOptimization(
-  profile: PaycheckProfile, 
-  availableAmount: number
-): AllocationItem | null {
-  const annualGross = profile.income.gross * 12;
-  const brackets = profile.taxes.filingStatus === 'marriedJoint' 
-    ? TAX_BRACKETS[2026].marriedJoint 
-    : TAX_BRACKETS[2026].single;
-  
-  const currentBracket = brackets.find(bracket => 
-    annualGross > bracket.min && annualGross <= bracket.max
-  );
-  
-  if (!currentBracket) return null;
-  
-  const nextLowerBracket = brackets.find(bracket => 
-    bracket.max === currentBracket.min
-  );
-  
-  if (!nextLowerBracket) return null;
-  
-  const amountToReduceBracket = annualGross - currentBracket.min;
-  const monthlyReduction = Math.min(amountToReduceBracket / 12, availableAmount);
-  
-  if (monthlyReduction <= 0 || monthlyReduction < 50) return null; // Don't optimize for tiny amounts
-  
-  const annualTaxSavings = amountToReduceBracket * (currentBracket.rate - nextLowerBracket.rate);
-  
-  return {
-    id: 'tax-optimization',
-    account: '401k Tax Optimization',
-    amount: monthlyReduction,
-    percentage: monthlyReduction / profile.income.net,
-    priority: 4,
-    reasoning: `Reduces taxable income to ${formatPercent(nextLowerBracket.rate)} bracket, saving ${formatPercent(currentBracket.rate - nextLowerBracket.rate)} on ${formatCurrency(amountToReduceBracket)}`,
-    taxImpact: -annualTaxSavings / 12,
-    category: 'tax_optimization',
-    implementation: `Additional 401k contribution to optimize tax bracket (${formatCurrency(annualTaxSavings)} annual tax savings)`,
+    monthlyEquivalent,
+    annualEquivalent: monthlyEquivalent * 12,
+    implementation: `Increase HSA by ${formatCurrency(recommendedContribution)} per paycheck (${formatCurrency(monthlyEquivalent * 12)}/year toward the ${formatCurrency(annualLimit)} limit)`,
   };
 }
 
@@ -338,18 +305,33 @@ export function calculateRothIRA(
   const rothPhaseoutEnd = phaseout.end;
   
   if (annualIncome > rothPhaseoutEnd) return null; // Not eligible
-  
-  let maxContribution: number = CONTRIBUTION_LIMITS[2026].ira;
-  
+
+  const age = profile.preferences.age;
+  let maxContribution: number = CONTRIBUTION_LIMITS_2026.ira
+    + (age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
+
   // Reduce contribution if in phaseout range
   if (annualIncome > rothPhaseoutStart) {
     const phaseoutAmount = (annualIncome - rothPhaseoutStart) / (rothPhaseoutEnd - rothPhaseoutStart);
     maxContribution = Math.floor(maxContribution * (1 - phaseoutAmount));
   }
-  
-  const monthlyContribution = Math.min(maxContribution / 12, availableAmount);
-  
-  if (monthlyContribution <= 50) return null; // Don't recommend tiny contributions
+
+  // The IRS limit is combined across traditional + Roth IRAs;
+  // currentContributions are stored monthly
+  const existingAnnualContributions =
+    (profile.benefits.ira.currentContributions.roth +
+      profile.benefits.ira.currentContributions.traditional) * 12;
+  const remainingAnnualRoom = maxContribution - existingAnnualContributions;
+
+  if (remainingAnnualRoom <= 0) return null;
+
+  const frequency = profile.income.frequency;
+  const paycheckContribution = Math.min(
+    monthlyToPaycheck(remainingAnnualRoom / 12, frequency),
+    availableAmount
+  );
+
+  if (paycheckContribution <= 50) return null; // Don't recommend tiny contributions
   
   // Get smart recommendation
   const recommendation = determineRothVsTraditional(profile);
@@ -375,16 +357,20 @@ export function calculateRothIRA(
     reasoning = 'Tax diversification recommended - consider splitting with Traditional';
   }
   
+  const monthlyEquivalent = paycheckToMonthly(paycheckContribution, frequency);
+
   return {
     id: 'roth-ira',
     account: 'Roth IRA',
-    amount: monthlyContribution,
-    percentage: monthlyContribution / profile.income.net,
+    amount: paycheckContribution,
+    percentage: paycheckContribution / profile.income.netPaycheck,
     priority: 5,
     reasoning: reasoning,
     taxImpact: 0, // Roth contributions are after-tax
     category: 'tax_advantaged',
-    implementation: `Contribute ${formatCurrency(monthlyContribution)}/month to Roth IRA (${formatCurrency(monthlyContribution * 12)} annually)`,
+    monthlyEquivalent,
+    annualEquivalent: monthlyEquivalent * 12,
+    implementation: `Contribute ${formatCurrency(paycheckContribution)} per paycheck to Roth IRA (${formatCurrency(monthlyEquivalent * 12)} annually)`,
   };
 }
 
@@ -400,15 +386,23 @@ export function calculateAdditional401k(
   
   const annualSalary = profile.income.gross * 12;
   const currentAnnualContribution = annualSalary * benefits.currentContribution;
-  const maxAnnualContribution = CONTRIBUTION_LIMITS[2026].traditional401k; // Same limit for both
-  
+  const age = profile.preferences.age;
+  // SECURE 2.0 super catch-up applies only for ages 60-63; regular catch-up at 50+
+  const catchUp = age >= 60 && age <= 63
+    ? CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k
+    : age >= 50
+      ? CONTRIBUTION_LIMITS_2026.catchUp['401k']
+      : 0;
+  const maxAnnualContribution = CONTRIBUTION_LIMITS_2026.traditional401k + catchUp; // Same limit for Roth and Traditional
+
   const remainingContributionRoom = maxAnnualContribution - currentAnnualContribution;
-  const monthlyRemainingRoom = remainingContributionRoom / 12;
-  
-  if (monthlyRemainingRoom <= 0) return null;
-  
-  const recommendedContribution = Math.min(monthlyRemainingRoom, availableAmount);
-  
+
+  if (remainingContributionRoom <= 0) return null;
+
+  const frequency = profile.income.frequency;
+  const roomPerPaycheck = monthlyToPaycheck(remainingContributionRoom / 12, frequency);
+  const recommendedContribution = Math.min(roomPerPaycheck, availableAmount);
+
   if (recommendedContribution <= 50) return null;
   
   // Get smart Roth vs Traditional recommendation
@@ -432,16 +426,20 @@ export function calculateAdditional401k(
     taxImpact = -recommendedContribution * 0.5 * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state);
   }
   
+  const monthlyEquivalent = paycheckToMonthly(recommendedContribution, frequency);
+
   return {
     id: 'additional-401k',
     account: accountType,
     amount: recommendedContribution,
-    percentage: recommendedContribution / profile.income.net,
+    percentage: recommendedContribution / profile.income.netPaycheck,
     priority: 6,
     reasoning: reasoning,
     taxImpact: taxImpact,
     category: 'tax_advantaged',
-    implementation: `Increase ${accountType} contribution by ${formatCurrency(recommendedContribution)}/month`,
+    monthlyEquivalent,
+    annualEquivalent: monthlyEquivalent * 12,
+    implementation: `Increase ${accountType} contribution by ${formatCurrency(recommendedContribution)} per paycheck`,
   };
 }
 
@@ -476,26 +474,31 @@ export function calculateMegaBackdoorRoth(
       ? TOTAL_415C_BY_AGE.catchUp50
       : TOTAL_415C_BY_AGE.standard;
   const employerMatch = annualSalary * benefits.matchPercent * Math.min(benefits.matchLimit, benefits.currentContribution);
-  
+
   const remainingAfterTaxRoom = totalLimit - currentAnnualContribution - employerMatch;
-  const monthlyAfterTaxRoom = remainingAfterTaxRoom / 12;
-  
-  if (monthlyAfterTaxRoom <= 0) return null;
-  
-  const recommendedContribution = Math.min(monthlyAfterTaxRoom, availableAmount);
-  
+
+  if (remainingAfterTaxRoom <= 0) return null;
+
+  const frequency = profile.income.frequency;
+  const roomPerPaycheck = monthlyToPaycheck(remainingAfterTaxRoom / 12, frequency);
+  const recommendedContribution = Math.min(roomPerPaycheck, availableAmount);
+
   if (recommendedContribution <= 100) return null; // Only recommend for meaningful amounts
-  
+
+  const monthlyEquivalent = paycheckToMonthly(recommendedContribution, frequency);
+
   return {
     id: 'mega-backdoor-roth',
     account: 'Mega Backdoor Roth',
     amount: recommendedContribution,
-    percentage: recommendedContribution / profile.income.net,
+    percentage: recommendedContribution / profile.income.netPaycheck,
     priority: 6.5, // After regular 401k but before taxable
     reasoning: 'Convert after-tax 401k contributions to Roth for tax-free growth (high earner strategy)',
     taxImpact: 0, // After-tax contributions, no immediate tax benefit
     category: 'tax_advantaged',
-    implementation: `Make after-tax 401k contributions of ${formatCurrency(recommendedContribution)}/month, then convert to Roth`,
+    monthlyEquivalent,
+    annualEquivalent: monthlyEquivalent * 12,
+    implementation: `Make after-tax 401k contributions of ${formatCurrency(recommendedContribution)} per paycheck, then convert to Roth`,
   };
 }
 
@@ -507,17 +510,21 @@ export function calculateTaxableInvestment(
   availableAmount: number
 ): AllocationItem | null {
   if (availableAmount <= 0) return null;
-  
+
+  const monthlyEquivalent = paycheckToMonthly(availableAmount, profile.income.frequency);
+
   return {
     id: 'taxable-investment',
     account: 'Taxable Investment',
     amount: availableAmount,
-    percentage: availableAmount / profile.income.net,
+    percentage: availableAmount / profile.income.netPaycheck,
     priority: 7,
     reasoning: 'Build wealth with tax-efficient index funds (VTI/VTSAX)',
     taxImpact: 0, // No immediate tax impact
     category: 'investment',
-    implementation: `Invest ${formatCurrency(availableAmount)}/month in low-cost index funds`,
+    monthlyEquivalent,
+    annualEquivalent: monthlyEquivalent * 12,
+    implementation: `Invest ${formatCurrency(availableAmount)} per paycheck in low-cost index funds`,
   };
 }
 

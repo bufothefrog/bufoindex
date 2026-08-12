@@ -1,11 +1,57 @@
-import { 
-  PaycheckProfile, 
-  AllocationItem, 
-  SkippedItem, 
-  ProjectionData, 
-  OptimizationScore 
+import {
+  PaycheckProfile,
+  AllocationItem,
+  SkippedItem,
+  ProjectionData,
+  OptimizationScore
 } from '../types';
-import { calculateCompoundGrowth } from './core';
+import { calculateCompoundGrowth, paycheckToMonthly } from './core';
+import {
+  FilingStatusInput,
+  getBracketsForStatus,
+  getStandardDeductionForStatus,
+} from '../constants/irs-2026';
+
+/**
+ * Progressive federal income tax on annual gross income:
+ * taxable income = gross - standard deduction, then walk the bracket table.
+ * (State tax and FICA are out of scope here, matching the previous model.)
+ */
+export function calculateAnnualFederalTax(
+  annualGrossIncome: number,
+  filingStatus: FilingStatusInput
+): number {
+  const taxableIncome = Math.max(
+    0,
+    annualGrossIncome - getStandardDeductionForStatus(filingStatus)
+  );
+  let tax = 0;
+  for (const bracket of getBracketsForStatus(filingStatus)) {
+    if (taxableIncome <= bracket.min) break;
+    tax += (Math.min(taxableIncome, bracket.max) - bracket.min) * bracket.rate;
+  }
+  return tax;
+}
+
+/**
+ * Future value of a level annual contribution stream (ordinary annuity):
+ * FV = payment * ((1 + r)^n - 1) / r
+ */
+export function calculateAnnuityFutureValue(
+  annualContribution: number,
+  rate: number,
+  years: number
+): number {
+  if (!Number.isFinite(annualContribution) || annualContribution <= 0) return 0;
+  const validYears = Number.isFinite(years) ? Math.max(0, years) : 0;
+  if (rate === 0) return annualContribution * validYears;
+  return annualContribution * ((Math.pow(1 + rate, validYears) - 1) / rate);
+}
+
+/** Number of paychecks per year for a pay frequency (26 for bi-weekly, etc.) */
+function paychecksPerYear(frequency: PaycheckProfile['income']['frequency']): number {
+  return paycheckToMonthly(1, frequency) * 12;
+}
 
 /**
  * Calculate future projections comparing current strategy vs optimized strategy
@@ -40,19 +86,21 @@ function calculateCurrentPathProjection(profile: PaycheckProfile) {
   const validCurrentNetWorth = Number.isFinite(currentNetWorth) ? currentNetWorth : 0;
   const grossIncome = Number(profile.income.gross) || 0;
   const netIncome = Number(profile.income.net) || 0;
-  const federalBracket = Number(profile.taxes.federalBracket) || 0;
-  
-  // Assume 7% annual return - with safe calculation
-  const compoundGrowth = calculateCompoundGrowth(validMonthlyInvestment * 12, 0.07, 10);
-  const tenYearNetWorth = validCurrentNetWorth + (Number.isFinite(compoundGrowth) ? compoundGrowth : 0);
-  
-  // Current tax burden - validate calculation
-  const annualTaxes = grossIncome * 12 * federalBracket;
-  
+
+  // Assume 7% annual return: existing net worth compounds, and each year's
+  // contributions are a stream (annuity FV), not a single lump sum
+  const annualInvestment = validMonthlyInvestment * 12;
+  const tenYearNetWorth =
+    calculateCompoundGrowth(validCurrentNetWorth, 0.07, 10) +
+    calculateAnnuityFutureValue(annualInvestment, 0.07, 10);
+
+  // Current tax burden: progressive tax on taxable income, not marginal rate on every dollar
+  const annualTaxes = calculateAnnualFederalTax(grossIncome * 12, profile.taxes.filingStatus);
+
   // Financial independence calculation (4% rule) - prevent division by zero
   const currentAnnualExpenses = Math.max(1, (netIncome - validMonthlyInvestment) * 12);
   const fiTarget = currentAnnualExpenses / 0.04;
-  const fiAge = calculateFIAge(profile, monthlyInvestment, fiTarget, currentNetWorth);
+  const fiAge = calculateFIAge(annualInvestment, fiTarget, validCurrentNetWorth);
   
   return {
     tenYear: tenYearNetWorth,
@@ -68,36 +116,41 @@ function calculateOptimizedPathProjection(
   profile: PaycheckProfile, 
   allocations: AllocationItem[]
 ) {
-  const totalOptimizedInvestment = allocations.reduce((sum, allocation) => {
+  // Allocation amounts are per-paycheck; annualize with the pay frequency (26 for bi-weekly)
+  const payPeriods = paychecksPerYear(profile.income.frequency);
+
+  const totalOptimizedInvestmentPerPaycheck = allocations.reduce((sum, allocation) => {
     // Count tax-advantaged and investment allocations
-    if (['tax_advantaged', 'investment', 'tax_optimization'].includes(allocation.category)) {
+    if (['tax_advantaged', 'investment'].includes(allocation.category)) {
       return sum + allocation.amount;
     }
     return sum;
   }, 0);
-  
+  const annualOptimizedInvestment = totalOptimizedInvestmentPerPaycheck * payPeriods;
+
   const currentNetWorth = estimateCurrentNetWorth(profile);
-  
-  // Account for tax advantages in growth calculation
-  const averageTaxAdvantage = calculateAverageTaxAdvantage(allocations, profile);
-  const effectiveReturn = 0.07 + averageTaxAdvantage; // Base return + tax advantage
-  
-  const tenYearNetWorth = currentNetWorth + calculateCompoundGrowth(
-    totalOptimizedInvestment * 12,
-    effectiveReturn,
-    10
-  );
-  
-  // Optimized tax burden
-  const totalTaxSavings = allocations.reduce((sum, allocation) => 
+
+  // Tax savings are cash freed up each pay period — model them as additional
+  // invested principal, not as a boost to the market return
+  const taxSavingsPerPaycheck = allocations.reduce((sum, allocation) =>
     sum + Math.abs(allocation.taxImpact), 0
   );
-  const optimizedAnnualTaxes = (profile.income.gross * 12 * profile.taxes.federalBracket) - (totalTaxSavings * 12);
-  
+  const annualTaxSavings = taxSavingsPerPaycheck * payPeriods;
+
+  const tenYearNetWorth =
+    calculateCompoundGrowth(currentNetWorth, 0.07, 10) +
+    calculateAnnuityFutureValue(annualOptimizedInvestment + annualTaxSavings, 0.07, 10);
+
+  // Optimized tax burden: progressive tax on taxable income, less the tax
+  // savings generated by the recommended pre-tax contributions
+  const optimizedAnnualTaxes =
+    calculateAnnualFederalTax(profile.income.gross * 12, profile.taxes.filingStatus) -
+    annualTaxSavings;
+
   // Optimized FI calculation
-  const optimizedAnnualExpenses = (profile.income.net - totalOptimizedInvestment) * 12;
+  const optimizedAnnualExpenses = Math.max(1, profile.income.net * 12 - annualOptimizedInvestment);
   const fiTarget = optimizedAnnualExpenses / 0.04;
-  const fiAge = calculateFIAge(profile, totalOptimizedInvestment, fiTarget, currentNetWorth);
+  const fiAge = calculateFIAge(annualOptimizedInvestment, fiTarget, currentNetWorth);
   
   return {
     tenYear: tenYearNetWorth,
@@ -188,38 +241,15 @@ function estimateCurrentNetWorth(profile: PaycheckProfile): number {
 }
 
 /**
- * Calculate average tax advantage across allocations
- */
-function calculateAverageTaxAdvantage(allocations: AllocationItem[], profile: PaycheckProfile): number {
-  const taxAdvantagedAllocations = allocations.filter(allocation => 
-    allocation.taxImpact < 0 && allocation.category === 'tax_advantaged'
-  );
-  
-  if (taxAdvantagedAllocations.length === 0) return 0;
-  
-  const totalTaxAdvantaged = taxAdvantagedAllocations.reduce((sum, allocation) => 
-    sum + allocation.amount, 0
-  );
-  const totalTaxSavings = taxAdvantagedAllocations.reduce((sum, allocation) => 
-    sum + Math.abs(allocation.taxImpact), 0
-  );
-  
-  // Convert monthly tax savings to effective return advantage
-  return totalTaxAdvantaged > 0 ? (totalTaxSavings / totalTaxAdvantaged) * 12 : 0;
-}
-
-/**
  * Calculate financial independence age
  */
 function calculateFIAge(
-  profile: PaycheckProfile, 
-  monthlyInvestment: number, 
-  fiTarget: number, 
+  annualInvestment: number,
+  fiTarget: number,
   currentNetWorth: number
 ): number {
-  if (monthlyInvestment <= 0) return 99; // Never reach FI
-  
-  const annualInvestment = monthlyInvestment * 12;
+  if (annualInvestment <= 0) return 99; // Never reach FI
+
   const yearsToFI = Math.log(
     (fiTarget - currentNetWorth) * 0.07 / annualInvestment + 1
   ) / Math.log(1.07);

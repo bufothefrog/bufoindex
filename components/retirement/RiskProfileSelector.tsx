@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, Shield, Zap, Settings, Calendar } from 'lucide-react';
+import { Settings, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  calculateTDFAllocation,
+  calculateTDFReturnForAge,
+  calculateTDFVolatilityForAge,
+} from '@/lib/calculations/retirement';
 
 export interface RiskProfile {
   type: 'tdf' | 'custom';
@@ -15,65 +20,22 @@ export interface RiskProfile {
 }
 
 /**
- * Calculate Target Date Fund asset allocation based on age
- */
-function calculateTDFAllocation(age: number) {
-  const clampedAge = Math.max(18, Math.min(100, age));
-  
-  let stockAllocation: number;
-  if (clampedAge <= 25) {
-    stockAllocation = 0.90;
-  } else if (clampedAge <= 65) {
-    // Linear decrease from 90% to 40% between ages 25-65
-    stockAllocation = 0.90 - ((clampedAge - 25) / 40) * 0.50;
-  } else {
-    // Slower decrease from 40% to 30% between ages 65-85
-    const ageAfter65 = Math.min(20, clampedAge - 65);
-    stockAllocation = 0.40 - (ageAfter65 / 20) * 0.10;
-  }
-  
-  const bondAllocation = 1 - stockAllocation;
-  
-  return {
-    stocks: stockAllocation,
-    bonds: bondAllocation,
-    age: clampedAge
-  };
-}
-
-/**
- * Calculate TDF risk profile based on current age
+ * Calculate TDF risk profile based on current age.
+ * Allocation, return, and volatility all come from the engine's glide path in
+ * lib/calculations/retirement.ts so the UI shows the numbers the simulator uses.
  */
 function calculateTDFProfile(age: number): RiskProfile {
   const allocation = calculateTDFAllocation(age);
-  
-  // Expected returns: Stocks ~10%, Bonds ~4%
-  const stockReturn = 0.10;
-  const bondReturn = 0.04;
-  
-  // Volatility: Stocks ~18%, Bonds ~6%
-  const stockVolatility = 0.18;
-  const bondVolatility = 0.06;
-  
-  // Calculate blended returns and volatility
-  const blendedReturn = (allocation.stocks * stockReturn) + (allocation.bonds * bondReturn);
-  const blendedVolatility = Math.sqrt(
-    Math.pow(allocation.stocks * stockVolatility, 2) + 
-    Math.pow(allocation.bonds * bondVolatility, 2)
-  );
-  
-  // For retirement phase, use slightly more conservative allocation
-  const retirementAge = Math.min(100, age + 30); // Project 30 years ahead
-  const retirementAllocation = calculateTDFAllocation(retirementAge);
-  const retirementReturn = (retirementAllocation.stocks * stockReturn) + (retirementAllocation.bonds * bondReturn);
-  
+  // Retirement-phase display figure: glide-path return ~30 years ahead
+  const retirementAge = Math.min(100, age + 30);
+
   return {
     type: 'tdf',
     name: `Target Date Fund`,
     description: `Age-based: ${Math.round(allocation.stocks * 100)}% stocks`,
-    accumulationReturn: blendedReturn,
-    retirementReturn: retirementReturn,
-    volatility: blendedVolatility,
+    accumulationReturn: calculateTDFReturnForAge(age),
+    retirementReturn: calculateTDFReturnForAge(retirementAge),
+    volatility: calculateTDFVolatilityForAge(age),
     icon: Calendar
   };
 }

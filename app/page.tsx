@@ -77,7 +77,7 @@ export default function HomePage() {
           </div>
 
           <p className="text-sm text-muted-foreground mb-4">
-            Stay on target without selling. Tell us your holdings and new deposit;
+            Stay on target without taxable selling unless you opt in. Tell us your holdings and new deposit;
             we&apos;ll compute exactly how many shares to buy of each asset.
           </p>
 

@@ -3,7 +3,10 @@
  *
  * Given a set of assets (ticker, current shares, price, target %) and a new
  * deposit, decide how many shares of each asset to buy so the post-deposit
- * portfolio moves toward its target allocation — without selling.
+ * portfolio moves toward its target allocation — without taxable selling
+ * unless the caller opts in. Overweight positions in tax-advantaged accounts
+ * are trimmed freely (no tax event); taxable positions are only sold when
+ * `allowTaxableSelling` is enabled.
  *
  * Two modes:
  *  - 'whole':      whole-share purchases only (greedy fill of leftover cents)
@@ -627,6 +630,9 @@ function runRebalancePass(
   accountOrderForBuy: (cls: AssetClass) => string[],
   accountOrderForSell: (cls: AssetClass) => string[],
   groupKey: (accountId: string) => string | null,
+  // When set (multi-shared), returns a zero-share holding to open so an
+  // account with cash but no holding of an underweight class can still buy.
+  openPosition?: (accountId: string, cls: AssetClass) => WorkingHolding | null,
 ): {
   taxEventDollars: number;
   spent: number;
@@ -647,6 +653,14 @@ function runRebalancePass(
       ? workingHoldings
       : workingHoldings.filter(h => groupKey(h.accountId) === gk);
     const accountsInGroup = new Set(holdings.map(h => h.accountId));
+    // Deposit-bearing accounts belong to the group even with zero holdings —
+    // otherwise a fresh account's cash is invisible to the group value and
+    // can never be spent (it would strand as depositLeftover).
+    for (const acctId of cashByAccount.keys()) {
+      if (groupKey(acctId) === gk && (cashByAccount.get(acctId) ?? 0) > 0) {
+        accountsInGroup.add(acctId);
+      }
+    }
     // Cash available in this group = sum of cashByAccount for accounts in group
     const groupValue = () =>
       sumBy(holdings, h => h.shares * h.price) +
@@ -712,7 +726,9 @@ function runRebalancePass(
       const target = targets.get(cls) ?? 0;
       if (target <= 0) continue;
       const classHoldings = holdings.filter(h => h.assetClass === cls);
-      if (classHoldings.length === 0) continue; // can't buy class with no existing holding
+      // Without openPosition (single / multi-unique) a class held nowhere in
+      // the group cannot be bought.
+      if (classHoldings.length === 0 && !openPosition) continue;
 
       const currentValue = () => sumBy(classHoldings, h => h.shares * h.price);
       const combinedNow = groupValue();
@@ -726,9 +742,21 @@ function runRebalancePass(
         if (!accountsInGroup.has(acctId)) continue;
         const cash = cashByAccount.get(acctId) ?? 0;
         if (cash <= 0.005) continue;
-        const buyable = classHoldings
+        let buyable = classHoldings
           .filter(h => h.accountId === acctId && h.price > 0)
           .sort((a, b) => a.price - b.price); // lowest price first
+        if (buyable.length === 0 && openPosition) {
+          // Account has cash but no holding of this class (e.g. a fresh Roth
+          // with only a deposit) — open a zero-share position so its cash
+          // isn't stranded.
+          const opened = openPosition(acctId, cls);
+          if (opened && opened.price > 0) {
+            workingHoldings.push(opened);
+            if (holdings !== workingHoldings) holdings.push(opened);
+            classHoldings.push(opened);
+            buyable = [opened];
+          }
+        }
         if (buyable.length === 0) continue;
         const target0 = buyable[0];
 
@@ -788,8 +816,13 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
     if (inputs.setupMode === 'multi-shared') {
       const pref = LOCATION_PREFERENCE[cls];
       if (!pref) return inputs.accounts.map(a => a.id);
-      const reversed = [...pref].reverse();
-      return reversed.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
+      // Sell order is decoupled from buy-side location preference: taxable is
+      // always LAST (selling there realizes gains), and the two tax-advantaged
+      // types are ordered by reverse location preference so the class's
+      // least-preferred shelter is trimmed first.
+      const taxAdvantaged = pref.filter(t => t !== 'taxable').reverse();
+      const order: AccountType[] = [...taxAdvantaged, 'taxable'];
+      return order.flatMap(t => inputs.accounts.filter(a => a.accountType === t).map(a => a.id));
     }
     return inputs.accounts.map(a => a.id);
   };
@@ -797,6 +830,38 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
     if (inputs.setupMode === 'multi-unique') return accountId;
     return null;
   };
+
+  // Multi-shared only: when an account holds cash but no security of an
+  // underweight class, open a zero-share position in a registry security of
+  // that class. Prefer a security already held elsewhere in the portfolio;
+  // lowest price breaks ties (matches the buy loop's ordering).
+  const accountById = new Map<string, Account>(inputs.accounts.map(a => [a.id, a]));
+  const openPosition =
+    inputs.setupMode === 'multi-shared'
+      ? (accountId: string, cls: AssetClass): WorkingHolding | null => {
+          const acct = accountById.get(accountId);
+          if (!acct) return null;
+          const candidates = inputs.securities.filter(
+            s => s.assetClass === cls && s.price > 0,
+          );
+          if (candidates.length === 0) return null;
+          const heldIds = new Set(inputs.holdings.map(h => h.securityId));
+          const held = candidates.filter(s => heldIds.has(s.id));
+          const pool = held.length > 0 ? held : candidates;
+          const sec = pool.reduce((best, s) => (s.price < best.price ? s : best));
+          return {
+            id: `opened:${accountId}:${sec.id}`,
+            accountId,
+            securityId: sec.id,
+            ticker: sec.ticker,
+            price: sec.price,
+            assetClass: sec.assetClass,
+            accountType: acct.accountType,
+            startShares: 0,
+            shares: 0,
+          };
+        }
+      : undefined;
 
   const { taxEventDollars, spent, received } = runRebalancePass(
     working,
@@ -807,14 +872,13 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
     accountOrderForBuy,
     accountOrderForSell,
     groupKey,
+    openPosition,
   );
 
-  // Build per-holding plans. Include untouched holdings too.
-  const holdingMap = new Map<string, WorkingHolding>(working.map(w => [w.id, w]));
+  // Build per-holding plans. Include untouched holdings and any zero-share
+  // positions the pass opened (they live in `working` but not inputs.holdings).
   const planByAccount = new Map<string, HoldingRebalancePlan[]>();
-  for (const h of inputs.holdings) {
-    const w = holdingMap.get(h.id);
-    if (!w) continue;
+  for (const w of working) {
     const sharesDelta = w.shares - w.startShares;
     const sharesToBuy = sharesDelta > 0 ? sharesDelta : 0;
     const sharesToSell = sharesDelta < 0 ? -sharesDelta : 0;
@@ -873,18 +937,17 @@ export function rebalancePortfolioV2(inputs: RebalanceInputsV2): RebalanceResult
 
   for (const gk of groups) {
     const groupHoldings = gk === null ? working : working.filter(h => h.accountId === gk);
-    const groupAccountIds = gk === null
-      ? new Set(inputs.accounts.map(a => a.id))
-      : new Set([gk]);
     const groupCurrentValue = sumBy(groupHoldings, h => h.startShares * h.price);
     const groupNewValue = sumBy(groupHoldings, h => h.shares * h.price);
-    // "Before" reflects the portfolio as it stands pre-deposit: holdings only,
-    // no deposit cash. Including the deposit diluted every asset's current %
-    // toward its post-deposit %, which made holdings with no action (e.g. a
-    // held bond position) display identical current and after allocations.
+    // Drift convention: both sides are measured over INVESTED (securities)
+    // value only — uninvested cash (the deposit before, leftover after) is
+    // excluded from both denominators. This keeps before/after comparable:
+    // including the deposit in "before" diluted every asset's current %
+    // toward its post-deposit %, and including leftover cash in "after"
+    // could make totalDriftAfter exceed totalDriftBefore even when every
+    // trade moved toward target.
     const combinedBefore = groupCurrentValue;
-    const combinedAfter = groupNewValue +
-      sumBy(Array.from(groupAccountIds), id => cashByAccount.get(id) ?? 0);
+    const combinedAfter = groupNewValue;
     const targets = classTargetsByGroup.get(gk) ?? new Map();
     const driftClasses = new Set<AssetClass>([
       ...groupHoldings.map(h => h.assetClass),

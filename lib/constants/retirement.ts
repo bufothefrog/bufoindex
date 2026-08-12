@@ -46,12 +46,10 @@ export class RetirementConstants {
   static readonly SS_FULL_RETIREMENT_AGE = 67;             // Full retirement age for SS
   static readonly SS_MIN_AGE = 62;                         // Minimum SS claiming age
   static readonly SS_MAX_AGE = 70;                         // Maximum SS claiming age
-  static readonly SS_REDUCTION_RATE = 0.0667;              // 6.67% reduction per year before FRA
   static readonly SS_CREDIT_RATE = 0.08;                   // 8% credit per year after FRA
-  
+
   // Healthcare Costs
   static readonly HEALTHCARE_BASE_COST = 7500;             // Base annual healthcare cost
-  static readonly HEALTHCARE_AGE_MULTIPLIER = 1.5;         // Multiplier for older ages
   
   // Monte Carlo Simulation
   static readonly DEFAULT_MONTE_CARLO_RUNS = 1000;         // Default simulation runs

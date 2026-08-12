@@ -367,7 +367,7 @@ describe('rebalancePortfolioV2 — single mode', () => {
     );
 
     const preDepositTotal = 620 * 61 + 40 * 116; // 42,460
-    const postTotal = result.totalValueAfter + result.cashLeftover;
+    const investedAfter = result.totalValueAfter; // 43,985 — leftover cash excluded
 
     const usStock = result.classDrift.find(d => d.assetClass === 'us-stock')!;
     const bonds = result.classDrift.find(d => d.assetClass === 'bonds')!;
@@ -376,14 +376,52 @@ describe('rebalancePortfolioV2 — single mode', () => {
     expect(usStock.currentAllocation).toBeCloseTo((620 * 61) / preDepositTotal, 6);
     expect(bonds.currentAllocation).toBeCloseTo((40 * 116) / preDepositTotal, 6);
 
-    // After % is measured against the post-trade portfolio (including leftover cash).
-    expect(usStock.newAllocation).toBeCloseTo(usStock.newValue / postTotal, 6);
-    expect(bonds.newAllocation).toBeCloseTo(bonds.newValue / postTotal, 6);
+    // After % is measured against the post-trade INVESTED value; uninvested
+    // leftover cash is excluded on both sides so before/after are comparable.
+    expect(usStock.newAllocation).toBeCloseTo(usStock.newValue / investedAfter, 6);
+    expect(bonds.newAllocation).toBeCloseTo(bonds.newValue / investedAfter, 6);
 
     // Held-only asset (BOXX, no action) must not report current === after, since
     // the denominator differs even when its dollar value is unchanged.
     expect(bonds.newValue).toBeCloseTo(bonds.currentValue, 6);
     expect(bonds.currentAllocation).not.toBeCloseTo(bonds.newAllocation, 4);
+  });
+
+  it('reports driftAfter <= driftBefore when leftover cash remains (whole shares)', () => {
+    // Regression: "before" excluded the deposit while "after" included leftover
+    // cash, so an already-balanced portfolio whose deposit couldn't buy a
+    // single whole share reported driftAfter 8.26pp > driftBefore 0pp.
+    // Portfolio: VTI 6 × $100 = $600 US (60%), BND 4 × $100 = $400 bonds (40%),
+    // targets 60/40 — perfectly balanced. Deposit $90 buys nothing at $100/share.
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'single',
+        accounts: [account('a1', 'Brokerage', 'taxable', 90)],
+        securities: [
+          security('s1', 'VTI', 100, 'us-stock'),
+          security('s2', 'BND', 100, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'a1', 's1', 6),
+          holding('h2', 'a1', 's2', 4),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.6),
+          classTarget(null, 'bonds', 0.4),
+        ],
+      }),
+    );
+
+    expect(result.cashLeftover).toBe(90);
+    // Both drift sides use invested value only ($1,000), so the untouched
+    // portfolio stays exactly on target.
+    const usStock = result.classDrift.find(d => d.assetClass === 'us-stock')!;
+    const bonds = result.classDrift.find(d => d.assetClass === 'bonds')!;
+    expect(usStock.newAllocation).toBeCloseTo(0.6, 10);
+    expect(bonds.newAllocation).toBeCloseTo(0.4, 10);
+    expect(result.totalDriftBefore).toBeCloseTo(0, 10);
+    expect(result.totalDriftAfter).toBeCloseTo(0, 10);
+    expect(result.totalDriftAfter).toBeLessThanOrEqual(result.totalDriftBefore);
   });
 });
 
@@ -486,6 +524,104 @@ describe('rebalancePortfolioV2 — multi-shared mode', () => {
       .holdings.find(h => h.ticker === 'BND')!;
     // Sell proceeds land in Roth; Roth should use them to buy bonds.
     expect(rothBnd.sharesToBuy).toBeGreaterThan(0);
+  });
+
+  it('trims overweight classes from tax-advantaged accounts before taxable', () => {
+    // Regression: sell order was the straight reverse of LOCATION_PREFERENCE,
+    // which put taxable FIRST for bonds/REITs — realizing gains even when
+    // tax-deferred could absorb the whole trim.
+    // Bonds: $500 in Taxable + $500 in Trad IRA = $1,000 held vs a target of
+    // 50% × $1,000 total = $500 → $500 overweight, which the Trad IRA
+    // position can absorb entirely.
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        allowTaxableSelling: true,
+        accounts: [
+          account('taxable', 'Taxable', 'taxable', 0),
+          account('trad', 'Trad IRA', 'tax-deferred', 0),
+        ],
+        securities: [
+          security('vti', 'VTI', 100, 'us-stock'),
+          security('bnd', 'BND', 100, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'taxable', 'bnd', 5), // $500 bonds in taxable
+          holding('h2', 'trad', 'bnd', 5),    // $500 bonds in trad
+          holding('h3', 'taxable', 'vti', 0),
+          holding('h4', 'trad', 'vti', 0),
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.5),
+          classTarget(null, 'bonds', 0.5),
+        ],
+      }),
+    );
+
+    const taxableBnd = result.accounts.find(a => a.accountId === 'taxable')!
+      .holdings.find(h => h.ticker === 'BND')!;
+    const tradBnd = result.accounts.find(a => a.accountId === 'trad')!
+      .holdings.find(h => h.ticker === 'BND')!;
+    const tradVti = result.accounts.find(a => a.accountId === 'trad')!
+      .holdings.find(h => h.ticker === 'VTI')!;
+
+    // The whole $500 trim comes out of the Trad IRA; taxable is untouched,
+    // so no gains are realized even with taxable selling enabled.
+    expect(tradBnd.sharesToSell).toBe(5);
+    expect(taxableBnd.sharesToSell).toBe(0);
+    expect(result.taxEventDollars).toBe(0);
+    // Proceeds stay in the Trad IRA and buy the underweight US position.
+    expect(tradVti.sharesToBuy).toBe(5);
+    expect(tradVti.dollarsSpent).toBe(500);
+    expect(result.cashLeftover).toBe(0);
+  });
+
+  it('spends a fresh account\'s deposit by opening a target-class position', () => {
+    // Regression: accountsInGroup derived from holdings only, so a brand-new
+    // Roth IRA holding nothing but a $7,000 deposit was excluded from the
+    // group entirely — its cash silently stranded as depositLeftover.
+    // Portfolio: $7,000 VTI in taxable + $7,000 cash in the fresh Roth =
+    // $14,000. Bonds target 50% → $7,000 deficit; the Roth (preferred over
+    // taxable for bonds) opens a BND position: floor(7000/80) = 87 shares
+    // = $6,960, leaving $40.
+    const result = rebalancePortfolioV2(
+      inputsV2({
+        setupMode: 'multi-shared',
+        accounts: [
+          account('brokerage', 'Brokerage', 'taxable', 0),
+          account('roth', 'Fresh Roth IRA', 'tax-free', 7000),
+        ],
+        securities: [
+          security('vti', 'VTI', 100, 'us-stock'),
+          security('bnd', 'BND', 80, 'bonds'),
+        ],
+        holdings: [
+          holding('h1', 'brokerage', 'vti', 70), // $7,000 US — Roth holds nothing
+        ],
+        classTargets: [
+          classTarget(null, 'us-stock', 0.5),
+          classTarget(null, 'bonds', 0.5),
+        ],
+      }),
+    );
+
+    const roth = result.accounts.find(a => a.accountId === 'roth')!;
+    const rothBnd = roth.holdings.find(h => h.ticker === 'BND')!;
+    expect(rothBnd.currentShares).toBe(0);
+    expect(rothBnd.action).toBe('buy');
+    expect(rothBnd.sharesToBuy).toBe(87);
+    expect(rothBnd.dollarsSpent).toBe(6960);
+    expect(roth.depositUsed).toBe(6960);
+    expect(roth.depositLeftover).toBe(40);
+    expect(result.totalSpent).toBe(6960);
+    expect(result.cashLeftover).toBe(40);
+    expect(result.taxEventDollars).toBe(0);
+
+    // Drift reflects the buy: bonds go from 0% to 6960/13960 of invested value.
+    const bonds = result.classDrift.find(d => d.assetClass === 'bonds')!;
+    expect(bonds.newValue).toBe(6960);
+    expect(bonds.newAllocation).toBeCloseTo(6960 / 13960, 6);
+    expect(result.totalDriftAfter).toBeLessThanOrEqual(result.totalDriftBefore);
   });
 });
 

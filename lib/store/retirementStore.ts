@@ -1,13 +1,20 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { RetirementInputs, RetirementResults, annualizeIncome } from '../calculations/retirement';
-import { calculateRetirementAnalysis } from '../calculations/retirement';
+import { calculateRetirementAnalysis, RetirementInputValidationError } from '../calculations/retirement';
 import { RetirementConstants } from '../constants/retirement';
 import { encodeRetirementToUrlHash, decodeRetirementFromUrlHash } from '../utils/retirementState';
 
 // Module-level timeout references to prevent debounce leaks (BUG-13)
 let recalculateTimeout: ReturnType<typeof setTimeout> | null = null;
 let hashUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Map a thrown calculation error onto the store's errors map: validation
+// errors surface per-field, anything else lands under 'calculation'.
+const toErrorMap = (error: unknown): Record<string, string> =>
+  error instanceof RetirementInputValidationError
+    ? error.fieldErrors
+    : { calculation: error instanceof Error ? error.message : 'Calculation failed' };
 
 interface RetirementState {
   // Current calculation data
@@ -106,11 +113,7 @@ export const useRetirementStore = create<RetirementState>()(
                 set({ results: calculationResults });
               } catch (error) {
                 console.error('Auto-calculation error:', error);
-                set({
-                  errors: {
-                    calculation: error instanceof Error ? error.message : 'Calculation failed'
-                  }
-                });
+                set({ errors: toErrorMap(error) });
               }
               recalculateTimeout = null;
             }, 300); // Shorter debounce for better UX
@@ -134,26 +137,21 @@ export const useRetirementStore = create<RetirementState>()(
 
         calculate: async () => {
           set({ isCalculating: true, errors: {} });
-          
+
           try {
-            // Simulate calculation time for UX
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
             const { inputs } = get();
             const calculationResults = calculateRetirementAnalysis(inputs);
-            
-            set({ 
+
+            set({
               results: calculationResults,
               isCalculating: false,
               hasCalculatedOnce: true // Mark that user has calculated once
             });
           } catch (error) {
             console.error('Retirement calculation error:', error);
-            set({ 
-              errors: { 
-                calculation: error instanceof Error ? error.message : 'Calculation failed' 
-              },
-              isCalculating: false 
+            set({
+              errors: toErrorMap(error),
+              isCalculating: false
             });
           }
         },
@@ -181,11 +179,9 @@ export const useRetirementStore = create<RetirementState>()(
                   });
                 } catch (error) {
                   console.error('URL calculation error:', error);
-                  set({ 
+                  set({
                     inputs: urlInputs,
-                    errors: { 
-                      calculation: error instanceof Error ? error.message : 'Calculation failed' 
-                    }
+                    errors: toErrorMap(error)
                   });
                 }
               }

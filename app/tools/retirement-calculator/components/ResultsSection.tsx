@@ -22,6 +22,14 @@ function mapProbabilityToVariant(successProbability: number): CardVariant {
   return 'danger';
 }
 
+// Grade the plan's implied withdrawal rate against the 4% guideline: at or
+// below it is comfortable, within one point is marginal, beyond that is risky.
+function mapWithdrawalRateToVariant(rate: number): CardVariant {
+  if (rate <= 0.04) return 'success';
+  if (rate <= 0.05) return 'warning';
+  return 'danger';
+}
+
 function getScenarioIcon(successProbability: number) {
   if (successProbability >= 0.9) return Target;
   if (successProbability >= 0.7) return Calculator;
@@ -43,11 +51,15 @@ export function ResultsSection() {
       {/* Results Header - Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <MetricCard
-          label="Safe Withdrawal Rate"
-          value={formatPercent(results.safeWithdrawalRate)}
+          label="Implied Withdrawal Rate"
+          value={formatPercent(results.initialWithdrawalRate)}
           icon={Target}
-          variant="success"
-          trend="up"
+          variant={mapWithdrawalRateToVariant(results.initialWithdrawalRate)}
+          subtext={
+            results.initialWithdrawalRate <= 0.04
+              ? 'at or below the 4% guideline'
+              : 'above the 4% guideline'
+          }
         />
         <MetricCard
           label="Scenarios Analyzed"

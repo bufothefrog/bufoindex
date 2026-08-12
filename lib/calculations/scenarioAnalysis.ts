@@ -7,7 +7,6 @@
  */
 
 import { RetirementInputs, calculateProjectedBalance, calculateRequiredBalance } from './retirement';
-import { adjustForInflation, calculateInflatedIncome } from './inflationAdjustment';
 import { calculateCoastFire } from './coastFire';
 
 export interface ScenarioAnalysis {
@@ -72,8 +71,6 @@ export function determineRetirementStatus(
  * Perform comprehensive scenario analysis
  */
 export function analyzeRetirementScenarios(inputs: RetirementInputs): ScenarioAnalysis {
-  const start = performance.now();
-  
   // Calculate base scenario
   const projectedBalance = calculateProjectedBalance(inputs);
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
@@ -95,16 +92,13 @@ export function analyzeRetirementScenarios(inputs: RetirementInputs): ScenarioAn
   const current = buildCurrentScenario(inputs, projectedBalance, requiredBalance, status);
   
   // Generate recommendations
-  const recommendations = generateScenarioRecommendations(inputs, status, balanceRatio);
-  
-  const elapsed = performance.now() - start;
-  console.log(`Scenario analysis completed in ${elapsed.toFixed(2)}ms`);
-  
+  const recommendations = generateScenarioRecommendations(inputs, status);
+
   return {
     status,
     current,
-    withExtra500: buildExtraScenario(with500Extra, status),
-    withExtra1000: buildExtraScenario(with1000Extra, status),
+    withExtra500: buildExtraScenario(with500Extra),
+    withExtra1000: buildExtraScenario(with1000Extra),
     coastFire,
     recommendations
   };
@@ -180,7 +174,7 @@ function buildCurrentScenario(
 /**
  * Build extra savings scenario data
  */
-function buildExtraScenario(projection: ScenarioProjection, status: 'exceeding' | 'onTrack' | 'falling') {
+function buildExtraScenario(projection: ScenarioProjection) {
   const base = { projectedBalance: projection.projectedBalance };
   
   if (projection.balanceRatio >= 1.0) {
@@ -261,9 +255,8 @@ function calculateActualIncomeAtTargetAge(projectedBalance: number): number {
  * Generate BufoIndex contrarian recommendations
  */
 function generateScenarioRecommendations(
-  inputs: RetirementInputs, 
-  status: 'exceeding' | 'onTrack' | 'falling',
-  _balanceRatio: number
+  inputs: RetirementInputs,
+  status: 'exceeding' | 'onTrack' | 'falling'
 ): string[] {
   // Only return 1 most relevant recommendation based on status
   
@@ -295,53 +288,4 @@ function generateScenarioRecommendations(
   }
   
   return []; // No insights if none of the above apply
-}
-
-/**
- * Calculate impact of working additional years
- */
-export function calculateWorkingLongerImpact(inputs: RetirementInputs, additionalYears: number): {
-  newProjectedBalance: number;
-  additionalBalance: number;
-  newSafeWithdrawal: number;
-} {
-  const modifiedInputs = {
-    ...inputs,
-    retirementAge: inputs.retirementAge + additionalYears
-  };
-  
-  const newProjectedBalance = calculateProjectedBalance(modifiedInputs);
-  const originalProjectedBalance = calculateProjectedBalance(inputs);
-  const additionalBalance = newProjectedBalance - originalProjectedBalance;
-  const newSafeWithdrawal = newProjectedBalance * 0.04; // 4% rule
-  
-  return {
-    newProjectedBalance,
-    additionalBalance,
-    newSafeWithdrawal
-  };
-}
-
-/**
- * Calculate impact of reducing target income
- */
-export function calculateReducedIncomeImpact(inputs: RetirementInputs, reductionPercent: number): {
-  newTargetIncome: number;
-  newRequiredBalance: number;
-  balanceSurplus: number;
-  earlierRetirementAge: number;
-} {
-  const newTargetIncome = inputs.targetIncome * (1 - reductionPercent);
-  const newRequiredBalance = calculateRequiredBalance(newTargetIncome);
-  const projectedBalance = calculateProjectedBalance(inputs);
-  const balanceSurplus = projectedBalance - newRequiredBalance;
-  
-  const earlierRetirementAge = findEarlierRetirementAge(inputs, newTargetIncome);
-  
-  return {
-    newTargetIncome,
-    newRequiredBalance,
-    balanceSurplus,
-    earlierRetirementAge
-  };
 }

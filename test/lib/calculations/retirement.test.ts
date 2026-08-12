@@ -2,25 +2,35 @@
  * Retirement Calculations Test Suite
  *
  * Covers TVM math, Social Security adjustments, healthcare cost inflation,
- * effective tax-rate calculation against IRS 2026 brackets, Monte Carlo
- * sustainability, and the full calculateRetirementAnalysis orchestrator.
+ * effective tax-rate calculation against IRS 2026 brackets, the seeded Monte
+ * Carlo simulation (including Social Security / healthcare wiring), input
+ * validation, the TDF glide path, and the full calculateRetirementAnalysis
+ * orchestrator.
+ *
+ * Monte Carlo results are deterministic: the engine seeds its own PRNG with a
+ * fixed default seed, so no Math.random stubbing is needed.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   annualizeIncome,
   calculateEffectiveTaxRate,
   calculateHealthcareCosts,
+  calculateInitialWithdrawalRate,
   calculateProjectedBalance,
   calculateRequiredBalance,
   calculateRetirementAnalysis,
-  calculateSafeWithdrawalRate,
   calculateSocialSecurityBenefit,
+  calculateTDFAllocation,
+  calculateTDFReturnForAge,
+  calculateTDFVolatilityForAge,
   futureValue,
   futureValueOfAnnuity,
   INCOME_PERIOD_MULTIPLIERS,
   presentValue,
+  RetirementInputValidationError,
   runMonteCarloSimulation,
+  validateRetirementInputs,
   type IncomePeriod,
   type RetirementInputs,
 } from '@/lib/calculations/retirement'
@@ -62,6 +72,18 @@ function makeInputs(overrides: Partial<RetirementInputs> = {}): RetirementInputs
     estimatedAnnualHealthcareCost: null,
     ...overrides,
   }
+}
+
+/**
+ * Helper: inputs with Social Security and healthcare zeroed out, so tests can
+ * isolate the pure inflated-target-income withdrawal stream.
+ */
+function makeBareInputs(overrides: Partial<RetirementInputs> = {}): RetirementInputs {
+  return makeInputs({
+    socialSecurityBenefit: 0,
+    healthcareCostMultiplier: 0,
+    ...overrides,
+  })
 }
 
 describe('annualizeIncome / INCOME_PERIOD_MULTIPLIERS', () => {
@@ -265,7 +287,103 @@ describe('calculateProjectedBalance — TDF risk profile', () => {
   })
 })
 
-describe('calculateSafeWithdrawalRate', () => {
+describe('TDF glide path (engine is the single source of truth)', () => {
+  it('holds 90% stocks through age 35', () => {
+    expect(calculateTDFAllocation(25).stocks).toBeCloseTo(0.9, 10)
+    expect(calculateTDFAllocation(35).stocks).toBeCloseTo(0.9, 10)
+  })
+
+  it('allocates 76.7% stocks at age 45 (linear 90% → 70% between 35 and 50)', () => {
+    // 0.90 - (10/15) * 0.20 = 0.766666...
+    const allocation = calculateTDFAllocation(45)
+    expect(allocation.stocks).toBeCloseTo(0.9 - (10 / 15) * 0.2, 10)
+    expect(allocation.stocks + allocation.bonds).toBeCloseTo(1, 10)
+  })
+
+  it('reaches 40% stocks at 65 and bottoms out at 30% by 85', () => {
+    expect(calculateTDFAllocation(65).stocks).toBeCloseTo(0.4, 10)
+    expect(calculateTDFAllocation(85).stocks).toBeCloseTo(0.3, 10)
+    // Clamped: past 85 the floor holds.
+    expect(calculateTDFAllocation(100).stocks).toBeCloseTo(0.3, 10)
+  })
+
+  it('derives the blended return from the allocation (stocks 10%, bonds 4%)', () => {
+    // At 45: 0.766667 * 0.10 + 0.233333 * 0.04 = 0.086.
+    const stocks = 0.9 - (10 / 15) * 0.2
+    const expected = stocks * 0.1 + (1 - stocks) * 0.04
+    expect(calculateTDFReturnForAge(45)).toBeCloseTo(expected, 10)
+    expect(calculateTDFReturnForAge(45)).toBeCloseTo(0.086, 6)
+  })
+
+  it('derives the blended volatility from the allocation (stocks 18%, bonds 6%)', () => {
+    const stocks = 0.9 - (10 / 15) * 0.2
+    const expected = Math.sqrt(
+      Math.pow(stocks * 0.18, 2) + Math.pow((1 - stocks) * 0.06, 2),
+    )
+    expect(calculateTDFVolatilityForAge(45)).toBeCloseTo(expected, 10)
+  })
+
+  it('return and volatility both decline as the glide path de-risks', () => {
+    expect(calculateTDFReturnForAge(65)).toBeLessThan(calculateTDFReturnForAge(35))
+    expect(calculateTDFVolatilityForAge(65)).toBeLessThan(
+      calculateTDFVolatilityForAge(35),
+    )
+  })
+})
+
+describe('validateRetirementInputs', () => {
+  it('returns an empty map for valid inputs', () => {
+    expect(validateRetirementInputs(makeInputs())).toEqual({})
+  })
+
+  it('rejects retirementAge <= startingAge', () => {
+    const errors = validateRetirementInputs(
+      makeInputs({ startingAge: 50, retirementAge: 45 }),
+    )
+    expect(errors.retirementAge).toBeDefined()
+  })
+
+  it('rejects lifeExpectancy < retirementAge', () => {
+    const errors = validateRetirementInputs(
+      makeInputs({ retirementAge: 70, lifeExpectancy: 65 }),
+    )
+    expect(errors.lifeExpectancy).toBeDefined()
+  })
+
+  it('allows lifeExpectancy === retirementAge (zero retirement years)', () => {
+    const errors = validateRetirementInputs(
+      makeInputs({ retirementAge: 65, lifeExpectancy: 65 }),
+    )
+    expect(errors.lifeExpectancy).toBeUndefined()
+  })
+
+  it('rejects negative money fields', () => {
+    const errors = validateRetirementInputs(
+      makeInputs({
+        targetIncome: -1,
+        startingBalance: -50,
+        monthlySavings: -10,
+        socialSecurityBenefit: -100,
+      }),
+    )
+    expect(errors.targetIncome).toBeDefined()
+    expect(errors.startingBalance).toBeDefined()
+    expect(errors.monthlySavings).toBeDefined()
+    expect(errors.socialSecurityBenefit).toBeDefined()
+  })
+
+  it('rejects a negative estimatedAnnualHealthcareCost but allows null', () => {
+    expect(
+      validateRetirementInputs(makeInputs({ estimatedAnnualHealthcareCost: -1 }))
+        .estimatedAnnualHealthcareCost,
+    ).toBeDefined()
+    expect(
+      validateRetirementInputs(makeInputs({ estimatedAnnualHealthcareCost: null })),
+    ).toEqual({})
+  })
+})
+
+describe('calculateInitialWithdrawalRate', () => {
   it('returns 0 when projected balance is 0', () => {
     const inputs = makeInputs({
       startingBalance: 0,
@@ -274,7 +392,7 @@ describe('calculateSafeWithdrawalRate', () => {
       startingAge: 65, // zero years, zero contributions, zero balance
       accumulationReturn: 0.07,
     })
-    expect(calculateSafeWithdrawalRate(inputs)).toBe(0)
+    expect(calculateInitialWithdrawalRate(inputs)).toBe(0)
   })
 
   it('reflects the inflation-adjusted target income at retirement', () => {
@@ -288,10 +406,10 @@ describe('calculateSafeWithdrawalRate', () => {
     const projected = calculateProjectedBalance(inputs)
     const inflated = 60000 * Math.pow(1.03, 35)
     const expected = inflated / projected
-    expect(calculateSafeWithdrawalRate(inputs)).toBeCloseTo(expected, 6)
+    expect(calculateInitialWithdrawalRate(inputs)).toBeCloseTo(expected, 6)
   })
 
-  it('falls below the conservative 4% rule when severely under-saved', () => {
+  it('exceeds the 4% guideline when severely under-saved', () => {
     const inputs = makeInputs({
       startingBalance: 10,
       monthlySavings: 1,
@@ -299,8 +417,8 @@ describe('calculateSafeWithdrawalRate', () => {
       inflationRate: 0.03,
       riskProfile: 'custom',
     })
-    // Tiny savings vs $100k target => required SWR will exceed 4%.
-    expect(calculateSafeWithdrawalRate(inputs)).toBeGreaterThan(0.04)
+    // Tiny savings vs $100k target => implied withdrawal rate exceeds 4%.
+    expect(calculateInitialWithdrawalRate(inputs)).toBeGreaterThan(0.04)
   })
 })
 
@@ -386,6 +504,11 @@ describe('calculateHealthcareCosts', () => {
     // At 65, ageMultiplier = 1 + 0 = 1.
     expect(calculateHealthcareCosts(65, 1, 0)).toBeCloseToCurrency(baseCost, 6)
   })
+
+  it('accepts a user-estimated base annual cost override', () => {
+    expect(calculateHealthcareCosts(40, 1, 0, 10000)).toBeCloseToCurrency(10000, 6)
+    expect(calculateHealthcareCosts(40, 2, 0, 10000)).toBeCloseToCurrency(20000, 6)
+  })
 })
 
 describe('calculateEffectiveTaxRate', () => {
@@ -444,18 +567,6 @@ describe('calculateEffectiveTaxRate', () => {
 })
 
 describe('runMonteCarloSimulation', () => {
-  // Determinism: stub Math.random so we get consistent normal draws.
-  let randSpy: ReturnType<typeof vi.spyOn>
-
-  beforeEach(() => {
-    // 0.5 maps to a stable, finite Box-Muller value (not log(0)).
-    randSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
-  })
-
-  afterEach(() => {
-    randSpy.mockRestore()
-  })
-
   it('returns 1.0 (always succeeds) for an over-funded scenario', () => {
     const inputs = makeInputs({
       startingBalance: 5_000_000,
@@ -496,21 +607,94 @@ describe('runMonteCarloSimulation', () => {
     expect(rate).toBeGreaterThanOrEqual(0)
     expect(rate).toBeLessThanOrEqual(1)
   })
+
+  it('is deterministic: same inputs and seed give the same success rate', () => {
+    const inputs = makeInputs({ startingBalance: 200_000, volatility: 0.15 })
+    // Explicit seed.
+    expect(runMonteCarloSimulation(inputs, 200, 42)).toBe(
+      runMonteCarloSimulation(inputs, 200, 42),
+    )
+    // Default seed is fixed too, so bare calls are also reproducible.
+    expect(runMonteCarloSimulation(inputs, 200)).toBe(
+      runMonteCarloSimulation(inputs, 200),
+    )
+  })
+
+  // Marginal plan used for the Social Security / healthcare wiring tests:
+  // ~$1.57M at 65 against a $40k (today) income need. With SS the net
+  // withdrawal drops to ~2.5% of the balance from age 67; without SS it stays
+  // above 5.5% and climbs with healthcare inflation, so a meaningful share of
+  // paths must fail.
+  const marginalPlan = makeInputs({
+    startingAge: 50,
+    retirementAge: 65,
+    lifeExpectancy: 95,
+    startingBalance: 400_000,
+    monthlySavings: 1500,
+    targetIncome: 40000,
+    accumulationReturn: 0.07,
+    retirementReturn: 0.05,
+    inflationRate: 0.03,
+    volatility: 0.15,
+    socialSecurityAge: 67,
+    socialSecurityBenefit: 30000,
+    healthcareCostMultiplier: 1,
+    riskProfile: 'custom',
+  })
+
+  it('zeroing a $30k Social Security benefit reduces the success probability', () => {
+    // Without SS every retirement year's net withdrawal is >= the with-SS
+    // withdrawal (SS only ever offsets spending), so failures can only
+    // increase. The plan is marginal by construction, so the effect is large.
+    const withSS = runMonteCarloSimulation(marginalPlan, 1000)
+    const withoutSS = runMonteCarloSimulation(
+      { ...marginalPlan, socialSecurityBenefit: 0 },
+      1000,
+    )
+    expect(withoutSS).toBeLessThan(withSS)
+    // The gap should be substantial, not seed noise.
+    expect(withSS - withoutSS).toBeGreaterThan(0.05)
+  })
+
+  it('raising the healthcare cost multiplier reduces the success probability', () => {
+    // Multiplier 3 adds 2 * $7,500 (today) of healthcare-inflated annual cost
+    // to every retirement year, strictly increasing net withdrawals.
+    const baseline = runMonteCarloSimulation(marginalPlan, 1000)
+    const expensive = runMonteCarloSimulation(
+      { ...marginalPlan, healthcareCostMultiplier: 3 },
+      1000,
+    )
+    expect(expensive).toBeLessThan(baseline)
+    expect(baseline - expensive).toBeGreaterThan(0.05)
+  })
+
+  it('custom plans respond to the user-supplied retirement return', () => {
+    // Sanity check for the contrast with the TDF case below: on a marginal
+    // plan, cutting the mean retirement return must reduce success.
+    const base = runMonteCarloSimulation(marginalPlan, 1000)
+    const worse = runMonteCarloSimulation(
+      { ...marginalPlan, retirementReturn: 0.0 },
+      1000,
+    )
+    expect(worse).toBeLessThan(base)
+  })
+
+  it('TDF plans derive return/volatility from the glide path, ignoring UI-pushed values', () => {
+    // Regression for the default-state bug: with riskProfile 'tdf', the
+    // simulator must NOT trust inputs.retirementReturn/volatility (which the
+    // UI may or may not have synced) — success is identical however those
+    // fields are set.
+    const tdfPlan = makeInputs({ ...marginalPlan, riskProfile: 'tdf' })
+    const a = runMonteCarloSimulation(tdfPlan, 500)
+    const b = runMonteCarloSimulation(
+      { ...tdfPlan, retirementReturn: 0.0, volatility: 0.30 },
+      500,
+    )
+    expect(a).toBe(b)
+  })
 })
 
 describe('calculateRetirementAnalysis (orchestrator)', () => {
-  // The orchestrator runs ~1000-iteration Monte Carlo across multiple scenarios.
-  // Stub Math.random for both speed and determinism.
-  let randSpy: ReturnType<typeof vi.spyOn>
-
-  beforeEach(() => {
-    randSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
-  })
-
-  afterEach(() => {
-    randSpy.mockRestore()
-  })
-
   it('returns the documented top-level shape', () => {
     const result = calculateRetirementAnalysis(makeInputs())
     expect(Array.isArray(result.scenarios)).toBe(true)
@@ -518,10 +702,18 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     expect(typeof result.netWorthByAge).toBe('object')
     expect(typeof result.withdrawalsByAge).toBe('object')
     expect(Array.isArray(result.insights)).toBe(true)
-    expect(typeof result.safeWithdrawalRate).toBe('number')
+    expect(typeof result.initialWithdrawalRate).toBe('number')
     expect(result.scenarioAnalysis).toBeDefined()
     expect(result.coastFireAnalysis).toBeDefined()
     expect(result.inflationAnalysis).toBeDefined()
+  })
+
+  it('is deterministic across repeated runs (seeded Monte Carlo)', () => {
+    const a = calculateRetirementAnalysis(makeInputs())
+    const b = calculateRetirementAnalysis(makeInputs())
+    expect(a.scenarios.map((s) => s.successProbability)).toEqual(
+      b.scenarios.map((s) => s.successProbability),
+    )
   })
 
   it('limits insights to a maximum of 3 entries', () => {
@@ -546,7 +738,41 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     }
   })
 
-  it('emits withdrawalsByAge only during the retirement years', () => {
+  it('records the pre-withdrawal balance at retirement age (custom profile)', () => {
+    // Regression for the boundary off-by-one: netWorthByAge[retirementAge]
+    // must equal the projected balance at retirement, before any withdrawal
+    // or double-counted year of returns.
+    const inputs = makeInputs({ lifeExpectancy: 85, riskProfile: 'custom' })
+    const result = calculateRetirementAnalysis(inputs)
+    expect(result.netWorthByAge[65]).toBeCloseToCurrency(
+      calculateProjectedBalance(inputs),
+      2,
+    )
+  })
+
+  it('records the pre-withdrawal balance at retirement age (TDF profile)', () => {
+    const inputs = makeInputs({ lifeExpectancy: 85, riskProfile: 'tdf' })
+    const result = calculateRetirementAnalysis(inputs)
+    expect(result.netWorthByAge[65]).toBeCloseToCurrency(
+      calculateProjectedBalance(inputs),
+      2,
+    )
+  })
+
+  it('applies exactly one year of growth and one withdrawal per retirement year', () => {
+    // With SS and healthcare zeroed, the first retirement year is:
+    // balance(66) = balance(65) * (1 + retirementReturn) - target * (1+i)^35.
+    const inputs = makeBareInputs({ lifeExpectancy: 85, riskProfile: 'custom' })
+    const result = calculateRetirementAnalysis(inputs)
+    const firstWithdrawal = 60000 * Math.pow(1.03, 35)
+    expect(result.withdrawalsByAge[66]).toBeCloseToCurrency(firstWithdrawal, 2)
+    expect(result.netWorthByAge[66]).toBeCloseToCurrency(
+      result.netWorthByAge[65] * 1.05 - firstWithdrawal,
+      2,
+    )
+  })
+
+  it('emits withdrawalsByAge only after the retirement snapshot', () => {
     const inputs = makeInputs({
       startingAge: 30,
       retirementAge: 65,
@@ -557,13 +783,15 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     // Pre-retirement years should NOT have a withdrawal entry.
     expect(result.withdrawalsByAge[30]).toBeUndefined()
     expect(result.withdrawalsByAge[64]).toBeUndefined()
-    // Retirement years should have one.
-    expect(result.withdrawalsByAge[65]).toBeGreaterThan(0)
+    // retirementAge itself is the pre-withdrawal snapshot.
+    expect(result.withdrawalsByAge[65]).toBeUndefined()
+    // Withdrawal years run from retirementAge + 1 through lifeExpectancy.
+    expect(result.withdrawalsByAge[66]).toBeGreaterThan(0)
     expect(result.withdrawalsByAge[85]).toBeGreaterThan(0)
   })
 
   it('inflation-adjusts the first retirement-year withdrawal to the target income at retirement', () => {
-    const inputs = makeInputs({
+    const inputs = makeBareInputs({
       startingAge: 30,
       retirementAge: 65,
       lifeExpectancy: 85,
@@ -572,12 +800,14 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       riskProfile: 'custom',
     })
     const result = calculateRetirementAnalysis(inputs)
+    // First withdrawal (recorded at age 66, covering the year the retiree is
+    // 65) is the target income inflated over the 35 accumulation years.
     const expectedFirstYear = 60000 * Math.pow(1.03, 35)
-    expect(result.withdrawalsByAge[65]).toBeCloseToCurrency(expectedFirstYear, 0)
+    expect(result.withdrawalsByAge[66]).toBeCloseToCurrency(expectedFirstYear, 0)
   })
 
   it('compounds withdrawal inflation year-over-year during retirement', () => {
-    const inputs = makeInputs({
+    const inputs = makeBareInputs({
       startingAge: 30,
       retirementAge: 65,
       lifeExpectancy: 85,
@@ -586,10 +816,101 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       riskProfile: 'custom',
     })
     const result = calculateRetirementAnalysis(inputs)
-    const w65 = result.withdrawalsByAge[65]
-    const w75 = result.withdrawalsByAge[75]
-    // 10 years of 3% inflation between age 65 and 75.
-    expect(w75 / w65).toBeCloseTo(Math.pow(1.03, 10), 4)
+    const w66 = result.withdrawalsByAge[66]
+    const w76 = result.withdrawalsByAge[76]
+    // 10 years of 3% inflation between the first and eleventh withdrawals.
+    expect(w76 / w66).toBeCloseTo(Math.pow(1.03, 10), 4)
+  })
+
+  it('offsets withdrawals by the Social Security benefit from the claiming age', () => {
+    // SS claimed at FRA (67) => no claiming adjustment. The withdrawal
+    // covering the year the retiree is 66 (recorded at 67) has no SS; the one
+    // covering age 67 (recorded at 68) is reduced by 24000 * (1+i)^37.
+    const withSS = makeInputs({
+      lifeExpectancy: 85,
+      healthcareCostMultiplier: 0,
+      socialSecurityBenefit: 24000,
+      socialSecurityAge: 67,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(withSS)
+    expect(result.withdrawalsByAge[67]).toBeCloseToCurrency(
+      60000 * Math.pow(1.03, 36), // age 66 that year: SS not yet claimed
+      0,
+    )
+    expect(result.withdrawalsByAge[68]).toBeCloseToCurrency(
+      (60000 - 24000) * Math.pow(1.03, 37), // both inflate at the same rate
+      0,
+    )
+  })
+
+  it('applies the SSA early-claiming reduction to the wired benefit', () => {
+    // Claiming at 62 => 30% reduction => $24,000 becomes $16,800 (today's
+    // dollars). Retiring at 65 (>= 62), SS offsets from the very first year:
+    // withdrawal = (60000 - 16800) * (1+i)^35.
+    const inputs = makeInputs({
+      lifeExpectancy: 85,
+      healthcareCostMultiplier: 0,
+      socialSecurityBenefit: 24000,
+      socialSecurityAge: 62,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    expect(result.withdrawalsByAge[66]).toBeCloseToCurrency(
+      (60000 - 24000 * 0.7) * Math.pow(1.03, 35),
+      0,
+    )
+  })
+
+  it('adds healthcare costs (healthcare inflation) on top of the income need', () => {
+    // With SS zeroed and multiplier 1, the first withdrawal adds the $7,500
+    // base cost inflated at 5.5% over the 35 years from today (age 65 during
+    // that year => unit age multiplier).
+    const inputs = makeInputs({
+      lifeExpectancy: 85,
+      socialSecurityBenefit: 0,
+      healthcareCostMultiplier: 1,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    const expected =
+      60000 * Math.pow(1.03, 35) + 7500 * Math.pow(1.055, 35)
+    expect(result.withdrawalsByAge[66]).toBeCloseToCurrency(expected, 0)
+    // Ten years later (age 75 during the year recorded at 76): healthcare has
+    // inflated 45 years and carries the 1.2 over-65 age multiplier.
+    const expected76 =
+      60000 * Math.pow(1.03, 45) + 7500 * Math.pow(1.055, 45) * 1.2
+    expect(result.withdrawalsByAge[76]).toBeCloseToCurrency(expected76, 0)
+  })
+
+  it('lets estimatedAnnualHealthcareCost replace the default base cost', () => {
+    const inputs = makeInputs({
+      lifeExpectancy: 85,
+      socialSecurityBenefit: 0,
+      healthcareCostMultiplier: 1,
+      estimatedAnnualHealthcareCost: 10000,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    const expected =
+      60000 * Math.pow(1.03, 35) + 10000 * Math.pow(1.055, 35)
+    expect(result.withdrawalsByAge[66]).toBeCloseToCurrency(expected, 0)
+  })
+
+  it('floors the net withdrawal at zero when Social Security exceeds spending', () => {
+    // $10k income need vs $50k SS benefit from 67, no healthcare: from the
+    // year the retiree is 67 (recorded at 68), the portfolio withdrawal is 0.
+    const inputs = makeInputs({
+      lifeExpectancy: 85,
+      targetIncome: 10000,
+      socialSecurityBenefit: 50000,
+      socialSecurityAge: 67,
+      healthcareCostMultiplier: 0,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    expect(result.withdrawalsByAge[68]).toBe(0)
+    expect(result.withdrawalsByAge[85]).toBe(0)
   })
 
   it('produces TDF-glide-path analysis when riskProfile is "tdf"', () => {
@@ -632,40 +953,127 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     const result = calculateRetirementAnalysis(inputs)
     expect(result.scenarioAnalysis?.status).toBe('exceeding')
   })
+
+  it('gives the "live on affordable income" scenario a high success probability (4% rule, no double inflation)', () => {
+    // Regression for the double-inflation bug: affordableIncome (4% of the
+    // retirement-date balance) is a retirement-date figure and must be
+    // deflated to today's dollars before being fed back as targetIncome. Done
+    // right, the scenario starts at exactly a 4% withdrawal rate; with a 6%
+    // mean return / 8% volatility over a 23-year retirement that plan is
+    // comfortably above 80% success. The old code re-inflated the figure by
+    // (1.03)^35 ≈ 2.81x, an ~11% withdrawal rate that almost always failed.
+    const inputs = makeBareInputs({
+      startingAge: 30,
+      retirementAge: 65,
+      lifeExpectancy: 88,
+      startingBalance: 10000,
+      monthlySavings: 300,
+      targetIncome: 150000, // far out of reach => falling-short branch
+      retirementReturn: 0.06,
+      volatility: 0.08,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    expect(result.scenarioAnalysis?.status).toBe('falling')
+
+    const reality = result.scenarios.find((s) => s.id === 'reality-income')
+    expect(reality).toBeDefined()
+    // 4% consistency: required balance for the affordable income IS the
+    // projected balance (income = 4% of balance, required = income / 4%).
+    expect(reality!.requiredBalance).toBeCloseToCurrency(
+      calculateProjectedBalance(inputs),
+      2,
+    )
+    expect(reality!.successProbability).toBeGreaterThan(0.8)
+  })
+
+  it('labels the affordable-income scenario in today\'s dollars', () => {
+    const inputs = makeBareInputs({
+      startingAge: 30,
+      retirementAge: 65,
+      lifeExpectancy: 88,
+      startingBalance: 10000,
+      monthlySavings: 300,
+      targetIncome: 150000,
+      retirementReturn: 0.06,
+      volatility: 0.08,
+      riskProfile: 'custom',
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    const reality = result.scenarios.find((s) => s.id === 'reality-income')!
+
+    const projected = calculateProjectedBalance(inputs)
+    const affordableToday = (projected * 0.04) / Math.pow(1.03, 35)
+    const roundedMonthly = Math.round(affordableToday / 12 / 100) * 100
+    expect(reality.name).toContain(`$${roundedMonthly.toLocaleString('en-US')}`)
+    expect(reality.name).toContain("today's dollars")
+  })
+})
+
+describe('input validation at the orchestrator boundary', () => {
+  it('rejects lifeExpectancy < retirementAge instead of reporting certain success', () => {
+    // Regression: a plan that "succeeds" only because the retirement loop
+    // never runs must be a validation error, not a 100% success probability.
+    const inputs = makeInputs({ retirementAge: 70, lifeExpectancy: 65 })
+    expect(() => calculateRetirementAnalysis(inputs)).toThrow(
+      RetirementInputValidationError,
+    )
+    try {
+      calculateRetirementAnalysis(inputs)
+      expect.unreachable('should have thrown')
+    } catch (error) {
+      expect(error).toBeInstanceOf(RetirementInputValidationError)
+      expect(
+        (error as RetirementInputValidationError).fieldErrors.lifeExpectancy,
+      ).toBeDefined()
+    }
+  })
+
+  it('rejects retirementAge <= startingAge', () => {
+    const inputs = makeInputs({ startingAge: 50, retirementAge: 45, lifeExpectancy: 90 })
+    try {
+      calculateRetirementAnalysis(inputs)
+      expect.unreachable('should have thrown')
+    } catch (error) {
+      expect(error).toBeInstanceOf(RetirementInputValidationError)
+      expect(
+        (error as RetirementInputValidationError).fieldErrors.retirementAge,
+      ).toBeDefined()
+    }
+  })
+
+  it('rejects negative money fields', () => {
+    const inputs = makeInputs({ targetIncome: -60000 })
+    try {
+      calculateRetirementAnalysis(inputs)
+      expect.unreachable('should have thrown')
+    } catch (error) {
+      expect(error).toBeInstanceOf(RetirementInputValidationError)
+      expect(
+        (error as RetirementInputValidationError).fieldErrors.targetIncome,
+      ).toBeDefined()
+    }
+  })
 })
 
 describe('Edge cases and boundary conditions', () => {
-  let randSpy: ReturnType<typeof vi.spyOn>
-  beforeEach(() => {
-    randSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
-  })
-  afterEach(() => {
-    randSpy.mockRestore()
-  })
-
   it('handles lifeExpectancy === retirementAge (zero retirement years)', () => {
     // No retirement years => Monte Carlo loop never executes => always succeeds.
+    // (Equality is legal; only lifeExpectancy < retirementAge is rejected.)
     const inputs = makeInputs({ retirementAge: 65, lifeExpectancy: 65 })
     expect(runMonteCarloSimulation(inputs, 5)).toBe(1)
   })
 
-  it('handles lifeExpectancy < retirementAge gracefully (no infinite loop)', () => {
-    // negative `retirementYears` => for-loop never enters => success path.
-    const inputs = makeInputs({ retirementAge: 70, lifeExpectancy: 65 })
-    const rate = runMonteCarloSimulation(inputs, 3)
-    expect(rate).toBe(1)
-  })
-
-  it('safe withdrawal rate is identical to nominal when inflation = 0', () => {
+  it('initial withdrawal rate is identical to nominal when inflation = 0', () => {
     // With 0% inflation, the inflation-adjusted income equals targetIncome,
-    // so SWR = targetIncome / projectedBalance — the "real == nominal" case.
+    // so the rate = targetIncome / projectedBalance — the "real == nominal" case.
     const inputs = makeInputs({
       inflationRate: 0,
       targetIncome: 60000,
       riskProfile: 'custom',
     })
     const projected = calculateProjectedBalance(inputs)
-    expect(calculateSafeWithdrawalRate(inputs)).toBeCloseTo(60000 / projected, 8)
+    expect(calculateInitialWithdrawalRate(inputs)).toBeCloseTo(60000 / projected, 8)
   })
 
   it('projected balance grows monotonically with monthly savings', () => {

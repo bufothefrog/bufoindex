@@ -11,10 +11,13 @@
  * Notes on units (verified by reading the source):
  *   - `profile.income.gross` and `profile.income.net` are MONTHLY values
  *     (populated by updateLegacyIncomeFields). Annual income is `gross * 12`.
- *   - `availableAmount` is per-paycheck for emergency-fund / employer-match /
- *     debt steps and monthly-ish for the HSA / Roth / 401k steps (the source
- *     mixes scopes — see findings at the bottom of this file).
- *   - `hsa.currentContribution` is monthly per the type comment.
+ *   - `availableAmount` and every AllocationItem.amount are PER-PAYCHECK.
+ *     Annual IRS caps are converted with monthlyToPaycheck, so a bi-weekly
+ *     earner's annual room divides by 26 pay periods (factor 12/26 per month).
+ *   - `hsa.currentContribution` and `ira.currentContributions.*` are monthly.
+ *
+ * The factory default frequency is bi-weekly, so hand-computed expectations
+ * below use annualAmount / 26 for per-paycheck values.
  *
  * Most boundary tests target the actual constants imported from
  * lib/constants/irs-2026.ts so they remain correct as IRS limits update.
@@ -29,7 +32,6 @@ import {
   hasHighInterestDebt,
   hasLowInterestDebt,
   calculateHSAOptimal,
-  calculateTaxBracketOptimization,
   determineRothVsTraditional,
   calculateRothIRA,
   calculateAdditional401k,
@@ -44,9 +46,23 @@ import {
   createIncomeData,
   createHSABenefits,
   createEmployerBenefits,
+  createIRAData,
   createUserPreferences,
   createTaxData,
 } from '@/test/factories/test-data-factory'
+
+// Factory default frequency is bi-weekly: 26 paychecks/year, 26/12 per month
+const PAYCHECKS_PER_YEAR = 26
+
+// IRA benefits with no existing contributions (the factory default contributes
+// $500/month to a Roth, which consumes IRS room under the netting rules)
+const emptyIRA = () =>
+  createIRAData({
+    hasIRA: false,
+    accountTypes: { traditional: false, roth: false },
+    currentContributions: { traditional: 0, roth: 0 },
+    currentBalances: { traditional: 0, roth: 0 },
+  })
 
 describe('optimization.ts — paycheck allocation decisions', () => {
   // ────────────────────────────────────────────────────────────────────────
@@ -344,22 +360,23 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(calculateHighInterestDebt(profile, 1000)).toBeNull()
     })
 
-    it('returns null when available budget does not exceed the minimum payment', () => {
+    it('returns null when available budget does not exceed the per-paycheck minimum payment', () => {
       const profile = createPaycheckProfile({
         debts: [createDebtData({ balance: 5000, interestRate: 0.18, minimumPayment: 200 })],
       })
-      // available 200 → recommendedPayment = min(200, 5000) = 200, which equals minimumPayment
-      // → null (no extra payment to recommend)
-      expect(calculateHighInterestDebt(profile, 200)).toBeNull()
-      expect(calculateHighInterestDebt(profile, 150)).toBeNull()
+      // Monthly minimum $200 → per paycheck (bi-weekly) 200 * 12/26 ≈ $92.31.
+      // available 92 ≤ 92.31 → null (no extra payment to recommend)
+      expect(calculateHighInterestDebt(profile, 92)).toBeNull()
+      expect(calculateHighInterestDebt(profile, 50)).toBeNull()
     })
 
-    it('records extraPayment as `amount` (above minimum payment)', () => {
+    it('records extraPayment as `amount` (above the per-paycheck minimum payment)', () => {
       const profile = createPaycheckProfile({
         debts: [createDebtData({ balance: 5000, interestRate: 0.18, minimumPayment: 100 })],
       })
       const result = calculateHighInterestDebt(profile, 500)
-      expect(result!.amount).toBe(500 - 100) // extraPayment
+      // Monthly minimum $100 → per paycheck 100 * 12/26 ≈ 46.15 → extra = 500 - 46.15 = 453.85
+      expect(result!.amount).toBeCloseTo(453.85, 2)
       expect(result!.taxImpact).toBe(0)
     })
 
@@ -367,9 +384,10 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       const profile = createPaycheckProfile({
         debts: [createDebtData({ balance: 200, interestRate: 0.18, minimumPayment: 25 })],
       })
-      // available 1000 > balance 200 → recommendedPayment = 200, extra = 175
+      // available 1000 > balance 200 → recommendedPayment = 200,
+      // extra = 200 - (25 * 12/26 = 11.54) = 188.46
       const result = calculateHighInterestDebt(profile, 1000)
-      expect(result!.amount).toBe(200 - 25)
+      expect(result!.amount).toBeCloseTo(188.46, 2)
     })
   })
 
@@ -389,7 +407,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(calculateHSAOptimal(profile, 500)).toBeNull()
     })
 
-    it('uses the individual limit when coverageType is individual', () => {
+    it('uses the individual limit when coverageType is individual (per-paycheck amount)', () => {
       const profile = createPaycheckProfile({
         benefits: {
           employer401k: createEmployerBenefits(),
@@ -397,6 +415,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
             eligible: true,
             coverageType: 'individual',
             currentContribution: 0,
+            employerContribution: 0,
           }),
           ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
           other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
@@ -404,8 +423,9 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       })
       const result = calculateHSAOptimal(profile, 99999)
       expect(result).not.toBeNull()
-      // monthly limit = $4,400 / 12 ≈ $366.67
-      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.hsa.individual / 12, 2)
+      // per-paycheck cap = $4,400 / 26 paychecks ≈ $169.23
+      expect(result!.amount).toBeCloseTo(169.23, 2)
+      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.hsa.individual / PAYCHECKS_PER_YEAR, 2)
     })
 
     it('uses the family limit when coverageType is family', () => {
@@ -416,25 +436,73 @@ describe('optimization.ts — paycheck allocation decisions', () => {
             eligible: true,
             coverageType: 'family',
             currentContribution: 0,
+            employerContribution: 0,
           }),
           ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
           other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
         },
       })
       const result = calculateHSAOptimal(profile, 99999)
-      // monthly limit = $8,750 / 12
-      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.hsa.family / 12, 2)
+      // per-paycheck cap = $8,750 / 26 ≈ $336.54
+      expect(result!.amount).toBeCloseTo(336.54, 2)
+      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.hsa.family / PAYCHECKS_PER_YEAR, 2)
     })
 
-    it('returns null when already at the monthly contribution limit', () => {
-      const monthlyLimit = CONTRIBUTION_LIMITS_2026.hsa.individual / 12
+    it('annualizes with the actual paycheck frequency: annualEquivalent = amount * 26 for bi-weekly', () => {
       const profile = createPaycheckProfile({
         benefits: {
           employer401k: createEmployerBenefits(),
           hsa: createHSABenefits({
             eligible: true,
             coverageType: 'individual',
-            currentContribution: monthlyLimit, // already maxed
+            currentContribution: 0,
+            employerContribution: 0,
+          }),
+          ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+      const result = calculateHSAOptimal(profile, 99999)!
+      // Regression (unit-mixing fix): a bi-weekly earner has 26 paychecks/year,
+      // so the annual equivalent is amount * 26, NOT amount * 12
+      expect(result.annualEquivalent).toBeCloseTo(result.amount * 26, 6)
+      // and a full-room recommendation annualizes back to the $4,400 IRS cap
+      expect(result.annualEquivalent).toBeCloseTo(4400, 2)
+    })
+
+    it('subtracts the annual employer seed from IRS room (combined cap, IRC 223)', () => {
+      const buildProfile = (employerContribution: number) =>
+        createPaycheckProfile({
+          benefits: {
+            employer401k: createEmployerBenefits(),
+            hsa: createHSABenefits({
+              eligible: true,
+              coverageType: 'individual',
+              currentContribution: 0,
+              employerContribution,
+            }),
+            ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
+            other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+          },
+        })
+      const withSeed = calculateHSAOptimal(buildProfile(1000), 99999)!
+      const withoutSeed = calculateHSAOptimal(buildProfile(0), 99999)!
+      // $1,000 employer seed reduces annual room by exactly $1,000: 4,400 → 3,400
+      expect(withSeed.annualEquivalent).toBeCloseTo(3400, 2)
+      expect(withoutSeed.annualEquivalent! - withSeed.annualEquivalent!).toBeCloseTo(1000, 2)
+      // per paycheck: 3,400 / 26 ≈ 130.77
+      expect(withSeed.amount).toBeCloseTo(130.77, 2)
+    })
+
+    it('returns null when personal + employer contributions already fill the annual limit', () => {
+      const profile = createPaycheckProfile({
+        benefits: {
+          employer401k: createEmployerBenefits(),
+          hsa: createHSABenefits({
+            eligible: true,
+            coverageType: 'individual',
+            currentContribution: (CONTRIBUTION_LIMITS_2026.hsa.individual - 1200) / 12, // monthly
+            employerContribution: 1200, // annual employer seed tops it off
           }),
           ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
           other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
@@ -444,7 +512,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
     })
 
     it('uses calculateHSATaxRate (federal+state+FICA) for tax savings — i.e. includes FICA', () => {
-      // Federal 22% + TX state 0% + FICA 7.65% = 29.65% → contribution 200 → savings ≈ 59.30
+      // Federal 22% + TX state 0% + FICA 7.65% = 29.65% → contribution 100 → savings ≈ 29.65
       const profile = createPaycheckProfile({
         income: createIncomeData({ gross: 8000, monthlyGross: 8000, monthlyNet: 6000, net: 6000 }),
         taxes: createTaxData({ federalBracket: 0.22, state: 'TX' }),
@@ -454,15 +522,17 @@ describe('optimization.ts — paycheck allocation decisions', () => {
             eligible: true,
             coverageType: 'individual',
             currentContribution: 0,
+            employerContribution: 0,
           }),
           ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
           other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
         },
       })
-      const result = calculateHSAOptimal(profile, 200)
+      const result = calculateHSAOptimal(profile, 100)
       expect(result).not.toBeNull()
-      // 200 * (0.22 + 0.0765) = 59.30
-      expect(result!.taxImpact).toBeCloseTo(-59.30, 2)
+      // amount = min(4400/26 ≈ 169.23, 100) = 100 → 100 * (0.22 + 0.0765) = 29.65
+      expect(result!.amount).toBe(100)
+      expect(result!.taxImpact).toBeCloseTo(-29.65, 2)
     })
 
     it('priority is 2 when not currently contributing, 3 when already contributing', () => {
@@ -481,77 +551,6 @@ describe('optimization.ts — paycheck allocation decisions', () => {
         })
       expect(calculateHSAOptimal(buildProfile(0), 200)!.priority).toBe(2)
       expect(calculateHSAOptimal(buildProfile(50), 200)!.priority).toBe(3)
-    })
-  })
-
-  // ────────────────────────────────────────────────────────────────────────
-  // Tax bracket optimization
-  // ────────────────────────────────────────────────────────────────────────
-  describe('calculateTaxBracketOptimization', () => {
-    it('recommends 401k contribution to drop into the next-lower bracket (single filer)', () => {
-      // Single, $52,000 annual gross is just past the 22% bracket boundary at $50,400.
-      // Reducing $1,600 of taxable income drops you to the 12% bracket → savings = 1600 * (0.22 - 0.12) = $160/yr.
-      const profile = createPaycheckProfile({
-        income: createIncomeData({
-          gross: 52000 / 12,
-          monthlyGross: 52000 / 12,
-          monthlyNet: 3500,
-          net: 3500,
-        }),
-        taxes: createTaxData({ federalBracket: 0.22, filingStatus: 'single' }),
-      })
-      const result = calculateTaxBracketOptimization(profile, 200)
-      expect(result).not.toBeNull()
-      expect(result!.id).toBe('tax-optimization')
-      expect(result!.account).toBe('401k Tax Optimization')
-      // monthly reduction is min(amountToReduce/12, available) = min(133.33, 200) = 133.33
-      expect(result!.amount).toBeCloseTo(1600 / 12, 2)
-      // taxImpact = -annualSavings/12 = -160/12
-      expect(result!.taxImpact).toBeCloseTo(-160 / 12, 2)
-    })
-
-    it('returns null when income is in the lowest bracket (no lower bracket to drop into)', () => {
-      const profile = createPaycheckProfile({
-        income: createIncomeData({
-          gross: 800,
-          monthlyGross: 800,
-          monthlyNet: 700,
-          net: 700,
-        }),
-        taxes: createTaxData({ federalBracket: 0.10, filingStatus: 'single' }),
-      })
-      expect(calculateTaxBracketOptimization(profile, 100)).toBeNull()
-    })
-
-    it('returns null when monthly reduction is below the $50 threshold', () => {
-      // Sit barely above the 22% boundary so the bracket reduction is tiny.
-      const profile = createPaycheckProfile({
-        income: createIncomeData({
-          gross: (50400 + 60) / 12, // just $60/yr inside 22% bracket → $5/mo reduction
-          monthlyGross: (50400 + 60) / 12,
-          monthlyNet: 3500,
-          net: 3500,
-        }),
-        taxes: createTaxData({ federalBracket: 0.22, filingStatus: 'single' }),
-      })
-      expect(calculateTaxBracketOptimization(profile, 1000)).toBeNull()
-    })
-
-    it('uses the marriedJoint bracket table for married filers', () => {
-      // 100,800 is the top of 12% MFJ bracket; sit just inside 22%.
-      const profile = createPaycheckProfile({
-        income: createIncomeData({
-          gross: 102000 / 12,
-          monthlyGross: 102000 / 12,
-          monthlyNet: 6500,
-          net: 6500,
-        }),
-        taxes: createTaxData({ federalBracket: 0.22, filingStatus: 'marriedJoint' }),
-      })
-      const result = calculateTaxBracketOptimization(profile, 500)
-      expect(result).not.toBeNull()
-      // amountToReduce = 102_000 - 100_800 = 1200
-      expect(result!.amount).toBeCloseTo(1200 / 12, 2)
     })
   })
 
@@ -647,6 +646,13 @@ describe('optimization.ts — paycheck allocation decisions', () => {
   describe('calculateRothIRA', () => {
     const roth = ROTH_IRA_PHASEOUT_2026
 
+    const emptyIRABenefits = () => ({
+      employer401k: createEmployerBenefits(),
+      hsa: createHSABenefits(),
+      ira: emptyIRA(),
+      other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+    })
+
     it('returns null when income is above the single phaseout end (ineligible)', () => {
       const profile = createPaycheckProfile({
         income: createIncomeData({
@@ -689,13 +695,81 @@ describe('optimization.ts — paycheck allocation decisions', () => {
         }),
         taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'single' }),
         preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+        benefits: emptyIRABenefits(),
       })
       const result = calculateRothIRA(profile, 999)
       expect(result).not.toBeNull()
       expect(result!.id).toBe('roth-ira')
-      // monthly contribution = min(7500/12, 999) = 625
-      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.ira / 12, 2)
+      // per-paycheck contribution = min(7500/26 ≈ 288.46, 999) = 288.46
+      expect(result!.amount).toBeCloseTo(288.46, 2)
+      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.ira / PAYCHECKS_PER_YEAR, 2)
       expect(result!.taxImpact).toBe(0) // Roth = after-tax
+      // Bi-weekly regression: annual equivalent = amount * 26, recovering the $7,500 cap
+      expect(result!.annualEquivalent).toBeCloseTo(result!.amount * 26, 6)
+      expect(result!.annualEquivalent).toBeCloseTo(7500, 2)
+    })
+
+    it('nets out existing IRA contributions: user already at the $7,500 limit gets $0 recommended', () => {
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 60000 / 12,
+          monthlyGross: 60000 / 12,
+          monthlyNet: 3800,
+          net: 3800,
+        }),
+        taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'single' }),
+        preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+        benefits: {
+          employer401k: createEmployerBenefits(),
+          hsa: createHSABenefits(),
+          // $400/mo Roth + $225/mo Traditional = $625/mo = $7,500/yr — the combined IRS limit
+          ira: createIRAData({ currentContributions: { traditional: 225, roth: 400 } }),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+      expect(calculateRothIRA(profile, 999)).toBeNull()
+    })
+
+    it('reduces recommended room by annualized existing contributions', () => {
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 60000 / 12,
+          monthlyGross: 60000 / 12,
+          monthlyNet: 3800,
+          net: 3800,
+        }),
+        taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'single' }),
+        preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+        benefits: {
+          employer401k: createEmployerBenefits(),
+          hsa: createHSABenefits(),
+          ira: createIRAData({ currentContributions: { traditional: 0, roth: 250 } }), // $3,000/yr
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+      const result = calculateRothIRA(profile, 999)!
+      // Remaining room = 7,500 - 3,000 = 4,500/yr → 4,500/26 ≈ 173.08 per paycheck
+      expect(result.amount).toBeCloseTo(173.08, 2)
+      expect(result.annualEquivalent).toBeCloseTo(4500, 2)
+    })
+
+    it('applies the $1,100 IRA catch-up at age 50 but not at 49', () => {
+      const buildProfile = (age: number) =>
+        createPaycheckProfile({
+          income: createIncomeData({
+            gross: 60000 / 12,
+            monthlyGross: 60000 / 12,
+            monthlyNet: 3800,
+            net: 3800,
+          }),
+          taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'single' }),
+          preferences: createUserPreferences({ age, isPeakEarnings: false }),
+          benefits: emptyIRABenefits(),
+        })
+      // Age 49: 7,500/26 ≈ 288.46. Age 50: (7,500 + 1,100)/26 = 8,600/26 ≈ 330.77
+      expect(calculateRothIRA(buildProfile(49), 9999)!.amount).toBeCloseTo(288.46, 2)
+      expect(calculateRothIRA(buildProfile(50), 9999)!.amount).toBeCloseTo(330.77, 2)
+      expect(calculateRothIRA(buildProfile(50), 9999)!.annualEquivalent).toBeCloseTo(8600, 2)
     })
 
     it('phases out the maximum contribution proportionally inside the phaseout band', () => {
@@ -710,11 +784,12 @@ describe('optimization.ts — paycheck allocation decisions', () => {
         }),
         taxes: createTaxData({ federalBracket: 0.22, filingStatus: 'single' }),
         preferences: createUserPreferences({ age: 28, isPeakEarnings: false }),
+        benefits: emptyIRABenefits(),
       })
       const result = calculateRothIRA(profile, 9999)
       expect(result).not.toBeNull()
-      // Math.floor(7500 * 0.5) = 3750 → monthly = 312.5
-      expect(result!.amount).toBeCloseTo(3750 / 12, 1)
+      // Math.floor(7500 * 0.5) = 3750/yr → per paycheck 3750/26 ≈ 144.23
+      expect(result!.amount).toBeCloseTo(144.23, 2)
     })
 
     it('respects the marriedJoint phaseout band', () => {
@@ -728,10 +803,11 @@ describe('optimization.ts — paycheck allocation decisions', () => {
         }),
         taxes: createTaxData({ federalBracket: 0.24, filingStatus: 'marriedJoint' }),
         preferences: createUserPreferences({ age: 28, isPeakEarnings: false }),
+        benefits: emptyIRABenefits(),
       })
       const result = calculateRothIRA(profile, 9999)
       expect(result).not.toBeNull()
-      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.ira / 12, 2)
+      expect(result!.amount).toBeCloseTo(CONTRIBUTION_LIMITS_2026.ira / PAYCHECKS_PER_YEAR, 2)
 
       // Above MFJ phaseout end → null
       const profileAbove = createPaycheckProfile({
@@ -746,7 +822,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(calculateRothIRA(profileAbove, 9999)).toBeNull()
     })
 
-    it('returns null when monthly contribution would be ≤ $50 (skip tiny contributions)', () => {
+    it('returns null when the per-paycheck contribution would be ≤ $50 (skip tiny contributions)', () => {
       const profile = createPaycheckProfile({
         income: createIncomeData({
           gross: 60000 / 12,
@@ -756,6 +832,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
         }),
         taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'single' }),
         preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+        benefits: emptyIRABenefits(),
       })
       expect(calculateRothIRA(profile, 30)).toBeNull()
       expect(calculateRothIRA(profile, 50)).toBeNull()
@@ -808,8 +885,35 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       const result = calculateAdditional401k(profile, 1000)
       expect(result).not.toBeNull()
       expect(result!.account).toBe('Traditional 401k')
-      // Federal 32 + TX 0 = 32% income-tax savings
-      expect(result!.taxImpact).toBeCloseTo(-1000 * 0.32, 2)
+      // Room = 24,500 - (100k × 6% = 6,000) = 18,500/yr → 18,500/26 ≈ 711.54 per paycheck,
+      // which is below the $1,000 budget → amount = 711.54
+      expect(result!.amount).toBeCloseTo(711.54, 2)
+      // Federal 32 + TX 0 = 32% income-tax savings on the per-paycheck amount
+      expect(result!.taxImpact).toBeCloseTo(-711.54 * 0.32, 1)
+    })
+
+    it('applies 401k catch-up tiers by age: none at 49, +$8,000 at 50, +$11,250 at 60-63, back to +$8,000 at 64', () => {
+      const buildProfile = (age: number) =>
+        createPaycheckProfile({
+          income: createIncomeData({ gross: 200000 / 12, monthlyGross: 200000 / 12, monthlyNet: 12000, net: 12000 }),
+          taxes: createTaxData({ federalBracket: 0.32, filingStatus: 'single', state: 'TX' }),
+          preferences: createUserPreferences({ age, isPeakEarnings: false }),
+          benefits: {
+            // 200k × 10% = $20,000/yr already contributed
+            employer401k: createEmployerBenefits({ available: true, currentContribution: 0.10 }),
+            hsa: createHSABenefits(),
+            ira: { hasIRA: false, accountTypes: { traditional: false, roth: false }, currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } },
+            other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+          },
+        })
+      // Age 49: room = 24,500 - 20,000 = 4,500/yr → 4,500/26 ≈ 173.08
+      expect(calculateAdditional401k(buildProfile(49), 9999)!.amount).toBeCloseTo(173.08, 2)
+      // Age 50: limit 24,500 + 8,000 = 32,500 → room 12,500/yr → 480.77
+      expect(calculateAdditional401k(buildProfile(50), 9999)!.amount).toBeCloseTo(480.77, 2)
+      // Age 60: super catch-up → limit 24,500 + 11,250 = 35,750 → room 15,750/yr → 605.77
+      expect(calculateAdditional401k(buildProfile(60), 9999)!.amount).toBeCloseTo(605.77, 2)
+      // Age 64: super catch-up window closed → regular catch-up again → 480.77
+      expect(calculateAdditional401k(buildProfile(64), 9999)!.amount).toBeCloseTo(480.77, 2)
     })
 
     it('recommends Roth 401k with zero tax impact for roth-preferred profiles', () => {
@@ -946,39 +1050,42 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(result!.id).toBe('mega-backdoor-roth')
       expect(result!.priority).toBe(6.5)
       expect(result!.taxImpact).toBe(0) // after-tax contribution
-      // remainingAfterTax = 72000 - 12000 (employee) - 6000 (employer match) = 54000 → $4500/mo
-      const expectedMonthly = (TOTAL_415C_BY_AGE.standard - 12000 - 6000) / 12
-      expect(result!.amount).toBeCloseTo(expectedMonthly, 2)
+      // remainingAfterTax = 72000 - 12000 (employee) - 6000 (employer match)
+      // = 54000/yr → 54000/26 ≈ 2076.92 per paycheck (bi-weekly)
+      expect(result!.amount).toBeCloseTo(2076.92, 2)
+      expect(result!.amount).toBeCloseTo((TOTAL_415C_BY_AGE.standard - 12000 - 6000) / PAYCHECKS_PER_YEAR, 2)
+      // Bi-weekly annualization regression: annualEquivalent = amount * 26
+      expect(result!.annualEquivalent).toBeCloseTo(result!.amount * 26, 6)
+      expect(result!.annualEquivalent).toBeCloseTo(54000, 2)
     })
 
     it('uses the catch-up limit for age 50+ workers', () => {
       const profile = buildProfile({ gross: 200000, currentContribution: 0.06, age: 55 })
       const result = calculateMegaBackdoorRoth(profile, 9999)
-      const expectedMonthly = (TOTAL_415C_BY_AGE.catchUp50 - 12000 - 6000) / 12
-      expect(result!.amount).toBeCloseTo(expectedMonthly, 2)
+      // (80,000 - 18,000) / 26 ≈ 2384.62 per paycheck
+      expect(result!.amount).toBeCloseTo(2384.62, 2)
+      expect(result!.amount).toBeCloseTo((TOTAL_415C_BY_AGE.catchUp50 - 12000 - 6000) / PAYCHECKS_PER_YEAR, 2)
     })
 
     it('uses the super-catch-up limit for ages 60–63', () => {
       const profile = buildProfile({ gross: 200000, currentContribution: 0.06, age: 62 })
       const result = calculateMegaBackdoorRoth(profile, 9999)
-      const expectedMonthly = (TOTAL_415C_BY_AGE.superCatchUp60to63 - 12000 - 6000) / 12
-      expect(result!.amount).toBeCloseTo(expectedMonthly, 2)
+      // (83,250 - 18,000) / 26 ≈ 2509.62 per paycheck
+      expect(result!.amount).toBeCloseTo(2509.62, 2)
+      expect(result!.amount).toBeCloseTo((TOTAL_415C_BY_AGE.superCatchUp60to63 - 12000 - 6000) / PAYCHECKS_PER_YEAR, 2)
     })
 
-    it('returns null when monthly room is below $100 (skip tiny amounts)', () => {
-      // Crank current contribution so almost no room remains
+    it('returns null when per-paycheck room is at or below $100 (skip tiny amounts)', () => {
+      // 200k × 30% = 60,000 employee + 6,000 employer = 66,000 → room 6,000/yr
+      // → 6,000/26 ≈ 230.77 per paycheck (> 100 → allocation)
       const profile = buildProfile({ gross: 200000, currentContribution: 0.30 })
-      // 200k × 30% = 60000 employee + 6000 employer = 66000; 415c room = 6000/yr = 500/mo
-      // That's > 100, so to get null we need even more crowding — set higher.
-      const tightProfile = buildProfile({ gross: 200000, currentContribution: 0.32 })
-      // 200k × 32% = 64000 + 6000 = 70000; room 2000/yr = 166/mo (still > 100).
-      // Push tighter:
-      const tighterProfile = buildProfile({ gross: 200000, currentContribution: 0.33 })
-      // 66000 + 6000 = 72000 → exactly at limit → 0 room → null
-      expect(calculateMegaBackdoorRoth(tighterProfile, 9999)).toBeNull()
-      // Sanity check: looser profile still returns an allocation
       expect(calculateMegaBackdoorRoth(profile, 9999)).not.toBeNull()
-      expect(calculateMegaBackdoorRoth(tightProfile, 9999)).not.toBeNull()
+      // 200k × 32% = 64,000 + 6,000 = 70,000 → room 2,000/yr → 76.92 per paycheck (≤ 100 → null)
+      const tightProfile = buildProfile({ gross: 200000, currentContribution: 0.32 })
+      expect(calculateMegaBackdoorRoth(tightProfile, 9999)).toBeNull()
+      // 200k × 33% = 66,000 + 6,000 = 72,000 → exactly at the 415c limit → 0 room → null
+      const tighterProfile = buildProfile({ gross: 200000, currentContribution: 0.33 })
+      expect(calculateMegaBackdoorRoth(tighterProfile, 9999)).toBeNull()
     })
 
     it('respects the available-amount cap', () => {
@@ -1117,23 +1224,4 @@ describe('optimization.ts — paycheck allocation decisions', () => {
  *
  * - The exact relative ordering "401k match → HSA → high-interest debt → Roth"
  *   is also enforced by the orchestrator, not these per-step functions.
- *
- * UNIT-OF-MEASURE INCONSISTENCY (potential bug, not fixed per instructions)
- *
- * The optimizer mixes per-paycheck and per-month scopes:
- *   - calculate1MonthEmergency / calculateEmergencyFundCompletion divide
- *     `actualAllocation / profile.income.netPaycheck` (per-paycheck).
- *   - calculateHighInterestDebt / calculateHSAOptimal / calculateRothIRA /
- *     calculateAdditional401k / calculateMegaBackdoorRoth / calculateTaxableInvestment
- *     all divide by `profile.income.net` (which is MONTHLY).
- *   The `availableAmount` budget passed in by core.ts is per-paycheck, so a
- *   $500 paycheck-scope contribution gets divided by a monthly net (e.g. $6000),
- *   producing a 'percentage' that is ~2.17× too small for bi-weekly users.
- *   See lines 199, 237, 281, 382, 439, 493, 515 of optimization.ts.
- *
- * EMPLOYER-MATCH "monthly" COMMENT vs reality (minor)
- *
- * calculateHighInterestDebt's implementation copy says "per month" but the
- * `extraPayment` used is per-paycheck (matches what `availableAmount` carries).
- * Output text is therefore mis-labelled when the user is paid weekly/bi-weekly.
  */
