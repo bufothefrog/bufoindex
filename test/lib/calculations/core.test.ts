@@ -1,6 +1,6 @@
 /**
  * Core Paycheck Optimization Test Suite
- * 100% Coverage Required - Sprint 7 Testing Framework
+ * Covers allocation ordering, validation, formatting, and frequency conversion.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'

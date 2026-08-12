@@ -26,12 +26,9 @@ pids
 *.seed
 *.pid.lock
 
-# Env
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Env — catch-all so no variant can be committed by accident
+.env*
+!.env.example
 
 # Next.js
 .next/
@@ -79,9 +76,6 @@ pnpm-lock.yaml
 
 # Vercel
 .vercel
-
-# Git artifacts
-.gitmodules
 
 # Stale perf-monitoring artifacts (the system was removed; ignored so leftovers
 # from old branches don't get committed by accident)

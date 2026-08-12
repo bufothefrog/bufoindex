@@ -2,11 +2,6 @@
  * Design System Type Definitions
  */
 
-import { ColorVariant, ColorShade } from './colors';
-
-// Re-export color types
-export type { ColorVariant, ColorShade };
-
 /**
  * Base props for all input components
  */
