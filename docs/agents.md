@@ -22,7 +22,7 @@ npm run test:run      # vitest run
 npm run build         # next build (catches a different class of issues)
 ```
 
-Pre-commit (husky → lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI re-runs type-check, lint (max 200 warnings), and tests on a Node 20 + 22 matrix (coverage on Node 20), then runs a production build and an `npm audit --audit-level=high` scan as separate jobs.
+Pre-commit (husky → lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI re-runs type-check, lint (max 200 warnings), and tests on a Node 22 + 24 matrix (coverage on Node 20), then runs a production build and an `npm audit --audit-level=high` scan as separate jobs.
 
 A change is ready when:
 

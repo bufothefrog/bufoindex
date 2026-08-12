@@ -136,6 +136,7 @@ function compressRetirementData(
   if (inputs.filingStatus !== 'single') compressed.fs = inputs.filingStatus;
   if (inputs.state !== 'TX') compressed.st = inputs.state; // Default to Texas (no state income tax)
   if (inputs.riskProfile !== 'tdf') compressed.rp = inputs.riskProfile;
+  if (inputs.necessaryMonthlyExpenses !== 5000) compressed.nme = inputs.necessaryMonthlyExpenses;
   if (inputs.effectiveTaxRate !== null && inputs.effectiveTaxRate !== undefined) compressed.etr = inputs.effectiveTaxRate;
   if (inputs.estimatedAnnualHealthcareCost !== null && inputs.estimatedAnnualHealthcareCost !== undefined) compressed.eahc = inputs.estimatedAnnualHealthcareCost;
   if (displayMode !== DEFAULT_DOLLAR_DISPLAY_MODE) compressed.dm = displayMode;
@@ -155,26 +156,26 @@ function decompressRetirementData(compressed: any): DecodedRetirementState {
   }
 
   const inputs: RetirementInputs = {
-    startingAge: compressed.sa || 25,
-    retirementAge: compressed.ra || 60,
-    lifeExpectancy: compressed.le || 85,
-    targetIncome: compressed.ti || 80000,
-    startingBalance: compressed.sb || 10000,
-    currentIncome: compressed.ci || 100000,
-    incomeAmount: compressed.ia || 100000,
-    incomePeriod: compressed.ip || 'yearly',
-    monthlySavings: compressed.ms || 2000,
-    accumulationReturn: compressed.ar || RetirementConstants.DEFAULT_ACCUMULATION_RETURN,
-    retirementReturn: compressed.rr || RetirementConstants.DEFAULT_RETIREMENT_RETURN,
-    inflationRate: compressed.ir || RetirementConstants.DEFAULT_INFLATION_RATE,
-    socialSecurityAge: compressed.ssa || RetirementConstants.SS_FULL_RETIREMENT_AGE,
-    socialSecurityBenefit: compressed.ssb || 30000,
-    healthcareCostMultiplier: compressed.hcm || 1,
-    volatility: compressed.vol || RetirementConstants.DEFAULT_VOLATILITY,
-    filingStatus: compressed.fs || 'single',
-    state: compressed.st || 'TX', // Default to Texas (no state income tax)
-    riskProfile: compressed.rp || 'tdf',
-    necessaryMonthlyExpenses: compressed.nme || 5000,
+    startingAge: compressed.sa ?? 25,
+    retirementAge: compressed.ra ?? 60,
+    lifeExpectancy: compressed.le ?? 85,
+    targetIncome: compressed.ti ?? 80000,
+    startingBalance: compressed.sb ?? 10000,
+    currentIncome: compressed.ci ?? 100000,
+    incomeAmount: compressed.ia ?? 100000,
+    incomePeriod: compressed.ip ?? 'yearly',
+    monthlySavings: compressed.ms ?? 2000,
+    accumulationReturn: compressed.ar ?? RetirementConstants.DEFAULT_ACCUMULATION_RETURN,
+    retirementReturn: compressed.rr ?? RetirementConstants.DEFAULT_RETIREMENT_RETURN,
+    inflationRate: compressed.ir ?? RetirementConstants.DEFAULT_INFLATION_RATE,
+    socialSecurityAge: compressed.ssa ?? RetirementConstants.SS_FULL_RETIREMENT_AGE,
+    socialSecurityBenefit: compressed.ssb ?? 30000,
+    healthcareCostMultiplier: compressed.hcm ?? 1,
+    volatility: compressed.vol ?? RetirementConstants.DEFAULT_VOLATILITY,
+    filingStatus: compressed.fs ?? 'single',
+    state: compressed.st ?? 'TX', // Default to Texas (no state income tax)
+    riskProfile: compressed.rp ?? 'tdf',
+    necessaryMonthlyExpenses: compressed.nme ?? 5000,
     effectiveTaxRate: compressed.etr !== undefined ? compressed.etr : null,
     estimatedAnnualHealthcareCost: compressed.eahc !== undefined ? compressed.eahc : null,
   };

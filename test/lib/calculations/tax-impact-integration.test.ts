@@ -23,7 +23,7 @@ describe('Tax Rate Functions', () => {
   describe('calculateIncomeTaxRate (federal + state only, no FICA)', () => {
     it('should return federal + state for CA resident in 22% bracket', () => {
       const rate = calculateIncomeTaxRate(0.22, 'CA')
-      expect(rate).toBeCloseTo(0.22 + 0.133, 4) // 0.353 — CA top marginal 12.3% + 1% MHST
+      expect(rate).toBeCloseTo(0.22 + 0.093, 4) // 0.313 — CA 9.3% middle-income marginal bracket
     })
 
     it('should return federal only for no-income-tax states', () => {
@@ -38,7 +38,7 @@ describe('Tax Rate Functions', () => {
       // Must NOT equal the old broken value of 0.3895 (which included 7.65% FICA)
       expect(rate).not.toBeCloseTo(0.3895, 2)
       // Must equal federal + state only
-      expect(rate).toBeCloseTo(0.353, 3)
+      expect(rate).toBeCloseTo(0.313, 3)
     })
 
     it('should handle empty state code', () => {
@@ -49,20 +49,20 @@ describe('Tax Rate Functions', () => {
   describe('calculateHSATaxRate (includes FICA for HSA payroll deductions)', () => {
     it('should include full FICA for income below SS wage base', () => {
       const rate = calculateHSATaxRate(0.22, 'CA', 100000)
-      // 22% federal + 13.3% CA + 7.65% FICA = 43.25%
-      expect(rate).toBeCloseTo(0.22 + 0.133 + 0.0765, 4)
+      // 22% federal + 9.3% CA + 7.65% FICA = 38.95%
+      expect(rate).toBeCloseTo(0.22 + 0.093 + 0.0765, 4)
     })
 
     it('should use Medicare-only FICA above SS wage base ($184,500)', () => {
       const rate = calculateHSATaxRate(0.22, 'CA', 190000)
-      // 22% federal + 13.3% CA + 1.45% Medicare only = 36.75%
-      expect(rate).toBeCloseTo(0.22 + 0.133 + 0.0145, 4)
+      // 22% federal + 9.3% CA + 1.45% Medicare only = 32.75%
+      expect(rate).toBeCloseTo(0.22 + 0.093 + 0.0145, 4)
     })
 
     it('should include additional Medicare tax above $200k', () => {
       const rate = calculateHSATaxRate(0.22, 'CA', 250000)
-      // 22% federal + 13.3% CA + 2.35% (Medicare + additional) = 37.65%
-      expect(rate).toBeCloseTo(0.22 + 0.133 + 0.0235, 4)
+      // 22% federal + 9.3% CA + 2.35% (Medicare + additional) = 32.85%
+      expect(rate).toBeCloseTo(0.22 + 0.093 + 0.0235, 4)
     })
 
     it('should match old calculateMarginalTaxRate for income below SS wage base', () => {

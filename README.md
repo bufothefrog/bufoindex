@@ -38,7 +38,7 @@ npm install
 npm run dev   # http://localhost:3000
 ```
 
-Node 20+ is required.
+Node 22+ is required.
 
 ## Scripts
 
@@ -54,7 +54,7 @@ Node 20+ is required.
 | `npm run test:ui`       | Vitest browser UI                |
 | `npm run test:coverage` | Vitest one-shot + v8 coverage    |
 
-Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, lint, and tests on a Node 20/22 matrix, plus separate production-build and dependency-audit jobs.
+Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, lint, and tests on a Node 22/24 matrix, plus separate production-build and dependency-audit jobs.
 
 ## Project layout
 

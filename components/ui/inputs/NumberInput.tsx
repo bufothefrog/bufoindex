@@ -78,7 +78,9 @@ export function NumberInput({
   // (https://react.dev/learn/you-might-not-need-an-effect): while the field
   // is being edited the user's raw text wins; otherwise the committed value
   // is authoritative. A committed value of 0 always shows an empty field.
-  const shownValue = value === 0 ? '' : isFocused ? displayValue : format(value);
+  // While focused the user's draft text always wins (a committed 0 mid-edit
+  // must not wipe the field, e.g. typing '0.5'); unfocused, 0 shows empty.
+  const shownValue = isFocused ? displayValue : value === 0 ? '' : format(value);
 
   const validateAndUpdate = (newValue: number) => {
     // Apply min/max constraints

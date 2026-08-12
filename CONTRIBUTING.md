@@ -10,13 +10,13 @@ npm install
 npm run dev   # http://localhost:3000
 ```
 
-Node 20+ is required. Pre-commit hooks (husky + lint-staged) run `eslint --fix`
+Node 22+ is required. Pre-commit hooks (husky + lint-staged) run `eslint --fix`
 and `tsc --noEmit` on staged TypeScript files.
 
 ## Quality bar
 
 Before opening a PR, make sure all four of these pass locally — CI runs the
-same checks on Node 20 and 22:
+same checks on Node 22 and 24:
 
 ```bash
 npm run type-check

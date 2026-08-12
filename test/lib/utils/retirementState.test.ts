@@ -19,8 +19,7 @@ import { RetirementConstants } from '@/lib/constants/retirement';
 // ---------------------------------------------------------------------------
 
 /**
- * Round-trippable inputs. Note: necessaryMonthlyExpenses must be 5000 — the
- * codec never encodes it and always restores that default on decode.
+ * Round-trippable inputs.
  */
 function fixtureInputs(overrides: Partial<RetirementInputs> = {}): RetirementInputs {
   return {
@@ -152,3 +151,25 @@ describe('v1 payload migration', () => {
     expect(decodeRetirementFromUrlHash('')).toBeNull();
   });
 });
+
+describe('zero-value round-trips (regression: || decode restored defaults)', () => {
+  it('preserves explicit zeros for money fields through encode/decode', () => {
+    const inputs = fixtureInputs({
+      socialSecurityBenefit: 0, // planning without Social Security
+      monthlySavings: 0,
+      startingBalance: 0,
+    })
+    const hash = encodeRetirementToUrlHash(inputs, 'today')
+    const decoded = decodeRetirementFromUrlHash(hash)
+    expect(decoded).not.toBeNull()
+    expect(decoded!.inputs.socialSecurityBenefit).toBe(0)
+    expect(decoded!.inputs.monthlySavings).toBe(0)
+    expect(decoded!.inputs.startingBalance).toBe(0)
+  })
+
+  it('round-trips a customized necessaryMonthlyExpenses (regression: field was never encoded)', () => {
+    const inputs = { ...fixtureInputs(), necessaryMonthlyExpenses: 9000 }
+    const decoded = decodeRetirementFromUrlHash(encodeRetirementToUrlHash(inputs, 'today'))
+    expect(decoded!.inputs.necessaryMonthlyExpenses).toBe(9000)
+  })
+})

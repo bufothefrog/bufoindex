@@ -29,8 +29,6 @@ components/
                          #   inputs/ (StateSelector, SelectInput, PercentageSlider,
                          #   DebtInput), layout/ (InputRow, FieldGroup),
                          #   cards/ (AllocationCard, OpportunityCostCard)
-  charts/                # Recharts wrappers (RetirementCharts, NetWorthProgression,
-                         #   WithdrawalTimeline, ScenarioComparisonChart) — must use getChartTheme()
   paycheck-allocator/    # Paycheck-allocator UI
   calculators/shared/    # CalculatorTabs, ExpandableListCard, StatusAlert, BreakdownRow
   retirement/            # RiskProfileSelector
@@ -56,7 +54,7 @@ test/
 - **Dev server:** `npm run dev` · **Build:** `npm run build` · **Type check:** `npm run type-check` · **Lint:** `npm run lint`
 - **Tests:** `npm run test` (watch) / `npm run test:run` (one-shot) / `npm run test:coverage`
 - **Pre-commit (husky + lint-staged):** `eslint --fix` + `tsc --noEmit` on staged TS/TSX.
-- **CI (`.github/workflows/test.yml`):** type-check, lint (max 200 warnings), and `test:run` on a Node 20 + 22 matrix (coverage + Codecov upload on Node 20 only), then separate production-build and `npm audit --audit-level=high` jobs.
+- **CI (`.github/workflows/test.yml`):** type-check, lint (max 200 warnings), and `test:run` on a Node 22 + 24 matrix (coverage + Codecov upload on Node 20 only), then separate production-build and `npm audit --audit-level=high` jobs.
 
 There is no editorial-language grep gate, no orchestration shell script wrapping these commands, and no benchmark workflow in CI. Don't add one without discussion.
 

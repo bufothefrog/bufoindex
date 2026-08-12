@@ -148,6 +148,26 @@ describe('projections.ts — tax model and growth projections', () => {
   // ────────────────────────────────────────────────────────────────────────
   // calculateProjections — end-to-end with hand-computed numbers
   // ────────────────────────────────────────────────────────────────────────
+  describe('calculateProjections — already financially independent (regression: NaN fiAge)', () => {
+    it('produces finite improvement numbers when net worth already exceeds the FI target', () => {
+      // Emergency fund large enough that estimated net worth far exceeds
+      // 25x annual expenses, which previously drove Math.log of a negative
+      // argument inside the FI-age solver and NaN through the results.
+      const profile = createPaycheckProfile({
+        income: createIncomeData({ gross: 5000, monthlyGross: 5000, net: 4000, monthlyNet: 4000, frequency: 'monthly' }),
+        preferences: createUserPreferences({
+          necessaryExpenses: 1000,
+          currentEmergencyFund: 2000000, // dwarfs the 25x * 12 * 1000 = $300k FI target
+          funMoney: { min: 200, max: 500, current: 350 },
+        }),
+      })
+      const projections = calculateProjections(profile, [])
+      expect(Number.isFinite(projections.improvement.fiYearsEarlier)).toBe(true)
+      expect(Number.isFinite(projections.currentPath.fiAge)).toBe(true)
+      expect(Number.isFinite(projections.optimizedPath.fiAge)).toBe(true)
+    })
+  })
+
   describe('calculateProjections', () => {
     // Bi-weekly earner, $5,000/mo gross ($60k/yr), $4,000/mo net, no 401k plan.
     // estimateCurrentNetWorth = 10,000 emergency fund + 60,000 × 0.5 = 40,000 (no debts)

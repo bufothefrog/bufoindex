@@ -51,13 +51,14 @@ export function PercentInput({
   // (https://react.dev/learn/you-might-not-need-an-effect): while the field
   // is being edited the user's raw text wins; otherwise a positive committed
   // value is authoritative (negative values keep the raw text, matching the
-  // long-standing sync behavior). A committed value of 0 always shows an
-  // empty field — including mid-edit, when a keystroke fails the min/max
-  // gate and the committed value stays 0.
-  const shownValue =
-    value === 0
+  // long-standing sync behavior). While focused the user's draft text always
+  // wins — a committed 0 mid-edit must not wipe the field (typing '0.5'
+  // would otherwise lose its leading keystrokes). Unfocused, 0 shows empty.
+  const shownValue = isFocused
+    ? displayValue
+    : value === 0
       ? ''
-      : !isFocused && value > 0
+      : value > 0
         ? (value * 100).toFixed(precision)
         : displayValue;
 

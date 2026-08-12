@@ -52,14 +52,14 @@ export function EnhancedMoneyInput({
 
   // The rendered text is derived instead of synced in an effect
   // (https://react.dev/learn/you-might-not-need-an-effect): while the field
-  // is being edited the user's raw text wins; otherwise the committed value
-  // is authoritative. A committed value of 0 always shows an empty field —
-  // including mid-edit, when a keystroke fails the min/max gate and the
-  // committed value stays 0.
-  const shownValue =
-    value === 0
+  // is being edited the user's raw text always wins — a committed 0 mid-edit
+  // must not wipe the field (typing '0.5' would otherwise lose keystrokes).
+  // Unfocused, the committed value is authoritative and 0 shows empty.
+  const shownValue = isFocused
+    ? displayValue
+    : value === 0
       ? ''
-      : !isFocused && value > 0
+      : value > 0
         ? formatCurrency(value).replace('$', '')
         : displayValue;
 

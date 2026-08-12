@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { monthlyToPaycheck } from '@/lib/calculations/core';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
@@ -83,10 +84,7 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
     // Convert to per-paycheck amount
     const frequency = profile.income.frequency;
-    const multiplier = frequency === 'weekly' ? 52/12 :
-                      frequency === 'bi-weekly' ? 26/12 :
-                      frequency === 'semi-monthly' ? 2 : 1;
-    const missedMatchPerPaycheck = missedMatch / multiplier;
+    const missedMatchPerPaycheck = monthlyToPaycheck(missedMatch, frequency);
 
     const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' :
                          frequency === 'semi-monthly' ? 'semi-monthly' :
@@ -120,10 +118,7 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
     // Convert to per-paycheck amount
     const frequency = profile.income.frequency;
-    const multiplier = frequency === 'weekly' ? 52/12 :
-                      frequency === 'bi-weekly' ? 26/12 :
-                      frequency === 'semi-monthly' ? 2 : 1;
-    const interestPerPaycheck = monthlyInterest / multiplier;
+    const interestPerPaycheck = monthlyToPaycheck(monthlyInterest, frequency);
 
     const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' :
                          frequency === 'semi-monthly' ? 'semi-monthly' :

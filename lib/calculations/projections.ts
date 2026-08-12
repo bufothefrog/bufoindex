@@ -248,6 +248,7 @@ function calculateFIAge(
   fiTarget: number,
   currentNetWorth: number
 ): number {
+  if (currentNetWorth >= fiTarget) return 30; // Already at/past FI today
   if (annualInvestment <= 0) return 99; // Never reach FI
 
   const yearsToFI = Math.log(

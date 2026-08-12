@@ -35,12 +35,13 @@ export const PayrollSetupGuide = React.memo(function PayrollSetupGuide({ profile
     frequency
   );
   
+  // AllocationItem.amount and remainingAmount are already per-paycheck
   const priorityAllocations = useMemo(() => result.allocations.map(allocation => ({
     ...allocation,
-    paycheckAmount: monthlyToPaycheck(allocation.amount, frequency)
-  })), [result.allocations, frequency]);
-  
-  const remainingPerPaycheck = monthlyToPaycheck(result.remainingAmount, frequency);
+    paycheckAmount: allocation.amount
+  })), [result.allocations]);
+
+  const remainingPerPaycheck = result.remainingAmount;
   
   const getFrequencyText = () => {
     switch (frequency) {
