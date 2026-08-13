@@ -838,7 +838,7 @@ describe('calculateStepStatus — recommendation copy', () => {
       preferences: { age: 40 },
     }))
 
-    expect(status.recommendation).toBe('Additional $1,652 (25.4%) contributions needed for max')
+    expect(status.recommendation).toBe('Additional $1,652/month (25.4% of salary) contributions needed for max')
   })
 
   it('reports the contribution rate once the 401k is maxed', () => {
@@ -860,9 +860,9 @@ describe('calculateStepStatus — recommendation copy', () => {
       preferences: { age: 40 },
     }))
 
-    expect(status.recommendation).toBe('Additional $2,042 contributions needed for max')
+    expect(status.recommendation).toBe('Additional $2,042/month contributions needed for max')
     expect(status.recommendation).not.toMatch(/∞|Infinity|NaN/)
-    expect(status.implementationSteps[1]).toBe('Increase contribution by $2,042/month more')
+    expect(status.implementationSteps[1]).toBe('Increase contributions by $2,042/month')
   })
 
   it('states the Roth IRA monthly figure from the age-adjusted limit', () => {
@@ -961,7 +961,7 @@ describe('calculateStepStatus — implementation guidance', () => {
       preferences: { age: 40 },
     }))
 
-    expect(status.implementationSteps[1]).toBe('Increase contribution by 25.4% more')
+    expect(status.implementationSteps[1]).toBe('Raise your contribution rate by 25.4% of salary (from 6% to about 31.4%)')
   })
 
   it('sizes the Roth IRA transfer from the age-adjusted IRA limit', () => {
@@ -990,14 +990,16 @@ describe('calculateStepStatus — implementation guidance', () => {
       .toBe('Contribute up to annual limit ($83,250 total)')
   })
 
-  it('explains why the early steps matter and falls back for the later ones', () => {
+  it('explains why each step matters with step-specific copy', () => {
     const profile = buildProfile({ employer401k: { afterTaxAvailable: true } })
 
     expect(statusFor('hsa-max', profile).whyItMatters).toContain('triple tax-advantaged')
     expect(statusFor('additional-401k', profile).whyItMatters)
-      .toBe('Adds to long-term savings capacity.')
+      .toContain('traditional deferrals reduce taxable income now')
     expect(statusFor('taxable-investment', profile).whyItMatters)
-      .toBe('Adds to long-term savings capacity.')
+      .toContain('no contribution limits or withdrawal restrictions')
+    expect(statusFor('mega-backdoor', profile).whyItMatters)
+      .toContain('above the elective deferral limit')
   })
 })
 

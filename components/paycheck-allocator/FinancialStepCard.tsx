@@ -7,6 +7,7 @@ import { StepStatus } from '@/lib/constants/financialSteps';
 import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
 import { PaycheckProfile } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
+import { monthlyToPaycheck } from '@/lib/calculations/core';
 
 interface FinancialStepCardProps {
   step: StepStatus;
@@ -100,10 +101,9 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
   if (max === 0) return null;
 
   const additional = max - current;
-  const paychecksPerMonth = profile.income.frequency === 'bi-weekly' ? 26 / 12 :
-                            profile.income.frequency === 'weekly' ? 52 / 12 :
-                            profile.income.frequency === 'semi-monthly' ? 2 : 1;
-  const additionalPerPaycheck = additional > 0 ? additional / 12 / paychecksPerMonth : 0;
+  const additionalPerPaycheck = additional > 0
+    ? monthlyToPaycheck(additional / 12, profile.income.frequency)
+    : 0;
 
   return (
     <div className="text-right">
@@ -111,11 +111,11 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
         {formatCurrency(current)} of {formatCurrency(max)}
       </div>
       <div className="text-xs text-muted-foreground">
-        ({progressPercent}% maxed annually)
+        ({progressPercent}% of the annual limit)
       </div>
       {additional > 0 && (
-        <div className="text-xs text-destructive mt-1">
-          <span className="font-mono tabular-nums">{formatCurrency(additionalPerPaycheck)}</span> per paycheck needed
+        <div className="text-xs text-muted-foreground mt-1">
+          <span className="font-mono tabular-nums">{formatCurrency(additionalPerPaycheck)}</span> per paycheck to reach the limit
         </div>
       )}
     </div>
@@ -190,7 +190,7 @@ function StepExpandedContent({ step }: { step: StepStatus }) {
           </StatusAlert>
         ) : step.urgencyLevel === 'important' ? (
           <StatusAlert variant="warning">
-            <strong>High impact:</strong> Significant opportunity to optimize your financial situation.
+            <strong>High impact:</strong> The dollar amounts in this step are large relative to the other open steps.
           </StatusAlert>
         ) : (
           <StatusAlert variant="info">

@@ -278,7 +278,7 @@ export function calculateStepStatus(
           return [
             `Calculate total needed: ${formatCurrency(needed)}`,
             `Set automatic transfer for ${formatCurrency(monthlyNeeded)}/month`,
-            "Park funds in high-yield savings (4%+ APY)"
+            "Park funds in a high-yield savings account"
           ];
         }
         case 'additional-401k': {
@@ -287,10 +287,11 @@ export function calculateStepStatus(
           const maxLimit = elective401kLimit(profile.preferences.age);
           const neededAnnual = Math.max(0, maxLimit - (annualGross * currentContrib));
           // Without a gross figure there is no percent-of-salary to quote; the
-          // dollar amount still stands on its own.
+          // dollar amount still stands on its own. "by X% more" was ambiguous
+          // (relative vs percentage points), so spell out the from/to rates.
           const increaseStep = annualGross > 0
-            ? `Increase contribution by ${formatPercent(neededAnnual / annualGross)} more`
-            : `Increase contribution by ${formatCurrency(neededAnnual / 12)}/month more`;
+            ? `Raise your contribution rate by ${formatPercent(neededAnnual / annualGross)} of salary (from ${formatPercent(currentContrib)} to about ${formatPercent(currentContrib + neededAnnual / annualGross)})`
+            : `Increase contributions by ${formatCurrency(neededAnnual / 12)}/month`;
           return [
             "Log into company 401k portal",
             increaseStep,
@@ -307,7 +308,7 @@ export function calculateStepStatus(
           return [
             "Open brokerage account at low-cost provider",
             "Set up automatic monthly investment",
-            "Buy low-cost index funds (VTI/VXUS)"
+            "Choose broadly diversified, low-cost funds"
           ];
         default:
           return ["Contact your financial advisor for guidance"];
@@ -328,7 +329,13 @@ export function calculateStepStatus(
         case 'hsa-max':
           return "HSA is the only triple tax-advantaged account: deductible contributions, tax-free growth, tax-free medical withdrawals.";
         case 'roth-ira':
-          return "Roth IRA provides tax-free retirement income and penalty-free access to contributions. Essential for tax diversification.";
+          return "Roth IRA provides tax-free retirement income and penalty-free access to contributions, adding tax diversification.";
+        case 'additional-401k':
+          return "Contributions beyond the match still grow tax-advantaged: traditional deferrals reduce taxable income now, and Roth deferrals are untaxed at withdrawal.";
+        case 'mega-backdoor':
+          return "After-tax 401k contributions converted to Roth grow untaxed above the elective deferral limit - room no other account type offers.";
+        case 'taxable-investment':
+          return "Taxable accounts carry no contribution limits or withdrawal restrictions, extending saving once tax-advantaged room is used.";
         default:
           return "Adds to long-term savings capacity.";
       }
@@ -403,10 +410,11 @@ export function calculateStepStatus(
           const additionalNeeded = Math.max(0, maxEmployee401kLimit - currentAnnualContribution);
           const additionalNeededMonthly = additionalNeeded / 12;
           // With no gross pay on file the percent-of-salary figure is undefined,
-          // so the copy quotes dollars only.
+          // so the copy quotes dollars only. Label the period and the base —
+          // "$922 (13.2%)" left the reader to guess both.
           const additionalFigure = annualGross > 0
-            ? `${formatCurrency(additionalNeededMonthly)} (${formatPercent(additionalNeeded / annualGross)})`
-            : formatCurrency(additionalNeededMonthly);
+            ? `${formatCurrency(additionalNeededMonthly)}/month (${formatPercent(additionalNeeded / annualGross)} of salary)`
+            : `${formatCurrency(additionalNeededMonthly)}/month`;
 
           if (isComplete) return `401k maximized at ${formatPercent(currentEmployee401k)}`;
           if (allocation) {
