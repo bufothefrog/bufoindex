@@ -3,8 +3,22 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MoneyInput } from '@/components/ui/inputs';
+import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { DollarSign } from 'lucide-react';
 import type { IncomeData } from '@/lib/types';
+
+const PAY_FREQUENCY_OPTIONS = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'bi-weekly', label: 'Bi-Weekly' },
+  { value: 'semi-monthly', label: 'Semi-Monthly (2x/month)' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+const BONUS_FREQUENCY_OPTIONS = [
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'annual', label: 'Annual' },
+  { value: 'irregular', label: 'Irregular' },
+];
 
 interface IncomeInputCardProps {
   income: IncomeData;
@@ -31,19 +45,13 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
             required
           />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Pay Frequency</label>
-            <select
-              value={income.frequency}
-              onChange={(e) => onUpdate({ frequency: e.target.value as 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly' })}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 dark:focus-visible:ring-sage-600 focus-visible:ring-offset-2 hover:border-sage-300 dark:hover:border-sage-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-            >
-              <option value="weekly">Weekly</option>
-              <option value="bi-weekly">Bi-Weekly</option>
-              <option value="semi-monthly">Semi-Monthly (2x/month)</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </div>
+          <SelectInput
+            name="payFrequency"
+            label="Pay Frequency"
+            value={income.frequency}
+            onChange={(value) => onUpdate({ frequency: value as 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly' })}
+            options={PAY_FREQUENCY_OPTIONS}
+          />
         </div>
 
         <MoneyInput
@@ -59,12 +67,13 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
         <div className="space-y-3">
           <div className="flex items-center space-x-2">
             <input
+              id="regularBonus"
               type="checkbox"
               checked={income.regularBonus || false}
               onChange={(e) => onUpdate({ regularBonus: e.target.checked })}
               className="rounded"
             />
-            <label className="text-sm font-medium">I receive regular bonuses</label>
+            <label htmlFor="regularBonus" className="text-sm font-medium">I receive regular bonuses</label>
           </div>
 
           {income.regularBonus && (
@@ -77,18 +86,13 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
                 placeholder="2,000"
               />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Bonus Frequency</label>
-                <select
-                  value={income.bonusFrequency}
-                  onChange={(e) => onUpdate({ bonusFrequency: e.target.value as 'quarterly' | 'annual' | 'irregular' })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sage-400 dark:focus-visible:ring-sage-600 focus-visible:ring-offset-2 hover:border-sage-300 dark:hover:border-sage-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                >
-                  <option value="quarterly">Quarterly</option>
-                  <option value="annual">Annual</option>
-                  <option value="irregular">Irregular</option>
-                </select>
-              </div>
+              <SelectInput
+                name="bonusFrequency"
+                label="Bonus Frequency"
+                value={income.bonusFrequency}
+                onChange={(value) => onUpdate({ bonusFrequency: value as 'quarterly' | 'annual' | 'irregular' })}
+                options={BONUS_FREQUENCY_OPTIONS}
+              />
             </div>
           )}
         </div>

@@ -134,7 +134,7 @@ export function RiskProfileSelector({
         })}
       </div>
       <p className="text-xs text-muted-foreground">
-        Target Date Fund automatically adjusts allocation based on your age. Select another profile for fixed allocations, or Custom to set your own values.
+        Target Date Fund adjusts allocation automatically based on your age. Custom lets you set return and volatility yourself.
       </p>
     </div>
   );

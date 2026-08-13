@@ -15,8 +15,8 @@ export default function ErrorPage({ reset }: ErrorPageProps) {
         <CardHeader>
           <CardTitle>Something went wrong</CardTitle>
           <CardDescription>
-            An unexpected error occurred while rendering this page. Your inputs are encoded in the
-            URL, so retrying will not lose them.
+            An unexpected error occurred while rendering this page. Calculator inputs are kept in
+            this browser, so retrying should not lose them.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload, label, savingsData, accentColor }: Too
             {dataPoint.requiredSavingsRate.toFixed(1)}%
           </p>
           <p className="text-muted-foreground">
-            <span style={{ color: accentColor }}>Monthly Savings:</span>{' '}
+            <span style={{ color: accentColor }}>Monthly Savings (today&apos;s $):</span>{' '}
             {formatCurrency(dataPoint.requiredMonthlySavings)}
           </p>
         </div>
@@ -134,7 +134,14 @@ export function SavingsRateChart({ inputs }: SavingsRateChartProps) {
   }, [inputs]);
 
   return (
-    <div className="h-96">
+    <div>
+      {/* The required contribution is a level stream that starts today, not a
+          single future-dated amount, so it reads the same under either setting
+          of the dollar-display toggle. */}
+      <p className="text-xs text-muted-foreground text-right">
+        contributions start today — shown in today&apos;s dollars in either display mode
+      </p>
+      <div className="h-96">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={savingsData}
@@ -196,6 +203,7 @@ export function SavingsRateChart({ inputs }: SavingsRateChartProps) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

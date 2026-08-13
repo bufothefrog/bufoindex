@@ -73,6 +73,31 @@ describe('PercentInput', () => {
     expect(screen.getByText('%')).toBeInTheDocument();
   });
 
+  it('exposes ariaLabel as the accessible name when no visible label text exists', () => {
+    render(
+      <PercentInput
+        name="target-us-stock"
+        label=""
+        ariaLabel="US Stock target"
+        value={0.6}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('textbox', { name: 'US Stock target' }),
+    ).toBeInTheDocument();
+  });
+
+  it('requests a numeric keyboard on mobile', () => {
+    render(
+      <PercentInput name="rate" label="Return rate" value={0.07} onChange={vi.fn()} />,
+    );
+    expect(screen.getByLabelText('Return rate')).toHaveAttribute(
+      'inputmode',
+      'decimal',
+    );
+  });
+
   it('displays a decimal value as a percentage at the default precision', () => {
     render(
       <PercentInput name="rate" label="Return rate" value={0.075} onChange={vi.fn()} />,
@@ -232,12 +257,30 @@ describe('PercentInput', () => {
         onChange={vi.fn()}
       />,
     );
-    const slider = screen.getByRole('slider');
+    // The name has to land on the element that carries role="slider" (the
+    // Radix thumb), not on the wrapper the props are spread onto.
+    const slider = screen.getByRole('slider', { name: 'Stock allocation' });
     // 0.6 decimal → slider operates in percent units (60 of 0–100).
     expect(slider).toHaveAttribute('aria-valuenow', '60');
     expect(screen.getByText('0.0%')).toBeInTheDocument();
     expect(screen.getByText('60.0%')).toBeInTheDocument();
     expect(screen.getByText('100.0%')).toBeInTheDocument();
+  });
+
+  it('falls back to ariaLabel for the slider name when the label is empty', () => {
+    render(
+      <PercentInput
+        name="stocks"
+        label=""
+        ariaLabel="Stock allocation"
+        value={0.6}
+        showSlider
+        onChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('slider', { name: 'Stock allocation' }),
+    ).toBeInTheDocument();
   });
 });
 

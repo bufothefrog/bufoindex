@@ -112,6 +112,7 @@ export function TargetsCard() {
                 <PercentInput
                   name={`target-portfolio-${cls}`}
                   label=""
+                  ariaLabel={`${getAssetClassLabel(cls, customAssetClasses)} target`}
                   value={targetFor(cls)}
                   onChange={value => setClassTarget(cls, value)}
                   min={0}
@@ -192,6 +193,9 @@ function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
   const generatedId = useId();
   const inputId = `add-asset-class-${generatedId}`;
   const listboxId = `${inputId}-listbox`;
+  // Focus stays on the input, so the highlighted option is announced through
+  // aria-activedescendant rather than by moving focus into the list.
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
 
   const [draft, setDraft] = useState('');
   const [open, setOpen] = useState(false);
@@ -289,9 +293,13 @@ function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
           id={inputId}
           type="text"
           role="combobox"
+          aria-label="Add asset class"
           aria-expanded={open}
           aria-controls={listboxId}
           aria-autocomplete="list"
+          aria-activedescendant={
+            open && filtered[highlighted] ? optionId(highlighted) : undefined
+          }
           value={draft}
           placeholder="Add asset class…"
           onFocus={() => setOpen(true)}
@@ -355,6 +363,7 @@ function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
             {filtered.map((opt, idx) => (
               <li
                 key={opt.id}
+                id={optionId(idx)}
                 role="option"
                 aria-selected={idx === highlighted}
                 onMouseDown={e => {

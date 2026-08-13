@@ -8,16 +8,3 @@ global.console = {
   warn: console.warn,
   error: console.error,
 }
-
-// Performance measurement helper for calculation benchmarks
-global.measurePerformance = function<T>(name: string, fn: () => T): { result: T; duration: number } {
-  const start = performance.now()
-  const result = fn()
-  const duration = performance.now() - start
-  return { result, duration }
-}
-
-// Extend global types
-declare global {
-  function measurePerformance<T>(name: string, fn: () => T): { result: T; duration: number }
-}

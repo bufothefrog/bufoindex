@@ -226,7 +226,7 @@ function analyzeMissedBenefits(profile: PaycheckProfile): SkippedItem | null {
       },
       alternative: `Increase 401k contribution from ${formatPercent(benefits.currentContribution)} to ${formatPercent(benefits.matchLimit)}`,
       riskLevel: 'low',
-      education: 'Employer matching is free money with a guaranteed 100% return - always prioritize this first',
+      education: 'An employer match is an immediate return on contributions at the match rate; most allocation orderings place it ahead of unmatched investing',
     };
   }
   

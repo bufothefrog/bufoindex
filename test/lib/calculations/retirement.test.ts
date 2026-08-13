@@ -35,6 +35,7 @@ import {
   type RetirementInputs,
 } from '@/lib/calculations/retirement'
 import { RetirementConstants } from '@/lib/constants/retirement'
+import { displayRealDollars } from '@/lib/utils/displayDollars'
 import {
   STANDARD_DEDUCTIONS_2026,
   FEDERAL_TAX_BRACKETS_2026,
@@ -1007,6 +1008,75 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     const roundedMonthly = Math.round(affordableToday / 12 / 100) * 100
     expect(reality.name).toContain(`$${roundedMonthly.toLocaleString('en-US')}`)
     expect(reality.name).toContain("today's dollars")
+  })
+})
+
+describe('scenario dollar bases (what the results cards convert)', () => {
+  it("reports monthlyWithdrawal in today's dollars, after tax", () => {
+    // The scenario cards inflate this figure to the retirement year when the
+    // reader picks future dollars, so it must arrive un-inflated.
+    const inputs = makeInputs({ targetIncome: 60000, effectiveTaxRate: 0.2 })
+    const result = calculateRetirementAnalysis(inputs)
+    const baseline = result.scenarios.find((s) => s.id.startsWith('current-plan'))!
+    expect(baseline.monthlyWithdrawal).toBeCloseToCurrency((60000 / 12) * 0.8, 2)
+  })
+
+  it('moves the displayed monthly withdrawal only in future-dollar mode', () => {
+    const inputs = makeInputs({ targetIncome: 60000, effectiveTaxRate: 0.2 })
+    const result = calculateRetirementAnalysis(inputs)
+    const baseline = result.scenarios.find((s) => s.id.startsWith('current-plan'))!
+    const years = baseline.retirementAge - inputs.startingAge // 65 - 30
+
+    expect(
+      displayRealDollars(baseline.monthlyWithdrawal, 'today', 0.03, years),
+    ).toBe(baseline.monthlyWithdrawal)
+    expect(
+      displayRealDollars(baseline.monthlyWithdrawal, 'nominal', 0.03, years),
+    ).toBeCloseToCurrency(4000 * Math.pow(1.03, 35), 2)
+  })
+
+  it("dates each scenario's required balance to that scenario's own retirement age", () => {
+    // Regression: scenarios that retire at an age other than the plan's used
+    // to reuse the plan-dated required balance, so the results card deflated
+    // it over a horizon it was never inflated over.
+    const inputs = makeInputs({
+      startingBalance: 0,
+      monthlySavings: 100,
+      targetIncome: 200000, // wildly out of reach => falling-short branch
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    const todaysRequired = calculateRequiredBalance(inputs.targetIncome)
+
+    // Every falling-short scenario that plans on the full target income.
+    for (const id of ['current-plan-falling-short', 'reality-age', 'modest-fix']) {
+      const scenario = result.scenarios.find((s) => s.id === id)
+      expect(scenario, `${id} scenario missing`).toBeDefined()
+      const years = scenario!.retirementAge - inputs.startingAge
+      // Deflating over the card's own horizon recovers today's dollars.
+      expect(
+        scenario!.requiredBalance / Math.pow(1.03, years),
+      ).toBeCloseToCurrency(todaysRequired, 2)
+    }
+
+    // The regression only bites when the horizons differ, so assert they do.
+    const realityAge = result.scenarios.find((s) => s.id === 'reality-age')!
+    expect(realityAge.retirementAge).not.toBe(inputs.retirementAge)
+  })
+
+  it("dates the early-retirement scenario's required balance to the earlier age", () => {
+    const inputs = makeInputs({
+      startingBalance: 5_000_000,
+      monthlySavings: 10000,
+      targetIncome: 30000,
+    })
+    const result = calculateRetirementAnalysis(inputs)
+    const early = result.scenarios.find((s) => s.id === 'early-retirement')
+    expect(early).toBeDefined()
+    expect(early!.retirementAge).toBe(60) // max(startingAge + 10, retirementAge - 5)
+    expect(early!.requiredBalance).toBeCloseToCurrency(
+      calculateRequiredBalance(30000 * Math.pow(1.03, 30)),
+      2,
+    )
   })
 })
 

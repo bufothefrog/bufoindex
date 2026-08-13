@@ -10,13 +10,15 @@ npm install
 npm run dev   # http://localhost:3000
 ```
 
-Node 22+ is required. Pre-commit hooks (husky + lint-staged) run `eslint --fix`
-and `tsc --noEmit` on staged TypeScript files.
+Node 22.22.2+ is required — see `engines` in `package.json` for the exact
+range. Pre-commit hooks (husky + lint-staged) run `eslint --fix` and
+`tsc --noEmit` on staged TypeScript files.
 
 ## Quality bar
 
-Before opening a PR, make sure all four of these pass locally — CI runs the
-same checks on Node 22 and 24:
+Before opening a PR, make sure all four of these pass locally. CI runs
+type-check, lint and tests on a Node 22 + 24 matrix, and the production build
+in a separate Node 22 job:
 
 ```bash
 npm run type-check
@@ -24,6 +26,10 @@ npm run lint
 npm run test:run
 npm run build
 ```
+
+CI lints with `--max-warnings=0`, so leave no warnings behind. It also runs
+`npm run test:coverage`, which enforces the coverage floors in
+`vitest.config.ts`.
 
 ## Ground rules
 
@@ -47,3 +53,9 @@ npm run build
 Math bugs are the highest-value reports. Please include the inputs that
 reproduce the issue (a share URL is ideal), the value shown, and the value you
 expected with your reasoning or a source.
+
+## License
+
+By submitting a pull request, you agree that your contribution is licensed
+under the AGPL-3.0-only terms in [LICENSE](./LICENSE) — the same license the
+project ships under.

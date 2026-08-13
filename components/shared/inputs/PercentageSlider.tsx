@@ -47,15 +47,15 @@ export function PercentageSlider({
     return (
       <div className={cn("space-y-3", className)}>
         <div className="flex items-center justify-between">
-          <label htmlFor={name} className="text-sm font-medium leading-none">
+          <span className="text-sm font-medium leading-none">
             {label}
-          </label>
+          </span>
           <span className="text-sm font-semibold text-primary">
             {formatPercent(value)}
           </span>
         </div>
-        
-        <div className="grid grid-cols-4 gap-2">
+
+        <div role="group" aria-label={label} className="grid grid-cols-4 gap-2">
           {options.map((option) => (
             <button
               key={option}
@@ -79,18 +79,19 @@ export function PercentageSlider({
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex items-center justify-between">
-        <label htmlFor={name} className="text-sm font-medium leading-none">
+        <span className="text-sm font-medium leading-none">
           {label}
           {recordable && <span className="text-xs text-muted-foreground ml-2">(recordable)</span>}
-        </label>
+        </span>
         <span className="text-sm font-semibold text-primary">
           {formatPercent(value)}
         </span>
       </div>
-      
+
       <div className="px-1">
         <Slider
           id={name}
+          aria-label={label}
           min={min * 100}
           max={max * 100}
           step={step * 100}

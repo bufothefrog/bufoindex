@@ -4,6 +4,7 @@ import { ExpandableListCard, CardVariant } from '@/components/calculators/shared
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
 import { StepStatus } from '@/lib/constants/financialSteps';
+import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
 import { PaycheckProfile } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 
@@ -61,14 +62,22 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
   switch (step.id) {
     case 'additional-401k':
       if (profile.benefits.employer401k.available) {
-        const maxLimit = profile.preferences.age >= 50 ? 30500 : 23000;
+        const age = profile.preferences.age;
+        // Mirrors lib/calculations/optimization.ts: SECURE 2.0 super catch-up
+        // applies only for ages 60-63; regular catch-up at 50+.
+        const catchUp = age >= 60 && age <= 63
+          ? CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k
+          : age >= 50
+            ? CONTRIBUTION_LIMITS_2026.catchUp['401k']
+            : 0;
         current = profile.income.gross * (profile.benefits.employer401k.traditionalContribution + profile.benefits.employer401k.rothContribution) * 12;
-        max = maxLimit;
+        max = CONTRIBUTION_LIMITS_2026.traditional401k + catchUp;
         progressPercent = Math.round((current / max) * 100);
       }
       break;
     case 'roth-ira': {
-      const rothLimit = profile.preferences.age >= 50 ? 8000 : 7000;
+      const rothLimit = CONTRIBUTION_LIMITS_2026.ira
+        + (profile.preferences.age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
       current = (profile.benefits.ira?.currentContributions?.roth || 0) * 12;
       max = rothLimit;
       progressPercent = Math.round((current / max) * 100);
@@ -76,7 +85,9 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
     }
     case 'hsa-max':
       if (profile.benefits.hsa.eligible) {
-        const hsaLimit = profile.benefits.hsa.coverageType === 'family' ? 8300 : 4150;
+        const hsaLimit = profile.benefits.hsa.coverageType === 'family'
+          ? CONTRIBUTION_LIMITS_2026.hsa.family
+          : CONTRIBUTION_LIMITS_2026.hsa.individual;
         current = profile.benefits.hsa.currentContribution * 12;
         max = hsaLimit;
         progressPercent = Math.round((current / max) * 100);
@@ -165,7 +176,7 @@ function StepExpandedContent({ step }: { step: StepStatus }) {
       <div className="pt-2 border-t border-border">
         {step.isComplete ? (
           <StatusAlert variant="success" icon={CheckCircle}>
-            <span className="font-medium text-success">Completed! Keep up the great work.</span>
+            <span className="font-medium text-success">Complete.</span>
           </StatusAlert>
         ) : step.isNotApplicable ? (
           <StatusAlert variant="info">
@@ -174,7 +185,8 @@ function StepExpandedContent({ step }: { step: StepStatus }) {
           </StatusAlert>
         ) : step.urgencyLevel === 'critical' ? (
           <StatusAlert variant="danger">
-            <strong>Critical:</strong> This is costing you money right now. Address this as soon as possible.
+            <strong>Highest impact:</strong> The model places this step ahead of the others still open,
+            based on the monthly cost of leaving it as is.
           </StatusAlert>
         ) : step.urgencyLevel === 'important' ? (
           <StatusAlert variant="warning">
@@ -200,9 +212,9 @@ export const FinancialStepCard = React.memo(function FinancialStepCard({
 
   const subtitle = step.recommendation + (
     step.potentialSavings.monthly > 0 && step.urgencyLevel === 'critical'
-      ? ` — Losing ${formatCurrency(step.potentialSavings.monthly)}/mo`
+      ? ` — ${formatCurrency(step.potentialSavings.monthly)}/mo opportunity cost`
       : step.potentialSavings.monthly > 0
-      ? ` — Save ${formatCurrency(step.potentialSavings.monthly)}/mo`
+      ? ` — ${formatCurrency(step.potentialSavings.monthly)}/mo modeled gain`
       : ''
   );
 

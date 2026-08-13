@@ -128,7 +128,7 @@ export function calculateEmployerMatch(
     amount: actualContribution, // Per-paycheck amount
     percentage: actualContribution / profile.income.netPaycheck,
     priority: 1,
-    reasoning: `Free money! Your employer matches ${formatPercent(benefits.matchPercent)} up to ${formatPercent(benefits.matchLimit)} of salary`,
+    reasoning: `Employer matches ${formatPercent(benefits.matchPercent)} of contributions up to ${formatPercent(benefits.matchLimit)} of salary`,
     taxImpact: -actualContribution * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state),
     category: 'employer_match',
     monthlyEquivalent,
@@ -191,7 +191,7 @@ export function calculateHighInterestDebt(
   // so average effective time is ~6 months, not 12
   const annualSavings = monthlyEquivalent * 12 * highestRateDebt.interestRate * 0.5;
 
-  const reasoning = `Debt over 7% = guaranteed ${formatPercent(highestRateDebt.interestRate)} return. Prioritize before investing.`;
+  const reasoning = `Paying off debt at ${formatPercent(highestRateDebt.interestRate)} is a certain return at that rate, above typical long-run market assumptions.`;
 
   return {
     id: 'high-interest-debt',
@@ -565,6 +565,6 @@ export function calculateLowInterestDebtAnalysis(profile: PaycheckProfile): Skip
     },
     alternative: `Invest extra payments instead - potential ${formatCurrency(annualOpportunityCost)}/year more wealth creation`,
     riskLevel: 'low',
-    education: 'Low-interest debt (especially tax-deductible) should rarely be paid off early. The opportunity cost of not investing typically outweighs the guaranteed debt payoff return.',
+    education: 'Low-interest debt (especially tax-deductible) carries a payoff return below typical long-run market assumptions, so the comparison often favors investing - though the payoff return is certain and market returns are not.',
   };
 }

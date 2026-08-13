@@ -73,6 +73,24 @@ describe('EnhancedMoneyInput', () => {
     expect(screen.getByRole('textbox', { name: 'Monthly rent' })).toBeInTheDocument();
   });
 
+  it('requests a numeric keyboard on mobile, decimal-aware', () => {
+    const { rerender } = render(
+      <EnhancedMoneyInput name="amount" label="Amount" value={0} onChange={vi.fn()} />,
+    );
+    expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'numeric');
+
+    rerender(
+      <EnhancedMoneyInput
+        name="amount"
+        label="Amount"
+        value={0}
+        onChange={vi.fn()}
+        allowDecimals
+      />,
+    );
+    expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'decimal');
+  });
+
   it('renders an initial value formatted with thousands separators', () => {
     render(
       <EnhancedMoneyInput name="amount" label="Amount" value={1234} onChange={vi.fn()} />,

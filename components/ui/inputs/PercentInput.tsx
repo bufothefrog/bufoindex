@@ -19,6 +19,12 @@ interface PercentInputProps extends BaseInputProps {
   size?: 'sm' | 'md' | 'lg';
   step?: number; // Step size in decimal format
   showSlider?: boolean; // Render a range slider below the input
+  /**
+   * Accessible name for the input when no visible label text is rendered
+   * (e.g. label="" in a composite row that draws its own label). Never pass
+   * label="" without also passing ariaLabel.
+   */
+  ariaLabel?: string;
 }
 
 export function PercentInput({
@@ -39,6 +45,7 @@ export function PercentInput({
   step = 0.001,
   testId,
   showSlider = false,
+  ariaLabel,
 }: PercentInputProps) {
   // Convert decimal to percentage for display
   const percentValue = value * 100;
@@ -202,10 +209,12 @@ export function PercentInput({
       disabled={disabled}
       className={showSlider ? undefined : className}
       testId={showSlider ? undefined : testId}
+      aria-label={ariaLabel}
     >
       <div className="relative w-full">
         <input
           type="text"
+          inputMode="decimal"
           value={shownValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -253,7 +262,7 @@ export function PercentInput({
           step={step * 100}
           disabled={disabled}
           className="w-full"
-          aria-label={label || undefined}
+          aria-label={label || ariaLabel || undefined}
         />
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>{formatPercent(min)}</span>

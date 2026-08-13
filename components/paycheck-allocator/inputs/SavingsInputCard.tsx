@@ -38,8 +38,9 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
             />
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Target Months</label>
+              <label htmlFor="emergencyFundMonths" className="text-sm font-medium">Target Months</label>
               <Input
+                id="emergencyFundMonths"
                 type="number"
                 min="1"
                 max="24"
@@ -56,8 +57,9 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">APY (%)</label>
+              <label htmlFor="emergencyFundAPY" className="text-sm font-medium">APY (%)</label>
               <Input
+                id="emergencyFundAPY"
                 type="number"
                 step="0.1"
                 min="0"
@@ -212,8 +214,7 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
                 />
 
                 <div className="text-xs text-info bg-info/10 p-3 rounded-md">
-                  <p><strong>Taxable accounts:</strong> Most flexible for investing after maximizing tax-advantaged accounts.</p>
-                  <p>Consider low-cost index funds (VTI, VXUS) for tax efficiency.</p>
+                  <p><strong>Taxable accounts:</strong> No contribution limits or withdrawal restrictions, but gains and dividends are taxed in the year they occur.</p>
                 </div>
               </div>
             )}

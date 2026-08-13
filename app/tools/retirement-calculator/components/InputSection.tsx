@@ -307,9 +307,10 @@ export function InputSection() {
             </ThreeColumnFields>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Healthcare Cost Multiplier</label>
+              <span className="text-sm font-medium">Healthcare Cost Multiplier</span>
               <div className="px-3">
                 <Slider
+                  aria-label="Healthcare Cost Multiplier"
                   value={[inputs.healthcareCostMultiplier]}
                   onValueChange={(value: number[]) => handleInputChange('healthcareCostMultiplier', value[0])}
                   min={0.5}

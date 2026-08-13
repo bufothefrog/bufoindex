@@ -4,8 +4,10 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MoneyInput } from '@/components/ui/inputs';
 import { PercentageSlider } from '@/components/shared/inputs/PercentageSlider';
+import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { Building } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
 import type { BenefitsData, IncomeData } from '@/lib/types';
 
 interface BenefitsInputCardProps {
@@ -15,6 +17,10 @@ interface BenefitsInputCardProps {
 }
 
 export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps) {
+  const hsaAnnualLimit = benefits.hsa.coverageType === 'family'
+    ? CONTRIBUTION_LIMITS_2026.hsa.family
+    : CONTRIBUTION_LIMITS_2026.hsa.individual;
+
   return (
     <Card>
       <CardHeader>
@@ -69,11 +75,12 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Contribution Type</label>
-                  <select
+                  <SelectInput
+                    name="contributionType"
+                    label="Contribution Type"
                     value={benefits.employer401k.contributionType}
-                    onChange={(e) => {
-                      const newType = e.target.value as 'traditional' | 'roth' | 'split';
+                    onChange={(value) => {
+                      const newType = value as 'traditional' | 'roth' | 'split';
                       const updates: Partial<typeof benefits.employer401k> = {
                         contributionType: newType
                       };
@@ -101,15 +108,13 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
                         employer401k: { ...benefits.employer401k, ...updates }
                       });
                     }}
-                    className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-                  >
-                    <option value="traditional">Traditional (Pre-tax)</option>
-                    <option value="roth">Roth (After-tax)</option>
-                    <option value="split">Split (Both Traditional & Roth)</option>
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    Traditional reduces taxable income now, Roth is tax-free in retirement
-                  </p>
+                    options={[
+                      { value: 'traditional', label: 'Traditional (Pre-tax)' },
+                      { value: 'roth', label: 'Roth (After-tax)' },
+                      { value: 'split', label: 'Split (Both Traditional & Roth)' },
+                    ]}
+                    help="Traditional reduces taxable income now, Roth is tax-free in retirement"
+                  />
                 </div>
 
                 {benefits.employer401k.contributionType === 'split' ? (
@@ -211,17 +216,18 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
           {benefits.hsa.eligible && (
             <div className="space-y-4 pl-6 border-l-2 border-sage-100">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Coverage Type</label>
-                <select
+                <SelectInput
+                  name="hsaCoverageType"
+                  label="Coverage Type"
                   value={benefits.hsa.coverageType}
-                  onChange={(e) => onUpdate({
-                    hsa: { ...benefits.hsa, coverageType: e.target.value as 'individual' | 'family' }
+                  onChange={(value) => onUpdate({
+                    hsa: { ...benefits.hsa, coverageType: value as 'individual' | 'family' }
                   })}
-                  className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-                >
-                  <option value="individual">Individual ($4,150 limit)</option>
-                  <option value="family">Family ($8,300 limit)</option>
-                </select>
+                  options={[
+                    { value: 'individual', label: `Individual (${formatCurrency(CONTRIBUTION_LIMITS_2026.hsa.individual)} limit)` },
+                    { value: 'family', label: `Family (${formatCurrency(CONTRIBUTION_LIMITS_2026.hsa.family)} limit)` },
+                  ]}
+                />
               </div>
 
               <div className="space-y-2">
@@ -254,28 +260,31 @@ export function BenefitsInputCard({ benefits, onUpdate }: BenefitsInputCardProps
                 </div>
 
                 <div className="text-xs text-info bg-info/10 p-3 rounded-md">
-                  <p><strong>Triple tax advantage:</strong> Deductible contributions + tax-free growth + tax-free medical withdrawals</p>
-                  <p><strong>Max monthly:</strong> {formatCurrency(benefits.hsa.coverageType === 'family' ? 692 : 346)}</p>
+                  <p><strong>Three tax advantages:</strong> Deductible contributions + untaxed growth + untaxed withdrawals for qualified medical costs</p>
+                  <p>
+                    <strong>{formatCurrency(hsaAnnualLimit)}/year limit:</strong>{' '}
+                    {formatCurrency(hsaAnnualLimit / 12)} per month
+                  </p>
                 </div>
 
                 <div className="text-xs text-primary bg-primary/10 p-3 rounded-md border border-primary/30">
-                  <p><strong>⚠️ Critical HSA Strategy:</strong> Never withdraw from your HSA for current medical expenses if possible.</p>
-                  <p>Pay out-of-pocket and let your HSA compound tax-free. You can reimburse yourself decades later using saved receipts.</p>
-                  <p><a href="#" className="text-primary underline hover:text-primary/80">Learn the optimal HSA strategy →</a></p>
+                  <p><strong>Reimbursement timing:</strong> There is no deadline for reimbursing a qualified expense, so a receipt kept today can be reimbursed years later.</p>
+                  <p>Paying medical costs out of pocket leaves the balance invested and growing untaxed; reimbursing right away keeps that cash available now. The trade-off is between current liquidity and compounding.</p>
                 </div>
 
                 {benefits.hsa.investmentStrategy ? (
                   <div className="text-xs text-success bg-success/10 p-3 rounded-md">
-                    <p><strong>HSA Investment Strategy:</strong> With this approach, HSA beats Roth IRA due to triple tax advantage.</p>
-                    <p>• Pay medical expenses out-of-pocket</p>
-                    <p>• Save receipts indefinitely</p>
-                    <p>• Invest HSA funds in index funds</p>
-                    <p>• Withdraw tax-free against saved receipts in retirement</p>
+                    <p><strong>Held as an investment:</strong> contributions, growth, and qualified withdrawals go untaxed, where a Roth IRA taxes the contribution. That extra advantage only applies while the balance stays invested.</p>
+                    <p>This approach generally involves:</p>
+                    <p>• Paying medical expenses out-of-pocket</p>
+                    <p>• Keeping receipts for later reimbursement</p>
+                    <p>• Investing the HSA balance rather than holding cash</p>
+                    <p>• Reimbursing against those receipts in retirement</p>
                   </div>
                 ) : (
                   <div className="text-xs text-warning bg-warning/10 p-3 rounded-md">
-                    <p><strong>HSA vs Roth IRA Priority:</strong> If using HSA for current medical expenses, prioritize Roth IRA for better flexibility.</p>
-                    <p>HSA is only superior when maximized as a long-term investment account.</p>
+                    <p><strong>HSA and Roth IRA compared:</strong> spending the HSA on current medical costs uses up the balance that would otherwise compound untaxed.</p>
+                    <p>Roth IRA contributions can be withdrawn at any time without tax or penalty, so the two accounts differ mainly in how accessible the money is until retirement.</p>
                   </div>
                 )}
               </div>

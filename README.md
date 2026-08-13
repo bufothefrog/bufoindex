@@ -38,7 +38,7 @@ npm install
 npm run dev   # http://localhost:3000
 ```
 
-Node 22+ is required.
+Node 22.22.2+ is required — see `engines` in `package.json` for the exact range.
 
 ## Scripts
 
@@ -54,21 +54,22 @@ Node 22+ is required.
 | `npm run test:ui`       | Vitest browser UI                |
 | `npm run test:coverage` | Vitest one-shot + v8 coverage    |
 
-Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, lint, and tests on a Node 22/24 matrix, plus separate production-build and dependency-audit jobs.
+Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, a zero-warning lint gate (`--max-warnings=0`), and the tests on a Node 22/24 matrix (coverage on Node 22), plus separate Node 22 production-build and dependency-audit jobs.
 
 ## Project layout
 
 ```
 app/                     # Next.js App Router routes
-  tools/                 # Calculator pages (paycheck-allocator,
+  tools/                 # Calculator pages, plus the components and charts
+                         #   specific to each (paycheck-allocator,
                          #   retirement-calculator + methodology,
                          #   portfolio-rebalancing-calculator)
   demo/                  # Public component gallery
 components/
   ui/                    # Primitives: button, card, input, slider, inputs/, cards/, layouts/
-  shared/                # Navigation, Tooltip, UtilityBar, DollarModeToggle, inputs/, layout/
-  charts/                # Recharts wrappers (theme-aware via getChartTheme)
-  calculator/, calculators/, retirement/, methodology/
+  shared/                # Tooltip, UtilityBar, DollarModeToggle, inputs/, layout/, cards/
+  paycheck-allocator/    # Paycheck-allocator UI
+  calculators/, retirement/, methodology/
 contexts/                # ThemeContext (light/dark)
 lib/
   calculations/          # Pure financial logic — no React
@@ -76,12 +77,12 @@ lib/
   utils/                 # URL-hash codecs, seeded RNG, display-dollar conversion
   store/, types/, formulas/, chart-theme.ts
 test/                    # Vitest suites, factories, helpers
-docs/                    # architecture.md, agents.md
+docs/                    # architecture.md, agents.md, agents/ (patterns, coordination)
 ```
 
 ## Testing
 
-360 tests across 14 files (`npm run test:run`): unit tests for every calculation module in `test/lib/calculations/`, codec and utility tests in `test/lib/utils/`, and component tests in `test/components/`. Calculation tests assert real numeric values, hand-computed where practical. Coverage is collected over `lib/calculations/` and `lib/utils/`.
+Every module in `lib/calculations/` has a matching suite in `test/lib/calculations/`; codecs and utilities are covered in `test/lib/utils/`, stores in `test/lib/store/`, the formula registry in `test/lib/formulas/`, and components in `test/components/` (`npm run test:run`). Calculation tests assert real numeric values, hand-computed where practical. Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts` — a higher bar for `lib/calculations/` than for the rest — and CI fails when they are not met.
 
 ## Development process
 
@@ -93,6 +94,8 @@ Issues and pull requests are welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.
 
 ## License
 
-AGPL-3.0 — see LICENSE.
+Copyright (C) 2026 bufothefrog
+
+Licensed under AGPL-3.0-only — see [LICENSE](./LICENSE).
 
 Educational tool; not financial advice.

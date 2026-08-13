@@ -8,7 +8,7 @@ All financial logic lives in `lib/calculations/` as pure TypeScript. No React, n
 
 Why:
 
-- **Testability.** Every formula can be asserted against hand-computed values in `test/lib/calculations/` without mounting a component or mocking a browser. Numbers are the product here; the test suite (360 tests across 14 files) is mostly numeric assertions.
+- **Testability.** Every formula can be asserted against hand-computed values in `test/lib/calculations/` without mounting a component or mocking a browser. Numbers are the product here, so the test suite is mostly numeric assertions.
 - **Auditability.** The retirement calculator publishes a methodology page (`/tools/retirement-calculator/methodology`) rendering the actual formulas via `lib/formulas/`. That's only honest if the display formulas and the executed code sit next to each other and share constants.
 - **Separation of drift-prone data.** Figures that change annually (tax brackets, contribution limits, state rates) live in `lib/constants/` — `irs-2026.ts` and `states-2026.ts` carry source citations (IRS revenue procedures, state statutes) so an update is a one-file diff.
 
@@ -69,7 +69,9 @@ Vitest 4 + jsdom (`vitest.config.ts`; `@/` aliases repo root). Suites:
 
 - `test/lib/calculations/` — one file per calculation module, numeric assertions.
 - `test/lib/utils/` — URL-hash codecs (round-trip + migration), seeded RNG distribution checks, display-dollar conversion, tax-rate lookups.
+- `test/lib/store/` — Zustand store behavior: actions, recalculation, and share-hash round trips.
+- `test/lib/formulas/` — the formula registry behind the methodology page.
 - `test/components/` — Testing Library component tests.
 - `test/factories/test-data-factory.ts` — shared mock builders.
 
-Coverage is collected over `lib/calculations/` and `lib/utils/` — the layers where a wrong number is a bug rather than a styling issue.
+Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts`: a global floor for everything covered, and a higher statements/branches bar for `lib/calculations/` — the layer where a wrong number is a bug rather than a styling issue.

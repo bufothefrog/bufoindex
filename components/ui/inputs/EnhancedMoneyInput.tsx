@@ -203,6 +203,7 @@ export function EnhancedMoneyInput({
         </span>
         <input
           type="text"
+          inputMode={allowDecimals ? 'decimal' : 'numeric'}
           value={shownValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

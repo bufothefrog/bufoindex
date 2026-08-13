@@ -47,6 +47,9 @@ export function TickerCombobox({
   const generatedId = useId();
   const inputId = id ?? `ticker-combobox-${generatedId}`;
   const listboxId = `${inputId}-listbox`;
+  // Focus stays on the input, so the highlighted option is announced through
+  // aria-activedescendant rather than by moving focus into the list.
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
 
   const [draft, setDraft] = useState(value);
   const [open, setOpen] = useState(false);
@@ -139,6 +142,9 @@ export function TickerCombobox({
         aria-expanded={open}
         aria-controls={listboxId}
         aria-autocomplete="list"
+        aria-activedescendant={
+          open && filtered[highlighted] ? optionId(highlighted) : undefined
+        }
         value={draft}
         onFocus={() => setOpen(true)}
         onChange={e => {
@@ -179,6 +185,7 @@ export function TickerCombobox({
           {filtered.map((opt, idx) => (
             <li
               key={opt.id}
+              id={optionId(idx)}
               role="option"
               aria-selected={idx === highlighted}
               onMouseDown={e => {

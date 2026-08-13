@@ -52,6 +52,19 @@ export default function RootLayout({
             <main id="main-content" className="container mx-auto px-4 pt-2 pb-8">
               {children}
             </main>
+
+            <footer className="container mx-auto px-4 pb-8 text-center text-xs text-muted-foreground">
+              <a
+                href="https://github.com/bufothefrog/bufoindex"
+                className="underline underline-offset-4 hover:text-foreground"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Source
+              </a>
+              <span className="mx-2" aria-hidden="true">·</span>
+              <span>AGPL-3.0</span>
+            </footer>
           </div>
         </ThemeProvider>
       </body>

@@ -21,12 +21,8 @@ import { calculateProjections, calculateOptimizationScore } from './projections'
 /**
  * Paycheck frequency conversion utilities
  */
-export const FREQUENCY_MULTIPLIERS = {
-  'weekly': 52 / 12,      // 4.33 - weeks per month
-  'bi-weekly': 26 / 12,   // 2.17 - bi-weekly pays per month  
-  'semi-monthly': 2,      // 2.00 - semi-monthly pays per month
-  'monthly': 1            // 1.00 - monthly pays per month
-} as const;
+export { FREQUENCY_MULTIPLIERS } from '../constants/frequency';
+import { FREQUENCY_MULTIPLIERS } from '../constants/frequency';
 
 /**
  * Convert paycheck amount to monthly amount
@@ -118,7 +114,7 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
     // Step 1: 1-Month Emergency Fund (basic security first)
     () => calculate1MonthEmergency(updatedProfile, availableAmount),
     
-    // Step 2: Employer 401k Match (free money)
+    // Step 2: Employer 401k Match
     () => calculateEmployerMatch(updatedProfile, availableAmount),
     
     // Step 3: High-Interest Debt (over 7%)

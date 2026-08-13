@@ -22,17 +22,17 @@ npm run test:run      # vitest run
 npm run build         # next build (catches a different class of issues)
 ```
 
-Pre-commit (husky → lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI re-runs type-check, lint (max 200 warnings), and tests on a Node 22 + 24 matrix (coverage on Node 20), then runs a production build and an `npm audit --audit-level=high` scan as separate jobs.
+Pre-commit (husky → lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TS/TSX. CI re-runs type-check, lint with `--max-warnings=0`, and the tests on a Node 22 + 24 matrix (coverage on Node 22), then runs a production build and an `npm audit --audit-level=high` scan as separate Node 22 jobs.
 
 A change is ready when:
 
 - type-check is clean,
-- lint passes (under the warning ceiling),
+- lint passes with zero warnings,
 - relevant tests pass and you've added tests for new logic,
 - `npm run build` succeeds,
 - the design-system rules in `CLAUDE.md` are respected (semantic classes, `getChartTheme()`, `/demo` parity for new shared components).
 
-There is no fixed coverage requirement. Cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
+Coverage floors are enforced in `vitest.config.ts` — a global floor across the covered `lib/` code and a higher bar for `lib/calculations/` — and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
 
 ## Tests
 
@@ -81,7 +81,7 @@ Reuse existing inputs from `components/ui/inputs/` and `components/shared/inputs
 ## What not to recreate
 
 - Orchestration shell scripts that wrap `npm run` commands. The husky hook and CI workflow already invoke type-check, lint, test, and build directly — adding a wrapper layer just hides what's happening.
-- A benchmark CI job. The previous one was removed because it emitted hardcoded mock data for weeks. If you need real perf data, write actual benchmarks in `test/` and run them deliberately rather than wiring up a job that pretends to measure.
+- A benchmark CI job that does not run real benchmarks. If you need perf data, write actual benchmarks in `test/` and run them deliberately; a job that reports numbers it never measured is worse than no job at all.
 - An editorial-language grep gate. Voice and tone belong in code review, not in a CI step that fails the build over a word list.
 - Sprint-numbered process documents. Documentation should describe what's true, not what someone planned to do six months ago.
 

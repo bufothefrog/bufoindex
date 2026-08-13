@@ -2,9 +2,17 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { StateSelector } from '@/components/shared/inputs/StateSelector';
 import { Calculator } from 'lucide-react';
 import type { TaxData } from '@/lib/types';
+
+const FILING_STATUS_OPTIONS = [
+  { value: 'single', label: 'Single' },
+  { value: 'marriedJoint', label: 'Married Filing Jointly' },
+  { value: 'marriedSeparate', label: 'Married Filing Separately' },
+  { value: 'headOfHousehold', label: 'Head of Household' },
+];
 
 interface TaxInputCardProps {
   taxes: TaxData;
@@ -22,28 +30,21 @@ export function TaxInputCard({ taxes, onUpdate }: TaxInputCardProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">State</label>
-            <StateSelector
-              value={taxes.state}
-              onChange={(stateCode) => onUpdate({ state: stateCode })}
-              placeholder="Select your state"
-            />
-          </div>
+          <StateSelector
+            name="taxState"
+            label="State"
+            value={taxes.state}
+            onChange={(stateCode) => onUpdate({ state: stateCode })}
+            placeholder="Select your state"
+          />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Filing Status</label>
-            <select
-              value={taxes.filingStatus}
-              onChange={(e) => onUpdate({ filingStatus: e.target.value as 'single' | 'marriedJoint' | 'marriedSeparate' | 'headOfHousehold' })}
-              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-            >
-              <option value="single">Single</option>
-              <option value="marriedJoint">Married Filing Jointly</option>
-              <option value="marriedSeparate">Married Filing Separately</option>
-              <option value="headOfHousehold">Head of Household</option>
-            </select>
-          </div>
+          <SelectInput
+            name="filingStatus"
+            label="Filing Status"
+            value={taxes.filingStatus}
+            onChange={(value) => onUpdate({ filingStatus: value as TaxData['filingStatus'] })}
+            options={FILING_STATUS_OPTIONS}
+          />
         </div>
 
         <div className="p-3 bg-info/10 rounded-md border border-info/30">

@@ -7,7 +7,7 @@ import { ExpandableListCard, CardVariant } from '@/components/calculators/shared
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { formatCurrency, formatPercent } from '@/lib/utils';
-import { displayDollars } from '@/lib/utils/displayDollars';
+import { displayDollars, displayRealDollars } from '@/lib/utils/displayDollars';
 import {
   TrendingUp,
   Calculator,
@@ -54,6 +54,11 @@ export function ResultsSection() {
   const toDisplay = (nominalAmount: number, yearsFromNow: number) =>
     displayDollars(nominalAmount, displayMode, inputs.inflationRate, yearsFromNow);
 
+  // Mirror conversion for figures that are already in today's dollars: they
+  // move only when the future-dollar mode is active.
+  const toDisplayFromToday = (realAmount: number, yearsFromNow: number) =>
+    displayRealDollars(realAmount, displayMode, inputs.inflationRate, yearsFromNow);
+
   return (
     <div className="space-y-4">
       {/* Results Header - Dollar display mode */}
@@ -96,7 +101,8 @@ export function ResultsSection() {
           const variant = mapProbabilityToVariant(scenario.successProbability);
           const icon = getScenarioIcon(scenario.successProbability);
           // Balance-at-retirement figures are nominal as of this scenario's
-          // retirement year.
+          // retirement year; the monthly withdrawal is in today's dollars and
+          // first lands in that same year. Both convert over this horizon.
           const yearsToRetirement = scenario.retirementAge - inputs.startingAge;
 
           return (
@@ -105,7 +111,7 @@ export function ResultsSection() {
               icon={icon}
               title={scenario.name}
               subtitle={`Retire at ${scenario.retirementAge} • ${formatPercent(scenario.successProbability)} success rate`}
-              value={formatCurrency(scenario.monthlyWithdrawal)}
+              value={formatCurrency(toDisplayFromToday(scenario.monthlyWithdrawal, yearsToRetirement))}
               valueSubtext="monthly"
               variant={variant}
               expanded={expandedScenario === scenario.id}

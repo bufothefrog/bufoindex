@@ -22,10 +22,6 @@ export default function RetirementMethodologyPage() {
   const metadata = {
     totalFormulas: retirementFormulas.length,
     lastUpdated: '2026-08-12',
-    validationStatus: {
-      validated: retirementFormulas.filter(f => f.validated).length,
-      total: retirementFormulas.length
-    }
   };
 
   return (

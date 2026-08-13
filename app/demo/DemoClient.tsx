@@ -78,6 +78,11 @@ import { StateSelector } from '@/components/shared/inputs/StateSelector';
 import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { Tooltip as HelpTooltip, HELP_TOOLTIPS } from '@/components/shared/Tooltip';
 import { CalculatorTabs } from '@/components/calculators/shared/CalculatorTabs';
+import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
+import {
+  DEFAULT_DOLLAR_DISPLAY_MODE,
+  type DollarDisplayMode,
+} from '@/lib/utils/displayDollars';
 
 // Portfolio rebalancing composed widgets
 import { HoldingRow } from '@/app/tools/portfolio-rebalancing-calculator/components/HoldingRow';
@@ -165,6 +170,7 @@ export function DemoClient() {
 
   const [showSideBySide, setShowSideBySide] = React.useState(true);
   const [activeSection, setActiveSection] = React.useState<'widgets' | 'colors' | 'typography' | 'layouts' | 'charts'>('widgets');
+  const [dollarMode, setDollarMode] = React.useState<DollarDisplayMode>(DEFAULT_DOLLAR_DISPLAY_MODE);
 
   // Chart theme state (moved here to follow Rules of Hooks)
   const [chartTheme, setChartTheme] = React.useState(() => getChartTheme());
@@ -560,6 +566,21 @@ export function DemoClient() {
               />
             </div>
 
+            {/* Dollar Display Mode Toggle */}
+            <div>
+              <h4 className="text-sm font-medium mb-3">Dollar Display Mode</h4>
+              <div className="flex flex-wrap items-center gap-3">
+                <DollarModeToggle value={dollarMode} onChange={setDollarMode} />
+                <span className="text-sm text-muted-foreground">
+                  Selected: {dollarMode}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Display-only control. Simulations run in nominal dollars; this switches how
+                results are shown and never feeds back into the calculations.
+              </p>
+            </div>
+
             {/* Loading States */}
             <div>
               <h4 className="text-sm font-medium mb-3">Loading States</h4>
@@ -620,7 +641,7 @@ export function DemoClient() {
         <ResultCard title="Success Result" status="success" highlight={true}>
           <div className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-success" />
-            <span>Your optimization strategy is performing excellently!</span>
+            <span>Contributions are on track against every target you set.</span>
           </div>
         </ResultCard>
 
@@ -948,9 +969,10 @@ export function DemoClient() {
             </div>
             <div className="space-y-2">
               <div className="text-base">
-                Regular body text for main content. This is the default size for most paragraph content 
-                and provides good readability across all devices. Lorem ipsum dolor sit amet, consectetur 
-                adipiscing elit.
+                Regular body text for main content. This is the default size for most paragraph content
+                and provides good readability across all devices. Long-form explanations of a calculator&apos;s
+                assumptions and methodology are set at this size so they stay comfortable to read on both
+                phones and wide screens.
               </div>
               <code className="text-xs text-muted-foreground">text-base</code>
             </div>
@@ -1130,7 +1152,7 @@ export function DemoClient() {
                     change={{ value: "+5%", direction: "up" }}
                   />
                   <ResultCard title="Recommendations" status="success">
-                    <div className="text-sm">Your portfolio is well optimized!</div>
+                    <div className="text-sm">Every asset class is within 1% of its target weight.</div>
                   </ResultCard>
                 </div>
               }
@@ -1351,7 +1373,7 @@ export function DemoClient() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Diversified portfolio allocation following BufoIndex principles
+              Sample asset allocation, using the sage brand scale for series colors
             </p>
           </CardContent>
         </Card>

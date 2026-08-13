@@ -99,6 +99,10 @@ export function StateSelector({
   const selectedState = US_STATES.find(state => state.code === value);
   const displayValue = selectedState ? selectedState.name : '';
 
+  // Each option needs a stable id so the combobox can point at the highlighted
+  // one with aria-activedescendant (the input keeps DOM focus throughout).
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
+
   // Filter states based on search term (prioritize exact code matches)
   const filteredStates = React.useMemo(() => {
     if (!searchTerm) return US_STATES;
@@ -238,6 +242,7 @@ export function StateSelector({
         <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
         <input
           ref={inputRef}
+          id={name}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
@@ -265,6 +270,11 @@ export function StateSelector({
           role="combobox"
           aria-autocomplete="list"
           aria-controls={listboxId}
+          aria-activedescendant={
+            isOpen && highlightedIndex >= 0 && filteredStates[highlightedIndex]
+              ? optionId(highlightedIndex)
+              : undefined
+          }
           aria-invalid={!!error}
         />
         <ChevronDown className={cn(
@@ -284,16 +294,20 @@ export function StateSelector({
           {filteredStates.length > 0 ? (
             <div role="listbox" id={listboxId}>
               {filteredStates.map((state, index) => (
-                <button
+                // Options are plain elements, not buttons: focus stays on the
+                // combobox input and the active option is announced through
+                // aria-activedescendant.
+                <div
                   key={state.code}
-                  type="button"
+                  id={optionId(index)}
                   className={cn(
-                    "w-full px-3 py-2 text-left text-sm hover:bg-sage-50 focus:bg-sage-50 focus:outline-hidden flex items-center justify-between transition-colors",
+                    "w-full px-3 py-2 text-left text-sm cursor-pointer hover:bg-sage-50 flex items-center justify-between transition-colors",
                     index === highlightedIndex && "bg-sage-100",
                     selectedState?.code === state.code && "bg-sage-200 text-sage-900 font-medium"
                   )}
                   onClick={() => handleStateSelect(state)}
                   role="option"
+                  tabIndex={-1}
                   aria-selected={selectedState?.code === state.code}
                   onMouseEnter={() => setHighlightedIndex(index)}
                 >
@@ -304,7 +318,7 @@ export function StateSelector({
                   <span className="text-xs text-muted-foreground font-mono">
                     {state.hasIncomeTax ? `${(state.rate * 100).toFixed(1)}%` : 'No tax'}
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           ) : (

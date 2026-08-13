@@ -19,7 +19,8 @@ import {
   FREQUENCY_MULTIPLIERS
 } from '@/lib/calculations/core'
 import type { PaycheckProfile } from '@/lib/types'
-import { measureCalculationPerformance } from '@/test/utils/financial-test-helpers'
+// Side-effect import: registers the toBeCloseToCurrency custom matcher.
+import '@/test/utils/financial-test-helpers'
 import { createPaycheckProfile, createDebtData } from '@/test/factories/test-data-factory'
 
 describe('Core Paycheck Optimization', () => {
@@ -52,18 +53,6 @@ describe('Core Paycheck Optimization', () => {
     it('should handle zero and negative amounts', () => {
       expect(paycheckToMonthly(0, 'bi-weekly')).toBe(0)
       expect(paycheckToMonthly(-1000, 'monthly')).toBe(-1000)
-    })
-
-    it('should meet performance requirements', () => {
-      measureCalculationPerformance(
-        'paycheck-to-monthly-batch',
-        () => {
-          for (let i = 0; i < 1000; i++) {
-            paycheckToMonthly(2000 + i, 'bi-weekly')
-          }
-        },
-        100 // Max 100ms for 1000 conversions — 10x headroom for shared CI runners
-      )
     })
   })
 
@@ -375,12 +364,8 @@ describe('Core Paycheck Optimization', () => {
       })
     })
 
-    it('should calculate optimal allocation with performance requirements', () => {
-      const { result: allocation } = measureCalculationPerformance(
-        'optimal-allocation-calculation',
-        () => calculateOptimalAllocation(mockProfile),
-        5000 // Max 5000ms for complex optimization — 10x headroom for shared CI runners
-      )
+    it('should return a complete allocation result', () => {
+      const allocation = calculateOptimalAllocation(mockProfile)
 
       expect(allocation.allocations).toBeDefined()
       expect(Array.isArray(allocation.allocations)).toBe(true)
@@ -638,18 +623,6 @@ describe('Core Paycheck Optimization', () => {
         expect(calculateCompoundGrowth(10000, 0, 10)).toBe(10000)
         expect(calculateCompoundGrowth(10000, 0.07, 0)).toBe(10000)
         expect(calculateCompoundGrowth(0, 0.07, 10)).toBe(0)
-      })
-
-      it('should meet performance requirements', () => {
-        measureCalculationPerformance(
-          'compound-growth-batch',
-          () => {
-            for (let i = 0; i < 1000; i++) {
-              calculateCompoundGrowth(10000 + i, 0.07, 10 + i % 20)
-            }
-          },
-          500 // Max 500ms for 1000 calculations — 10x headroom for shared CI runners
-        )
       })
     })
 

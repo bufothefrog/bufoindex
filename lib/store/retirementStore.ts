@@ -36,8 +36,21 @@ let calculationSeq = 0;
 
 const pendingRequests = new Map<
   number,
-  { resolve: (results: RetirementResults) => void; reject: (error: unknown) => void }
+  {
+    inputs: RetirementInputs; // kept so a broken worker's runs can be retried in-thread
+    resolve: (results: RetirementResults) => void;
+    reject: (error: unknown) => void;
+  }
 >();
+
+/** Run the analysis in-thread, mapping a thrown error onto a rejected promise. */
+const runInThread = (inputs: RetirementInputs): Promise<RetirementResults> => {
+  try {
+    return Promise.resolve(calculateRetirementAnalysis(inputs));
+  } catch (error) {
+    return Promise.reject(error);
+  }
+};
 
 const getRetirementWorker = (): Worker | null => {
   if (workerUnavailable || typeof window === 'undefined' || typeof Worker === 'undefined') {
@@ -71,14 +84,18 @@ const getRetirementWorker = (): Worker | null => {
     }
   };
   worker.onerror = () => {
-    // The worker itself broke (e.g. its script failed to load). Fail the
-    // in-flight runs and permanently fall back to the synchronous path.
-    const error = new Error('Retirement calculation worker failed');
-    for (const { reject } of pendingRequests.values()) reject(error);
+    // The worker itself broke (e.g. its script failed to load). Retire it,
+    // permanently fall back to the synchronous path, and finish the in-flight
+    // runs in-thread so the user still gets results. Only a genuine
+    // calculation error (thrown by runInThread) reaches the caller's catch.
+    const stranded = [...pendingRequests.values()];
     pendingRequests.clear();
     worker.terminate();
     if (retirementWorker === worker) retirementWorker = null;
     workerUnavailable = true;
+    for (const { inputs, resolve, reject } of stranded) {
+      runInThread(inputs).then(resolve, reject);
+    }
   };
 
   retirementWorker = worker;
@@ -88,22 +105,26 @@ const getRetirementWorker = (): Worker | null => {
 /**
  * Run the retirement analysis off-thread when possible. Falls back to a
  * synchronous in-thread call (wrapped in a promise) when no worker is
- * available, so SSR guards and test environments share the browser code path.
+ * available, when construction fails, or when dispatch throws, so SSR guards,
+ * test environments and broken workers all share the browser code path.
  */
 const runRetirementAnalysis = (inputs: RetirementInputs, id: number): Promise<RetirementResults> => {
   const worker = getRetirementWorker();
-  if (worker) {
-    return new Promise<RetirementResults>((resolve, reject) => {
-      pendingRequests.set(id, { resolve, reject });
-      const request: RetirementWorkerRequest = { id, inputs };
+  if (!worker) return runInThread(inputs);
+
+  return new Promise<RetirementResults>((resolve, reject) => {
+    pendingRequests.set(id, { inputs, resolve, reject });
+    const request: RetirementWorkerRequest = { id, inputs };
+    try {
       worker.postMessage(request);
-    });
-  }
-  try {
-    return Promise.resolve(calculateRetirementAnalysis(inputs));
-  } catch (error) {
-    return Promise.reject(error);
-  }
+    } catch {
+      // Dispatch failed (e.g. the payload could not be cloned) — the worker
+      // will never answer, so run this one in-thread and stop using it.
+      pendingRequests.delete(id);
+      workerUnavailable = true;
+      runInThread(inputs).then(resolve, reject);
+    }
+  });
 };
 
 /**

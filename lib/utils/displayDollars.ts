@@ -1,9 +1,11 @@
 /**
  * Display-layer dollar conversion.
  *
- * All simulations and projections run in nominal (future) dollars; these
- * helpers convert nominal amounts back to today's purchasing power for
- * display. They must never feed back into calculations — display only.
+ * Most simulations and projections run in nominal (future) dollars, and a few
+ * figures (the scenario cards' monthly withdrawal) are already expressed in
+ * today's dollars. These helpers convert either kind into whichever basis the
+ * reader has selected. They must never feed back into calculations — display
+ * only.
  */
 
 export type DollarDisplayMode = 'today' | 'nominal';
@@ -32,6 +34,20 @@ export function toTodaysDollars(
 }
 
 /**
+ * Convert a today's-dollars amount into the nominal dollars of a year
+ * `yearsFromNow` in the future at the given annual inflation rate. The inverse
+ * of toTodaysDollars.
+ */
+export function toNominalDollars(
+  realAmount: number,
+  annualInflationRate: number,
+  yearsFromNow: number
+): number {
+  if (yearsFromNow <= 0) return realAmount;
+  return realAmount * Math.pow(1 + annualInflationRate, yearsFromNow);
+}
+
+/**
  * Convert a nominal amount for display according to the active mode.
  * In 'nominal' mode the value passes through unchanged.
  */
@@ -44,4 +60,21 @@ export function displayDollars(
   return mode === 'today'
     ? toTodaysDollars(nominalAmount, annualInflationRate, yearsFromNow)
     : nominalAmount;
+}
+
+/**
+ * Convert an amount that is already in today's dollars for display according
+ * to the active mode — the mirror of displayDollars. In 'today' mode the value
+ * passes through unchanged; in 'nominal' mode it is inflated to the year it
+ * occurs, so both bases stay internally consistent on screen.
+ */
+export function displayRealDollars(
+  realAmount: number,
+  mode: DollarDisplayMode,
+  annualInflationRate: number,
+  yearsFromNow: number
+): number {
+  return mode === 'nominal'
+    ? toNominalDollars(realAmount, annualInflationRate, yearsFromNow)
+    : realAmount;
 }

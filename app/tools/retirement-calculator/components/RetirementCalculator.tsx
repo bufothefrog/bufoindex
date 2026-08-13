@@ -62,7 +62,7 @@ export function RetirementCalculator() {
     <>
       <CalculatorLayout
         title="Retirement Planning Calculator"
-        description="Comprehensive retirement planning with Monte Carlo simulations and advanced financial modeling. Compare multiple retirement scenarios and get personalized insights."
+        description="Monte Carlo retirement modeling with Social Security, healthcare costs, and side-by-side scenario comparison."
         inputSections={<InputSection />}
         resultSection={results ? <ResultsSection /> : undefined}
         isCalculating={isCalculating}
@@ -76,6 +76,7 @@ export function RetirementCalculator() {
           description: 'Review your inputs and run the analysis',
           features: []
         }}
+        disclaimer="Educational tool only. Results are simulated outcomes under the assumptions you enter, not predictions. Not tax or investment advice."
       />
       <p className="mt-6 text-center text-sm text-muted-foreground">
         How these numbers are computed —{' '}

@@ -78,8 +78,9 @@ export default function HomePage() {
           </div>
 
           <p className="text-sm text-muted-foreground mb-4">
-            Stay on target without taxable selling unless you opt in. Tell us your holdings and new deposit;
-            we&apos;ll compute exactly how many shares to buy of each asset.
+            Multi-account rebalancing that directs new deposits toward underweight
+            asset classes, with taxable selling off by default and account-placement
+            advice.
           </p>
 
           <div className="flex items-center text-sm text-sage-600 dark:text-sage-300 font-medium group-hover:text-sage-700 dark:group-hover:text-sage-200 transition-colors">

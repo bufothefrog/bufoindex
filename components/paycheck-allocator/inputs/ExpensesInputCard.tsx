@@ -35,8 +35,9 @@ export function ExpensesInputCard({ preferences, onUpdate }: ExpensesInputCardPr
           />
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Your Age</label>
+            <label htmlFor="userAge" className="text-sm font-medium">Your Age</label>
             <Input
+              id="userAge"
               type="number"
               min="1"
               max="100"

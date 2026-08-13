@@ -4,16 +4,17 @@ import React from 'react';
 import { useCalculatorStore } from '@/lib/store/calculatorStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
-import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import { CalculatorLayout, type ShareResult } from '@/components/ui/layouts/CalculatorLayout';
 
 export function PaycheckAllocator() {
-  const { 
-    result, 
-    isCalculating, 
-    errors, 
+  const {
+    result,
+    isCalculating,
+    errors,
     calculate,
     clearErrors,
-    loadFromUrl
+    loadFromUrl,
+    generateShareUrl
   } = useCalculatorStore();
   
   React.useEffect(() => {
@@ -26,7 +27,35 @@ export function PaycheckAllocator() {
     await calculate();
   };
 
-  
+  const handleShare = async (): Promise<ShareResult | void> => {
+    const url = generateShareUrl();
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'BufoIndex Paycheck Allocator',
+          text: 'A paycheck allocation scenario',
+          url: url
+        });
+        return { status: 'shared' };
+      } catch (error) {
+        // User dismissed the share sheet — nothing to report
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        // Otherwise fall through to the clipboard fallback
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      return { status: 'copied' };
+    } catch {
+      // Clipboard unavailable (insecure context, permissions) — offer manual copy
+      return { status: 'error', url };
+    }
+  };
+
   return (
     <CalculatorLayout
       title="Paycheck Allocator Calculator"
@@ -35,6 +64,7 @@ export function PaycheckAllocator() {
       resultSection={result ? <ResultsSection /> : undefined}
       isCalculating={isCalculating}
       onCalculate={handleCalculate}
+      onShare={handleShare}
       calculateButtonText="Calculate My Allocation"
       calculatingText="Calculating Optimal Allocation..."
       errors={errors}
@@ -43,6 +73,7 @@ export function PaycheckAllocator() {
         description: 'Review your inputs and run the analysis',
         features: []
       }}
+      disclaimer="Educational tool only. Tax amounts are estimates from published 2026 federal and state tables applied to the inputs you enter. Not tax or investment advice."
     />
   );
 }

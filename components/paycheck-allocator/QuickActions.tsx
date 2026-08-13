@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { AllocationItem, PaycheckProfile, SkippedItem } from '@/lib/types';
+import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
 import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
 import {
   AlertTriangle,
@@ -64,7 +65,7 @@ const urgencyBadgeStyles: Record<QuickAction['urgency'], string> = {
 };
 
 const urgencyLabels: Record<QuickAction['urgency'], string> = {
-  critical: 'URGENT',
+  critical: 'HIGHEST IMPACT',
   important: 'HIGH IMPACT',
   optimization: 'OPTIMIZATION',
 };
@@ -92,13 +93,13 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
     actions.push({
       id: 'employer-match',
-      title: 'Missing Free Money from Employer Match',
+      title: 'Employer Match Not Fully Captured',
       urgency: 'critical',
-      impact: `${formatCurrency(missedMatchPerPaycheck)} per ${frequencyText} paycheck guaranteed`,
+      impact: `${formatCurrency(missedMatchPerPaycheck)} of unclaimed match per ${frequencyText} paycheck`,
       timeToImplement: '5 minutes',
       actionType: 'payroll',
       actionLabel: `Increase 401k to ${(profile.benefits.employer401k.matchLimit * 100).toFixed(0)}%`,
-      description: 'Your employer will match contributions up to a certain percentage. Not getting the full match is leaving guaranteed returns on the table.',
+      description: `Your employer matches contributions up to ${(profile.benefits.employer401k.matchLimit * 100).toFixed(0)}% of salary. Contributing below that limit leaves the unmatched portion of the benefit unpaid.`,
       icon: Building2,
       potentialSavings: {
         monthly: missedMatch,
@@ -126,13 +127,13 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
     actions.push({
       id: 'high-interest-debt',
-      title: `${(highInterestDebt.interestRate * 100).toFixed(1)}% Debt Costing You Money`,
+      title: `${(highInterestDebt.interestRate * 100).toFixed(1)}% Debt Accruing Interest`,
       urgency: 'critical',
       impact: `${formatCurrency(interestPerPaycheck)} per ${frequencyText} paycheck in interest`,
       timeToImplement: '6-24 months',
       actionType: 'bank',
       actionLabel: 'Create Payoff Plan',
-      description: 'High-interest debt compounds against you. Every paycheck you delay costs more than most investments can earn.',
+      description: `This balance accrues interest at ${(highInterestDebt.interestRate * 100).toFixed(1)}% a year. Paying it down avoids that rate; whether that compares favorably to investing the same dollars depends on the return you expect.`,
       icon: CreditCard,
       potentialSavings: {
         monthly: monthlyInterest,
@@ -149,13 +150,13 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
   if (profile.preferences.currentEmergencyFund < profile.preferences.necessaryExpenses) {
     actions.push({
       id: 'emergency-fund',
-      title: 'Build 1-Month Emergency Fund',
+      title: 'Emergency Fund Below One Month of Expenses',
       urgency: 'important',
-      impact: 'Prevents debt during emergencies',
+      impact: 'Covers one month of necessary expenses',
       timeToImplement: '3-6 months',
       actionType: 'bank',
       actionLabel: 'Setup Emergency Fund',
-      description: 'Having at least 1 month of expenses saved prevents going into debt during minor emergencies.',
+      description: 'A month of necessary expenses on hand covers a minor emergency without borrowing at credit-card rates.',
       icon: Shield,
       potentialSavings: {
         monthly: 0,
@@ -170,19 +171,21 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
   // Check for HSA opportunity (Important)
   if (profile.benefits.hsa.eligible && profile.benefits.hsa.currentContribution === 0) {
-    const hsaLimit = profile.benefits.hsa.coverageType === 'family' ? 8300 : 4150;
+    const hsaLimit = profile.benefits.hsa.coverageType === 'family'
+      ? CONTRIBUTION_LIMITS_2026.hsa.family
+      : CONTRIBUTION_LIMITS_2026.hsa.individual;
     const monthlyMax = hsaLimit / 12;
     const taxSavings = hsaLimit * 0.22; // Assume 22% tax bracket
 
     actions.push({
       id: 'hsa-max',
-      title: 'Triple Tax Advantage HSA',
+      title: 'No HSA Contributions',
       urgency: 'important',
-      impact: `${formatCurrency(taxSavings/12)}/month tax savings`,
+      impact: `${formatCurrency(taxSavings/12)}/month deferred tax at an assumed 22% rate`,
       timeToImplement: '5 minutes',
       actionType: 'payroll',
       actionLabel: `Contribute ${formatCurrency(monthlyMax)}/month to HSA`,
-      description: 'HSA is the only triple tax-advantaged account: deductible contributions, tax-free growth, tax-free medical withdrawals.',
+      description: 'HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.',
       icon: PiggyBank,
       potentialSavings: {
         monthly: taxSavings / 12,
@@ -198,19 +201,20 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
   // Check for Roth IRA opportunity (Important)
   const rothContribution = profile.benefits.ira?.currentContributions?.roth || 0;
   if (rothContribution === 0) {
-    const rothLimit = profile.preferences.age >= 50 ? 8000 : 7000;
+    const rothLimit = CONTRIBUTION_LIMITS_2026.ira
+      + (profile.preferences.age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
     const monthlyRoth = rothLimit / 12;
     const potentialGrowth = rothLimit * 0.07; // Assume 7% growth
 
     actions.push({
       id: 'roth-ira',
-      title: 'Tax-Free Retirement Growth',
+      title: 'No Roth IRA Contributions',
       urgency: 'important',
-      impact: `${formatCurrency(potentialGrowth/12)}/month potential growth`,
+      impact: `${formatCurrency(potentialGrowth/12)}/month at an assumed 7% return`,
       timeToImplement: '30 minutes',
       actionType: 'one-time',
       actionLabel: `Open Roth IRA - ${formatCurrency(monthlyRoth)}/month`,
-      description: 'Roth IRA provides tax-free retirement income and penalty-free access to contributions for emergencies.',
+      description: 'Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.',
       icon: TrendingUp,
       potentialSavings: {
         monthly: potentialGrowth / 12,
@@ -259,7 +263,7 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
                 </h4>
                 <span
                   className={cn("px-2 py-1 rounded-full text-xs font-medium", urgencyBadgeStyles[action.urgency])}
-                  aria-label={`Priority: ${action.urgency === 'critical' ? 'urgent' : action.urgency === 'important' ? 'high impact' : 'optimization'}`}
+                  aria-label={`Priority: ${urgencyLabels[action.urgency].toLowerCase()}`}
                 >
                   {urgencyLabels[action.urgency]}
                 </span>
@@ -306,7 +310,7 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-5 h-5 text-destructive" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-destructive">
-              Fix These First - You&apos;re Losing Money
+              Highest-Impact Items
             </h3>
           </div>
           <div className="space-y-3">

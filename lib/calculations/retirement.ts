@@ -92,7 +92,7 @@ export function annualizeIncome(amount: number, period: IncomePeriod): number {
 export interface RetirementInputs {
   startingAge: number;
   retirementAge: number;
-  lifeExpectancy: number; // ADDED: User-defined life expectancy instead of hardcoded value
+  lifeExpectancy: number; // Age the projection and simulation run to
   targetIncome: number;
   startingBalance: number;
   currentIncome: number; // Always annual — derived from incomeAmount × period multiplier
@@ -108,7 +108,7 @@ export interface RetirementInputs {
   healthcareCostMultiplier: number;
   volatility: number;
   filingStatus: 'single' | 'marriedJoint';
-  state: string; // ADDED: State for tax calculations
+  state: string; // Two-letter state code, used for state income tax
   riskProfile: 'tdf' | 'custom'; // Risk profile: Target Date Fund or Custom
   effectiveTaxRate: number | null;           // null = auto-calculate from income/filing
   estimatedAnnualHealthcareCost: number | null; // null = use default model
@@ -278,9 +278,9 @@ export function calculateProjectedBalance(inputs: RetirementInputs): number {
 
 /**
  * The plan's implied initial withdrawal rate: inflation-adjusted target income
- * at retirement divided by the projected balance at retirement. Despite the
- * old "safe withdrawal rate" label, nothing about this number is inherently
- * safe — it should be compared against the 4% guideline.
+ * at retirement divided by the projected balance at retirement. Nothing about
+ * the number is inherently safe, whatever the conventional "safe withdrawal
+ * rate" name suggests — compare it against the 4% guideline.
  */
 export function calculateInitialWithdrawalRate(inputs: RetirementInputs): number {
   const projectedBalance = calculateProjectedBalance(inputs);
@@ -686,11 +686,22 @@ function generateSophisticatedScenarios(
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
   const inflationFactor = Math.pow(1 + inputs.inflationRate, yearsToRetirement);
 
-  // Helper to compute after-tax monthly withdrawal for a given annual withdrawal
+  // Helper to compute after-tax monthly withdrawal for a given annual
+  // withdrawal. Inputs are today's dollars, so the result is too.
   const afterTaxMonthly = (annualWithdrawal: number): number => {
     const effectiveTaxRate = inputs.effectiveTaxRate ?? calculateEffectiveTaxRate(annualWithdrawal, inputs.filingStatus);
     return (annualWithdrawal / 12) * (1 - effectiveTaxRate);
   };
+
+  // Required balance for the plan's target income at a given retirement age:
+  // the income inflated to that year, capitalized at the withdrawal rate.
+  // Scenarios that retire at an age other than the plan's must use this rather
+  // than baseRequiredBalance, so their required and projected balances are both
+  // dated to the same year.
+  const requiredBalanceAtAge = (retirementAge: number): number =>
+    calculateRequiredBalance(
+      inputs.targetIncome * Math.pow(1 + inputs.inflationRate, retirementAge - inputs.startingAge)
+    );
 
   if (status === 'exceeding') {
     // SCENARIO 1: Current Plan (Baseline)
@@ -710,14 +721,13 @@ function generateSophisticatedScenarios(
     const earlyInputs = { ...inputs, retirementAge: earliestAge };
     const earlyBalance = calculateProjectedBalance(earlyInputs);
     const yearsDifference = inputs.retirementAge - earliestAge;
-    const earlyInflatedIncome = inputs.targetIncome * Math.pow(1 + inputs.inflationRate, earliestAge - inputs.startingAge);
 
     if (yearsDifference > 0) {
       scenarios.push({
         id: 'early-retirement',
         name: `Retire ${yearsDifference} ${yearsDifference === 1 ? 'year' : 'years'} early at ${earliestAge}`,
         retirementAge: earliestAge,
-        requiredBalance: calculateRequiredBalance(earlyInflatedIncome),
+        requiredBalance: requiredBalanceAtAge(earliestAge),
         projectedBalance: earlyBalance,
         monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
         successProbability: runMonteCarloSimulation(earlyInputs, 1000),
@@ -803,7 +813,7 @@ function generateSophisticatedScenarios(
       id: 'small-improvement',
       name: `Save extra $500/month → Retire ${yearsDifference} ${yearsDifference === 1 ? 'year' : 'years'} ${isEarlier ? 'early' : 'later'}`,
       retirementAge: plus500EarlyAge,
-      requiredBalance: baseRequiredBalance,
+      requiredBalance: requiredBalanceAtAge(plus500EarlyAge),
       projectedBalance: plus500Balance,
       monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation({ ...plus500Inputs, retirementAge: plus500EarlyAge }, 1000),
@@ -847,7 +857,7 @@ function generateSophisticatedScenarios(
       id: 'reality-age',
       name: `Work until age ${actualRetirementAge}`,
       retirementAge: actualRetirementAge,
-      requiredBalance: baseRequiredBalance,
+      requiredBalance: requiredBalanceAtAge(actualRetirementAge),
       projectedBalance: realityAgeBalance,
       monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation(realityAgeInputs, 1000),
@@ -883,7 +893,7 @@ function generateSophisticatedScenarios(
       id: 'modest-fix',
       name: `Save extra $500/month → Retire at ${plus500RetirementAge}`,
       retirementAge: plus500RetirementAge,
-      requiredBalance: baseRequiredBalance,
+      requiredBalance: requiredBalanceAtAge(plus500RetirementAge),
       projectedBalance: plus500Balance,
       monthlyWithdrawal: afterTaxMonthly(inputs.targetIncome),
       successProbability: runMonteCarloSimulation({ ...plus500Inputs, retirementAge: plus500RetirementAge }, 1000),

@@ -25,10 +25,10 @@ components/
                          #   MoneyInput, PercentInput, NumberInput, TickerCombobox),
                          #   cards/ (BaseCard, InputCard, ResultCard, SummaryCard),
                          #   layouts/ (CalculatorLayout variants, ResponsiveGrid, sections)
-  shared/                # Navigation, Tooltip, UtilityBar, DollarModeToggle,
+  shared/                # Tooltip, UtilityBar, DollarModeToggle,
                          #   inputs/ (StateSelector, SelectInput, PercentageSlider,
                          #   DebtInput), layout/ (InputRow, FieldGroup),
-                         #   cards/ (AllocationCard, OpportunityCostCard)
+                         #   cards/ (OpportunityCostCard)
   paycheck-allocator/    # Paycheck-allocator UI
   calculators/shared/    # CalculatorTabs, ExpandableListCard, StatusAlert, BreakdownRow
   retirement/            # RiskProfileSelector
@@ -44,6 +44,8 @@ lib/
 test/
   lib/calculations/      # Unit tests per calculation module
   lib/utils/             # Codec / RNG / display-dollar tests
+  lib/store/             # Zustand store tests
+  lib/formulas/          # Formula-registry tests
   components/            # Component tests (@testing-library/react)
   factories/             # test-data-factory.ts (shared mock builders)
   utils/, setup.ts
@@ -52,9 +54,9 @@ test/
 ## Tooling
 
 - **Dev server:** `npm run dev` · **Build:** `npm run build` · **Type check:** `npm run type-check` · **Lint:** `npm run lint`
-- **Tests:** `npm run test` (watch) / `npm run test:run` (one-shot) / `npm run test:coverage`
+- **Tests:** `npm run test` (watch) / `npm run test:run` (one-shot) / `npm run test:coverage` (instruments all of `lib/` and enforces the thresholds in `vitest.config.ts`)
 - **Pre-commit (husky + lint-staged):** `eslint --fix` + `tsc --noEmit` on staged TS/TSX.
-- **CI (`.github/workflows/test.yml`):** type-check, lint (max 200 warnings), and `test:run` on a Node 22 + 24 matrix (coverage + Codecov upload on Node 20 only), then separate production-build and `npm audit --audit-level=high` jobs.
+- **CI (`.github/workflows/test.yml`):** type-check, lint with `--max-warnings=0` (any warning fails the build), and the test suite on a Node 22 + 24 matrix (coverage + Codecov upload on Node 22 only), then separate Node 22 production-build and `npm audit --audit-level=high` jobs.
 
 There is no editorial-language grep gate, no orchestration shell script wrapping these commands, and no benchmark workflow in CI. Don't add one without discussion.
 

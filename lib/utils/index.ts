@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { STATE_TAX_RATES } from '../constants/states-2026'
+import { FREQUENCY_MULTIPLIERS } from '../constants/frequency'
 import {
   SS_WAGE_BASE_2026,
   FICA_RATE,
@@ -276,11 +277,18 @@ function compressCalculatorData(data: unknown): unknown {
 
   if (!profile) return compressed
   
-  // Income (only if different from defaults)
+  // Income (only if different from defaults). Legacy monthly figures (ig/in/ib)
+  // are kept for older payloads; the per-paycheck fields (ipg/ipn/...) are what
+  // the input UI and calculation engine actually consume.
   if (profile.income?.gross !== 0) p.ig = profile.income?.gross
   if (profile.income?.net !== 0) p.in = profile.income.net
   if (profile.income?.frequency !== 'monthly') p.if = profile.income.frequency
   if (profile.income.bonusExpected !== 0) p.ib = profile.income.bonusExpected
+  if (profile.income?.grossPaycheck) p.ipg = profile.income.grossPaycheck
+  if (profile.income?.netPaycheck) p.ipn = profile.income.netPaycheck
+  if (profile.income?.regularBonus) p.irb = true
+  if (profile.income?.bonusAmount) p.iba = profile.income.bonusAmount
+  if (profile.income?.bonusFrequency && profile.income.bonusFrequency !== 'annual') p.ibf = profile.income.bonusFrequency
   
   // Taxes
   if (profile.taxes.state) p.ts = profile.taxes.state
@@ -349,16 +357,34 @@ function decompressCalculatorData(compressed: any): any {
 
   const p = compressed.p || {}
 
+  // Rebuild the full IncomeData shape. Newer payloads carry the per-paycheck
+  // fields directly (ipg/ipn/irb/iba/ibf); older ones only carry monthly
+  // figures, so the per-paycheck values are derived via the frequency
+  // multiplier and the bonus amount from its monthly equivalent.
+  const frequency = (p.if || 'monthly') as keyof typeof FREQUENCY_MULTIPLIERS
+  const multiplier = FREQUENCY_MULTIPLIERS[frequency] ?? 1
+  const monthlyGross = p.ig || 0
+  const monthlyNet = p.in || 0
+  const bonusExpected = p.ib || 0
+  const bonusFrequency = p.ibf || 'annual'
+
   return {
     // Explicit nullish handling: missing dm (every v1 payload) decodes to
     // the default 'today'; only a valid 'nominal' flips the mode.
     displayMode: compressed.dm === 'nominal' ? 'nominal' : 'today',
     profile: {
       income: {
-        gross: p.ig || 0,
-        net: p.in || 0,
-        frequency: p.if || 'monthly',
-        bonusExpected: p.ib || 0
+        grossPaycheck: p.ipg ?? monthlyGross / multiplier,
+        netPaycheck: p.ipn ?? monthlyNet / multiplier,
+        frequency,
+        regularBonus: p.irb || bonusExpected > 0,
+        bonusAmount: p.iba ?? (bonusFrequency === 'quarterly' ? bonusExpected * 3 : bonusExpected * 12),
+        bonusFrequency,
+        monthlyGross,
+        monthlyNet,
+        gross: monthlyGross,
+        net: monthlyNet,
+        bonusExpected
       },
       taxes: {
         federalBracket: 0.22, // Default bracket

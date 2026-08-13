@@ -239,7 +239,7 @@ export function calculateStepStatus(
         case 'emergency-1month':
           return "Prevents debt accumulation during minor emergencies. Having $1,000+ available reduces financial stress and gives you breathing room.";
         case 'employer-match':
-          return "This is free money from your employer. Not getting the full match is leaving guaranteed returns on the table - it's an instant 50-100% return.";
+          return "An employer match adds contributions on top of yours, up to the match limit. Contributing below the limit forgoes part of that match - an immediate return at the match rate.";
         case 'high-interest-debt':
           return "High-interest debt compounds against you. Every month you delay costs you more in interest than most investments can earn.";
         case 'emergency-full':
@@ -249,7 +249,7 @@ export function calculateStepStatus(
         case 'roth-ira':
           return "Roth IRA provides tax-free retirement income and penalty-free access to contributions. Essential for tax diversification.";
         default:
-          return "Optimizes your long-term wealth building strategy.";
+          return "Adds to long-term savings capacity.";
       }
     };
 
@@ -285,13 +285,13 @@ export function calculateStepStatus(
 
         case 'employer-match':
           if (isComplete) return `Employer match maximized`;
-          if (isUrgent) return `Missing free money - increase 401k to ${formatPercent(profile.benefits.employer401k.matchLimit)}`;
+          if (isUrgent) return `Below match limit - increasing 401k to ${formatPercent(profile.benefits.employer401k.matchLimit)} captures the full match`;
           return allocation ? `Getting employer match` : `Contribute to get full employer match`;
 
         case 'high-interest-debt': {
           const highDebt = profile.debts.find(d => d.interestRate > 0.07);
           if (isComplete) return `All high-interest debt paid off`;
-          if (isUrgent) return `${formatPercent(highDebt?.interestRate || 0)} debt costing you money - prioritize payoff`;
+          if (isUrgent) return `${formatPercent(highDebt?.interestRate || 0)} interest debt - payoff returns that rate risk-free`;
           return allocation ? `Paying down high-interest debt` : `Pay off high-interest debt first`;
         }
 

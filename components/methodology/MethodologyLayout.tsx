@@ -6,19 +6,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  BookOpen, 
-  Calculator, 
-  Search, 
+import {
+  BookOpen,
+  Calculator,
+  Search,
   Filter,
-  Download,
-  Share,
   Clock,
-  CheckCircle,
   AlertCircle
 } from 'lucide-react';
 import { FormulaRegistryEntry, FormulaCategory } from '@/lib/formulas/types';
-import { FormulaCategory as FormulaCategoryComponent, CategorySummary } from './FormulaCategory';
+import { FormulaCategory as FormulaCategoryComponent } from './FormulaCategory';
 
 export interface MethodologyLayoutProps {
   calculatorName: string;
@@ -33,10 +30,6 @@ export interface MethodologyLayoutProps {
   metadata?: {
     totalFormulas: number;
     lastUpdated: string;
-    validationStatus: {
-      validated: number;
-      total: number;
-    };
   };
   onFormulaSelect?: (formula: FormulaRegistryEntry) => void;
   onMiniCalculatorOpen?: (formula: FormulaRegistryEntry) => void;
@@ -102,16 +95,6 @@ export function MethodologyLayout({
     return grouped;
   }, [formulas, searchQuery, selectedCategory]);
 
-  // Category summary data
-  const categorySummary = Object.entries(CATEGORY_INFO)
-    .sort(([,a], [,b]) => a.order - b.order)
-    .map(([category, info]) => ({
-      category: category as FormulaCategory,
-      title: info.title,
-      count: formulas[category as FormulaCategory]?.length || 0,
-      validated: formulas[category as FormulaCategory]?.filter(f => f.validated).length || 0
-    }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -132,15 +115,6 @@ export function MethodologyLayout({
                 <Calculator className="w-4 h-4" />
                 <span>{totalFormulas} formulas</span>
               </div>
-              
-              {metadata?.validationStatus && (
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-4 h-4 text-success" />
-                  <span>
-                    {metadata.validationStatus.validated}/{metadata.validationStatus.total} validated
-                  </span>
-                </div>
-              )}
               
               {metadata?.lastUpdated && (
                 <div className="flex items-center space-x-2">
@@ -165,9 +139,6 @@ export function MethodologyLayout({
         </div>
       </div>
 
-      {/* Category Summary */}
-      <CategorySummary categories={categorySummary} />
-
       {/* Search and Filters */}
       <div className="bg-card rounded-lg border p-4">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -176,6 +147,7 @@ export function MethodologyLayout({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <input
               type="text"
+              aria-label="Search formulas"
               placeholder="Search formulas, variables, or concepts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -187,6 +159,7 @@ export function MethodologyLayout({
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
             <select
+              aria-label="Filter by category"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value as FormulaCategory | 'all')}
               className="border rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring"
@@ -303,21 +276,12 @@ export function MethodologyLayout({
 
       {/* Footer */}
       <div className="border-t pt-6 mt-12">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div>
-            This methodology page is automatically generated from the calculator&apos;s source code.
-          </div>
-          <div className="flex items-center space-x-4">
-            <button className="flex items-center space-x-2 hover:text-foreground transition-colors">
-              <Share className="w-4 h-4" />
-              <span>Share</span>
-            </button>
-            <button className="flex items-center space-x-2 hover:text-foreground transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </button>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          This page is maintained alongside the code it describes: every entry is registered
+          by hand in <code className="font-mono">lib/formulas/</code>, names the function that
+          implements it, and has its worked example re-derived from that function by the test
+          suite.
+        </p>
       </div>
     </div>
   );

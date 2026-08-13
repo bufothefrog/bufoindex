@@ -3,8 +3,21 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import type { UserPreferences } from '@/lib/types';
+
+const RISK_TOLERANCE_OPTIONS = [
+  { value: 'conservative', label: 'Conservative (traditional ordering)' },
+  { value: 'moderate', label: 'Moderate (balanced ordering)' },
+  { value: 'optimizer', label: 'Optimizer (highest after-tax return first)' },
+];
+
+const OPTIMIZATION_GOAL_OPTIONS = [
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'tax_minimization', label: 'Tax Minimization' },
+  { value: 'wealth_maximization', label: 'Wealth Maximization' },
+];
 
 interface AdvancedSettingsCardProps {
   preferences: UserPreferences;
@@ -41,35 +54,25 @@ export function AdvancedSettingsCard({ preferences, showAdvanced, onToggle, onUp
             <CardTitle className="text-lg">Advanced Options</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Risk Tolerance</label>
-              <select
-                value={preferences.riskTolerance}
-                onChange={(e) => onUpdate({
-                  riskTolerance: e.target.value as 'conservative' | 'moderate' | 'optimizer'
-                })}
-                className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-              >
-                <option value="conservative">Conservative (traditional advice)</option>
-                <option value="moderate">Moderate (balanced approach)</option>
-                <option value="optimizer">Optimizer (maximum mathematical efficiency)</option>
-              </select>
-            </div>
+            <SelectInput
+              name="riskTolerance"
+              label="Risk Tolerance"
+              value={preferences.riskTolerance}
+              onChange={(value) => onUpdate({
+                riskTolerance: value as 'conservative' | 'moderate' | 'optimizer'
+              })}
+              options={RISK_TOLERANCE_OPTIONS}
+            />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Optimization Goal</label>
-              <select
-                value={preferences.optimizationGoal}
-                onChange={(e) => onUpdate({
-                  optimizationGoal: e.target.value as 'tax_minimization' | 'wealth_maximization' | 'balanced'
-                })}
-                className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-              >
-                <option value="balanced">Balanced (recommended)</option>
-                <option value="tax_minimization">Tax Minimization</option>
-                <option value="wealth_maximization">Wealth Maximization</option>
-              </select>
-            </div>
+            <SelectInput
+              name="optimizationGoal"
+              label="Optimization Goal"
+              value={preferences.optimizationGoal}
+              onChange={(value) => onUpdate({
+                optimizationGoal: value as 'tax_minimization' | 'wealth_maximization' | 'balanced'
+              })}
+              options={OPTIMIZATION_GOAL_OPTIONS}
+            />
           </CardContent>
         </Card>
       )}

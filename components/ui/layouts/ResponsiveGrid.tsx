@@ -174,50 +174,6 @@ export function EmptyStateSection({
 }
 
 /**
- * Flexible Grid - For custom layouts
- */
-interface FlexibleGridProps {
-  children: React.ReactNode;
-  columns?: {
-    sm?: number;
-    md?: number;
-    lg?: number;
-    xl?: number;
-  };
-  gap?: 'sm' | 'md' | 'lg' | 'xl';
-  className?: string;
-}
-
-export function FlexibleGrid({
-  children,
-  columns = { sm: 1, md: 2, lg: 3 },
-  gap = 'md',
-  className
-}: FlexibleGridProps) {
-  const gapClasses = {
-    sm: 'gap-4',
-    md: 'gap-6', 
-    lg: 'gap-8',
-    xl: 'gap-12'
-  };
-  
-  const gridCols = cn(
-    'grid',
-    gapClasses[gap],
-    columns.sm && `grid-cols-${columns.sm}`,
-    columns.md && `md:grid-cols-${columns.md}`,
-    columns.lg && `lg:grid-cols-${columns.lg}`,
-    columns.xl && `xl:grid-cols-${columns.xl}`
-  );
-  
-  return (
-    <div className={cn(gridCols, className)}>
-      {children}
-    </div>
-  );
-}
-
-/**
  * Container wrapper for consistent page layout
  */
 interface ContainerProps {
