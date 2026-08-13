@@ -25,6 +25,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  ALLOCATION_PRIORITY,
   calculate1MonthEmergency,
   calculateEmergencyFundCompletion,
   calculateEmployerMatch,
@@ -37,7 +38,6 @@ import {
   calculateAdditional401k,
   calculateMegaBackdoorRoth,
   calculateTaxableInvestment,
-  calculateLowInterestDebtAnalysis,
 } from '@/lib/calculations/optimization'
 import { CONTRIBUTION_LIMITS_2026, ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '@/lib/constants/irs-2026'
 import {
@@ -82,7 +82,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(result).not.toBeNull()
       expect(result!.id).toBe('1-month-emergency')
       expect(result!.category).toBe('emergency_fund')
-      expect(result!.priority).toBe(1)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.oneMonthEmergency)
       // amountNeeded = 3000 - 500 = 2500, available = 1000 → use 1000
       expect(result!.amount).toBe(1000)
       expect(result!.taxImpact).toBe(0)
@@ -130,6 +130,35 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(calculate1MonthEmergency(profile, 0)).toBeNull()
       expect(calculate1MonthEmergency(profile, -100)).toBeNull()
     })
+
+    it('returns null when the target is $0 (necessary expenses not entered yet)', () => {
+      // A $0 target must not read as "already funded" via `0 >= 0` — with no
+      // monthly expenses on file there is nothing to size the fund against.
+      const emptyFund = createPaycheckProfile({
+        preferences: createUserPreferences({
+          necessaryExpenses: 0,
+          currentEmergencyFund: 0,
+        }),
+      })
+      expect(calculate1MonthEmergency(emptyFund, 1000)).toBeNull()
+
+      const partialFund = createPaycheckProfile({
+        preferences: createUserPreferences({
+          necessaryExpenses: 0,
+          currentEmergencyFund: 1500,
+        }),
+      })
+      expect(calculate1MonthEmergency(partialFund, 1000)).toBeNull()
+
+      // Negative expenses are equally meaningless
+      const negativeExpenses = createPaycheckProfile({
+        preferences: createUserPreferences({
+          necessaryExpenses: -500,
+          currentEmergencyFund: 0,
+        }),
+      })
+      expect(calculate1MonthEmergency(negativeExpenses, 1000)).toBeNull()
+    })
   })
 
   describe('calculateEmergencyFundCompletion', () => {
@@ -157,7 +186,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       const result = calculateEmergencyFundCompletion(profile, 500)
       expect(result).not.toBeNull()
       expect(result!.id).toBe('emergency-fund-completion')
-      expect(result!.priority).toBe(4)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.emergencyFundCompletion)
       expect(result!.amount).toBe(500)
     })
 
@@ -205,7 +234,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       const result = calculateEmployerMatch(profile, 1000)
       expect(result).not.toBeNull()
       expect(result!.id).toBe('employer-match')
-      expect(result!.priority).toBe(1)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.employerMatch)
       // Annual additional needed = 5760, monthly = 480, paycheck (bi-weekly) ≈ 221.54
       expect(result!.amount).toBeCloseTo(221.54, 1)
     })
@@ -296,6 +325,90 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(result!.taxImpact).toBeCloseTo(-result!.amount * 0.22, 4)
       expect(result!.taxImpact).toBeLessThan(0)
     })
+
+    it('returns null when the match rate is 0% — there is no match to capture', () => {
+      // $13,000/month gross, matchLimit 6%, matchPercent 0. The old behaviour
+      // allocated $180/paycheck (weekly) to "401k Employer Match" at the top
+      // of the order while the employer contributed $0 against it.
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 13000,
+          monthlyGross: 13000,
+          monthlyNet: 9750,
+          net: 9750,
+          netPaycheck: 2250,
+          frequency: 'weekly',
+        }),
+        benefits: {
+          employer401k: createEmployerBenefits({
+            available: true,
+            matchPercent: 0,
+            matchLimit: 0.06,
+            currentContribution: 0,
+          }),
+          hsa: createHSABenefits(),
+          ira: emptyIRA(),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+      expect(calculateEmployerMatch(profile, 1000)).toBeNull()
+    })
+
+    it('returns null when the matched-salary limit is 0%', () => {
+      const profile = createPaycheckProfile({
+        income: createIncomeData({ gross: 8000, monthlyGross: 8000, monthlyNet: 6000, net: 6000 }),
+        benefits: {
+          employer401k: createEmployerBenefits({
+            available: true,
+            matchPercent: 0.5,
+            matchLimit: 0,
+            currentContribution: 0,
+          }),
+          hsa: createHSABenefits(),
+          ira: emptyIRA(),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+      expect(calculateEmployerMatch(profile, 1000)).toBeNull()
+    })
+
+    it('claims no current-year tax saving for a Roth deferral, and pro-rates a split election', () => {
+      const buildProfile = (employer401k: Partial<ReturnType<typeof createEmployerBenefits>>) =>
+        createPaycheckProfile({
+          income: createIncomeData({ gross: 8000, monthlyGross: 8000, monthlyNet: 6000, net: 6000 }),
+          taxes: createTaxData({ federalBracket: 0.22, state: 'TX' }),
+          benefits: {
+            employer401k: createEmployerBenefits({
+              available: true,
+              matchPercent: 0.5,
+              matchLimit: 0.06,
+              currentContribution: 0,
+              ...employer401k,
+            }),
+            hsa: createHSABenefits(),
+            ira: emptyIRA(),
+            other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+          },
+        })
+
+      const roth = calculateEmployerMatch(
+        buildProfile({ contributionType: 'roth', traditionalContribution: 0, rothContribution: 0.06 }),
+        1000
+      )!
+      // Roth deferrals are after-tax: no deduction this year, and no -0 either
+      expect(roth.taxImpact).toBe(0)
+      expect(Object.is(roth.taxImpact, -0)).toBe(false)
+
+      // 3% traditional + 1% Roth = 75% of the deferral is pre-tax
+      const split = calculateEmployerMatch(
+        buildProfile({ contributionType: 'split', traditionalContribution: 0.03, rothContribution: 0.01 }),
+        1000
+      )!
+      expect(split.taxImpact).toBeCloseTo(-split.amount * 0.75 * 0.22, 4)
+
+      const traditional = calculateEmployerMatch(buildProfile({ contributionType: 'traditional' }), 1000)!
+      expect(traditional.taxImpact).toBeCloseTo(-traditional.amount * 0.22, 4)
+    })
   })
 
   // ────────────────────────────────────────────────────────────────────────
@@ -345,7 +458,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(result).not.toBeNull()
       expect(result!.account).toContain('CC-B') // 24% wins
       expect(result!.category).toBe('debt_payoff')
-      expect(result!.priority).toBe(3)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.highInterestDebt)
     })
 
     it('returns null when no debt exceeds 7%', () => {
@@ -388,6 +501,64 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       // extra = 200 - (25 * 12/26 = 11.54) = 188.46
       const result = calculateHighInterestDebt(profile, 1000)
       expect(result!.amount).toBeCloseTo(188.46, 2)
+    })
+
+    it('never claims annual interest savings above balance x rate', () => {
+      // $6,000/month net, one $3,000 balance at 29% (minimum $90/month), with
+      // $2,800 of the paycheck allocatable. The recommended extra payment is
+      // $2,710/month = $32,520/year; the payment-stream formula would claim
+      // $32,520 x 0.29 x 0.5 = $4,715/year of interest "saved" on a $3,000
+      // debt whose full-year interest is only $3,000 x 0.29 = $870.
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 8000,
+          monthlyGross: 8000,
+          monthlyNet: 6000,
+          net: 6000,
+          netPaycheck: 6000,
+          frequency: 'monthly',
+        }),
+        debts: [
+          createDebtData({ name: 'High Card', balance: 3000, interestRate: 0.29, minimumPayment: 90 }),
+        ],
+      })
+
+      const result = calculateHighInterestDebt(profile, 2800)!
+      expect(result.amount).toBeCloseTo(2710, 2) // 2800 - 90 minimum
+
+      const fullYearInterest = 3000 * 0.29 // $870
+      expect(result.implementation).toContain('saves $870/year')
+      expect(result.implementation).not.toContain('$4,715')
+      // The reasoning quotes the same capped figure the implementation does
+      expect(result.reasoning).toContain('$870')
+
+      // Sanity: the claim is below both a year of interest and the balance
+      expect(fullYearInterest).toBeCloseTo(870, 2)
+      expect(fullYearInterest).toBeLessThan(3000)
+    })
+
+    it('keeps the 0.5 average-balance correction when it lands under the cap', () => {
+      // $20,000 balance at 18%: full-year interest is $3,600, while the
+      // payment stream is 500/month x 12 x 0.18 x 0.5 = $540 — under the cap,
+      // so the average-balance figure is reported unchanged.
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 8000,
+          monthlyGross: 8000,
+          monthlyNet: 6000,
+          net: 6000,
+          netPaycheck: 6000,
+          frequency: 'monthly',
+        }),
+        debts: [
+          createDebtData({ name: 'Card', balance: 20000, interestRate: 0.18, minimumPayment: 100 }),
+        ],
+      })
+
+      const result = calculateHighInterestDebt(profile, 600)!
+      expect(result.amount).toBeCloseTo(500, 2) // 600 - 100 minimum
+      // 500 * 12 * 0.18 * 0.5 = 540, well below 20,000 * 0.18 = 3,600
+      expect(result.implementation).toContain('saves $540/year')
     })
   })
 
@@ -535,7 +706,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(result!.taxImpact).toBeCloseTo(-29.65, 2)
     })
 
-    it('priority is 2 when not currently contributing, 3 when already contributing', () => {
+    it('carries the HSA position in the Financial Order of Operations, whatever the current contribution', () => {
       const buildProfile = (currentContribution: number) =>
         createPaycheckProfile({
           benefits: {
@@ -549,8 +720,48 @@ describe('optimization.ts — paycheck allocation decisions', () => {
             other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
           },
         })
-      expect(calculateHSAOptimal(buildProfile(0), 200)!.priority).toBe(2)
-      expect(calculateHSAOptimal(buildProfile(50), 200)!.priority).toBe(3)
+      // Previously 2 vs 3, which sorted HSA ahead of high-interest debt and
+      // straddled the emergency-fund step boundary in stepStatusUtils.
+      expect(calculateHSAOptimal(buildProfile(0), 200)!.priority).toBe(ALLOCATION_PRIORITY.hsa)
+      expect(calculateHSAOptimal(buildProfile(50), 200)!.priority).toBe(ALLOCATION_PRIORITY.hsa)
+    })
+
+    it('adds the $1,000 age-55 catch-up (IRC 223(b)(3)) at 55 but not at 54', () => {
+      const buildProfile = (age: number, coverageType: 'individual' | 'family') =>
+        createPaycheckProfile({
+          preferences: createUserPreferences({ age }),
+          benefits: {
+            employer401k: createEmployerBenefits(),
+            hsa: createHSABenefits({
+              eligible: true,
+              coverageType,
+              currentContribution: 0,
+              employerContribution: 0,
+            }),
+            ira: emptyIRA(),
+            other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+          },
+        })
+
+      const catchUp = CONTRIBUTION_LIMITS_2026.catchUp.hsa // $1,000
+      const family = CONTRIBUTION_LIMITS_2026.hsa.family // $8,750
+      const individual = CONTRIBUTION_LIMITS_2026.hsa.individual // $4,400
+
+      // Age 64, family coverage: $8,750 + $1,000 = $9,750/yr → 9,750/26 = $375
+      const age64Family = calculateHSAOptimal(buildProfile(64, 'family'), 99999)!
+      expect(age64Family.annualEquivalent).toBeCloseTo(family + catchUp, 2)
+      expect(age64Family.annualEquivalent).toBeCloseTo(9750, 2)
+      expect(age64Family.amount).toBeCloseTo(375, 2)
+      expect(age64Family.implementation).toContain('$9,750 limit')
+
+      // Age 55 individual: $4,400 + $1,000 = $5,400/yr
+      const age55Individual = calculateHSAOptimal(buildProfile(55, 'individual'), 99999)!
+      expect(age55Individual.annualEquivalent).toBeCloseTo(individual + catchUp, 2)
+      expect(age55Individual.annualEquivalent).toBeCloseTo(5400, 2)
+
+      // Age 54 gets the plain coverage-tier limits
+      expect(calculateHSAOptimal(buildProfile(54, 'family'), 99999)!.annualEquivalent).toBeCloseTo(family, 2)
+      expect(calculateHSAOptimal(buildProfile(54, 'individual'), 99999)!.annualEquivalent).toBeCloseTo(individual, 2)
     })
   })
 
@@ -822,6 +1033,55 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(calculateRothIRA(profileAbove, 9999)).toBeNull()
     })
 
+    it('uses the $0-$10,000 married-filing-separately band, not the single band', () => {
+      // MFS filers who lived with their spouse phase out from $0 to $10,000
+      // (IRC 408A(c)(3)(B)(ii)(III)); mapping them to the single band told a
+      // $60k earner to fund a Roth IRA they are not eligible for.
+      expect(roth.marriedFilingSeparately).toEqual({ start: 0, end: 10000 })
+
+      const buildProfile = (annualGross: number, filingStatus: 'marriedSeparate' | 'single') =>
+        createPaycheckProfile({
+          income: createIncomeData({
+            gross: annualGross / 12,
+            monthlyGross: annualGross / 12,
+            monthlyNet: (annualGross * 0.75) / 12,
+            net: (annualGross * 0.75) / 12,
+          }),
+          taxes: createTaxData({ federalBracket: 0.12, filingStatus }),
+          preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+          benefits: emptyIRABenefits(),
+        })
+
+      // $60,000 MFS is far above the $10,000 phase-out end → ineligible
+      expect(calculateRothIRA(buildProfile(60000, 'marriedSeparate'), 9999)).toBeNull()
+      // The same income filing single is fully eligible
+      expect(calculateRothIRA(buildProfile(60000, 'single'), 9999)!.amount).toBeCloseTo(
+        CONTRIBUTION_LIMITS_2026.ira / PAYCHECKS_PER_YEAR,
+        2
+      )
+
+      // Inside the MFS band: $5,000 income is halfway → floor(7,500 * 0.5) = $3,750/yr
+      const insideBand = calculateRothIRA(buildProfile(5000, 'marriedSeparate'), 9999)!
+      expect(insideBand.annualEquivalent).toBeCloseTo(3750, 2)
+    })
+
+    it('keeps head-of-household on the single band', () => {
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 100000 / 12,
+          monthlyGross: 100000 / 12,
+          monthlyNet: 6000,
+          net: 6000,
+        }),
+        taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'headOfHousehold' }),
+        preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+        benefits: emptyIRABenefits(),
+      })
+      // $100k is below the $153,000 single phase-out start → full contribution
+      const result = calculateRothIRA(profile, 9999)!
+      expect(result.annualEquivalent).toBeCloseTo(CONTRIBUTION_LIMITS_2026.ira, 2)
+    })
+
     it('returns null when the per-paycheck contribution would be ≤ $50 (skip tiny contributions)', () => {
       const profile = createPaycheckProfile({
         income: createIncomeData({
@@ -968,6 +1228,88 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(calculateAdditional401k(profile, 1000)).toBeNull()
     })
 
+    it('nets out the employee deferral the match step already recommended (IRC 402(g))', () => {
+      // Weekly pay, $13,000/month gross = $156,000/yr, age 60 (super catch-up
+      // → $24,500 + $11,250 = $35,750 elective-deferral limit), contributing
+      // 0% today with a 50% match up to 6% of salary.
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 13000,
+          monthlyGross: 13000,
+          monthlyNet: 9750,
+          net: 9750,
+          netPaycheck: 2250,
+          frequency: 'weekly',
+        }),
+        taxes: createTaxData({ federalBracket: 0.32, filingStatus: 'single', state: 'TX' }),
+        preferences: createUserPreferences({ age: 60, isPeakEarnings: false }),
+        benefits: {
+          employer401k: createEmployerBenefits({
+            available: true,
+            matchPercent: 0.5,
+            matchLimit: 0.06,
+            currentContribution: 0,
+          }),
+          hsa: createHSABenefits(),
+          ira: emptyIRA(),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+
+      const limit =
+        CONTRIBUTION_LIMITS_2026.traditional401k + CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k
+      expect(limit).toBe(35750)
+
+      // Match step: 156,000 * 6% = $9,360/yr → 9,360 / 52 = $180/paycheck
+      const match = calculateEmployerMatch(profile, 9999)!
+      expect(match.amount).toBeCloseTo(180, 2)
+      expect(match.annualEquivalent).toBeCloseTo(9360, 2)
+
+      // Blind to the match, the top-up used to claim the entire $35,750 limit
+      // ($687.50/paycheck), for $45,110/yr of deferral in one plan.
+      const blind = calculateAdditional401k(profile, 9999)!
+      expect(blind.annualEquivalent).toBeCloseTo(35750, 2)
+
+      // Aware of it, the top-up claims only the remaining $26,390/yr
+      const aware = calculateAdditional401k(profile, 9999, [match])!
+      expect(aware.annualEquivalent).toBeCloseTo(limit - 9360, 2)
+      expect(aware.annualEquivalent).toBeCloseTo(26390, 2)
+      expect(aware.amount).toBeCloseTo(26390 / 52, 2) // ≈ $507.50/paycheck
+
+      // The pair now lands exactly on the 402(g) limit
+      expect(match.annualEquivalent! + aware.annualEquivalent!).toBeCloseTo(limit, 2)
+    })
+
+    it('returns null when the match step has already claimed the whole 402(g) limit', () => {
+      // $500,000/yr salary with a 6% match limit means the match step alone
+      // recommends $30,000 of deferral, above the $24,500 age-45 limit.
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 500000 / 12,
+          monthlyGross: 500000 / 12,
+          monthlyNet: 25000,
+          net: 25000,
+        }),
+        taxes: createTaxData({ federalBracket: 0.35, filingStatus: 'single', state: 'TX' }),
+        preferences: createUserPreferences({ age: 45, isPeakEarnings: false }),
+        benefits: {
+          employer401k: createEmployerBenefits({
+            available: true,
+            matchPercent: 0.5,
+            matchLimit: 0.06,
+            currentContribution: 0,
+          }),
+          hsa: createHSABenefits(),
+          ira: emptyIRA(),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+
+      const match = calculateEmployerMatch(profile, 99999)!
+      expect(match.annualEquivalent).toBeCloseTo(30000, 2)
+      expect(calculateAdditional401k(profile, 99999, [match])).toBeNull()
+    })
+
     it('returns null when remaining room is below the $50 monthly threshold', () => {
       // 200k × 12.2% = $24,400 contributed → only $100/yr room ≈ $8.33/mo (< $50)
       const profile = createPaycheckProfile({
@@ -1048,7 +1390,12 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       const result = calculateMegaBackdoorRoth(profile, 9999)
       expect(result).not.toBeNull()
       expect(result!.id).toBe('mega-backdoor-roth')
-      expect(result!.priority).toBe(6.5)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.megaBackdoorRoth)
+      // The mega-backdoor step in lib/constants/financialSteps.ts is catalogued
+      // as 'tax_optimization', and lib/utils/stepStatusUtils.ts matches on that
+      // category — tagging the allocation 'tax_advantaged' left an $800/paycheck
+      // recommendation rendering as an unrealized opportunity.
+      expect(result!.category).toBe('tax_optimization')
       expect(result!.taxImpact).toBe(0) // after-tax contribution
       // remainingAfterTax = 72000 - 12000 (employee) - 6000 (employer match)
       // = 54000/yr → 54000/26 ≈ 2076.92 per paycheck (bi-weekly)
@@ -1099,12 +1446,12 @@ describe('optimization.ts — paycheck allocation decisions', () => {
   // Taxable & low-interest debt analysis
   // ────────────────────────────────────────────────────────────────────────
   describe('calculateTaxableInvestment', () => {
-    it('absorbs the entire remaining budget at priority 7', () => {
+    it('absorbs the entire remaining budget last in the order', () => {
       const profile = createPaycheckProfile()
       const result = calculateTaxableInvestment(profile, 750)
       expect(result).not.toBeNull()
       expect(result!.amount).toBe(750)
-      expect(result!.priority).toBe(7)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.taxableInvestment)
       expect(result!.category).toBe('investment')
       expect(result!.taxImpact).toBe(0)
     })
@@ -1116,42 +1463,38 @@ describe('optimization.ts — paycheck allocation decisions', () => {
     })
   })
 
-  describe('calculateLowInterestDebtAnalysis', () => {
-    it('returns null when there are no sub-7% debts', () => {
-      const profile = createPaycheckProfile({
-        debts: [createDebtData({ interestRate: 0.18, balance: 5000 })],
-      })
-      expect(calculateLowInterestDebtAnalysis(profile)).toBeNull()
+  // ────────────────────────────────────────────────────────────────────────
+  // Priority ladder
+  // ────────────────────────────────────────────────────────────────────────
+  describe('ALLOCATION_PRIORITY', () => {
+    it('assigns a distinct, strictly increasing priority to each step', () => {
+      const values = Object.values(ALLOCATION_PRIORITY)
+      expect(new Set(values).size).toBe(values.length)
+      for (let i = 1; i < values.length; i++) {
+        expect(values[i]).toBeGreaterThan(values[i - 1])
+      }
     })
 
-    it('flags low-interest debt as a SkippedItem with positive opportunity cost', () => {
-      const profile = createPaycheckProfile({
-        debts: [
-          createDebtData({ name: 'Mortgage', balance: 200000, interestRate: 0.04, minimumPayment: 1000 }),
-        ],
-      })
-      const result = calculateLowInterestDebtAnalysis(profile)
-      expect(result).not.toBeNull()
-      expect(result!.id).toBe('low-interest-debt-payoff')
-      // opportunity-cost rate = 0.07 - 0.04 = 0.03 → annual = 200000 * 0.03 = 6000
-      expect(result!.opportunityCost.annual).toBeCloseTo(6000, 2)
-      expect(result!.opportunityCost.monthly).toBeCloseTo(500, 2)
-      expect(result!.opportunityCost.tenYear).toBeCloseTo(60000, 2)
-      expect(result!.riskLevel).toBe('low')
+    it('matches the Financial Order of Operations execution order in core.ts', () => {
+      expect(Object.keys(ALLOCATION_PRIORITY)).toEqual([
+        'oneMonthEmergency',
+        'employerMatch',
+        'highInterestDebt',
+        'emergencyFundCompletion',
+        'hsa',
+        'rothIRA',
+        'additional401k',
+        'megaBackdoorRoth',
+        'taxableInvestment',
+      ])
     })
 
-    it('weights average rate by balance across multiple low-interest debts', () => {
-      const profile = createPaycheckProfile({
-        debts: [
-          createDebtData({ name: 'Mortgage', balance: 100000, interestRate: 0.05, minimumPayment: 600 }),
-          createDebtData({ name: 'Car', balance: 20000, interestRate: 0.03, minimumPayment: 300 }),
-        ],
-      })
-      const result = calculateLowInterestDebtAnalysis(profile)!
-      // Weighted rate = (0.05*100000 + 0.03*20000) / 120000 = 5600/120000 ≈ 0.04667
-      // Opportunity rate = 0.07 - 0.04667 ≈ 0.02333
-      // Annual = 120000 * 0.02333 ≈ 2800
-      expect(result.opportunityCost.annual).toBeCloseTo(2800, 0)
+    it('keeps the two emergency steps on opposite sides of stepStatusUtils 2/3 boundary', () => {
+      // lib/utils/stepStatusUtils.ts matches 'emergency-1month' on priority <= 2
+      // and 'emergency-full' on priority >= 3. Breaking this makes the two step
+      // cards claim each other's allocation.
+      expect(ALLOCATION_PRIORITY.oneMonthEmergency).toBeLessThanOrEqual(2)
+      expect(ALLOCATION_PRIORITY.emergencyFundCompletion).toBeGreaterThanOrEqual(3)
     })
   })
 
@@ -1206,7 +1549,6 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       calculateAdditional401k(profile, 500)
       calculateMegaBackdoorRoth(profile, 500)
       calculateTaxableInvestment(profile, 500)
-      calculateLowInterestDebtAnalysis(profile)
 
       expect(JSON.stringify(profile.debts)).toBe(snapshotDebts)
       expect(JSON.stringify(profile.income)).toBe(snapshotIncome)

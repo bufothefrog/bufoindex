@@ -137,6 +137,11 @@ export const CONTRIBUTION_LIMITS_2026 = {
 export const ROTH_IRA_PHASEOUT_2026 = {
   single: { start: 153000, end: 168000 },
   marriedFilingJointly: { start: 242000, end: 252000 },
+  // Married filing separately (spouses who lived together at any point in the
+  // year): $0-$10,000. The figure is written into IRC 408A(c)(3)(B)(ii)(III)
+  // and is not inflation-indexed, so Rev. Proc. 2025-32 / Notice 2025-67 carry
+  // it forward unchanged for 2026.
+  marriedFilingSeparately: { start: 0, end: 10000 },
 } as const;
 
 // ── FICA / Social Security ──────────────────────────────────────────────────

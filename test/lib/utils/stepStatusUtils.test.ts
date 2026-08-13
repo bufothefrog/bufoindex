@@ -9,12 +9,16 @@
  * Every expectation below is hand-computed from the thresholds the module
  * applies (98% of a contribution limit, the 7% high-interest debt cutoff,
  * months × necessary expenses) so a formula regression cannot hide behind a
- * re-derived expectation.
+ * re-derived expectation. The contribution limits themselves come from
+ * lib/constants/irs-2026.ts — the module must never restate them — so the
+ * limit-sensitive cases pair a literal hand-computed figure with the constant
+ * it was derived from.
  */
 
 import { describe, it, expect } from 'vitest'
 import { calculateStepStatus } from '@/lib/utils/stepStatusUtils'
 import { FINANCIAL_STEPS, type StepStatus } from '@/lib/constants/financialSteps'
+import { CONTRIBUTION_LIMITS_2026, TOTAL_415C_BY_AGE } from '@/lib/constants/irs-2026'
 import type {
   AllocationItem,
   DebtData,
@@ -303,6 +307,26 @@ describe('calculateStepStatus — completion thresholds', () => {
     expect(oneDollarShort.isUrgent).toBe(true)
   })
 
+  it('never completes an emergency fund whose target is $0', () => {
+    // necessaryExpenses = 0 means the input is unanswered, not that a $0 target
+    // has been met: `0 >= 0` must not read as a funded fund.
+    for (const currentEmergencyFund of [0, 1500]) {
+      const oneMonth = statusFor('emergency-1month', buildProfile({
+        preferences: { currentEmergencyFund, necessaryExpenses: 0 },
+      }))
+      expect(oneMonth.isComplete).toBe(false)
+      expect(oneMonth.isUrgent).toBe(false)
+      expect(oneMonth.isRecommendation).toBe(true)
+      expect(oneMonth.recommendation).not.toMatch(/complete/i)
+
+      const full = statusFor('emergency-full', buildProfile({
+        preferences: { currentEmergencyFund, necessaryExpenses: 0, emergencyFundMonths: 6 },
+      }))
+      expect(full.isComplete).toBe(false)
+      expect(full.recommendation).not.toMatch(/complete/i)
+    }
+  })
+
   it('completes the full emergency fund at months × necessary expenses', () => {
     // 6 months × $3,000 = $18,000
     const funded = statusFor('emergency-full', buildProfile({
@@ -343,16 +367,18 @@ describe('calculateStepStatus — completion thresholds', () => {
   })
 
   it('completes the HSA within 2% of the individual limit', () => {
-    // Individual limit $4,150 × 98% = $4,067 annual.
-    // $339/mo → $4,068 clears it; $338/mo → $4,056 does not.
+    // 2026 individual limit $4,400 × 98% = $4,312 annual.
+    // $360/mo → $4,320 clears it; $359/mo → $4,308 does not.
+    expect(CONTRIBUTION_LIMITS_2026.hsa.individual).toBe(4400)
+
     const clears = statusFor('hsa-max', buildProfile({
-      hsa: { eligible: true, coverageType: 'individual', currentContribution: 339 },
+      hsa: { eligible: true, coverageType: 'individual', currentContribution: 360 },
       preferences: { age: 40 },
     }))
     expect(clears.isComplete).toBe(true)
 
     const short = statusFor('hsa-max', buildProfile({
-      hsa: { eligible: true, coverageType: 'individual', currentContribution: 338 },
+      hsa: { eligible: true, coverageType: 'individual', currentContribution: 359 },
       preferences: { age: 40 },
     }))
     expect(short.isComplete).toBe(false)
@@ -360,51 +386,75 @@ describe('calculateStepStatus — completion thresholds', () => {
   })
 
   it('raises the HSA bar at age 55 for the catch-up limit', () => {
-    // $420/mo = $5,040 annual. Under 55: 98% of $4,150 = $4,067 → complete.
-    // At 55: 98% of $5,150 = $5,047 → short by $7.
+    // $440/mo = $5,280 annual. Under 55: 98% of $4,400 = $4,312 → complete.
+    // At 55 the limit is $4,400 + $1,000 = $5,400, so 98% = $5,292 → short by $12.
     const hsa: Partial<HSABenefits> = {
       eligible: true,
       coverageType: 'individual',
-      currentContribution: 420,
+      currentContribution: 440,
     }
+    const catchUpLimit = CONTRIBUTION_LIMITS_2026.hsa.individual + CONTRIBUTION_LIMITS_2026.catchUp.hsa
+    expect(catchUpLimit * 0.98).toBeCloseTo(5292, 6)
 
     expect(statusFor('hsa-max', buildProfile({ hsa, preferences: { age: 54 } })).isComplete).toBe(true)
     expect(statusFor('hsa-max', buildProfile({ hsa, preferences: { age: 55 } })).isComplete).toBe(false)
   })
 
   it('applies the family HSA limit for family coverage', () => {
-    // $680/mo = $8,160 annual. 98% of the $8,300 family limit = $8,134.
+    // $715/mo = $8,580 annual. 98% of the $8,750 family limit = $8,575.
+    expect(CONTRIBUTION_LIMITS_2026.hsa.family).toBe(8750)
+
     const status = statusFor('hsa-max', buildProfile({
-      hsa: { eligible: true, coverageType: 'family', currentContribution: 680 },
+      hsa: { eligible: true, coverageType: 'family', currentContribution: 715 },
       preferences: { age: 40 },
     }))
 
     expect(status.isComplete).toBe(true)
+
+    // $714/mo = $8,568, four dollars short of the 98% bar.
+    const short = statusFor('hsa-max', buildProfile({
+      hsa: { eligible: true, coverageType: 'family', currentContribution: 714 },
+      preferences: { age: 40 },
+    }))
+    expect(short.isComplete).toBe(false)
   })
 
   it('completes the Roth IRA within 2% of the annual limit', () => {
-    // $7,000 × 98% = $6,860. $572/mo → $6,864 clears; $571/mo → $6,852 does not.
+    // 2026 IRA limit $7,500 × 98% = $7,350.
+    // $613/mo → $7,356 clears; $612/mo → $7,344 does not.
+    expect(CONTRIBUTION_LIMITS_2026.ira).toBe(7500)
+
     const clears = statusFor('roth-ira', buildProfile({
-      ira: { currentContributions: { traditional: 0, roth: 572 } },
+      ira: { currentContributions: { traditional: 0, roth: 613 } },
       preferences: { age: 40 },
     }))
     expect(clears.isComplete).toBe(true)
 
     const short = statusFor('roth-ira', buildProfile({
-      ira: { currentContributions: { traditional: 0, roth: 571 } },
+      ira: { currentContributions: { traditional: 0, roth: 612 } },
       preferences: { age: 40 },
     }))
     expect(short.isComplete).toBe(false)
   })
 
   it('raises the Roth IRA bar at age 50 for the catch-up limit', () => {
-    // $572/mo = $6,864. At 50 the limit is $8,000, so 98% = $7,840.
+    // $613/mo = $7,356. At 50 the limit is $7,500 + $1,100 = $8,600, so 98% = $8,428.
+    const catchUpLimit = CONTRIBUTION_LIMITS_2026.ira + CONTRIBUTION_LIMITS_2026.catchUp.ira
+    expect(catchUpLimit).toBe(8600)
+
     const status = statusFor('roth-ira', buildProfile({
-      ira: { currentContributions: { traditional: 0, roth: 572 } },
+      ira: { currentContributions: { traditional: 0, roth: 613 } },
       preferences: { age: 50 },
     }))
 
     expect(status.isComplete).toBe(false)
+
+    // $703/mo = $8,436 clears the catch-up bar.
+    const clears = statusFor('roth-ira', buildProfile({
+      ira: { currentContributions: { traditional: 0, roth: 703 } },
+      preferences: { age: 50 },
+    }))
+    expect(clears.isComplete).toBe(true)
   })
 
   it('treats a missing Roth contribution as zero', () => {
@@ -417,25 +467,44 @@ describe('calculateStepStatus — completion thresholds', () => {
   })
 
   it('completes the 401k step within 2% of the elective deferral limit', () => {
-    // $6,500 monthly gross × 30% × 12 = $23,400 against 98% of $23,000 = $22,540.
+    // 2026 elective deferral limit $24,500 × 98% = $24,010.
+    // $6,500 monthly gross × 32% × 12 = $24,960 clears it.
+    expect(CONTRIBUTION_LIMITS_2026.traditional401k).toBe(24500)
+
     const maxed = statusFor('additional-401k', buildProfile({
       income: { gross: 6500 },
-      employer401k: { available: true, currentContribution: 0.3 },
+      employer401k: { available: true, currentContribution: 0.32 },
       preferences: { age: 40 },
     }))
     expect(maxed.isComplete).toBe(true)
 
-    // The same 30% only reaches $23,400 against 98% of $30,500 = $29,890 at 50+.
+    // The same 32% only reaches $24,960 against 98% of $32,500 = $31,850 at 50+.
     const catchUpShort = statusFor('additional-401k', buildProfile({
       income: { gross: 6500 },
-      employer401k: { available: true, currentContribution: 0.3 },
+      employer401k: { available: true, currentContribution: 0.32 },
       preferences: { age: 50 },
     }))
     expect(catchUpShort.isComplete).toBe(false)
   })
 
+  it('applies the 60-63 super catch-up and drops it again at 64', () => {
+    // $24,500 + $8,000 = $32,500 at 50+; + $11,250 = $35,750 for ages 60-63.
+    // $6,500 × 42% × 12 = $32,760 clears 98% of $32,500 ($31,850) but not 98%
+    // of $35,750 ($35,035).
+    expect(CONTRIBUTION_LIMITS_2026.catchUp['401k']).toBe(8000)
+    expect(CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k).toBe(11250)
+
+    const employer401k = { available: true, currentContribution: 0.42 }
+    const income = { gross: 6500 }
+
+    expect(statusFor('additional-401k', buildProfile({ income, employer401k, preferences: { age: 59 } })).isComplete).toBe(true)
+    expect(statusFor('additional-401k', buildProfile({ income, employer401k, preferences: { age: 60 } })).isComplete).toBe(false)
+    expect(statusFor('additional-401k', buildProfile({ income, employer401k, preferences: { age: 63 } })).isComplete).toBe(false)
+    expect(statusFor('additional-401k', buildProfile({ income, employer401k, preferences: { age: 64 } })).isComplete).toBe(true)
+  })
+
   it('leaves the 401k step incomplete at a 6% contribution', () => {
-    // $6,500 × 6% × 12 = $4,680 — well short of $22,540.
+    // $6,500 × 6% × 12 = $4,680 — well short of $24,010.
     const status = statusFor('additional-401k', buildProfile({
       income: { gross: 6500 },
       employer401k: { available: true, currentContribution: 0.06 },
@@ -541,7 +610,7 @@ describe('calculateStepStatus — potential savings', () => {
     expect(status.potentialSavings).toEqual({ monthly: 0, annual: 0 })
   })
 
-  it('values high-interest debt at the monthly interest of the first qualifying debt', () => {
+  it('values high-interest debt at the monthly interest of the qualifying debt', () => {
     // $12,000 × 18% = $2,160/yr → $180/mo. The 4% loan listed first is skipped.
     const status = statusFor('high-interest-debt', buildProfile({
       debts: [
@@ -554,15 +623,73 @@ describe('calculateStepStatus — potential savings', () => {
     expect(status.potentialSavings.annual).toBeCloseTo(2160, 6)
   })
 
-  it('values unused HSA room at a 22% tax saving', () => {
-    // $200/mo = $2,400; room to $4,150 is $1,750; × 22% = $385/yr.
+  it('values the highest-rate qualifying debt, not the first one listed', () => {
+    // The allocator pays the 29% card; the step has to price the same debt.
+    // $3,000 × 29% = $870/yr → $72.50/mo (the 8% card would price at $133.33/mo).
+    const status = statusFor('high-interest-debt', buildProfile({
+      debts: [
+        createDebtData({ name: 'Low Card', balance: 20000, interestRate: 0.08 }),
+        createDebtData({ name: 'High Card', balance: 3000, interestRate: 0.29 }),
+      ],
+    }))
+
+    expect(status.potentialSavings.monthly).toBeCloseTo(72.5, 6)
+    expect(status.potentialSavings.annual).toBeCloseTo(870, 6)
+  })
+
+  it('prices the savings on the recommended payment stream when one exists', () => {
+    // $200/mo extra at 29% with the allocator's 0.5 average-balance correction
+    // = 200 × 12 × 0.29 × 0.5 = $348/yr, under the $870 full-year ceiling.
+    const status = statusFor(
+      'high-interest-debt',
+      buildProfile({
+        debts: [createDebtData({ name: 'High Card', balance: 3000, interestRate: 0.29 })],
+      }),
+      [createAllocation({ category: 'high_interest_debt', account: 'High Card', monthlyEquivalent: 200 })]
+    )
+
+    expect(status.potentialSavings.annual).toBeCloseTo(348, 6)
+    expect(status.potentialSavings.monthly).toBeCloseTo(29, 6)
+  })
+
+  it('caps payment-stream savings at a full year of interest on the balance', () => {
+    // $2,000/mo × 12 × 0.29 × 0.5 = $3,480 would overstate a $3,000 debt whose
+    // full-year interest is $870 — the ceiling applies.
+    const status = statusFor(
+      'high-interest-debt',
+      buildProfile({
+        debts: [createDebtData({ name: 'High Card', balance: 3000, interestRate: 0.29 })],
+      }),
+      [createAllocation({ category: 'high_interest_debt', account: 'High Card', monthlyEquivalent: 2000 })]
+    )
+
+    expect(status.potentialSavings.annual).toBeCloseTo(870, 6)
+  })
+
+  it('values unused HSA room at the profile federal bracket', () => {
+    // $200/mo = $2,400; room to the $4,400 limit is $2,000; × the 12% bracket
+    // the factory sets = $240/yr.
     const status = statusFor('hsa-max', buildProfile({
       hsa: { eligible: true, coverageType: 'individual', currentContribution: 200 },
       preferences: { age: 40 },
     }))
 
-    expect(status.potentialSavings.annual).toBeCloseTo(385, 6)
-    expect(status.potentialSavings.monthly).toBeCloseTo(32.08, 2)
+    expect(status.potentialSavings.annual).toBeCloseTo(240, 6)
+    expect(status.potentialSavings.monthly).toBeCloseTo(20, 6)
+  })
+
+  it('rescales the HSA saving with the bracket the profile reports', () => {
+    // Same $2,000 of room at a 24% bracket = $480/yr.
+    const profile = buildProfile({
+      hsa: { eligible: true, coverageType: 'individual', currentContribution: 200 },
+      preferences: { age: 40 },
+    })
+    const status = statusFor('hsa-max', {
+      ...profile,
+      taxes: { ...profile.taxes, federalBracket: 0.24 },
+    })
+
+    expect(status.potentialSavings.annual).toBeCloseTo(480, 6)
   })
 
   it('reports no HSA saving when the limit is met or the user is ineligible', () => {
@@ -576,14 +703,24 @@ describe('calculateStepStatus — potential savings', () => {
   })
 
   it('values unused Roth IRA room at a 7% growth assumption', () => {
-    // $500/mo = $6,000; room to $7,000 is $1,000; × 7% = $70/yr.
+    // $500/mo = $6,000; room to the $7,500 limit is $1,500; × 7% = $105/yr.
     const status = statusFor('roth-ira', buildProfile({
       ira: { currentContributions: { traditional: 0, roth: 500 } },
       preferences: { age: 40 },
     }))
 
-    expect(status.potentialSavings.annual).toBeCloseTo(70, 6)
-    expect(status.potentialSavings.monthly).toBeCloseTo(5.83, 2)
+    expect(status.potentialSavings.annual).toBeCloseTo(105, 6)
+    expect(status.potentialSavings.monthly).toBeCloseTo(8.75, 6)
+  })
+
+  it('widens the Roth IRA room by the 50+ catch-up', () => {
+    // Room to $8,600 from $6,000 is $2,600; × 7% = $182/yr.
+    const status = statusFor('roth-ira', buildProfile({
+      ira: { currentContributions: { traditional: 0, roth: 500 } },
+      preferences: { age: 50 },
+    }))
+
+    expect(status.potentialSavings.annual).toBeCloseTo(182, 6)
   })
 
   it('reports zero for steps without a savings model', () => {
@@ -632,6 +769,17 @@ describe('calculateStepStatus — recommendation copy', () => {
       debts: [createDebtData({ balance: 0, interestRate: 0.18 })],
     }))
     expect(paidOff.recommendation).toBe('All high-interest debt paid off')
+  })
+
+  it('names the highest-rate debt, matching the debt the allocator pays', () => {
+    const status = statusFor('high-interest-debt', buildProfile({
+      debts: [
+        createDebtData({ name: 'Low Card', balance: 20000, interestRate: 0.08, minimumPayment: 200 }),
+        createDebtData({ name: 'High Card', balance: 3000, interestRate: 0.29, minimumPayment: 90 }),
+      ],
+    }))
+
+    expect(status.recommendation).toBe('29% interest debt - payoff returns that rate risk-free')
   })
 
   it('states the emergency fund target in months', () => {
@@ -683,24 +831,80 @@ describe('calculateStepStatus — recommendation copy', () => {
   })
 
   it('quantifies the gap to the 401k limit', () => {
-    // $23,000 − ($6,500 × 6% × 12 = $4,680) = $18,320 → $1,527/mo, 23.5% of $78,000.
+    // $24,500 − ($6,500 × 6% × 12 = $4,680) = $19,820 → $1,652/mo, 25.4% of $78,000.
     const status = statusFor('additional-401k', buildProfile({
       income: { gross: 6500 },
       employer401k: { available: true, currentContribution: 0.06 },
       preferences: { age: 40 },
     }))
 
-    expect(status.recommendation).toBe('Additional $1,527 (23.5%) contributions needed for max')
+    expect(status.recommendation).toBe('Additional $1,652 (25.4%) contributions needed for max')
   })
 
   it('reports the contribution rate once the 401k is maxed', () => {
     const status = statusFor('additional-401k', buildProfile({
       income: { gross: 6500 },
-      employer401k: { available: true, currentContribution: 0.3 },
+      employer401k: { available: true, currentContribution: 0.32 },
       preferences: { age: 40 },
     }))
 
-    expect(status.recommendation).toBe('401k maximized at 30%')
+    expect(status.recommendation).toBe('401k maximized at 32%')
+  })
+
+  it('drops the percent-of-salary figure when there is no gross pay on file', () => {
+    // Gross 0 makes "percent of salary" undefined; the dollar figure still
+    // stands ($24,500 / 12 = $2,042/month).
+    const status = statusFor('additional-401k', buildProfile({
+      income: { gross: 0 },
+      employer401k: { available: true, currentContribution: 0.06 },
+      preferences: { age: 40 },
+    }))
+
+    expect(status.recommendation).toBe('Additional $2,042 contributions needed for max')
+    expect(status.recommendation).not.toMatch(/∞|Infinity|NaN/)
+    expect(status.implementationSteps[1]).toBe('Increase contribution by $2,042/month more')
+  })
+
+  it('states the Roth IRA monthly figure from the age-adjusted limit', () => {
+    // $7,500 / 12 = $625; at 50+ ($7,500 + $1,100) / 12 = $717.
+    const underFifty = statusFor('roth-ira', buildProfile({
+      ira: { currentContributions: { traditional: 0, roth: 0 } },
+      preferences: { age: 40 },
+    }))
+    expect(underFifty.recommendation).toBe(
+      `Contribute $${CONTRIBUTION_LIMITS_2026.ira / 12}/month to Roth IRA`
+    )
+    expect(underFifty.recommendation).toBe('Contribute $625/month to Roth IRA')
+
+    const fifty = statusFor('roth-ira', buildProfile({
+      ira: { currentContributions: { traditional: 0, roth: 0 } },
+      preferences: { age: 50 },
+    }))
+    expect(fifty.recommendation).toBe('Contribute $717/month to Roth IRA')
+  })
+
+  it('stops telling the user to contribute once the Roth IRA is complete', () => {
+    // $700/mo = $8,400, past 98% of the $7,500 limit ($7,350).
+    const status = statusFor('roth-ira', buildProfile({
+      ira: { currentContributions: { traditional: 0, roth: 700 } },
+      preferences: { age: 40 },
+    }))
+
+    expect(status.isComplete).toBe(true)
+    expect(status.recommendation).toBe('Roth IRA maximized')
+    expect(status.recommendation).not.toMatch(/contribute/i)
+  })
+
+  it('says the emergency-fund target is unknown when necessary expenses are $0', () => {
+    const expected = 'Necessary monthly expenses not set - emergency fund target unknown'
+
+    expect(statusFor('emergency-1month', buildProfile({
+      preferences: { currentEmergencyFund: 1500, necessaryExpenses: 0 },
+    })).recommendation).toBe(expected)
+
+    expect(statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 1500, necessaryExpenses: 0, emergencyFundMonths: 6 },
+    })).recommendation).toBe(expected)
   })
 })
 
@@ -750,14 +954,40 @@ describe('calculateStepStatus — implementation guidance', () => {
   })
 
   it('states the additional 401k percentage needed', () => {
-    // ($23,000 − $4,680) / $78,000 = 23.5%.
+    // ($24,500 − $4,680) / $78,000 = 25.4%.
     const status = statusFor('additional-401k', buildProfile({
       income: { gross: 6500 },
       employer401k: { available: true, currentContribution: 0.06 },
       preferences: { age: 40 },
     }))
 
-    expect(status.implementationSteps[1]).toBe('Increase contribution by 23.5% more')
+    expect(status.implementationSteps[1]).toBe('Increase contribution by 25.4% more')
+  })
+
+  it('sizes the Roth IRA transfer from the age-adjusted IRA limit', () => {
+    const underFifty = statusFor('roth-ira', buildProfile({ preferences: { age: 40 } }))
+    expect(underFifty.implementationSteps[1]).toBe(
+      `Set up automatic $${CONTRIBUTION_LIMITS_2026.ira / 12}/month transfer`
+    )
+    expect(underFifty.implementationSteps[1]).toBe('Set up automatic $625/month transfer')
+
+    // ($7,500 + $1,100) / 12 = $716.67 → $717.
+    const fifty = statusFor('roth-ira', buildProfile({ preferences: { age: 50 } }))
+    expect(fifty.implementationSteps[1]).toBe('Set up automatic $717/month transfer')
+  })
+
+  it('quotes the age-banded 415(c) limit in the mega-backdoor steps', () => {
+    const profileAt = (age: number) =>
+      buildProfile({ employer401k: { afterTaxAvailable: true }, preferences: { age } })
+
+    expect(statusFor('mega-backdoor', profileAt(40)).implementationSteps[2])
+      .toBe(`Contribute up to annual limit ($${TOTAL_415C_BY_AGE.standard.toLocaleString('en-US')} total)`)
+    expect(statusFor('mega-backdoor', profileAt(40)).implementationSteps[2])
+      .toBe('Contribute up to annual limit ($72,000 total)')
+    expect(statusFor('mega-backdoor', profileAt(50)).implementationSteps[2])
+      .toBe('Contribute up to annual limit ($80,000 total)')
+    expect(statusFor('mega-backdoor', profileAt(61)).implementationSteps[2])
+      .toBe('Contribute up to annual limit ($83,250 total)')
   })
 
   it('explains why the early steps matter and falls back for the later ones', () => {
@@ -768,6 +998,109 @@ describe('calculateStepStatus — implementation guidance', () => {
       .toBe('Adds to long-term savings capacity.')
     expect(statusFor('taxable-investment', profile).whyItMatters)
       .toBe('Adds to long-term savings capacity.')
+  })
+})
+
+describe('calculateStepStatus — zero-value inputs', () => {
+  /** Every user-visible string a status carries. */
+  function stringsOf(status: StepStatus): string[] {
+    return [
+      status.recommendation,
+      status.whyItMatters,
+      status.implementationTime,
+      ...status.implementationSteps,
+    ]
+  }
+
+  /** Zeroed money, zeroed limits, zeroed targets, across the age bands. */
+  function zeroInputProfiles(): PaycheckProfile[] {
+    const profiles: PaycheckProfile[] = []
+    const debtSets = [
+      [],
+      [createDebtData({ balance: 0, interestRate: 0, minimumPayment: 0 })],
+      [createDebtData({ balance: 0, interestRate: 0.29, minimumPayment: 0 })],
+    ]
+
+    for (const available of [true, false]) {
+      for (const afterTaxAvailable of [true, false]) {
+        for (const eligible of [true, false]) {
+          for (const age of [25, 50, 55, 60, 64]) {
+            for (const debts of debtSets) {
+              profiles.push(buildProfile({
+                income: { gross: 0, monthlyGross: 0, grossPaycheck: 0, netPaycheck: 0, net: 0, monthlyNet: 0 },
+                preferences: {
+                  age,
+                  necessaryExpenses: 0,
+                  currentEmergencyFund: 0,
+                  emergencyFundMonths: 0,
+                  funMoney: { min: 0, max: 0, current: 0 },
+                },
+                employer401k: {
+                  available,
+                  afterTaxAvailable,
+                  matchLimit: 0,
+                  matchPercent: 0,
+                  currentContribution: 0,
+                },
+                hsa: { eligible, coverageType: 'individual', currentContribution: 0, employerContribution: 0 },
+                ira: { currentContributions: { traditional: 0, roth: 0 } },
+                debts,
+              }))
+            }
+          }
+        }
+      }
+    }
+
+    return profiles
+  }
+
+  /** One allocation per step, so the allocation-matched copy paths run too. */
+  const allocationsForEveryStep: AllocationItem[] = [
+    createAllocation({ id: 'a-em1', category: 'emergency_fund', account: 'Emergency Savings', priority: 2, amount: 0 }),
+    createAllocation({ id: 'a-emf', category: 'emergency_fund', account: 'Emergency Savings', priority: 3, amount: 0 }),
+    createAllocation({ id: 'a-match', category: 'employer_match', account: '401k Employer Match', amount: 0 }),
+    createAllocation({ id: 'a-debt', category: 'debt_payoff', account: 'Credit Card Debt', amount: 0 }),
+    createAllocation({ id: 'a-hsa', category: 'tax_advantaged', account: 'HSA Contribution', amount: 0 }),
+    createAllocation({ id: 'a-roth', category: 'tax_advantaged', account: 'Roth IRA', amount: 0 }),
+    createAllocation({ id: 'a-401k', category: 'tax_advantaged', account: 'Traditional 401k', amount: 0 }),
+    createAllocation({ id: 'a-mega', category: 'tax_optimization', account: 'Mega Backdoor Roth', amount: 0 }),
+    createAllocation({ id: 'a-taxable', category: 'investment', account: 'Taxable Investment', amount: 0 }),
+  ]
+
+  it('never emits NaN, Infinity, or an infinity glyph from any step', () => {
+    const bad: string[] = []
+
+    for (const profile of zeroInputProfiles()) {
+      for (const allocations of [[], allocationsForEveryStep]) {
+        for (const status of calculateStepStatus(FINANCIAL_STEPS, allocations, profile)) {
+          for (const text of stringsOf(status)) {
+            if (/NaN|Infinity|∞/.test(text)) {
+              bad.push(`${status.id} (age ${profile.preferences.age}): "${text}"`)
+            }
+            if (!text.trim()) bad.push(`${status.id}: empty string`)
+          }
+        }
+      }
+    }
+
+    expect(bad).toEqual([])
+  })
+
+  it('keeps every derived figure finite for zeroed inputs', () => {
+    const bad: string[] = []
+
+    for (const profile of zeroInputProfiles()) {
+      for (const status of calculateStepStatus(FINANCIAL_STEPS, [], profile)) {
+        const { monthly, annual } = status.potentialSavings
+        if (!Number.isFinite(monthly) || !Number.isFinite(annual)) {
+          bad.push(`${status.id}: ${monthly} / ${annual}`)
+        }
+        if (monthly < 0 || annual < 0) bad.push(`${status.id}: negative savings`)
+      }
+    }
+
+    expect(bad).toEqual([])
   })
 })
 

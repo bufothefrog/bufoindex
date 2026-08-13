@@ -101,10 +101,23 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   const necessaryExpensesMonthly = Number(updatedProfile.preferences.necessaryExpenses) || 0;
   const necessaryExpensesPerPaycheck = monthlyToPaycheck(necessaryExpensesMonthly, frequency);
 
-  const minFunMoneyMonthly = Number(updatedProfile.preferences.funMoney.min) || 0;
-  const maxFunMoneyMonthly = Number(updatedProfile.preferences.funMoney.max) || minFunMoneyMonthly || 0;
+  // Fun money: coerce non-finite input to 0 (rather than `|| 0`, which would
+  // also swallow a deliberate 0), then treat the maximum as at least the
+  // minimum so the reported range is never negative when a user types a
+  // maximum below their minimum.
+  const rawMinFunMoney = Number(updatedProfile.preferences.funMoney.min);
+  const rawMaxFunMoney = Number(updatedProfile.preferences.funMoney.max);
+  const minFunMoneyMonthly = Number.isFinite(rawMinFunMoney) ? rawMinFunMoney : 0;
+  const maxFunMoneyMonthly = Math.max(
+    minFunMoneyMonthly,
+    Number.isFinite(rawMaxFunMoney) ? rawMaxFunMoney : 0
+  );
   const funMoneyPerPaycheck = monthlyToPaycheck(minFunMoneyMonthly, frequency);
-  
+
+  // Necessary expenses above take-home pay leave nothing to allocate. The
+  // clamp below hides that, so record the gap for the UI to report.
+  const incomeShortfall = necessaryExpensesPerPaycheck - netPaycheck;
+
   // Available amount per paycheck (this is what the user actually has to allocate)
   let availableAmount = Math.max(0, netPaycheck - necessaryExpensesPerPaycheck - funMoneyPerPaycheck);
   const allocations: AllocationItem[] = [];
@@ -127,11 +140,13 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
     () => calculateHSAOptimal(updatedProfile, availableAmount), // HSA first - triple tax advantage
     () => calculateRothIRA(updatedProfile, availableAmount), // Smart Roth vs Traditional
     
-    // Step 6: Max Retirement Accounts (401k/403b)
-    () => calculateAdditional401k(updatedProfile, availableAmount),
+    // Step 6: Max Retirement Accounts (401k/403b). The allocations made so far
+    // are passed through so the top-up nets out the employee deferral the
+    // match step already recommended (IRC 402(g) is a single annual limit).
+    () => calculateAdditional401k(updatedProfile, availableAmount, allocations),
     
     // Step 6.5: Mega Backdoor Roth (high earners only)
-    () => calculateMegaBackdoorRoth(updatedProfile, availableAmount),
+    () => calculateMegaBackdoorRoth(updatedProfile, availableAmount, allocations),
     
     // Step 7: Hyper-Accumulation (taxable investing)
     () => calculateTaxableInvestment(updatedProfile, availableAmount),
@@ -172,6 +187,9 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
       difference: maxFunMoneyMonthly - minFunMoneyMonthly,
     },
     remainingAmount: availableAmount, // Now per-paycheck amount
+    // Only present when necessary expenses genuinely outrun the paycheck, so
+    // consumers can treat its absence as "no shortfall".
+    ...(incomeShortfall > 0 ? { incomeShortfall } : {}),
     paycheckContext: {
       netPaycheck,
       frequency,

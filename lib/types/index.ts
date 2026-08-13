@@ -196,6 +196,12 @@ export interface AllocationResult {
     difference: number;
   };
   remainingAmount: number; // Now per-paycheck amount
+  /**
+   * Per-paycheck dollars by which necessary expenses (converted to the pay
+   * frequency) exceed the net paycheck. Set only when positive, so an absent
+   * field means take-home pay covers necessary expenses.
+   */
+  incomeShortfall?: number;
   paycheckContext?: {
     netPaycheck: number;
     frequency: 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly';

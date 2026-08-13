@@ -1,27 +1,97 @@
 import {
   PaycheckProfile,
   AllocationItem,
-  SkippedItem
+  EmployerBenefits
 } from '../types';
 import { CONTRIBUTION_LIMITS_2026, ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '../constants/irs-2026';
 import { calculateIncomeTaxRate, calculateHSATaxRate } from '../utils';
 import { formatCurrency, formatPercent, paycheckToMonthly, monthlyToPaycheck } from './core';
 
 /**
+ * Priority attached to each allocation.
+ *
+ * The values mirror the Financial-Order-of-Operations execution order in
+ * core.ts (`calculateOptimalAllocation`) and the step catalogue in
+ * lib/constants/financialSteps.ts, so sorting a finished plan by `priority`
+ * reproduces the order the steps were actually applied in. Every value is
+ * distinct on purpose: with a tie, consumers that sort by priority (e.g. the
+ * account-prioritization score in projections.ts, which uses a stable sort)
+ * rank by array position instead of by the plan, and the winner of the tie
+ * depends on which step happened to be pushed first.
+ *
+ * CONSTRAINT — lib/utils/stepStatusUtils.ts splits the two emergency-fund
+ * allocations at a priority 2-vs-3 boundary: the `emergency-1month` step
+ * matches `priority <= 2` and the `emergency-full` step matches
+ * `priority >= 3`. Keep `oneMonthEmergency` at 2 or below and
+ * `emergencyFundCompletion` at 3 or above, or the two steps swap allocations.
+ */
+export const ALLOCATION_PRIORITY = {
+  oneMonthEmergency: 1,
+  employerMatch: 2,
+  highInterestDebt: 3,
+  emergencyFundCompletion: 4,
+  hsa: 5,
+  rothIRA: 6,
+  additional401k: 7,
+  megaBackdoorRoth: 8,
+  taxableInvestment: 9,
+} as const;
+
+/**
+ * Roth IRA phase-out band for a profile's filing status.
+ *
+ * Head-of-household uses the single band (IRC 408A(c)(3)(B)(ii)); married
+ * filing separately has its own, far narrower band.
+ */
+function getRothPhaseout(
+  filingStatus: PaycheckProfile['taxes']['filingStatus']
+): { start: number; end: number } {
+  switch (filingStatus) {
+    case 'marriedJoint':
+      return ROTH_IRA_PHASEOUT_2026.marriedFilingJointly;
+    case 'marriedSeparate':
+      return ROTH_IRA_PHASEOUT_2026.marriedFilingSeparately;
+    default:
+      return ROTH_IRA_PHASEOUT_2026.single;
+  }
+}
+
+/**
+ * Share of an employee 401k deferral that is pre-tax, and therefore the share
+ * that produces a current-year tax saving. Roth deferrals are after-tax; a
+ * split election is pro-rated by the traditional/Roth percentages on file.
+ */
+function preTaxDeferralShare(benefits: EmployerBenefits): number {
+  if (benefits.contributionType === 'roth') return 0;
+  if (benefits.contributionType === 'split') {
+    const traditional = Math.max(0, Number(benefits.traditionalContribution) || 0);
+    const roth = Math.max(0, Number(benefits.rothContribution) || 0);
+    const total = traditional + roth;
+    return total > 0 ? traditional / total : 0.5;
+  }
+  return 1;
+}
+
+/**
  * Calculate 1-month emergency fund (FOO Step 1)
  * Now works with per-paycheck amounts
  */
 export function calculate1MonthEmergency(
-  profile: PaycheckProfile, 
+  profile: PaycheckProfile,
   availableAmount: number
 ): AllocationItem | null {
   const monthlyExpenses = profile.preferences.necessaryExpenses;
   const currentEmergencyFund = profile.preferences.currentEmergencyFund;
   const targetAmount = monthlyExpenses; // 1 month of expenses
-  
+
+  // A non-positive target means monthly expenses have not been entered yet.
+  // A $0 goal is not a funded emergency fund, so make no allocation rather
+  // than letting `0 >= 0` read as "already complete".
+  if (!(targetAmount > 0)) return null;
+
   // If already have 1+ months, skip this step
   if (currentEmergencyFund >= targetAmount) return null;
-  
+
   const amountNeededTotal = targetAmount - currentEmergencyFund;
   const actualAllocation = Math.min(amountNeededTotal, availableAmount);
   
@@ -35,7 +105,7 @@ export function calculate1MonthEmergency(
     account: '1-Month Emergency Fund',
     amount: actualAllocation, // Per-paycheck amount
     percentage: actualAllocation / profile.income.netPaycheck,
-    priority: 1,
+    priority: ALLOCATION_PRIORITY.oneMonthEmergency,
     reasoning: 'Build basic financial security before optimization. One month of expenses provides essential protection.',
     taxImpact: 0, // No tax impact for emergency fund
     category: 'emergency_fund',
@@ -82,7 +152,7 @@ export function calculateEmergencyFundCompletion(
     account: 'Emergency Fund',
     amount: actualAllocation, // Per-paycheck amount
     percentage: actualAllocation / profile.income.netPaycheck,
-    priority: 4,
+    priority: ALLOCATION_PRIORITY.emergencyFundCompletion,
     reasoning: `Build from ${currentMonths.toFixed(1)} to ${targetMonths} months expenses. ${apy >= 0.04 ? 'Good HYSA rate' : 'Consider higher-yield savings'}`,
     taxImpact: 0,
     category: 'emergency_fund',
@@ -104,7 +174,14 @@ export function calculateEmployerMatch(
 ): AllocationItem | null {
   const benefits = profile.benefits.employer401k;
   if (!benefits.available) return null;
-  
+
+  // With a 0% match rate (or a 0% matched-salary limit) there is no match to
+  // capture, so this step has nothing to recommend — the deferral would be
+  // ordinary unmatched 401k saving, which `calculateAdditional401k` handles
+  // further down the order. analysis.ts `analyzeMissedBenefits` already treats
+  // a 0% rate as "no missed match"; the two now agree.
+  if (benefits.matchPercent <= 0 || benefits.matchLimit <= 0) return null;
+
   const annualSalary = profile.income.gross * 12;
   const maxMatchContribution = annualSalary * benefits.matchLimit;
   const currentAnnualContribution = annualSalary * benefits.currentContribution;
@@ -121,15 +198,22 @@ export function calculateEmployerMatch(
   if (actualContribution <= 0) return null;
   
   const monthlyEquivalent = paycheckToMonthly(actualContribution, frequency);
-  
+
+  // Only the pre-tax share of the employee deferral cuts this year's taxes: a
+  // Roth election saves nothing today, a split election saves pro-rata.
+  const deferralTaxSaving =
+    actualContribution *
+    preTaxDeferralShare(benefits) *
+    calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state);
+
   return {
     id: 'employer-match',
     account: '401k Employer Match',
     amount: actualContribution, // Per-paycheck amount
     percentage: actualContribution / profile.income.netPaycheck,
-    priority: 1,
+    priority: ALLOCATION_PRIORITY.employerMatch,
     reasoning: `Employer matches ${formatPercent(benefits.matchPercent)} of contributions up to ${formatPercent(benefits.matchLimit)} of salary`,
-    taxImpact: -actualContribution * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state),
+    taxImpact: deferralTaxSaving > 0 ? -deferralTaxSaving : 0,
     category: 'employer_match',
     monthlyEquivalent,
     annualEquivalent: monthlyEquivalent * 12,
@@ -189,16 +273,22 @@ export function calculateHighInterestDebt(
   const monthlyEquivalent = paycheckToMonthly(extraPayment, frequency);
   // Average-balance correction: payments reduce balance over the year,
   // so average effective time is ~6 months, not 12
-  const annualSavings = monthlyEquivalent * 12 * highestRateDebt.interestRate * 0.5;
+  const uncappedAnnualSavings = monthlyEquivalent * 12 * highestRateDebt.interestRate * 0.5;
+  // Interest avoided can never exceed a full year of interest on the balance
+  // itself: once the debt is retired there is nothing left to accrue. Without
+  // this cap a payment stream larger than the balance "saves" more than the
+  // debt is worth.
+  const maxAnnualInterest = Math.max(0, highestRateDebt.balance) * highestRateDebt.interestRate;
+  const annualSavings = Math.min(uncappedAnnualSavings, maxAnnualInterest);
 
-  const reasoning = `Paying off debt at ${formatPercent(highestRateDebt.interestRate)} is a certain return at that rate, above typical long-run market assumptions.`;
+  const reasoning = `Paying off debt at ${formatPercent(highestRateDebt.interestRate)} is a certain return at that rate, above typical long-run market assumptions. Clearing this balance avoids up to ${formatCurrency(annualSavings)} of interest a year.`;
 
   return {
     id: 'high-interest-debt',
     account: `${highestRateDebt.name} (${formatPercent(highestRateDebt.interestRate)})`,
     amount: extraPayment,
     percentage: extraPayment / profile.income.netPaycheck,
-    priority: 3,
+    priority: ALLOCATION_PRIORITY.highInterestDebt,
     reasoning: reasoning,
     taxImpact: 0, // Debt payments are not tax-deductible for most consumer debt
     category: 'debt_payoff',
@@ -218,9 +308,14 @@ export function calculateHSAOptimal(
   const hsa = profile.benefits.hsa;
   if (!hsa.eligible) return null;
 
-  const annualLimit = hsa.coverageType === 'family'
+  const baseAnnualLimit = hsa.coverageType === 'family'
     ? CONTRIBUTION_LIMITS_2026.hsa.family
     : CONTRIBUTION_LIMITS_2026.hsa.individual;
+
+  // Age-55 catch-up (IRC 223(b)(3)): a flat, non-indexed $1,000 on top of the
+  // coverage-tier limit from the year the account holder turns 55.
+  const annualLimit = baseAnnualLimit
+    + (profile.preferences.age >= 55 ? CONTRIBUTION_LIMITS_2026.catchUp.hsa : 0);
 
   // Employer contributions count against the combined IRS cap (IRC 223(b)(4)(B));
   // employerContribution is annual, currentContribution is monthly
@@ -244,7 +339,7 @@ export function calculateHSAOptimal(
     account: 'HSA Contribution',
     amount: recommendedContribution,
     percentage: recommendedContribution / profile.income.netPaycheck,
-    priority: hsa.currentContribution === 0 ? 2 : 3,
+    priority: ALLOCATION_PRIORITY.hsa,
     reasoning: 'Triple tax advantage: deductible contributions, tax-free growth, tax-free medical withdrawals',
     taxImpact: -taxSavings,
     category: 'tax_advantaged',
@@ -298,9 +393,7 @@ export function calculateRothIRA(
   const annualIncome = profile.income.gross * 12;
   
   // Check income eligibility for Roth IRA (from single source: lib/constants/irs-2026.ts)
-  const phaseout = profile.taxes.filingStatus === 'marriedJoint'
-    ? ROTH_IRA_PHASEOUT_2026.marriedFilingJointly
-    : ROTH_IRA_PHASEOUT_2026.single;
+  const phaseout = getRothPhaseout(profile.taxes.filingStatus);
   const rothPhaseoutStart = phaseout.start;
   const rothPhaseoutEnd = phaseout.end;
   
@@ -363,7 +456,7 @@ export function calculateRothIRA(
     account: 'Roth IRA',
     amount: paycheckContribution,
     percentage: paycheckContribution / profile.income.netPaycheck,
-    priority: 5,
+    priority: ALLOCATION_PRIORITY.rothIRA,
     reasoning: reasoning,
     taxImpact: 0, // Roth contributions are after-tax
     category: 'tax_advantaged',
@@ -377,12 +470,13 @@ export function calculateRothIRA(
  * Calculate additional 401k contribution beyond match with Roth vs Traditional choice
  */
 export function calculateAdditional401k(
-  profile: PaycheckProfile, 
-  availableAmount: number
+  profile: PaycheckProfile,
+  availableAmount: number,
+  plannedAllocations: AllocationItem[] = []
 ): AllocationItem | null {
   const benefits = profile.benefits.employer401k;
   if (!benefits.available) return null;
-  
+
   const annualSalary = profile.income.gross * 12;
   const currentAnnualContribution = annualSalary * benefits.currentContribution;
   const age = profile.preferences.age;
@@ -394,11 +488,24 @@ export function calculateAdditional401k(
       : 0;
   const maxAnnualContribution = CONTRIBUTION_LIMITS_2026.traditional401k + catchUp; // Same limit for Roth and Traditional
 
-  const remainingContributionRoom = maxAnnualContribution - currentAnnualContribution;
+  const frequency = profile.income.frequency;
+  // IRC 402(g) caps elective deferrals per employee per year, across every
+  // source. The match step earlier in the plan (core.ts) already recommends
+  // additional employee deferral, so this top-up has to net that out on top of
+  // the existing payroll election — otherwise the two steps each spend the
+  // same room and their sum breaches the limit.
+  const plannedAnnualDeferral = plannedAllocations
+    .filter(allocation => allocation.category === 'employer_match')
+    .reduce(
+      (sum, allocation) => sum + paycheckToMonthly(allocation.amount, frequency) * 12,
+      0
+    );
+
+  const remainingContributionRoom =
+    maxAnnualContribution - currentAnnualContribution - plannedAnnualDeferral;
 
   if (remainingContributionRoom <= 0) return null;
 
-  const frequency = profile.income.frequency;
   const roomPerPaycheck = monthlyToPaycheck(remainingContributionRoom / 12, frequency);
   const recommendedContribution = Math.min(roomPerPaycheck, availableAmount);
 
@@ -432,7 +539,7 @@ export function calculateAdditional401k(
     account: accountType,
     amount: recommendedContribution,
     percentage: recommendedContribution / profile.income.netPaycheck,
-    priority: 6,
+    priority: ALLOCATION_PRIORITY.additional401k,
     reasoning: reasoning,
     taxImpact: taxImpact,
     category: 'tax_advantaged',
@@ -446,19 +553,18 @@ export function calculateAdditional401k(
  * Calculate mega backdoor Roth opportunity for high earners
  */
 export function calculateMegaBackdoorRoth(
-  profile: PaycheckProfile, 
-  availableAmount: number
+  profile: PaycheckProfile,
+  availableAmount: number,
+  plannedAllocations: AllocationItem[] = []
 ): AllocationItem | null {
   const benefits = profile.benefits.employer401k;
   if (!benefits.available || !benefits.afterTaxAvailable) return null;
-  
+
   const annualIncome = profile.income.gross * 12;
-  
+
   // Check income threshold - typically beneficial for higher earners
   // who are above Roth IRA limits
-  const megaPhaseout = profile.taxes.filingStatus === 'marriedJoint'
-    ? ROTH_IRA_PHASEOUT_2026.marriedFilingJointly
-    : ROTH_IRA_PHASEOUT_2026.single;
+  const megaPhaseout = getRothPhaseout(profile.taxes.filingStatus);
 
   if (annualIncome < megaPhaseout.end) return null; // Regular Roth IRA is better
 
@@ -474,7 +580,23 @@ export function calculateMegaBackdoorRoth(
       : TOTAL_415C_BY_AGE.standard;
   const employerMatch = annualSalary * benefits.matchPercent * Math.min(benefits.matchLimit, benefits.currentContribution);
 
-  const remainingAfterTaxRoom = totalLimit - currentAnnualContribution - employerMatch;
+  // IRC 415(c) caps ALL annual additions — employee deferrals, employer match,
+  // and after-tax contributions. The match top-up and additional-401k steps
+  // earlier in the same plan already consumed part of that room (same defect
+  // class as the 402(g) netting in calculateAdditional401k), so subtract them.
+  // A match-step deferral also induces employer matching dollars on top of the
+  // employee amount, and those count against 415(c) too.
+  const frequency401k = profile.income.frequency;
+  const plannedAnnualAdditions = plannedAllocations
+    .filter(allocation => allocation.category === 'employer_match' || allocation.id === 'additional-401k')
+    .reduce((sum, allocation) => {
+      const annual = paycheckToMonthly(allocation.amount, frequency401k) * 12;
+      const inducedMatch = allocation.category === 'employer_match' ? annual * benefits.matchPercent : 0;
+      return sum + annual + inducedMatch;
+    }, 0);
+
+  const remainingAfterTaxRoom =
+    totalLimit - currentAnnualContribution - employerMatch - plannedAnnualAdditions;
 
   if (remainingAfterTaxRoom <= 0) return null;
 
@@ -491,10 +613,13 @@ export function calculateMegaBackdoorRoth(
     account: 'Mega Backdoor Roth',
     amount: recommendedContribution,
     percentage: recommendedContribution / profile.income.netPaycheck,
-    priority: 6.5, // After regular 401k but before taxable
+    priority: ALLOCATION_PRIORITY.megaBackdoorRoth, // After regular 401k but before taxable
     reasoning: 'Convert after-tax 401k contributions to Roth for tax-free growth (high earner strategy)',
     taxImpact: 0, // After-tax contributions, no immediate tax benefit
-    category: 'tax_advantaged',
+    // 'tax_optimization' is the taxonomy the mega-backdoor step uses in
+    // lib/constants/financialSteps.ts and lib/utils/stepStatusUtils.ts; tagging
+    // it 'tax_advantaged' left the step unable to find its own allocation.
+    category: 'tax_optimization',
     monthlyEquivalent,
     annualEquivalent: monthlyEquivalent * 12,
     implementation: `Make after-tax 401k contributions of ${formatCurrency(recommendedContribution)} per paycheck, then convert to Roth`,
@@ -517,7 +642,7 @@ export function calculateTaxableInvestment(
     account: 'Taxable Investment',
     amount: availableAmount,
     percentage: availableAmount / profile.income.netPaycheck,
-    priority: 7,
+    priority: ALLOCATION_PRIORITY.taxableInvestment,
     reasoning: 'Build wealth with tax-efficient index funds (VTI/VTSAX)',
     taxImpact: 0, // No immediate tax impact
     category: 'investment',
@@ -534,37 +659,7 @@ export function hasLowInterestDebt(profile: PaycheckProfile): boolean {
   return profile.debts.some(debt => debt.interestRate <= 0.07 && debt.balance > 0);
 }
 
-/**
- * Calculate low-interest debt analysis (Step 8 — usually better invested)
- * This is typically NOT recommended in favor of investing
- */
-export function calculateLowInterestDebtAnalysis(profile: PaycheckProfile): SkippedItem | null {
-  const lowInterestDebts = profile.debts.filter(debt => 
-    debt.interestRate <= 0.07 && debt.balance > 0
-  );
-  
-  if (lowInterestDebts.length === 0) return null;
-  
-  const totalBalance = lowInterestDebts.reduce((sum, debt) => sum + debt.balance, 0);
-  const weightedRate = lowInterestDebts.reduce((sum, debt) => 
-    sum + (debt.interestRate * debt.balance), 0) / totalBalance;
-  
-  // Calculate opportunity cost of paying off early vs investing
-  const marketReturn = 0.07; // 7% expected market return
-  const opportunityCostRate = marketReturn - weightedRate;
-  const annualOpportunityCost = totalBalance * opportunityCostRate;
-  
-  return {
-    id: 'low-interest-debt-payoff',
-    item: `Pay off ${lowInterestDebts.map(d => d.name).join(', ')} early`,
-    reason: `Debt rates (${formatPercent(weightedRate)} avg) below expected investment returns (~7%)`,
-    opportunityCost: {
-      monthly: annualOpportunityCost / 12,
-      annual: annualOpportunityCost,
-      tenYear: annualOpportunityCost * 10, // Simplified calculation
-    },
-    alternative: `Invest extra payments instead - potential ${formatCurrency(annualOpportunityCost)}/year more wealth creation`,
-    riskLevel: 'low',
-    education: 'Low-interest debt (especially tax-deductible) carries a payoff return below typical long-run market assumptions, so the comparison often favors investing - though the payoff return is certain and market returns are not.',
-  };
-}
+// Low-interest debt (FOO Step 8) is surfaced as a skipped item by
+// `analyzeLowInterestDebtStrategy` in lib/calculations/analysis.ts, which
+// `identifySkippedOptimizations` calls. A second, never-called implementation
+// of the same idea used to live here and has been removed.

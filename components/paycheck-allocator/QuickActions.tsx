@@ -4,8 +4,8 @@ import React, { useMemo } from 'react';
 import { monthlyToPaycheck } from '@/lib/calculations/core';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
-import { AllocationItem, PaycheckProfile, SkippedItem } from '@/lib/types';
+import { formatCurrency, formatPercent } from '@/lib/utils';
+import { DebtData, PaycheckProfile } from '@/lib/types';
 import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
 import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
 import {
@@ -25,15 +25,26 @@ import { cn } from '@/lib/utils';
 
 interface QuickActionsProps {
   profile: PaycheckProfile;
-  allocations: AllocationItem[];
-  skippedItems: SkippedItem[];
+}
+
+/**
+ * The impact of an action is split into a short figure and a prose qualifier.
+ * BreakdownRow renders its value column at a fixed width (`shrink-0`), so a
+ * full sentence passed as `value` overflows the row and paints over the label.
+ * Keeping the figure separate lets the qualifier wrap in the label column.
+ */
+interface QuickActionImpact {
+  /** Short figure for the row's value column, e.g. "$45" or "$92/month". */
+  value: string;
+  /** Prose qualifier rendered under the row label, where it can wrap. */
+  detail: string;
 }
 
 interface QuickAction {
   id: string;
   title: string;
   urgency: 'critical' | 'important' | 'optimization';
-  impact: string;
+  impact: QuickActionImpact;
   timeToImplement: string;
   actionType: 'payroll' | 'bank' | 'one-time';
   actionLabel: string;
@@ -45,6 +56,9 @@ interface QuickAction {
   };
   onAction: () => void;
 }
+
+/** Rate above which a debt counts as high-interest (mirrors optimization.ts). */
+const HIGH_INTEREST_THRESHOLD = 0.07;
 
 const urgencyBorderStyles: Record<QuickAction['urgency'], string> = {
   critical: 'border-l-4 border-l-destructive',
@@ -95,7 +109,10 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
       id: 'employer-match',
       title: 'Employer Match Not Fully Captured',
       urgency: 'critical',
-      impact: `${formatCurrency(missedMatchPerPaycheck)} of unclaimed match per ${frequencyText} paycheck`,
+      impact: {
+        value: formatCurrency(missedMatchPerPaycheck),
+        detail: `unclaimed match per ${frequencyText} paycheck`,
+      },
       timeToImplement: '5 minutes',
       actionType: 'payroll',
       actionLabel: `Increase 401k to ${(profile.benefits.employer401k.matchLimit * 100).toFixed(0)}%`,
@@ -112,8 +129,15 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
     });
   }
 
-  // Check for high-interest debt (Critical)
-  const highInterestDebt = profile.debts.find(d => d.interestRate > 0.07);
+  // Check for high-interest debt (Critical). The allocator targets the
+  // highest-rate qualifying debt (optimization.ts calculateHighInterestDebt),
+  // so this card has to name that same debt rather than the first one listed.
+  const highInterestDebt = profile.debts
+    .filter(d => d.interestRate > HIGH_INTEREST_THRESHOLD)
+    .reduce<DebtData | undefined>(
+      (highest, debt) => (highest === undefined || debt.interestRate > highest.interestRate ? debt : highest),
+      undefined
+    );
   if (highInterestDebt) {
     const monthlyInterest = (highInterestDebt.balance * highInterestDebt.interestRate) / 12;
 
@@ -129,7 +153,10 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
       id: 'high-interest-debt',
       title: `${(highInterestDebt.interestRate * 100).toFixed(1)}% Debt Accruing Interest`,
       urgency: 'critical',
-      impact: `${formatCurrency(interestPerPaycheck)} per ${frequencyText} paycheck in interest`,
+      impact: {
+        value: formatCurrency(interestPerPaycheck),
+        detail: `in interest per ${frequencyText} paycheck`,
+      },
       timeToImplement: '6-24 months',
       actionType: 'bank',
       actionLabel: 'Create Payoff Plan',
@@ -152,7 +179,10 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
       id: 'emergency-fund',
       title: 'Emergency Fund Below One Month of Expenses',
       urgency: 'important',
-      impact: 'Covers one month of necessary expenses',
+      impact: {
+        value: '1 month',
+        detail: 'of necessary expenses covered',
+      },
       timeToImplement: '3-6 months',
       actionType: 'bank',
       actionLabel: 'Setup Emergency Fund',
@@ -171,17 +201,23 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
   // Check for HSA opportunity (Important)
   if (profile.benefits.hsa.eligible && profile.benefits.hsa.currentContribution === 0) {
-    const hsaLimit = profile.benefits.hsa.coverageType === 'family'
+    const hsaBase = profile.benefits.hsa.coverageType === 'family'
       ? CONTRIBUTION_LIMITS_2026.hsa.family
       : CONTRIBUTION_LIMITS_2026.hsa.individual;
+    const hsaLimit = hsaBase + (profile.preferences.age >= 55 ? CONTRIBUTION_LIMITS_2026.catchUp.hsa : 0);
     const monthlyMax = hsaLimit / 12;
-    const taxSavings = hsaLimit * 0.22; // Assume 22% tax bracket
+    // Deduction value at the profile's own federal bracket, not a fixed rate.
+    const bracket = Math.max(0, profile.taxes.federalBracket);
+    const taxSavings = hsaLimit * bracket;
 
     actions.push({
       id: 'hsa-max',
       title: 'No HSA Contributions',
       urgency: 'important',
-      impact: `${formatCurrency(taxSavings/12)}/month deferred tax at an assumed 22% rate`,
+      impact: {
+        value: `${formatCurrency(taxSavings / 12)}/month`,
+        detail: `deferred tax at your ${formatPercent(bracket)} federal bracket`,
+      },
       timeToImplement: '5 minutes',
       actionType: 'payroll',
       actionLabel: `Contribute ${formatCurrency(monthlyMax)}/month to HSA`,
@@ -210,7 +246,10 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
       id: 'roth-ira',
       title: 'No Roth IRA Contributions',
       urgency: 'important',
-      impact: `${formatCurrency(potentialGrowth/12)}/month at an assumed 7% return`,
+      impact: {
+        value: `${formatCurrency(potentialGrowth / 12)}/month`,
+        detail: 'at an assumed 7% return',
+      },
       timeToImplement: '30 minutes',
       actionType: 'one-time',
       actionLabel: `Open Roth IRA - ${formatCurrency(monthlyRoth)}/month`,
@@ -275,7 +314,8 @@ export const QuickActions = React.memo(function QuickActions({ profile }: QuickA
                 <BreakdownRow
                   icon={DollarSign}
                   label="Impact"
-                  value={action.impact}
+                  subtitle={action.impact.detail}
+                  value={action.impact.value}
                   variant="success"
                 />
                 <BreakdownRow

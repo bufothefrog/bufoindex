@@ -95,6 +95,12 @@ export function IncomeInputCard({ income, onUpdate }: IncomeInputCardProps) {
               />
             </div>
           )}
+          {income.regularBonus && (
+            <p className="ml-6 text-xs text-muted-foreground">
+              Bonuses are recorded for context and shareable links; the per-paycheck
+              allocation math is based on regular paychecks only.
+            </p>
+          )}
         </div>
 
       </CardContent>

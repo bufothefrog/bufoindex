@@ -437,13 +437,14 @@ describe('Core Paycheck Optimization', () => {
 
       expect(allocation.allocations.length).toBeGreaterThan(0)
 
-      // High earners should see mega backdoor Roth recommendation if available
-      const megaBackdoorAllocation = allocation.allocations.find(a =>
-        a.category === 'tax_advantaged' && a.reasoning.includes('Mega Backdoor')
-      )
+      // High earners should see mega backdoor Roth recommendation if available.
+      // The allocation is catalogued as 'tax_optimization' (matching
+      // lib/constants/financialSteps.ts), not 'tax_advantaged'.
+      const megaBackdoorAllocation = allocation.allocations.find(a => a.id === 'mega-backdoor-roth')
 
       if (megaBackdoorAllocation) {
         expect(megaBackdoorAllocation.amount).toBeGreaterThan(0)
+        expect(megaBackdoorAllocation.category).toBe('tax_optimization')
       }
     })
 
@@ -525,6 +526,217 @@ describe('Core Paycheck Optimization', () => {
       expect(allocation.allocations).toHaveLength(0)
       expect(allocation.remainingAmount).toBe(0)
       expect(allocation.funMoneyAllocated).toBe(167)
+    })
+
+    it('should never report a negative fun-money range', () => {
+      // The max input is not constrained to the min, and validateProfile only
+      // reports the error — it never blocks the calculation. A max below the
+      // min must not surface as a negative flexible-spending band.
+      const inverted = createPaycheckProfile({
+        ...mockProfile,
+        preferences: {
+          ...mockProfile.preferences,
+          funMoney: { min: 800, max: 200, current: 400 },
+        },
+      })
+
+      const result = calculateOptimalAllocation(inverted)
+      expect(result.funMoneyRange.min).toBe(800)
+      expect(result.funMoneyRange.max).toBe(800)
+      expect(result.funMoneyRange.difference).toBe(0)
+      // The floor the plan reserves is still the minimum the user asked for
+      expect(result.funMoneyAllocated).toBe(800)
+
+      // A negative maximum is clamped the same way
+      const negativeMax = calculateOptimalAllocation(
+        createPaycheckProfile({
+          ...mockProfile,
+          preferences: { ...mockProfile.preferences, funMoney: { min: 0, max: -100, current: 0 } },
+        })
+      )
+      expect(negativeMax.funMoneyRange.max).toBe(0)
+      expect(negativeMax.funMoneyRange.difference).toBe(0)
+    })
+
+    it('should respect a deliberate fun-money maximum of $0', () => {
+      // `Number(max) || min || 0` treated a deliberate 0 as missing input.
+      const noFunMoney = createPaycheckProfile({
+        ...mockProfile,
+        preferences: {
+          ...mockProfile.preferences,
+          funMoney: { min: 0, max: 0, current: 0 },
+        },
+      })
+
+      const result = calculateOptimalAllocation(noFunMoney)
+      expect(result.funMoneyRange).toEqual({ min: 0, max: 0, difference: 0 })
+      expect(result.funMoneyAllocated).toBe(0)
+      expect(Object.is(result.funMoneyRange.difference, -0)).toBe(false)
+      // With no fun-money floor, the whole post-expenses paycheck is allocatable:
+      // 2200 - 3000/(26/12) = 2200 - 1384.62 = 815.38
+      expect(result.paycheckContext!.funMoneyPerPaycheck).toBe(0)
+      expect(result.paycheckContext!.availablePerPaycheck + result.allocations.reduce((s, a) => s + a.amount, 0))
+        .toBeCloseToCurrency(815.38, 2)
+    })
+
+    it('should report incomeShortfall when necessary expenses exceed take-home pay', () => {
+      // $20,000/month of necessary expenses against a $2,200 bi-weekly
+      // paycheck. Per paycheck the expenses are 20,000 * 12/26 = $9,230.77,
+      // i.e. $7,030.77 more than the paycheck itself.
+      const underwater = createPaycheckProfile({
+        ...mockProfile,
+        preferences: { ...mockProfile.preferences, necessaryExpenses: 20000 },
+      })
+
+      const result = calculateOptimalAllocation(underwater)
+
+      expect(result.allocations).toHaveLength(0)
+      expect(result.remainingAmount).toBe(0)
+      expect(result.incomeShortfall).toBeCloseToCurrency(7030.77, 2)
+      // = necessaryExpensesPerPaycheck - netPaycheck, exactly
+      expect(result.incomeShortfall).toBeCloseToCurrency(
+        result.paycheckContext!.necessaryExpensesPerPaycheck - 2200,
+        6
+      )
+    })
+
+    it('should omit incomeShortfall when take-home pay covers necessary expenses', () => {
+      const result = calculateOptimalAllocation(mockProfile)
+      expect(result.incomeShortfall).toBeUndefined()
+
+      // Exactly break-even is not a shortfall either: 2200/paycheck bi-weekly
+      // = 2200 * 26/12 = $4,766.67/month of necessary expenses.
+      const breakEven = calculateOptimalAllocation(
+        createPaycheckProfile({
+          ...mockProfile,
+          preferences: {
+            ...mockProfile.preferences,
+            necessaryExpenses: 2200 * FREQUENCY_MULTIPLIERS['bi-weekly'],
+            funMoney: { min: 0, max: 0, current: 0 },
+          },
+        })
+      )
+      expect(breakEven.incomeShortfall).toBeUndefined()
+    })
+
+    it('should keep total 401k deferral inside the 402(g) limit across the match and top-up steps', () => {
+      // Weekly pay, $13,000/month gross ($156,000/yr), age 60 → the elective
+      // deferral limit is $24,500 + $11,250 super catch-up = $35,750. The match
+      // step recommends 6% of salary ($9,360/yr); the top-up must claim only
+      // the remaining $26,390, not the whole limit again.
+      const profile = createPaycheckProfile({
+        income: {
+          grossPaycheck: 3000,
+          netPaycheck: 2250,
+          frequency: 'weekly',
+          regularBonus: false,
+          bonusAmount: 0,
+          bonusFrequency: 'annual',
+          monthlyGross: 13000,
+          monthlyNet: 9750,
+          gross: 13000,
+          net: 9750,
+          bonusExpected: 0,
+        },
+        taxes: {
+          federalBracket: 0.32,
+          state: 'TX',
+          filingStatus: 'single',
+          currentWithholding: { federal: 0, state: 0, fica: 0 },
+        },
+        benefits: {
+          employer401k: {
+            available: true,
+            matchPercent: 0.5,
+            matchLimit: 0.06,
+            currentContribution: 0,
+            contributionType: 'traditional',
+            traditionalContribution: 0,
+            rothContribution: 0,
+            afterTaxAvailable: false,
+            currentYTD: 0,
+          },
+          hsa: {
+            eligible: false,
+            employerContribution: 0,
+            currentContribution: 0,
+            currentYTD: 0,
+            coverageType: 'individual',
+            investmentStrategy: false,
+          },
+          ira: {
+            hasIRA: false,
+            accountTypes: { traditional: false, roth: false },
+            currentContributions: { traditional: 0, roth: 0 },
+            currentBalances: { traditional: 0, roth: 0 },
+          },
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+        debts: [],
+        preferences: {
+          emergencyFundMonths: 3,
+          currentEmergencyFund: 30000,
+          emergencyFundAPY: 0.045,
+          necessaryExpenses: 2000,
+          funMoney: { min: 0, max: 0, current: 0 },
+          age: 60,
+          isPeakEarnings: false,
+          expectedRetirementBracket: 0.12,
+          riskTolerance: 'moderate',
+          optimizationGoal: 'wealth_maximization',
+          hasTaxableAccount: false,
+          taxableAccountContribution: 0,
+        },
+      })
+
+      const result = calculateOptimalAllocation(profile)
+      const paychecksPerYear = FREQUENCY_MULTIPLIERS.weekly * 12 // 52
+
+      const match = result.allocations.find(a => a.id === 'employer-match')!
+      const topUp = result.allocations.find(a => a.id === 'additional-401k')!
+      expect(match).toBeDefined()
+      expect(topUp).toBeDefined()
+
+      const matchAnnual = match.amount * paychecksPerYear
+      const topUpAnnual = topUp.amount * paychecksPerYear
+      expect(matchAnnual).toBeCloseToCurrency(9360, 2) // 156,000 * 6%
+      expect(topUpAnnual).toBeCloseToCurrency(26390, 2) // 35,750 - 9,360
+
+      // Previously 9,360 + 35,750 = 45,110 against a 35,750 limit
+      expect(matchAnnual + topUpAnnual).toBeCloseToCurrency(35750, 2)
+      expect(matchAnnual + topUpAnnual).toBeLessThanOrEqual(35750 + 1e-6)
+    })
+
+    it('should emit allocations in non-decreasing priority order', () => {
+      // A profile that lights up most of the order: no emergency fund, a live
+      // employer match, 22% debt, HSA room, Roth room and 401k room.
+      const richProfile = createPaycheckProfile({
+        ...mockProfile,
+        income: {
+          ...mockProfile.income,
+          netPaycheck: 4000,
+          monthlyNet: 4000 * FREQUENCY_MULTIPLIERS['bi-weekly'],
+          net: 4000 * FREQUENCY_MULTIPLIERS['bi-weekly'],
+        },
+        preferences: {
+          ...mockProfile.preferences,
+          necessaryExpenses: 2000,
+          currentEmergencyFund: 500,
+          funMoney: { min: 100, max: 300, current: 200 },
+        },
+        debts: [
+          createDebtData({ name: 'Credit Card', balance: 9000, interestRate: 0.22, minimumPayment: 200 }),
+        ],
+      })
+
+      const result = calculateOptimalAllocation(richProfile)
+      expect(result.allocations.length).toBeGreaterThan(2)
+
+      const priorities = result.allocations.map(a => a.priority)
+      const sorted = [...priorities].sort((a, b) => a - b)
+      expect(priorities).toEqual(sorted)
+      // Distinct values: sorting by priority cannot depend on array order
+      expect(new Set(priorities).size).toBe(priorities.length)
     })
 
     it('should update legacy income fields automatically', () => {

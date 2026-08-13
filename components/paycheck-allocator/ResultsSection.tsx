@@ -12,7 +12,9 @@ import { PaycheckBreakdown } from './PaycheckBreakdown';
 import { QuickActions } from './QuickActions';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { formatCurrency, formatYearsAndMonths } from '@/lib/utils';
+import type { AllocationResult } from '@/lib/types';
 import { displayDollars, DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
+import { PROJECTION_YEARS } from '@/lib/calculations/projections';
 import {
   TrendingUp,
   ChevronDown,
@@ -40,15 +42,52 @@ export const ResultsSection = React.memo(function ResultsSection() {
 
   // Display-only conversion for multi-year projections: per-paycheck
   // allocation amounts are current-year money and are never converted.
+  // Deflation is linear, so applying it to each path and to their difference
+  // stays internally consistent — the sign of the difference cannot flip.
   const toDisplayTenYear = (nominalAmount: number) =>
-    displayDollars(nominalAmount, displayMode, DISPLAY_INFLATION_ASSUMPTION, 10);
+    displayDollars(
+      nominalAmount,
+      displayMode,
+      DISPLAY_INFLATION_ASSUMPTION,
+      PROJECTION_YEARS
+    );
+
+  // The projection compares the same universe of dollars on both paths, but the
+  // recommended split can still come out behind — e.g. when part of the paycheck
+  // is left unallocated. Read the sign off the rounded figure so a difference
+  // that renders as $0 is labelled neither a gain nor a shortfall.
+  const improvementValue = toDisplayTenYear(result.projections.improvement.tenYear);
+  const roundedImprovement = Math.round(improvementValue);
+  const isGain = roundedImprovement > 0;
+  const isShortfall = roundedImprovement < 0;
 
   const visibleSkippedItems = showAllSkipped
-    ? result.skippedItems 
+    ? result.skippedItems
     : result.skippedItems.slice(0, 2);
-  
+
+  // Per-paycheck dollars by which necessary expenses exceed net pay. The field
+  // is optional on AllocationResult and only set when the shortfall is positive;
+  // read it through an intersection so this file compiles either way.
+  const incomeShortfall = (result as AllocationResult & { incomeShortfall?: number })
+    .incomeShortfall;
+  const hasIncomeShortfall = typeof incomeShortfall === 'number' && incomeShortfall > 0;
+
   return (
     <div className="space-y-6">
+      {hasIncomeShortfall && (
+        <StatusAlert
+          variant="warning"
+          icon={AlertTriangle}
+          title="Necessary expenses exceed take-home pay"
+        >
+          Your necessary expenses are {formatCurrency(incomeShortfall)} more than
+          your net pay per paycheck, so nothing is left to allocate
+          {result.allocations.length === 0 && ' and no allocations were generated'}.
+          The figures below are calculated from the same inputs; changing the
+          expense, income, or pay-frequency figures changes this gap.
+        </StatusAlert>
+      )}
+
       {/* Paycheck Breakdown */}
       <PaycheckBreakdown 
         profile={profile}
@@ -59,11 +98,7 @@ export const ResultsSection = React.memo(function ResultsSection() {
       />
 
       {/* Quick Actions - Action-focused priority items */}
-      <QuickActions 
-        profile={profile}
-        allocations={result.allocations}
-        skippedItems={result.skippedItems}
-      />
+      <QuickActions profile={profile} />
       
       {/* Notes on this allocation / Skipped Items */}
       {result.skippedItems.length > 0 && (
@@ -137,9 +172,11 @@ export const ResultsSection = React.memo(function ResultsSection() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
+            Both paths start from the same balances and payroll contributions and
+            assume today&apos;s split continues for ten years.{' '}
             {displayMode === 'today'
-              ? "adjusted to today's dollars (assumes 3% inflation)"
-              : 'in future dollars'}
+              ? "Adjusted to today's dollars (assumes 3% inflation)."
+              : 'Shown in future dollars.'}
           </p>
           <div className="space-y-3">
             <BreakdownRow
@@ -149,16 +186,29 @@ export const ResultsSection = React.memo(function ResultsSection() {
             <BreakdownRow
               label="Optimized Path (10 years)"
               value={formatCurrency(toDisplayTenYear(result.projections.optimizedPath.tenYear))}
-              variant="success"
+              variant={isShortfall ? 'default' : 'success'}
             />
             <hr className="border" />
             <BreakdownRow
-              label="Improvement"
-              value={formatCurrency(toDisplayTenYear(result.projections.improvement.tenYear))}
-              prefix="+"
-              variant="success"
+              label={isShortfall ? 'Difference' : 'Improvement'}
+              value={formatCurrency(Math.abs(improvementValue))}
+              prefix={isGain ? '+' : isShortfall ? '-' : ''}
+              variant={isGain ? 'success' : isShortfall ? 'danger' : 'default'}
             />
           </div>
+
+          {isShortfall && (
+            <StatusAlert
+              variant="warning"
+              icon={AlertTriangle}
+              title="This split projects below your current path"
+            >
+              The allocation above directs less money toward net worth than your
+              current saving rate implies, or routes it to lower-yielding
+              accounts. Anything left unallocated is treated as spent — check
+              your necessary expenses and fun-money inputs.
+            </StatusAlert>
+          )}
 
           {result.projections.improvement.fiYearsEarlier > 0 && (
             <StatusAlert variant="info">

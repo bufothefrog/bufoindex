@@ -39,6 +39,61 @@ export function identifySkippedOptimizations(profile: PaycheckProfile): SkippedI
   return skippedItems;
 }
 
+/** Long-run return this module assumes for invested dollars. */
+const ASSUMED_MARKET_RETURN = 0.07;
+
+/** Months of expenses this module treats as the top of the cash range. */
+const CASH_MONTHS_CAP = 3;
+
+const MARKET_LABEL = `${(ASSUMED_MARKET_RETURN * 100).toFixed(0)}%`;
+
+const apyLabel = (apy: number): string => `${(apy * 100).toFixed(1)}%`;
+
+/**
+ * Cost of holding a balance in cash at `apy` instead of investing it at the
+ * assumed market return.
+ *
+ * A cash yield at or above that assumption carries no opportunity cost, so the
+ * figures floor at 0 rather than reporting the negative spread as a "cost";
+ * `meetsMarket` lets the copy say why instead of quoting a $0 (or negative)
+ * dollar figure.
+ */
+interface CashHoldingCost {
+  monthly: number;
+  annual: number;
+  tenYear: number;
+  /** The cash yield meets or exceeds the assumed market return. */
+  meetsMarket: boolean;
+}
+
+function cashHoldingCost(amount: number, apy: number): CashHoldingCost {
+  const spread = ASSUMED_MARKET_RETURN - apy;
+  if (spread <= 0 || !(amount > 0)) {
+    return { monthly: 0, annual: 0, tenYear: 0, meetsMarket: spread <= 0 };
+  }
+
+  const annual = amount * spread;
+  return {
+    monthly: annual / 12,
+    annual,
+    tenYear: calculateCompoundOpportunityCost(amount, apy, ASSUMED_MARKET_RETURN, 10),
+    meetsMarket: false,
+  };
+}
+
+/**
+ * Education copy for a cash-holding comparison. The dollar framing appears only
+ * when a dollar cost was actually computed, so no card ever claims a "$0
+ * opportunity cost".
+ */
+function cashHoldingEducation(subject: string, apy: number, cost: CashHoldingCost): string {
+  if (cost.meetsMarket) {
+    return `${subject} earns ${apyLabel(apy)} APY, at or above the ${MARKET_LABEL} this model assumes for invested dollars, so no opportunity cost is modeled here`;
+  }
+
+  return `${subject} earns ${apyLabel(apy)} APY against the ${MARKET_LABEL} assumed for invested dollars: ${formatCurrency(cost.tenYear)} over 10 years`;
+}
+
 /**
  * Analyze emergency fund with enhanced opportunity cost calculations
  */
@@ -48,59 +103,67 @@ function analyzeEmergencyFund(profile: PaycheckProfile): SkippedItem | null {
   const currentEmergencyFund = profile.preferences.currentEmergencyFund;
   const emergencyFundAPY = profile.preferences.emergencyFundAPY;
   const targetAmount = monthlyExpenses * targetMonths;
-  const currentMonths = currentEmergencyFund / monthlyExpenses;
-  
+  // With no expense base there is no months-of-expenses figure at all — the
+  // division used to yield Infinity and print it straight into the card copy,
+  // so every branch below has to read as sense without a ratio.
+  const monthsCovered = monthlyExpenses > 0 ? currentEmergencyFund / monthlyExpenses : null;
+
   // Case 1: Current emergency fund exceeds target
   if (currentEmergencyFund > targetAmount + 500) { // $500 buffer
     const excessAmount = currentEmergencyFund - targetAmount;
-    const tenYearOpportunityCost = calculateCompoundOpportunityCost(
-      excessAmount, 
-      emergencyFundAPY, 
-      0.07, // Expected market return
-      10
-    );
-    
+    const cost = cashHoldingCost(excessAmount, emergencyFundAPY);
+
     return {
       id: 'excessive-emergency-fund',
       item: 'Excessive Emergency Fund',
-      reason: `You have ${formatCurrency(currentEmergencyFund)} (${currentMonths.toFixed(1)} months) but target ${targetMonths} months`,
+      reason:
+        monthsCovered === null
+          ? `You have ${formatCurrency(currentEmergencyFund)} saved and $0 of monthly necessary expenses recorded, so months of coverage cannot be computed`
+          : `You have ${formatCurrency(currentEmergencyFund)} (${monthsCovered.toFixed(1)} months) but target ${targetMonths} months`,
       opportunityCost: {
-        monthly: excessAmount * (0.07 - emergencyFundAPY) / 12,
-        annual: excessAmount * (0.07 - emergencyFundAPY),
-        tenYear: tenYearOpportunityCost,
+        monthly: cost.monthly,
+        annual: cost.annual,
+        tenYear: cost.tenYear,
       },
-      alternative: `Invest excess ${formatCurrency(excessAmount)} in taxable accounts. Keep ${targetMonths} months + Roth IRA as backup emergency fund`,
-      riskLevel: targetMonths >= 3 ? 'low' : 'medium',
-      education: `Emergency funds at ${(emergencyFundAPY * 100).toFixed(1)}% APY vs 7% expected market returns = ${formatCurrency(tenYearOpportunityCost)} opportunity cost over 10 years`,
+      alternative: cost.meetsMarket
+        ? `The ${formatCurrency(excessAmount)} above target already earns ${apyLabel(emergencyFundAPY)} in cash; what is left to weigh is liquidity, not return`
+        : `Invest excess ${formatCurrency(excessAmount)} in taxable accounts. Keep ${targetMonths} months + Roth IRA as backup emergency fund`,
+      riskLevel: targetMonths >= CASH_MONTHS_CAP ? 'low' : 'medium',
+      education: cashHoldingEducation('The balance above target', emergencyFundAPY, cost),
     };
   }
-  
-  // Case 2: Target emergency fund is excessive (BufoIndex maximum: 3 months)
-  if (targetMonths > 3) {
-    const excessMonths = targetMonths - 3;
-    const excessAmount = monthlyExpenses * excessMonths;
-    const tenYearOpportunityCost = calculateCompoundOpportunityCost(
-      excessAmount,
-      emergencyFundAPY,
-      0.07,
-      10
-    );
-    
+
+  // Case 2: Target runs past the cash cap. The cost is charged on the cash the
+  // profile actually holds above that cap — a target nobody has funded yet
+  // costs nothing, and used to pre-empt the far more relevant zero-fund case.
+  const cashCap = monthlyExpenses * CASH_MONTHS_CAP;
+  const heldTowardTarget = Math.min(currentEmergencyFund, targetAmount);
+  const excessHeld = Math.max(0, heldTowardTarget - cashCap);
+
+  if (targetMonths > CASH_MONTHS_CAP && excessHeld > 0) {
+    const cost = cashHoldingCost(excessHeld, emergencyFundAPY);
+
     return {
       id: 'large-emergency-fund-target',
       item: 'Large Emergency Fund Target',
-      reason: `${targetMonths}-month emergency fund exceeds BufoIndex maximum of 3 months - opportunity cost too high`,
+      reason: `Under a ${targetMonths}-month target, ${formatCurrency(excessHeld)} of the ${formatCurrency(currentEmergencyFund)} saved sits beyond ${CASH_MONTHS_CAP} months of expenses`,
       opportunityCost: {
-        monthly: excessAmount * (0.07 - emergencyFundAPY) / 12,
-        annual: excessAmount * (0.07 - emergencyFundAPY),
-        tenYear: tenYearOpportunityCost,
+        monthly: cost.monthly,
+        annual: cost.annual,
+        tenYear: cost.tenYear,
       },
-      alternative: `Limit to 3-month cash maximum + Roth IRA principal as extended backup. Invest the excess ${formatCurrency(excessAmount)}`,
+      alternative: cost.meetsMarket
+        ? `At ${apyLabel(emergencyFundAPY)} the ${formatCurrency(excessHeld)} beyond ${CASH_MONTHS_CAP} months gives up no modeled return; the trade-off is liquidity`
+        : `Keep ${CASH_MONTHS_CAP} months in cash and invest the remaining ${formatCurrency(excessHeld)}, with Roth IRA principal available as a backup`,
       riskLevel: 'low',
-      education: `BufoIndex philosophy: Emergency funds beyond 3 months cost more in opportunity (${formatCurrency(tenYearOpportunityCost)} over 10 years) than they provide in security`,
+      education: cashHoldingEducation(
+        `Cash held beyond ${CASH_MONTHS_CAP} months`,
+        emergencyFundAPY,
+        cost
+      ),
     };
   }
-  
+
   // Case 3: Emergency fund APY too low
   if (currentEmergencyFund > 1000 && emergencyFundAPY < 0.04) {
     const betterAPY = 0.04; // 4.0% HYSA
@@ -121,22 +184,24 @@ function analyzeEmergencyFund(profile: PaycheckProfile): SkippedItem | null {
     };
   }
   
-  // Case 4: Zero emergency fund with conservative/moderate risk tolerance
-  if (currentMonths < 1 && profile.preferences.riskTolerance !== 'optimizer') {
+  // Case 4: Zero emergency fund with conservative/moderate risk tolerance.
+  // A risk note, not a priced trade-off: the costs stay at zero and the copy
+  // carries no dollar framing for the card to render.
+  if (monthsCovered !== null && monthsCovered < 1 && profile.preferences.riskTolerance !== 'optimizer') {
     return {
       id: 'no-emergency-fund',
       item: 'Insufficient Emergency Fund',
-      reason: 'Less than 1 month of expenses saved increases financial risk',
+      reason: `${formatCurrency(currentEmergencyFund)} saved covers ${monthsCovered.toFixed(1)} months of a ${formatCurrency(monthlyExpenses)}/month expense base`,
       opportunityCost: {
         monthly: 0,
         annual: 0,
       },
-      alternative: 'Build 1-month emergency fund first, then up to 3-month maximum total',
+      alternative: `Build 1 month of expenses first, then up to the ${CASH_MONTHS_CAP}-month cash maximum`,
       riskLevel: 'high',
-      education: 'Emergency funds provide peace of mind and prevent debt accumulation during crises',
+      education: 'This is a risk note rather than a priced trade-off: a cash buffer is what keeps an unplanned expense from becoming high-rate debt',
     };
   }
-  
+
   return null;
 }
 
@@ -322,20 +387,23 @@ function analyzeRothVsTraditionalStrategy(profile: PaycheckProfile): SkippedItem
     }
   }
   
-  // Case 2: Young person not in peak earnings choosing Traditional
+  // Case 2: Young person not in peak earnings choosing Traditional.
+  // The size of the Roth-vs-Traditional gap depends on a retirement bracket
+  // decades out, so no dollar figure is modeled here; the item carries zero
+  // costs and no dollar framing rather than the flat $15,000 estimate it used
+  // to report for every profile that reached this branch.
   if (age < 30 && !isPeakEarnings && currentBracket <= 0.12) {
     return {
       id: 'traditional-vs-roth',
-      item: 'Traditional vs Roth Strategy', 
-      reason: `Age ${age} + not peak earnings + ${(currentBracket * 100).toFixed(0)}% bracket: Roth likely optimal`,
+      item: 'Traditional vs Roth Strategy',
+      reason: `Age ${age}, not peak earnings, ${(currentBracket * 100).toFixed(0)}% bracket: contributions are deducted at a low rate today`,
       opportunityCost: {
-        monthly: 0, // No immediate monthly cost
+        monthly: 0,
         annual: 0,
-        tenYear: 15000, // Rough estimate of tax-free growth benefit
       },
-      alternative: 'Roth IRA provides tax-free growth for decades - pay low taxes now',
+      alternative: `Roth contributions are taxed at today's ${(currentBracket * 100).toFixed(0)}% and grow tax-free; Traditional defers the tax to whatever bracket applies at withdrawal`,
       riskLevel: 'low',
-      education: 'Young + low bracket = Roth sweet spot. Tax-free growth compounds for 35+ years',
+      education: `The comparison turns on today's ${(currentBracket * 100).toFixed(0)}% bracket versus the bracket at withdrawal, and on how long the balance compounds — no dollar difference is modeled here`,
     };
   }
   
@@ -358,27 +426,34 @@ function analyzeLowInterestDebtStrategy(profile: PaycheckProfile): SkippedItem |
   
   const debt = lowInterestDebt[0]; // Focus on first one
   const extraPayment = debt.extraPayment;
-  const expectedMarketReturn = 0.07;
-  const arbitrageReturn = expectedMarketReturn - debt.interestRate;
-  
+  const arbitrageReturn = ASSUMED_MARKET_RETURN - debt.interestRate;
+
   const tenYearOpportunityCost = calculateCompoundOpportunityCost(
     extraPayment * 12, // Annual extra payment
     debt.interestRate,
-    expectedMarketReturn,
+    ASSUMED_MARKET_RETURN,
     10
   );
-  
+
+  // `extraPayment` is a monthly figure, so the annual stream is 12x it and the
+  // monthly cost is exactly one twelfth of the annual one. Dividing by 12 a
+  // second time understated the monthly line by a factor of 12.
+  const annualCost = extraPayment * 12 * arbitrageReturn;
+
   return {
     id: 'low-interest-debt-prepayment',
     item: 'Low-Interest Debt Prepayment',
     reason: `Paying extra on ${(debt.interestRate * 100).toFixed(1)}% debt instead of investing`,
     opportunityCost: {
-      monthly: extraPayment * arbitrageReturn / 12,
-      annual: extraPayment * 12 * arbitrageReturn,
+      monthly: annualCost / 12,
+      annual: annualCost,
       tenYear: tenYearOpportunityCost,
     },
-    alternative: `Invest extra ${formatCurrency(extraPayment)}/month instead. Expected arbitrage: ${(arbitrageReturn * 100).toFixed(1)}%/year`,
+    alternative: `Invest extra ${formatCurrency(extraPayment)}/month instead. Modeled spread: ${(arbitrageReturn * 100).toFixed(1)}%/year`,
     riskLevel: 'medium',
-    education: `BufoIndex debt threshold: Only prepay debt above 7% interest rate. Below 7%, invest instead. ${formatCurrency(tenYearOpportunityCost)} opportunity cost over 10 years.`,
+    education:
+      arbitrageReturn > 0
+        ? `Prepaying returns the debt's ${(debt.interestRate * 100).toFixed(1)}% with certainty; investing is modeled at ${MARKET_LABEL}, a ${formatCurrency(tenYearOpportunityCost)} difference over 10 years on this payment stream.`
+        : `Prepaying returns the debt's ${(debt.interestRate * 100).toFixed(1)}%, the same rate this model assumes for invested dollars, so no dollar difference is modeled — and the debt payoff is the certain side of that comparison.`,
   };
 }

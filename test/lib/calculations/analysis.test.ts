@@ -30,6 +30,20 @@ function findItem(items: SkippedItem[], id: string): SkippedItem | undefined {
   return items.find((item) => item.id === id)
 }
 
+/**
+ * An item with no modeled dollar cost keeps a valid shape (zeros, so the card
+ * drops its cost rows) and carries no dollar framing in its education line —
+ * the "= $0 opportunity cost over 10 years" claim these cards used to render.
+ */
+function expectNoDollarFraming(item: SkippedItem): void {
+  expect(item.opportunityCost.monthly).toBe(0)
+  expect(item.opportunityCost.annual).toBe(0)
+  expect(item.opportunityCost.tenYear ?? 0).toBe(0)
+  expect(item.opportunityCost.twentyYear ?? 0).toBe(0)
+  expect(item.education?.trim()).toBeTruthy()
+  expect(item.education).not.toContain('$')
+}
+
 describe('identifySkippedOptimizations', () => {
   describe('emergency fund analysis', () => {
     it('flags an excessive emergency fund with compound opportunity cost', () => {
@@ -61,11 +75,13 @@ describe('identifySkippedOptimizations', () => {
       expect(findItem(items, 'excessive-emergency-fund')).toBeUndefined()
     })
 
-    it('flags an emergency fund target above the 3-month maximum', () => {
-      // 6-month target, $3,000/mo expenses: excess = 3 months = $9,000 at 4.5% APY
-      //   monthly = 9000 * 0.025 / 12 = $18.75
-      //   annual  = 9000 * 0.025 = $225
-      //   tenYear = 9000 * (1.07^10 - 1.045^10) = $3,727.64
+    it('flags an emergency fund target above the 3-month maximum, priced on the cash actually held', () => {
+      // 6-month target, $3,000/mo expenses, $17,000 saved. The cost is charged on
+      // the cash held beyond 3 months, not on the whole 3-month gap in the target:
+      //   excess  = min(17,000, 18,000) - 9,000 = $8,000 at 4.5% APY
+      //   monthly = 8000 * 0.025 / 12 = $16.67
+      //   annual  = 8000 * 0.025 = $200
+      //   tenYear = 8000 * (1.07^10 - 1.045^10) = 8000 * 0.4141819 = $3,313.46
       // Current fund $17,000 stays below target + $500 = $18,500 so Case 1 does not fire.
       const profile = createPaycheckProfile({
         preferences: createUserPreferences({
@@ -76,10 +92,46 @@ describe('identifySkippedOptimizations', () => {
 
       const item = findItem(identifySkippedOptimizations(profile), 'large-emergency-fund-target')
       expect(item).toBeDefined()
-      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(18.75)
-      expect(item!.opportunityCost.annual).toBeCloseToCurrency(225)
-      expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(3727.64)
+      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(16.67)
+      expect(item!.opportunityCost.annual).toBeCloseToCurrency(200)
+      expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(3313.46)
       expect(item!.riskLevel).toBe('low')
+    })
+
+    it('prices the large-target item on the balance above 3 months, not the target gap', () => {
+      // Same 6-month target with only $12,000 saved: excess = 12,000 - 9,000 = $3,000
+      //   monthly = 3000 * 0.025 / 12 = $6.25
+      //   annual  = 3000 * 0.025 = $75
+      //   tenYear = 3000 * 0.4141819 = $1,242.55
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({
+          emergencyFundMonths: 6,
+          currentEmergencyFund: 12000,
+        }),
+      })
+
+      const item = findItem(identifySkippedOptimizations(profile), 'large-emergency-fund-target')
+      expect(item).toBeDefined()
+      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(6.25)
+      expect(item!.opportunityCost.annual).toBeCloseToCurrency(75)
+      expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(1242.55)
+    })
+
+    it('charges no cost against a large target the user has not funded', () => {
+      // Regression: a $0 fund with a 6-month target was told its (nonexistent)
+      // $9,000 excess cost $3,727.64 over ten years, and that card pre-empted the
+      // zero-fund card entirely.
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({
+          emergencyFundMonths: 6,
+          currentEmergencyFund: 0,
+        }),
+        debts: [],
+      })
+
+      const items = identifySkippedOptimizations(profile)
+      expect(findItem(items, 'large-emergency-fund-target')).toBeUndefined()
+      expect(findItem(items, 'no-emergency-fund')).toBeDefined()
     })
 
     it('flags a low emergency fund APY with simple (non-compounded) ten-year cost', () => {
@@ -113,7 +165,7 @@ describe('identifySkippedOptimizations', () => {
       expect(findItem(items, 'low-emergency-fund-apy')).toBeUndefined()
     })
 
-    it('flags a missing emergency fund as high risk with zero opportunity cost', () => {
+    it('flags a missing emergency fund as a risk note with no dollar cost claimed', () => {
       const profile = createPaycheckProfile({
         preferences: createUserPreferences({ currentEmergencyFund: 0 }),
       })
@@ -124,6 +176,66 @@ describe('identifySkippedOptimizations', () => {
       expect(item!.opportunityCost.monthly).toBe(0)
       expect(item!.opportunityCost.annual).toBe(0)
       expect(item!.opportunityCost.tenYear).toBeUndefined()
+      // The shape stays valid, but nothing in the copy asserts a dollar cost
+      expectNoDollarFraming(item!)
+      expect(item!.reason).toContain('0.0 months')
+    })
+
+    it('claims no months-of-coverage figure when there is no expense base', () => {
+      // Regression: necessaryExpenses = 0 divided by zero and printed the result,
+      // producing "You have $1,500 (Infinity months) but target 3 months".
+      // With a $0 expense base the target is $0, so the whole fund is excess:
+      //   monthly = 1500 * (0.07 - 0.045) / 12 = $3.125
+      //   annual  = 1500 * 0.025 = $37.50
+      //   tenYear = 1500 * (1.07^10 - 1.045^10) = 1500 * 0.4141819 = $621.27
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({
+          necessaryExpenses: 0,
+          currentEmergencyFund: 1500,
+        }),
+      })
+
+      const item = findItem(identifySkippedOptimizations(profile), 'excessive-emergency-fund')
+      expect(item).toBeDefined()
+      expect(item!.reason).not.toMatch(/Infinity|∞|NaN/)
+      expect(item!.reason).not.toMatch(/months\)/) // no "(x.x months)" ratio at all
+      expect(item!.reason).toContain('$1,500')
+      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(3.125, 3)
+      expect(item!.opportunityCost.annual).toBeCloseToCurrency(37.5)
+      expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(621.27)
+    })
+
+    it('reports no opportunity cost when the fund yield beats the market assumption', () => {
+      // $50,000 at 9% APY, 3-month ($9,000) target. The 0.07 - 0.09 spread used to
+      // be reported as a cost: { monthly: -68.33, annual: -820, tenYear: -16,408.71 }.
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({
+          currentEmergencyFund: 50000,
+          emergencyFundAPY: 0.09,
+        }),
+        debts: [],
+      })
+
+      const item = findItem(identifySkippedOptimizations(profile), 'excessive-emergency-fund')
+      expect(item).toBeDefined()
+      expectNoDollarFraming(item!)
+      expect(item!.education).toContain('at or above')
+      // the months figure is still real and still quoted: 50,000 / 3,000 = 16.7
+      expect(item!.reason).toContain('16.7 months')
+    })
+
+    it('reports no opportunity cost at exactly the 7% market assumption', () => {
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({
+          currentEmergencyFund: 50000,
+          emergencyFundAPY: 0.07,
+        }),
+        debts: [],
+      })
+
+      const item = findItem(identifySkippedOptimizations(profile), 'excessive-emergency-fund')
+      expect(item).toBeDefined()
+      expectNoDollarFraming(item!)
     })
 
     it('does not flag a missing emergency fund for the optimizer risk tolerance', () => {
@@ -140,15 +252,17 @@ describe('identifySkippedOptimizations', () => {
   })
 
   describe('Roth vs Traditional strategy', () => {
-    it('recommends Roth for a young, low-bracket, non-peak earner', () => {
-      // Factory defaults: age 28 (< 30), isPeakEarnings false, 12% bracket (<= 0.12)
+    it('surfaces Roth for a young, low-bracket, non-peak earner without inventing a dollar figure', () => {
+      // Factory defaults: age 28 (< 30), isPeakEarnings false, 12% bracket (<= 0.12).
+      // The item used to carry a flat tenYear: 15000 "rough estimate" that was the
+      // same for every profile reaching this branch, alongside a $0 monthly/annual.
       const profile = createPaycheckProfile()
 
       const item = findItem(identifySkippedOptimizations(profile), 'traditional-vs-roth')
       expect(item).toBeDefined()
-      expect(item!.opportunityCost.monthly).toBe(0)
-      expect(item!.opportunityCost.annual).toBe(0)
-      expect(item!.opportunityCost.tenYear).toBe(15000) // module's fixed estimate
+      expect(item!.opportunityCost.tenYear).toBeUndefined()
+      expectNoDollarFraming(item!)
+      expect(item!.reason).toContain('12% bracket')
       expect(item!.riskLevel).toBe('low')
     })
 
@@ -280,8 +394,9 @@ describe('identifySkippedOptimizations', () => {
 
   describe('low-interest debt prepayment', () => {
     it('flags prepayment of 4% debt with compound ten-year opportunity cost', () => {
-      // $250/mo extra on 4% debt; arbitrage = 7% - 4% = 3%
-      //   monthly = 250 * 0.03 / 12 = $0.625; annual = 250 * 12 * 0.03 = $90
+      // $250/mo extra on 4% debt; arbitrage = 7% - 4% = 3%. extraPayment is a
+      // monthly figure, so the annual stream is 12x it and monthly = annual / 12:
+      //   annual  = 250 * 12 * 0.03 = $90; monthly = 90 / 12 = $7.50
       //   tenYear = 3000 * (1.07^10 - 1.04^10) = 3000 * (1.9671514 - 1.4802443) = $1,460.72
       const profile = createPaycheckProfile({
         debts: [createDebtData({ id: 'auto', interestRate: 0.04, extraPayment: 250 })],
@@ -290,7 +405,7 @@ describe('identifySkippedOptimizations', () => {
       const items = identifySkippedOptimizations(profile)
       const item = findItem(items, 'low-interest-debt-prepayment')
       expect(item).toBeDefined()
-      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(0.63)
+      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(7.5)
       expect(item!.opportunityCost.annual).toBeCloseToCurrency(90)
       expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(1460.72)
       expect(item!.riskLevel).toBe('medium')
@@ -298,18 +413,46 @@ describe('identifySkippedOptimizations', () => {
       expect(findItem(items, 'debt-strategy-auto')?.riskLevel).toBe('medium')
     })
 
-    it('yields zero arbitrage at exactly the 7% threshold', () => {
+    it('keeps monthly exactly one twelfth of annual (was understated 12x)', () => {
+      // The sweep's trigger: a 4.5% mortgage with $400/mo extra reported
+      //   { monthly: 0.8333, annual: 120.00 } — a ratio of 144, not 12.
+      //   annual  = 400 * 12 * (0.07 - 0.045) = $120; monthly = 120 / 12 = $10
+      //   tenYear = 4,800 * (1.07^10 - 1.045^10) = 4,800 * 0.4141819 = $1,988.07
+      const profile = createPaycheckProfile({
+        debts: [
+          createDebtData({
+            id: 'd-extra',
+            name: 'Mortgage',
+            balance: 300000,
+            interestRate: 0.045,
+            minimumPayment: 1800,
+            extraPayment: 400,
+            taxDeductible: true,
+          }),
+        ],
+      })
+
+      const item = findItem(identifySkippedOptimizations(profile), 'low-interest-debt-prepayment')
+      expect(item).toBeDefined()
+      expect(item!.opportunityCost.monthly).toBeCloseToCurrency(10)
+      expect(item!.opportunityCost.annual).toBeCloseToCurrency(120)
+      expect(item!.opportunityCost.monthly * 12).toBeCloseToCurrency(item!.opportunityCost.annual)
+      expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(1988.07)
+    })
+
+    it('yields zero arbitrage at exactly the 7% threshold, with no dollar claim in the copy', () => {
       // interestRate 0.07 <= 0.07 still qualifies; arbitrage = 0.07 - 0.07 = 0
-      // tenYear = 1200 * (1.07^10 - 1.07^10) = 0
+      // tenYear = 1200 * (1.07^10 - 1.07^10) = 0, so the education line used to
+      // read "$0 opportunity cost over 10 years"
       const profile = createPaycheckProfile({
         debts: [createDebtData({ id: 'edge', interestRate: 0.07, extraPayment: 100 })],
       })
 
       const item = findItem(identifySkippedOptimizations(profile), 'low-interest-debt-prepayment')
       expect(item).toBeDefined()
-      expect(item!.opportunityCost.monthly).toBe(0)
-      expect(item!.opportunityCost.annual).toBe(0)
       expect(item!.opportunityCost.tenYear).toBeCloseToCurrency(0)
+      expectNoDollarFraming(item!)
+      expect(item!.education).toContain('the same rate this model assumes')
     })
 
     it('reports only the first low-interest debt when several qualify', () => {

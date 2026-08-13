@@ -1,6 +1,71 @@
-import { AllocationItem, PaycheckProfile } from '@/lib/types';
+import { AllocationItem, DebtData, PaycheckProfile } from '@/lib/types';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { FinancialStep, StepStatus, UrgencyLevel } from '@/lib/constants/financialSteps';
+import { CONTRIBUTION_LIMITS_2026, TOTAL_415C_BY_AGE } from '@/lib/constants/irs-2026';
+
+/**
+ * Rate above which a debt counts as high-interest. Same threshold the allocator
+ * applies (lib/calculations/optimization.ts `getHighInterestThreshold`).
+ */
+const HIGH_INTEREST_THRESHOLD = 0.07;
+
+/**
+ * Copy for the emergency-fund steps when necessary expenses are $0: the target
+ * is unknown rather than met, so the step must not read as funded.
+ */
+const NO_EXPENSE_TARGET = 'Necessary monthly expenses not set - emergency fund target unknown';
+
+/**
+ * 402(g) elective-deferral limit, including the age-based catch-ups the
+ * allocator applies (optimization.ts `calculateAdditional401k`): the regular
+ * catch-up at 50+, and the SECURE 2.0 super catch-up for ages 60-63 only.
+ * Figures come from lib/constants/irs-2026.ts.
+ */
+function elective401kLimit(age: number): number {
+  const catchUp = age >= 60 && age <= 63
+    ? CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k
+    : age >= 50
+      ? CONTRIBUTION_LIMITS_2026.catchUp['401k']
+      : 0;
+  return CONTRIBUTION_LIMITS_2026.traditional401k + catchUp;
+}
+
+/**
+ * Combined traditional + Roth IRA contribution limit, with the 50+ catch-up
+ * (optimization.ts `calculateRothIRA` uses the same pair of constants).
+ */
+function iraLimit(age: number): number {
+  return CONTRIBUTION_LIMITS_2026.ira + (age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
+}
+
+/** HSA limit for the coverage tier, plus the age-55 catch-up. */
+function hsaLimit(coverageType: 'individual' | 'family', age: number): number {
+  const base = coverageType === 'family'
+    ? CONTRIBUTION_LIMITS_2026.hsa.family
+    : CONTRIBUTION_LIMITS_2026.hsa.individual;
+  return base + (age >= 55 ? CONTRIBUTION_LIMITS_2026.catchUp.hsa : 0);
+}
+
+/** Total 415(c) annual-additions limit for the age band. */
+function total415cLimit(age: number): number {
+  if (age >= 60 && age <= 63) return TOTAL_415C_BY_AGE.superCatchUp60to63;
+  if (age >= 50) return TOTAL_415C_BY_AGE.catchUp50;
+  return TOTAL_415C_BY_AGE.standard;
+}
+
+/**
+ * The qualifying debt the allocator actually targets: highest rate first, not
+ * first in input order (optimization.ts `calculateHighInterestDebt` sorts the
+ * filtered list descending by rate).
+ */
+function highestRateHighInterestDebt(debts: DebtData[]): DebtData | undefined {
+  return debts
+    .filter(d => d.interestRate > HIGH_INTEREST_THRESHOLD)
+    .reduce<DebtData | undefined>(
+      (highest, debt) => (highest === undefined || debt.interestRate > highest.interestRate ? debt : highest),
+      undefined
+    );
+}
 
 /**
  * Calculate the full status for each financial step given the user's profile and allocations.
@@ -45,7 +110,7 @@ export function calculateStepStatus(
         case 'employer-match':
           return !profile.benefits.employer401k.available;
         case 'high-interest-debt':
-          return !profile.debts.some(d => d.interestRate > 0.07);
+          return !profile.debts.some(d => d.interestRate > HIGH_INTEREST_THRESHOLD);
         case 'mega-backdoor':
           return !profile.benefits.employer401k.afterTaxAvailable;
         default:
@@ -58,35 +123,36 @@ export function calculateStepStatus(
       if (isNotApplicable) return false;
 
       switch (step.id) {
+        // A target of $0 means necessary expenses have not been entered yet, not
+        // that the fund is funded — `0 >= 0` must not read as complete.
         case 'emergency-1month':
-          return profile.preferences.currentEmergencyFund >= profile.preferences.necessaryExpenses;
+          return profile.preferences.necessaryExpenses > 0 &&
+                 profile.preferences.currentEmergencyFund >= profile.preferences.necessaryExpenses;
         case 'employer-match':
           return profile.benefits.employer401k.available &&
                  profile.benefits.employer401k.currentContribution >= profile.benefits.employer401k.matchLimit;
         case 'high-interest-debt':
-          return profile.debts.length === 0 || !profile.debts.some(d => d.interestRate > 0.07 && d.balance > 0);
-        case 'emergency-full':
-          return profile.preferences.currentEmergencyFund >=
-                 (profile.preferences.necessaryExpenses * profile.preferences.emergencyFundMonths);
+          return profile.debts.length === 0 ||
+                 !profile.debts.some(d => d.interestRate > HIGH_INTEREST_THRESHOLD && d.balance > 0);
+        case 'emergency-full': {
+          const fullTarget = profile.preferences.necessaryExpenses * profile.preferences.emergencyFundMonths;
+          return fullTarget > 0 && profile.preferences.currentEmergencyFund >= fullTarget;
+        }
         case 'hsa-max': {
           if (!profile.benefits.hsa.eligible) return false;
           const hsaAnnualContribution = profile.benefits.hsa.currentContribution * 12;
-          const hsaLimit = profile.preferences.age >= 55
-            ? (profile.benefits.hsa.coverageType === 'family' ? 9300 : 5150)
-            : (profile.benefits.hsa.coverageType === 'family' ? 8300 : 4150);
-          return hsaAnnualContribution >= (hsaLimit * 0.98);
+          const limit = hsaLimit(profile.benefits.hsa.coverageType, profile.preferences.age);
+          return hsaAnnualContribution >= (limit * 0.98);
         }
         case 'roth-ira': {
           const rothContribution = profile.benefits.ira?.currentContributions?.roth || 0;
           const rothAnnualContribution = rothContribution * 12;
-          const rothLimit = profile.preferences.age >= 50 ? 8000 : 7000;
-          return rothAnnualContribution >= (rothLimit * 0.98);
+          return rothAnnualContribution >= (iraLimit(profile.preferences.age) * 0.98);
         }
         case 'additional-401k': {
           if (!profile.benefits.employer401k.available) return false;
           const employee401kContribution = profile.income.gross * profile.benefits.employer401k.currentContribution * 12;
-          const employee401kLimit = profile.preferences.age >= 50 ? 30500 : 23000;
-          return employee401kContribution >= (employee401kLimit * 0.98);
+          return employee401kContribution >= (elective401kLimit(profile.preferences.age) * 0.98);
         }
         default:
           return false;
@@ -99,7 +165,7 @@ export function calculateStepStatus(
 
       switch (step.id) {
         case 'high-interest-debt':
-          return profile.debts.some(d => d.interestRate > 0.07 && d.balance > 0);
+          return profile.debts.some(d => d.interestRate > HIGH_INTEREST_THRESHOLD && d.balance > 0);
         case 'employer-match':
           return profile.benefits.employer401k.available &&
                  profile.benefits.employer401k.currentContribution < profile.benefits.employer401k.matchLimit;
@@ -140,22 +206,30 @@ export function calculateStepStatus(
           return { monthly: missedMatch, annual: missedMatch * 12 };
         }
         case 'high-interest-debt': {
-          const highDebt = profile.debts.find(d => d.interestRate > 0.07);
+          const highDebt = highestRateHighInterestDebt(profile.debts);
           if (!highDebt) return { monthly: 0, annual: 0 };
-          const monthlyInterest = (highDebt.balance * highDebt.interestRate) / 12;
-          return { monthly: monthlyInterest, annual: monthlyInterest * 12 };
+          // A full year's interest on the balance is the ceiling on what payoff
+          // can save. When the plan recommends a concrete payment stream, price
+          // the savings on that stream with the same average-balance correction
+          // the allocator applies (optimization.ts calculateHighInterestDebt).
+          const fullYearInterest = Math.max(0, highDebt.balance) * highDebt.interestRate;
+          const paymentStream = allocation?.monthlyEquivalent;
+          const annual = paymentStream != null && Number.isFinite(paymentStream)
+            ? Math.min(paymentStream * 12 * highDebt.interestRate * 0.5, fullYearInterest)
+            : fullYearInterest;
+          return { monthly: annual / 12, annual };
         }
         case 'hsa-max': {
           if (!profile.benefits.hsa.eligible) return { monthly: 0, annual: 0 };
-          const hsaLimit = profile.benefits.hsa.coverageType === 'family' ? 8300 : 4150;
+          const limit = hsaLimit(profile.benefits.hsa.coverageType, profile.preferences.age);
           const currentHSA = profile.benefits.hsa.currentContribution * 12;
-          const taxSavings = Math.max(0, hsaLimit - currentHSA) * 0.22;
+          // Deduction value at the profile's own federal bracket, not a fixed rate.
+          const taxSavings = Math.max(0, limit - currentHSA) * Math.max(0, profile.taxes.federalBracket);
           return { monthly: taxSavings / 12, annual: taxSavings };
         }
         case 'roth-ira': {
-          const rothLimit = profile.preferences.age >= 50 ? 8000 : 7000;
           const currentRoth = (profile.benefits.ira?.currentContributions?.roth || 0) * 12;
-          const potentialGrowth = Math.max(0, rothLimit - currentRoth) * 0.07;
+          const potentialGrowth = Math.max(0, iraLimit(profile.preferences.age) - currentRoth) * 0.07;
           return { monthly: potentialGrowth / 12, annual: potentialGrowth };
         }
         default:
@@ -190,12 +264,14 @@ export function calculateStepStatus(
             "Increase HSA contribution to maximum",
             "Set up investment options within HSA"
           ];
-        case 'roth-ira':
+        case 'roth-ira': {
+          const monthlyToLimit = iraLimit(profile.preferences.age) / 12;
           return [
             "Open Roth IRA at low-cost broker (Vanguard, Fidelity)",
-            "Set up automatic $583/month transfer",
+            `Set up automatic ${formatCurrency(monthlyToLimit)}/month transfer`,
             "Invest in target-date fund or total market index"
           ];
+        }
         case 'emergency-full': {
           const needed = profile.preferences.necessaryExpenses * profile.preferences.emergencyFundMonths;
           const monthlyNeeded = Math.max(0, (needed - profile.preferences.currentEmergencyFund) / 12);
@@ -207,12 +283,17 @@ export function calculateStepStatus(
         }
         case 'additional-401k': {
           const currentContrib = profile.benefits.employer401k.currentContribution;
-          const maxLimit = profile.preferences.age >= 50 ? 30500 : 23000;
-          const neededAnnual = maxLimit - (profile.income.gross * currentContrib * 12);
-          const neededPercent = neededAnnual / (profile.income.gross * 12);
+          const annualGross = profile.income.gross * 12;
+          const maxLimit = elective401kLimit(profile.preferences.age);
+          const neededAnnual = Math.max(0, maxLimit - (annualGross * currentContrib));
+          // Without a gross figure there is no percent-of-salary to quote; the
+          // dollar amount still stands on its own.
+          const increaseStep = annualGross > 0
+            ? `Increase contribution by ${formatPercent(neededAnnual / annualGross)} more`
+            : `Increase contribution by ${formatCurrency(neededAnnual / 12)}/month more`;
           return [
             "Log into company 401k portal",
-            `Increase contribution by ${formatPercent(neededPercent)} more`,
+            increaseStep,
             "Adjust budget for reduced take-home pay"
           ];
         }
@@ -220,7 +301,7 @@ export function calculateStepStatus(
           return [
             "Confirm after-tax 401k contributions allowed",
             "Set up in-service Roth conversions with provider",
-            "Contribute up to annual limit ($69,000 total)"
+            `Contribute up to annual limit (${formatCurrency(total415cLimit(profile.preferences.age))} total)`
           ];
         case 'taxable-investment':
           return [
@@ -280,6 +361,7 @@ export function calculateStepStatus(
       switch (step.id) {
         case 'emergency-1month':
           if (isComplete) return `Emergency fund complete (${formatCurrency(profile.preferences.currentEmergencyFund)})`;
+          if (profile.preferences.necessaryExpenses <= 0) return NO_EXPENSE_TARGET;
           if (isUrgent) return `Need ${formatCurrency(profile.preferences.necessaryExpenses)} emergency fund`;
           return allocation ? `Building emergency fund` : `Build 1-month emergency fund`;
 
@@ -289,7 +371,7 @@ export function calculateStepStatus(
           return allocation ? `Getting employer match` : `Contribute to get full employer match`;
 
         case 'high-interest-debt': {
-          const highDebt = profile.debts.find(d => d.interestRate > 0.07);
+          const highDebt = highestRateHighInterestDebt(profile.debts);
           if (isComplete) return `All high-interest debt paid off`;
           if (isUrgent) return `${formatPercent(highDebt?.interestRate || 0)} interest debt - payoff returns that rate risk-free`;
           return allocation ? `Paying down high-interest debt` : `Pay off high-interest debt first`;
@@ -297,29 +379,40 @@ export function calculateStepStatus(
 
         case 'emergency-full':
           if (isComplete) return `Full emergency fund complete (${profile.preferences.emergencyFundMonths} months)`;
+          if (profile.preferences.necessaryExpenses <= 0) return NO_EXPENSE_TARGET;
           return allocation ? `Building full emergency fund` : `Complete ${profile.preferences.emergencyFundMonths}-month emergency fund`;
 
         case 'hsa-max':
           return allocation ? `Maximizing HSA contributions` : profile.benefits.hsa.eligible ? `Contribute to HSA for triple tax advantage` : `Not HSA eligible`;
 
-        case 'roth-ira':
-          return allocation ? `Contributing to Roth IRA` : `Contribute $500/month to Roth IRA`;
+        case 'roth-ira': {
+          if (isComplete) return `Roth IRA maximized`;
+          const monthlyToLimit = iraLimit(profile.preferences.age) / 12;
+          return allocation
+            ? `Contributing to Roth IRA`
+            : `Contribute ${formatCurrency(monthlyToLimit)}/month to Roth IRA`;
+        }
 
         case 'additional-401k': {
           if (!profile.benefits.employer401k.available) return `401k not available`;
 
           const currentEmployee401k = profile.benefits.employer401k.currentContribution;
-          const maxEmployee401kLimit = profile.preferences.age >= 50 ? 30500 : 23000;
-          const currentAnnualContribution = profile.income.gross * currentEmployee401k * 12;
+          const annualGross = profile.income.gross * 12;
+          const maxEmployee401kLimit = elective401kLimit(profile.preferences.age);
+          const currentAnnualContribution = annualGross * currentEmployee401k;
           const additionalNeeded = Math.max(0, maxEmployee401kLimit - currentAnnualContribution);
           const additionalNeededMonthly = additionalNeeded / 12;
-          const additionalPercentNeeded = additionalNeeded / (profile.income.gross * 12);
+          // With no gross pay on file the percent-of-salary figure is undefined,
+          // so the copy quotes dollars only.
+          const additionalFigure = annualGross > 0
+            ? `${formatCurrency(additionalNeededMonthly)} (${formatPercent(additionalNeeded / annualGross)})`
+            : formatCurrency(additionalNeededMonthly);
 
           if (isComplete) return `401k maximized at ${formatPercent(currentEmployee401k)}`;
           if (allocation) {
-            return `Additional ${formatCurrency(additionalNeededMonthly)} (${formatPercent(additionalPercentNeeded)}) needed for max`;
+            return `Additional ${additionalFigure} needed for max`;
           }
-          return `Additional ${formatCurrency(additionalNeededMonthly)} (${formatPercent(additionalPercentNeeded)}) contributions needed for max`;
+          return `Additional ${additionalFigure} contributions needed for max`;
         }
 
         case 'mega-backdoor':
