@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from '@/components/ui/inputs';
+import { MoneyInput, PercentInput } from '@/components/ui/inputs';
 import { DebtData } from '@/lib/types';
 import { formatPercent, formatCurrency } from '@/lib/utils';
 import { Plus, Trash2, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react';
@@ -97,14 +97,16 @@ export function DebtInput({ debts, onAddDebt, onUpdateDebt, onRemoveDebt }: Debt
                         />
                       </div>
                       <div>
-                        <label className="text-sm font-medium">Interest Rate (%)</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="50"
-                          value={debt.interestRate * 100}
-                          onChange={(e) => onUpdateDebt(index, { interestRate: Number(e.target.value) / 100 })}
+                        <label className="text-sm font-medium">Interest Rate</label>
+                        <PercentInput
+                          name={`debt-rate-${index}`}
+                          label=""
+                          ariaLabel="Interest Rate"
+                          value={debt.interestRate}
+                          onChange={(value) => onUpdateDebt(index, { interestRate: value })}
+                          min={0}
+                          max={0.5}
+                          precision={2}
                           placeholder="15.99"
                           className="mt-1"
                         />

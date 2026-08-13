@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoneyInput } from '@/components/ui/inputs';
+import { MoneyInput, PercentInput } from '@/components/ui/inputs';
 import { Input } from '@/components/ui/input';
 import { PiggyBank } from 'lucide-react';
 import type { UserPreferences, BenefitsData } from '@/lib/types';
@@ -56,21 +56,17 @@ export function SavingsInputCard({ preferences, benefits, onUpdatePreferences, o
               <p className="text-xs text-muted-foreground">Months of expenses to save (typically 3-6)</p>
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="emergencyFundAPY" className="text-sm font-medium">APY (%)</label>
-              <Input
-                id="emergencyFundAPY"
-                type="number"
-                step="0.1"
-                min="0"
-                max="10"
-                value={preferences.emergencyFundAPY * 100}
-                onChange={(e) => onUpdatePreferences({ emergencyFundAPY: parseFloat(e.target.value) / 100 })}
-                placeholder="4.0"
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">High-yield savings currently offer 3.5-4.5% APY</p>
-            </div>
+            <PercentInput
+              name="emergencyFundAPY"
+              label="APY"
+              value={preferences.emergencyFundAPY}
+              onChange={(value) => onUpdatePreferences({ emergencyFundAPY: value })}
+              min={0}
+              max={0.1}
+              precision={1}
+              placeholder="4.0"
+              help="High-yield savings accounts have recently offered 3.5-4.5% APY"
+            />
           </div>
         </div>
 
