@@ -33,9 +33,18 @@ export const PaycheckSummaryBox = React.memo(function PaycheckSummaryBox({ profi
     ? (profile.income.grossPaycheck * profile.benefits.employer401k.rothContribution)
     : 0;
 
-  // Calculate taxes and other deductions from paycheck
-  const grossAfterPretax = profile.income.grossPaycheck - pretaxDeductionsFromPaycheck;
-  const totalTaxAndDeductions = grossAfterPretax - profile.income.netPaycheck;
+  // Taxes and other deductions as a residual. The take-home the user typed
+  // already has EVERY employee 401k deferral withheld by payroll — the pre-tax
+  // traditional deferral AND the after-tax Roth deferral — so both must come
+  // out of the residual, or the Roth line double-counts and the rows stop
+  // summing to take-home (and the "tax rate" silently absorbs the deferral).
+  const totalTaxAndDeductions = Math.max(
+    0,
+    profile.income.grossPaycheck -
+      pretaxDeductionsFromPaycheck -
+      rothContribution -
+      profile.income.netPaycheck
+  );
 
   // Calculate effective tax rate (tax/taxable income, where taxable = gross - employee pre-tax deductions)
   const taxableIncome = profile.income.grossPaycheck - pretaxDeductionsFromPaycheck;
@@ -139,7 +148,7 @@ export const PaycheckSummaryBox = React.memo(function PaycheckSummaryBox({ profi
               <BreakdownRow
                 icon={Building2}
                 label="Employer 401k Match"
-                subtitle="Additional compensation (not from paycheck)"
+                subtitle="Pre-tax employer contribution, not from your paycheck — matching dollars go into the traditional 401k bucket even when your own deferral is Roth"
                 value={formatCurrency(employerMatch)}
                 prefix="+"
                 variant="success"
