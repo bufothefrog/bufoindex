@@ -35,6 +35,7 @@ jobs:
       run: npm run lint -- --max-warnings=0
 
     - name: Run tests
+      if: matrix.node-version != '22.x'
       run: npm run test:run
 
     - name: Run tests with coverage
