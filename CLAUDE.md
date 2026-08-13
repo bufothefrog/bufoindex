@@ -66,7 +66,7 @@ Component hierarchy — use the highest level that fits, with `components/ui/` a
 
 1. **Primitives** — `@/components/ui/*` (see layout tree above for the inventory).
 2. **Specialized inputs** — `@/components/shared/inputs/*`.
-3. **Charts** — `@/components/charts/*`; charts MUST call `getChartTheme()` from `@/lib/chart-theme` so they adapt to light/dark mode.
+3. **Charts** — live with their calculator (e.g. `app/tools/retirement-calculator/components/`); charts MUST call `getChartTheme()` from `@/lib/chart-theme` so they adapt to light/dark mode.
 4. **Interactive** — `Tooltip` + `HELP_TOOLTIPS` (`@/components/shared/Tooltip`), `CalculatorTabs` + `TabPanel` (`@/components/calculators/shared/CalculatorTabs`), `ThemeToggle`, `DollarModeToggle`.
 5. **Layouts** — `@/components/ui/layouts/*` and `@/components/shared/layout/*`.
 

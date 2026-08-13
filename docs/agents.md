@@ -76,7 +76,7 @@ A new calculator typically touches:
 - `test/lib/calculations/<calculator-name>.test.ts` — unit tests for the logic.
 - Optionally `test/components/<Component>.test.tsx`.
 
-Reuse existing inputs from `components/ui/inputs/` and `components/shared/inputs/` (see `CLAUDE.md` for the hierarchy). Reuse charts from `components/charts/` and pull theme via `getChartTheme()`.
+Reuse existing inputs from `components/ui/inputs/` and `components/shared/inputs/` (see `CLAUDE.md` for the hierarchy). Chart components live with their calculator (e.g. `app/tools/retirement-calculator/components/`) and must pull theme via `getChartTheme()`.
 
 ## What not to recreate
 
