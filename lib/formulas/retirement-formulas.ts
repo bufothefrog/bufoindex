@@ -510,6 +510,7 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     ],
     assumptions: [
       "Returns are drawn independently each year from a normal distribution (see the return-draw entry)",
+      "Return inputs are nominal (before inflation); the simulation stays in nominal dollars and the today's-dollars display deflates outputs by the general inflation rate, which is equivalent to compounding at the real return",
       "The return is applied first and the whole year's withdrawal comes out at year end",
       "Withdrawals are computed once and reused across paths: they depend on your inputs, not on how a path performed",
       "Social Security in excess of the year's spending does not add to the portfolio — the net withdrawal is floored at zero",

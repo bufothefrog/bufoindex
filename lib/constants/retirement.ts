@@ -25,11 +25,19 @@ export class RetirementConstants {
   static readonly DEFAULT_SAVINGS_RATE = 0.15;             // 15% default savings rate
   static readonly MIN_SAVINGS_RATE = 0.01;                 // 1% minimum savings rate
   
-  // Return Rates (annual)
+  // Return Rates (annual, NOMINAL — i.e. before inflation).
+  // The simulation compounds at these rates in nominal dollars; the
+  // today's-dollars display mode deflates the OUTPUTS by the inflation rate
+  // (lib/utils/displayDollars.ts), which is equivalent to compounding at the
+  // real return. Entering a real (inflation-adjusted) return here would
+  // double-count inflation in today's-dollars mode. For scale: long-run US
+  // large-cap nominal total return is roughly 10%/yr, so 8% reflects a
+  // diversified accumulation portfolio and 6% a more conservative
+  // in-retirement allocation.
   static readonly MIN_RETURN_RATE = -0.50;                 // -50% minimum return (market crash)
   static readonly MAX_RETURN_RATE = 0.30;                  // 30% maximum return
-  static readonly DEFAULT_ACCUMULATION_RETURN = 0.08;      // 8% default accumulation return
-  static readonly DEFAULT_RETIREMENT_RETURN = 0.06;        // 6% default retirement return
+  static readonly DEFAULT_ACCUMULATION_RETURN = 0.08;      // 8% nominal default accumulation return
+  static readonly DEFAULT_RETIREMENT_RETURN = 0.06;        // 6% nominal default retirement return
   
   // Inflation
   static readonly MIN_INFLATION_RATE = 0.00;               // 0% minimum inflation

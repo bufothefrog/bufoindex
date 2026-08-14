@@ -231,6 +231,7 @@ export function InputSection() {
                 step={0.001}
                 precision={2}
                 showSlider
+                help="Nominal (before inflation) annual return while saving — the today's-dollars view handles inflation"
               />
 
               <PercentInput
@@ -243,6 +244,7 @@ export function InputSection() {
                 step={0.001}
                 precision={2}
                 showSlider
+                help="Nominal (before inflation) annual return after retiring"
               />
             </TwoColumnFields>
 
@@ -257,6 +259,7 @@ export function InputSection() {
                 step={0.001}
                 precision={2}
                 showSlider
+                help="Grows spending in the simulation and sets the today's-dollars conversion"
               />
 
               <PercentInput
@@ -269,6 +272,7 @@ export function InputSection() {
                 step={0.005}
                 precision={2}
                 showSlider
+                help="Annual standard deviation of returns in the Monte Carlo draws"
               />
             </TwoColumnFields>
 
