@@ -1,0 +1,22 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "redirects": [
+    {
+      "source": "/paycheck-allocator",
+      "destination": "/tools/paycheck-allocator",
+      "permanent": true
+    },
+    {
+      "source": "/retirement-calculator",
+      "destination": "/tools/retirement-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/portfolio-rebalancing-calculator",
+      "destination": "/tools/portfolio-rebalancing-calculator",
+      "permanent": true
+    }
+  ]
+}

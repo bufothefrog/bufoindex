@@ -1,0 +1,399 @@
+'use client';
+
+import React, { useMemo } from 'react';
+import { monthlyToPaycheck } from '@/lib/calculations/core';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { formatCurrency, formatPercent } from '@/lib/utils';
+import { DebtData, PaycheckProfile } from '@/lib/types';
+import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
+import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
+import {
+  AlertTriangle,
+  Target,
+  TrendingUp,
+  Clock,
+  Zap,
+  ArrowRight,
+  DollarSign,
+  Building2,
+  CreditCard,
+  Shield,
+  PiggyBank
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface QuickActionsProps {
+  profile: PaycheckProfile;
+}
+
+/**
+ * The impact of an action is split into a short figure and a prose qualifier.
+ * BreakdownRow renders its value column at a fixed width (`shrink-0`), so a
+ * full sentence passed as `value` overflows the row and paints over the label.
+ * Keeping the figure separate lets the qualifier wrap in the label column.
+ */
+interface QuickActionImpact {
+  /** Short figure for the row's value column, e.g. "$45" or "$92/month". */
+  value: string;
+  /** Prose qualifier rendered under the row label, where it can wrap. */
+  detail: string;
+}
+
+interface QuickAction {
+  id: string;
+  title: string;
+  urgency: 'critical' | 'important' | 'optimization';
+  impact: QuickActionImpact;
+  timeToImplement: string;
+  actionType: 'payroll' | 'bank' | 'one-time';
+  actionLabel: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  potentialSavings: {
+    monthly: number;
+    annual: number;
+  };
+  onAction: () => void;
+}
+
+/** Rate above which a debt counts as high-interest (mirrors optimization.ts). */
+const HIGH_INTEREST_THRESHOLD = 0.07;
+
+const urgencyBorderStyles: Record<QuickAction['urgency'], string> = {
+  critical: 'border-l-4 border-l-destructive',
+  important: 'border-l-4 border-l-warning',
+  optimization: 'border-l-4 border-l-success',
+};
+
+const urgencyIconStyles: Record<QuickAction['urgency'], string> = {
+  critical: 'text-destructive',
+  important: 'text-warning',
+  optimization: 'text-success',
+};
+
+const urgencyBadgeStyles: Record<QuickAction['urgency'], string> = {
+  critical: 'bg-destructive text-destructive-foreground',
+  important: 'bg-warning text-warning-foreground',
+  optimization: 'bg-success text-success-foreground',
+};
+
+const urgencyLabels: Record<QuickAction['urgency'], string> = {
+  critical: 'HIGHEST IMPACT',
+  important: 'HIGH IMPACT',
+  optimization: 'OPTIMIZATION',
+};
+
+// Generate quick actions based on the current situation. Module-scoped so
+// the useMemo below can depend on `profile` alone.
+function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
+  const actions: QuickAction[] = [];
+
+  // Check for missing employer match (Critical)
+  if (profile.benefits.employer401k.available &&
+      profile.benefits.employer401k.currentContribution < profile.benefits.employer401k.matchLimit) {
+    const monthlyGross = profile.income.gross;
+    const potentialMatch = monthlyGross * profile.benefits.employer401k.matchLimit * profile.benefits.employer401k.matchPercent;
+    const currentMatch = monthlyGross * profile.benefits.employer401k.currentContribution * profile.benefits.employer401k.matchPercent;
+    const missedMatch = potentialMatch - currentMatch;
+
+    // Convert to per-paycheck amount
+    const frequency = profile.income.frequency;
+    const missedMatchPerPaycheck = monthlyToPaycheck(missedMatch, frequency);
+
+    const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' :
+                         frequency === 'semi-monthly' ? 'semi-monthly' :
+                         frequency === 'weekly' ? 'weekly' : 'monthly';
+
+    actions.push({
+      id: 'employer-match',
+      title: 'Employer Match Not Fully Captured',
+      urgency: 'critical',
+      impact: {
+        value: formatCurrency(missedMatchPerPaycheck),
+        detail: `unclaimed match per ${frequencyText} paycheck`,
+      },
+      timeToImplement: '5 minutes',
+      actionType: 'payroll',
+      actionLabel: `Increase 401k to ${(profile.benefits.employer401k.matchLimit * 100).toFixed(0)}%`,
+      description: `Your employer matches contributions up to ${(profile.benefits.employer401k.matchLimit * 100).toFixed(0)}% of salary. Contributing below that limit leaves the unmatched portion of the benefit unpaid.`,
+      icon: Building2,
+      potentialSavings: {
+        monthly: missedMatch,
+        annual: missedMatch * 12
+      },
+      onAction: () => {
+        const element = document.querySelector('[data-section="employer-benefits"]');
+        element?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  // Check for high-interest debt (Critical). The allocator targets the
+  // highest-rate qualifying debt (optimization.ts calculateHighInterestDebt),
+  // so this card has to name that same debt rather than the first one listed.
+  const highInterestDebt = profile.debts
+    .filter(d => d.interestRate > HIGH_INTEREST_THRESHOLD)
+    .reduce<DebtData | undefined>(
+      (highest, debt) => (highest === undefined || debt.interestRate > highest.interestRate ? debt : highest),
+      undefined
+    );
+  if (highInterestDebt) {
+    const monthlyInterest = (highInterestDebt.balance * highInterestDebt.interestRate) / 12;
+
+    // Convert to per-paycheck amount
+    const frequency = profile.income.frequency;
+    const interestPerPaycheck = monthlyToPaycheck(monthlyInterest, frequency);
+
+    const frequencyText = frequency === 'bi-weekly' ? 'bi-weekly' :
+                         frequency === 'semi-monthly' ? 'semi-monthly' :
+                         frequency === 'weekly' ? 'weekly' : 'monthly';
+
+    actions.push({
+      id: 'high-interest-debt',
+      title: `${(highInterestDebt.interestRate * 100).toFixed(1)}% Debt Accruing Interest`,
+      urgency: 'critical',
+      impact: {
+        value: formatCurrency(interestPerPaycheck),
+        detail: `in interest per ${frequencyText} paycheck`,
+      },
+      timeToImplement: '6-24 months',
+      actionType: 'bank',
+      actionLabel: 'Create Payoff Plan',
+      description: `This balance accrues interest at ${(highInterestDebt.interestRate * 100).toFixed(1)}% a year. Paying it down avoids that rate; whether that compares favorably to investing the same dollars depends on the return you expect.`,
+      icon: CreditCard,
+      potentialSavings: {
+        monthly: monthlyInterest,
+        annual: monthlyInterest * 12
+      },
+      onAction: () => {
+        const element = document.querySelector('[data-section="debts"]');
+        element?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  // Check for insufficient emergency fund (Important)
+  if (profile.preferences.currentEmergencyFund < profile.preferences.necessaryExpenses) {
+    actions.push({
+      id: 'emergency-fund',
+      title: 'Emergency Fund Below One Month of Expenses',
+      urgency: 'important',
+      impact: {
+        value: '1 month',
+        detail: 'of necessary expenses covered',
+      },
+      timeToImplement: '3-6 months',
+      actionType: 'bank',
+      actionLabel: 'Setup Emergency Fund',
+      description: 'A month of necessary expenses on hand covers a minor emergency without borrowing at credit-card rates.',
+      icon: Shield,
+      potentialSavings: {
+        monthly: 0,
+        annual: 0
+      },
+      onAction: () => {
+        const element = document.querySelector('[data-section="emergency-fund"]');
+        element?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  // Check for HSA opportunity (Important)
+  if (profile.benefits.hsa.eligible && profile.benefits.hsa.currentContribution === 0) {
+    const hsaBase = profile.benefits.hsa.coverageType === 'family'
+      ? CONTRIBUTION_LIMITS_2026.hsa.family
+      : CONTRIBUTION_LIMITS_2026.hsa.individual;
+    const hsaLimit = hsaBase + (profile.preferences.age >= 55 ? CONTRIBUTION_LIMITS_2026.catchUp.hsa : 0);
+    const monthlyMax = hsaLimit / 12;
+    // Deduction value at the profile's own federal bracket, not a fixed rate.
+    const bracket = Math.max(0, profile.taxes.federalBracket);
+    const taxSavings = hsaLimit * bracket;
+
+    actions.push({
+      id: 'hsa-max',
+      title: 'No HSA Contributions',
+      urgency: 'important',
+      impact: {
+        value: `${formatCurrency(taxSavings / 12)}/month`,
+        detail: `deferred tax at your ${formatPercent(bracket)} federal bracket`,
+      },
+      timeToImplement: '5 minutes',
+      actionType: 'payroll',
+      actionLabel: `Contribute ${formatCurrency(monthlyMax)}/month to HSA`,
+      description: 'HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.',
+      icon: PiggyBank,
+      potentialSavings: {
+        monthly: taxSavings / 12,
+        annual: taxSavings
+      },
+      onAction: () => {
+        const element = document.querySelector('[data-section="hsa"]');
+        element?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  // Check for Roth IRA opportunity (Important)
+  const rothContribution = profile.benefits.ira?.currentContributions?.roth || 0;
+  if (rothContribution === 0) {
+    const rothLimit = CONTRIBUTION_LIMITS_2026.ira
+      + (profile.preferences.age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
+    const monthlyRoth = rothLimit / 12;
+    const potentialGrowth = rothLimit * 0.07; // Assume 7% growth
+
+    actions.push({
+      id: 'roth-ira',
+      title: 'No Roth IRA Contributions',
+      urgency: 'important',
+      impact: {
+        value: `${formatCurrency(potentialGrowth / 12)}/month`,
+        detail: 'at an assumed 7% return',
+      },
+      timeToImplement: '30 minutes',
+      actionType: 'one-time',
+      actionLabel: `Open Roth IRA - ${formatCurrency(monthlyRoth)}/month`,
+      description: 'Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.',
+      icon: TrendingUp,
+      potentialSavings: {
+        monthly: potentialGrowth / 12,
+        annual: potentialGrowth
+      },
+      onAction: () => {
+        const element = document.querySelector('[data-section="ira"]');
+        element?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  return actions.sort((a, b) => {
+    const urgencyOrder = { critical: 0, important: 1, optimization: 2 };
+    if (urgencyOrder[a.urgency] !== urgencyOrder[b.urgency]) {
+      return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    }
+    return b.potentialSavings.monthly - a.potentialSavings.monthly;
+  });
+}
+
+export const QuickActions = React.memo(function QuickActions({ profile }: QuickActionsProps) {
+  const quickActions = useMemo(() => generateQuickActions(profile), [profile]);
+  const criticalActions = useMemo(() => quickActions.filter(action => action.urgency === 'critical'), [quickActions]);
+  const importantActions = useMemo(() => quickActions.filter(action => action.urgency === 'important'), [quickActions]);
+  const optimizationActions = useMemo(() => quickActions.filter(action => action.urgency === 'optimization'), [quickActions]);
+
+  if (quickActions.length === 0) {
+    return null;
+  }
+
+  const ActionCard = ({ action }: { action: QuickAction }) => {
+    const IconComponent = action.icon;
+
+    return (
+      <Card className={cn("transition-all duration-200 hover:shadow-md", urgencyBorderStyles[action.urgency])}>
+        <CardContent className="p-4">
+          <div className="flex items-start space-x-4">
+            <div className="p-2 rounded-full bg-card shadow-xs">
+              <IconComponent className={cn("w-5 h-5", urgencyIconStyles[action.urgency])} aria-hidden="true" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-sm">
+                  {action.title}
+                </h4>
+                <span
+                  className={cn("px-2 py-1 rounded-full text-xs font-medium", urgencyBadgeStyles[action.urgency])}
+                  aria-label={`Priority: ${urgencyLabels[action.urgency].toLowerCase()}`}
+                >
+                  {urgencyLabels[action.urgency]}
+                </span>
+              </div>
+
+              <p className="text-sm text-muted-foreground mb-3">{action.description}</p>
+
+              <div className="space-y-1 mb-3">
+                <BreakdownRow
+                  icon={DollarSign}
+                  label="Impact"
+                  subtitle={action.impact.detail}
+                  value={action.impact.value}
+                  variant="success"
+                />
+                <BreakdownRow
+                  icon={Clock}
+                  label="Time to implement"
+                  value={action.timeToImplement}
+                  variant="info"
+                />
+              </div>
+
+              <Button
+                onClick={action.onAction}
+                className="w-full text-sm bg-primary hover:bg-primary/90 text-primary-foreground"
+                size="sm"
+              >
+                <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
+                {action.actionLabel}
+                <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Critical Actions */}
+      {criticalActions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5 text-destructive" aria-hidden="true" />
+            <h3 className="text-lg font-semibold text-destructive">
+              Highest-Impact Items
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {criticalActions.map(action => (
+              <ActionCard key={action.id} action={action} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Important Actions */}
+      {importantActions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <Target className="w-5 h-5 text-warning" aria-hidden="true" />
+            <h3 className="text-lg font-semibold text-foreground">
+              High-Impact Optimizations
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {importantActions.map(action => (
+              <ActionCard key={action.id} action={action} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Optimization Actions */}
+      {optimizationActions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5 text-success" aria-hidden="true" />
+            <h3 className="text-lg font-semibold text-foreground">
+              Advanced Optimizations
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {optimizationActions.map(action => (
+              <ActionCard key={action.id} action={action} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});

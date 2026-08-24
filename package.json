@@ -1,0 +1,86 @@
+{
+  "name": "bufoindex",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive personal-finance calculators: paycheck allocation, Monte Carlo retirement modeling, and multi-account portfolio rebalancing. Client-side only; scenarios share via URL hash.",
+  "homepage": "https://bufoindex.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bufothefrog/bufoindex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bufothefrog/bufoindex/issues"
+  },
+  "author": "bufothefrog",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "personal-finance",
+    "retirement-calculator",
+    "monte-carlo",
+    "portfolio-rebalancing",
+    "paycheck-allocator",
+    "nextjs",
+    "typescript"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    "prepare": "husky || true"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "bash -c 'npm run type-check'"
+    ],
+    "*.{js,jsx,mjs}": "eslint --fix"
+  },
+  "dependencies": {
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-slot": "^1.0.2",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "katex": "^0.18.4",
+    "lucide-react": "^1.14.0",
+    "next": "^16.2.4",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "@tailwindcss/postcss": "^4.3.0",
+    "@tailwindcss/typography": "^0.5.10",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/katex": "^0.16.7",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.5",
+    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/ui": "^4.1.5",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.6",
+    "husky": "^9.1.7",
+    "jsdom": "^30.0.1",
+    "lint-staged": "^17.3.0",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  }
+}

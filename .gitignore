@@ -1,0 +1,95 @@
+# Node
+node_modules/
+.npm
+npm-debug.log*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Env — catch-all so no variant can be committed by accident
+.env*
+!.env.example
+
+# Next.js
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# TypeScript
+*.d.ts.map
+.tsbuild/
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+test-results/
+playwright-report/
+playwright/.cache/
+junit.xml
+
+# Caches
+.cache/
+.parcel-cache/
+.sass-cache/
+.stylelintcache
+.eslintcache
+.turbo/
+
+# Temp / backup files
+.tmp/
+*.tmp
+*.tmp.*
+*.temp
+*.bak
+*.orig
+*.rej
+.#*
+
+# Lockfiles from other package managers (this repo uses npm — keep package-lock.json)
+yarn.lock
+pnpm-lock.yaml
+.yarn/
+.pnpm-store/
+
+# Vercel
+.vercel
+
+# Stale perf-monitoring artifacts (the system was removed; ignored so leftovers
+# from old branches don't get committed by accident)
+performance-baseline.json
+performance-report-*.json
+performance-dashboard.json
+.performance-alerts.json
+.performance-baselines.json
+.performance-history.json
+quality-check.log
+
+# Claude Code local files (keep agents synced)
+.claude/**/*.local
+.claude/**/*.local.*
+.claude/**/local-*
+.claude/local_*
+.claude/worktrees/
