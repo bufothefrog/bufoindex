@@ -63,81 +63,104 @@ Facts that shape the redesign (file references are to the current tree):
 
 ### 2.1 Flow overview
 
+Revised 2026-10-03 after the first prototype: everyone answers the same
+short core intake first, then chooses what to learn, then answers only the
+questions that calculator still needs.
+
 ```
 /  (landing)
+|   hero + one primary CTA "Get started" -> /start
+|   preview cards for each calculator (what it answers) -> /start?next=<intent>
+|   "Continue with my profile" (returning visitor) -> /start/choose
+|   "Just show me the tools" -> /tools
 |
-|-- "What do you want to do?"  (single question, 4 to 6 large tap targets)
-|      |
-|      |-- Figure out where each paycheck should go  -> intake:paycheck
-|      |-- See if I'm on track to retire             -> intake:retirement
-|      |-- Rebalance my accounts with new cash       -> intake:portfolio
-|      |-- Decide how big my emergency fund should be -> intake:emergency (new)
-|      |-- Compare leveraged vs plain index investing -> intake:leverage (new)
-|      |-- Build my full financial profile            -> intake:profile
-|      `-- "Just show me the tools" (small text link)  -> /tools (current card list)
+|-- /start   (core intake: about six screens, one question each)
+|      age, state, filing status, gross pay + frequency, take-home,
+|      must-pay monthly costs. Shared by every calculator.
+|      finish -> /start/<next> when a preview card set one, else:
 |
-|-- intake:<x>   (2 to 5 screens, one question each, big inputs, Back/Next)
-|      |  easy questions only: age, state, filing status, income, paycheck
-|      |  frequency, take-home, rough balances, rough monthly must-pay costs
-|      |
-|      `-- "Good enough to start"  -> /tools/<calculator>#<hash>
+|-- /start/choose   "What do you want to learn?"
+|      1. Finish your profile            -> /start/profile
+|         (becomes "See your overview"   -> /overview once complete)
+|      2. Figure out where each paycheck should go   -> /start/paycheck
+|      3. See if I am on track to retire             -> /start/retirement
+|      4. Rebalance my accounts with new cash        -> /start/portfolio
+|      5. Compare leveraged vs plain index investing -> /start/leverage
+|      one-line summary of the core answers + "Edit the basics" -> /start
+|
+|-- /start/<intent>   (only the questions this calculator still needs;
+|      answered ones are not asked again; nothing left -> straight through)
+|      finish -> /tools/<calculator>#<hash>   (seeded and run on arrival)
 |
 |-- /tools/<calculator>
-|      |  Results first (computed from intake seeds + defaults).
-|      |  "Quick answers" card: collapsed summary of what intake collected, tap to edit.
-|      |  "Details worth looking up" card group: everything else, expanded,
-|      |     each field tagged with where to find it (pay stub, benefits portal,
-|      |     ssa.gov, brokerage).
-|      |  Sticky bottom bar on mobile: Recalculate / Share / Jump to results.
-|      `-- "Save these answers to my profile" (writes back to the shared profile)
+|      Results first. Quick answers collapsed; look-up details; assumptions.
+|      "What next?" card at the end of the results:
+|         Finish your profile (or See your overview) -> /start/profile | /overview
+|         Try another calculator                     -> /start/choose
 |
-`-- /overview  (dashboard; requires a profile)
-       |  One card per calculator plus philosophy cards (cash drag, automation
-       |  checklist, leverage comparison), each deep-linking into its tool.
+`-- /overview  (dashboard; needs the profile)
 ```
+
+Rules that fall out of this:
+
+- Every entry path goes through `/start` first. The preview cards on the
+  landing page and the tool list exist to show what the site can answer,
+  not to bypass the shared questions. Direct links to a calculator still
+  work for returning visitors and for anyone who skips the flow; their
+  results end with the same "What next?" card, which offers the core
+  intake instead.
+- A calculator intake never re-asks a question the profile already holds.
+  A skipped question is still unanswered and comes back the next time a
+  calculator needs it.
+- `/start/choose` and `/start/<intent>` redirect to `/start` when the core
+  is incomplete, so a bookmarked chooser cannot show an empty summary.
 
 ### 2.2 Landing page
 
-- One question above the fold: "What do you want to do with your money
-  today?" Options are full-width cards on mobile, a 2 or 3 column grid on
-  desktop. Each card has a verb-first label and a one-line description of
-  what the answer looks like ("A per-paycheck split you can set up in your
-  payroll portal").
-- Below the fold: a short statement of the site's point of view (section 5),
-  a "how this site works" strip (runs in your browser, nothing uploaded,
-  share by link), and the plain list of tools for returning users.
-- Returning visitors with a saved profile see a second option at the top:
-  "Continue with my profile" leading to `/overview`.
+- Above the fold: the name, one sentence of positioning, and the single
+  primary action, "Get started", with a line under it saying it is about
+  six quick questions before picking what to learn.
+- Returning visitors with a saved profile see "Continue with my profile"
+  with the core summary, leading to the chooser.
+- Below: "What you can learn", one preview card per calculator with the
+  question it answers and what the result looks like; each card sets the
+  `next` intent and still starts at `/start`. Then the "How this site
+  works" strip (runs in your browser, nothing uploaded, easy questions
+  first, shows the math), the point-of-view block (section 5), and a text
+  link to the plain tool list.
 
 ### 2.3 Intake wizard
 
-One question per screen, large input, Next button pinned to the bottom of
-the viewport, progress dots, Back always available. Every screen has a
-"skip, use a typical value" link so nobody gets stuck. The wizard never asks
-anything that requires a document. Each screen's answer is written to the
-shared profile draft (section 3) and, on finish, encoded into the target
-calculator's hash.
+One question per screen, large input, Next pinned to the bottom of the
+viewport with the Skip affordance inside the same bar so it is visible on
+first paint, progress dots, Back always available. The wizard never asks
+anything that requires a document; those fields wait on the calculator.
 
-Design rules for the question set:
+Two flows share one component:
 
-- Ask only what changes the first result materially. Everything else gets a
-  defensible default and is surfaced later on the calculator.
-- Ask in the user's units (per paycheck, not per month) and convert.
-- Ask the same core questions regardless of which tool was chosen, so an
-  intake for one tool already seeds the others. The order is: age, state,
-  filing status, gross pay and frequency, take-home, must-pay monthly costs.
-  Tool-specific questions follow.
+- **Core** (`/start`): the six shared questions. Heading "A few basics"
+  and a line saying every calculator uses these answers. Finishes to the
+  chooser, or to the intent a landing card chose.
+- **Calculator** (`/start/<intent>`): only the intent's own questions
+  whose profile path is not yet provided. Heading is the intent title with
+  "Just the questions this calculator still needs." Finishes to the
+  calculator's seeded link. The `profile` intent asks every remaining
+  question across sections, with "Skip the rest of this section", and
+  finishes on the overview.
 
-Rough per-tool question sets (easy tier only):
+Per-calculator questions (easy tier only; the core is asked once):
 
-| Tool | Shared core | Tool-specific easy questions | Screens |
-|---|---|---|---|
-| Paycheck | age, state, filing, gross pay + frequency, take-home, must-pay costs | fun-money range, does employer offer 401k match (yes/no/unsure) | 5 to 6 |
-| Retirement | same | target retirement age, current invested balance (rough), monthly savings (rough) | 5 to 6 |
-| Portfolio | age, state (for placement advice) | which account types you have (checkboxes), new cash this month, pick a target mix preset (e.g. 100/0, 80/20, 60/40, custom later) | 3 to 4 |
-| Emergency fund (new) | age, must-pay costs, take-home | job stability self-rating, severance/notice, available credit line, Roth contribution basis (yes/no) | 4 to 5 |
-| Leverage comparison (new) | age | monthly contribution, horizon in years, starting balance | 3 |
-| Full profile | all of the above core | then one branch per tool, with "skip this section" | 10 to 14 |
+| Tool | Calculator-specific questions | Screens after the core |
+|---|---|---|
+| Paycheck | fun-money range; has 401k match (yes/no); match % and limit when yes | 2 to 3 |
+| Retirement | target retirement age, invested balance (rough), monthly contribution | 3 |
+| Portfolio | new cash this month, target mix preset (100/0, 80/20, 60/40) | 2 |
+| Leverage comparison | taxable monthly contribution, target retirement age, invested balance | 2 to 3 |
+| Finish your profile | everything above not yet answered, plus emergency fund balance and APY, and the strategy preset | up to 10 |
+
+Design rules for the question set are unchanged: ask only what changes the
+first result materially, ask in the user's units, and defer anything that
+needs a document.
 
 ### 2.4 Calculator page, second pass
 
