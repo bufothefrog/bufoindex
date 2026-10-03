@@ -410,10 +410,11 @@ export function calculateRothIRA(
   }
 
   // The IRS limit is combined across traditional + Roth IRAs;
-  // currentContributions are stored monthly
+  // currentContributions are stored monthly. Profiles restored from older
+  // share links or saved state may lack the ira block entirely.
+  const iraContributions = profile.benefits.ira?.currentContributions;
   const existingAnnualContributions =
-    (profile.benefits.ira.currentContributions.roth +
-      profile.benefits.ira.currentContributions.traditional) * 12;
+    ((iraContributions?.roth ?? 0) + (iraContributions?.traditional ?? 0)) * 12;
   const remainingAnnualRoom = maxContribution - existingAnnualContributions;
 
   if (remainingAnnualRoom <= 0) return null;

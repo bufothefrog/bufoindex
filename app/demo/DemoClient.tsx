@@ -94,6 +94,12 @@ import {
 import { cn } from '@/lib/utils';
 import { Coins, Scissors, Scale } from 'lucide-react';
 
+// Guided-flow widgets (landing intent picker + intake choice cards)
+import { IntentPicker } from '@/components/guided/IntentPicker';
+import { OptionCard } from '@/components/guided/OptionCard';
+import { LookupHint } from '@/components/shared/LookupHint';
+import { Compass } from 'lucide-react';
+
 interface DemoState {
   basicInputs: {
     text: string;
@@ -171,6 +177,7 @@ export function DemoClient() {
   const [showSideBySide, setShowSideBySide] = React.useState(true);
   const [activeSection, setActiveSection] = React.useState<'widgets' | 'colors' | 'typography' | 'layouts' | 'charts'>('widgets');
   const [dollarMode, setDollarMode] = React.useState<DollarDisplayMode>(DEFAULT_DOLLAR_DISPLAY_MODE);
+  const [guidedChoice, setGuidedChoice] = React.useState<'standard' | 'cashflow-investor'>('cashflow-investor');
 
   // Chart theme state (moved here to follow Rules of Hooks)
   const [chartTheme, setChartTheme] = React.useState(() => getChartTheme());
@@ -698,6 +705,89 @@ export function DemoClient() {
           </div>
         </InputCard>
       </div>
+
+      {/* Guided Flow Widgets */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Compass className="w-5 h-5" />
+            Guided Flow
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          <div>
+            <h4 className="text-sm font-medium mb-1">IntentPicker</h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              Landing-page question with one full-width OptionCard link per intent
+              (2 columns from <code className="text-xs">md:</code>). Server-renderable.
+            </p>
+            <IntentPicker />
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium mb-1">OptionCard</h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              Link mode (default and emphasis tones) and radio mode, as used by the
+              intake wizard&apos;s choice questions. Minimum height 64px.
+            </p>
+            <div className="space-y-2 max-w-xl">
+              <OptionCard
+                href="/tools"
+                icon={Calculator}
+                title="Link mode"
+                description="Full-width link with an icon tile and a chevron."
+              />
+              <OptionCard
+                href="/tools"
+                tone="emphasis"
+                icon={User}
+                title="Emphasis tone"
+                description="Used for the returning-visitor 'Continue with my profile' card."
+              />
+            </div>
+            <div
+              className="space-y-2 max-w-xl mt-4"
+              role="radiogroup"
+              aria-label="Strategy preset (demo)"
+            >
+              <OptionCard
+                title="Standard"
+                description="About 3 months of must-pay costs in cash, then unleveraged index funds."
+                selected={guidedChoice === 'standard'}
+                onSelect={() => setGuidedChoice('standard')}
+                tabIndex={guidedChoice === 'standard' ? 0 : -1}
+              />
+              <OptionCard
+                title="Cash-flow investor"
+                description="About 1 month in cash backed by a plan, automated contributions, and a leverage comparison for long horizons."
+                selected={guidedChoice === 'cashflow-investor'}
+                onSelect={() => setGuidedChoice('cashflow-investor')}
+                tabIndex={guidedChoice === 'cashflow-investor' ? 0 : -1}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Selected: <span className="font-mono">{guidedChoice}</span>
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium mb-1">LookupHint</h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              Muted &quot;where to find this&quot; helper placed under inputs that usually need a
+              document (the retirement calculator&apos;s &quot;Details worth looking up&quot; card).
+            </p>
+            <div className="space-y-1 max-w-xl">
+              <EnhancedMoneyInput
+                name="demo-lookup-hint"
+                label="Expected Social Security (monthly)"
+                value={1800}
+                onChange={() => {}}
+              />
+              <LookupHint>ssa.gov/myaccount shows your estimate.</LookupHint>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Portfolio Rebalancing Composed Widgets */}
       <Card>

@@ -7,10 +7,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // developer surface rather than a page worth submitting to search engines.
   const routes = [
     '/',
+    '/tools',
     '/tools/paycheck-allocator',
     '/tools/retirement-calculator',
     '/tools/retirement-calculator/methodology',
     '/tools/portfolio-rebalancing-calculator',
+    '/tools/leverage-comparison',
   ];
 
   // `lastModified` is omitted rather than hardcoded: a frozen date goes stale

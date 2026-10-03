@@ -5,7 +5,10 @@ import { AlertCircle, CheckCircle2, Plus, Target as TargetIcon, Trash2 } from 'l
 import { Button } from '@/components/ui/button';
 import { InputCard } from '@/components/ui/cards/BaseCard';
 import { PercentInput } from '@/components/ui/inputs';
-import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
+import {
+  selectCustomAssetClasses,
+  usePortfolioRebalancingStore,
+} from '@/lib/store/portfolioRebalancingStore';
 import {
   AssetClass,
   BUILTIN_ASSET_CLASS_LABELS,
@@ -67,9 +70,7 @@ export function TargetsCard() {
   const securities = usePortfolioRebalancingStore(s => s.inputs.securities);
   const holdings = usePortfolioRebalancingStore(s => s.inputs.holdings);
   const classTargets = usePortfolioRebalancingStore(s => s.inputs.classTargets);
-  const customAssetClasses = usePortfolioRebalancingStore(
-    s => s.inputs.customAssetClasses ?? [],
-  );
+  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
   const setClassTarget = usePortfolioRebalancingStore(s => s.setClassTarget);
   const removeAssetClass = usePortfolioRebalancingStore(s => s.removeAssetClass);
 
@@ -182,9 +183,7 @@ interface AssetClassOption {
  * unmatched query creates a new custom class with that label.
  */
 function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
-  const customAssetClasses = usePortfolioRebalancingStore(
-    s => s.inputs.customAssetClasses ?? [],
-  );
+  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
   const ensureAssetClassVisible = usePortfolioRebalancingStore(
     s => s.ensureAssetClassVisible,
   );
