@@ -455,6 +455,67 @@ This is the honest way to make the argument: the tool shows the upside
 and the tail, and the user decides. The dashboard card is this calculator
 run on the profile's taxable contribution.
 
+**C. Cash-flow framing versus lump-sum framing.** The usual leveraged-vs-
+index chart grows a single starting dollar over N years. That framing
+answers the wrong question for someone investing out of each paycheck, and
+it misstates the leveraged case in both directions:
+
+- A deterministic CAGR line ignores volatility decay, so it flatters the
+  leveraged fund.
+- A single historical path starting at a bad date (2000, 2007) buries the
+  leveraged fund under one drawdown it never recovers from within the
+  window, so it punishes it.
+
+With monthly contributions the terminal value is a sum of many small
+positions, each compounding from its own entry date. Three things follow,
+and the tool should show each of them separately rather than asserting a
+net effect:
+
+1. **Sequence exposure shrinks.** Early contributions are small relative to
+   the eventual balance, so an early crash hurts less than in the lump-sum
+   case, and a late crash hurts both paths roughly equally.
+2. **Drawdown buying is convex in leverage.** A 2x fund falls further than
+   the index in a drawdown, so a fixed monthly dollar buys proportionally
+   more of it at the bottom. The recovery is also larger, so the
+   contributions made during the drawdown carry more of the final value.
+   This is the mechanism behind the "DCA helps leverage more" intuition.
+3. **The left tail does not go away.** A long flat or falling decade (1966
+   to 1982 in real terms, 2000 to 2012) still leaves the leveraged DCA path
+   behind the index DCA path, sometimes badly. Decay is paid every year
+   regardless of contribution timing.
+
+Modeling requirements that follow from this:
+
+- Equal dollars in on both paths, same dates. Compare money-weighted
+  return (IRR) and ending balance, not CAGR; CAGR is undefined for a
+  contribution stream.
+- Two engines, both reported. A Monte Carlo engine with monthly lognormal
+  draws (the leveraged return model from part A applied monthly, so decay
+  is captured path by path), and a historical engine that replays a monthly
+  S&P 500 total-return series through the same leverage model. The monthly
+  series from 1871 (Shiller data) is about 1,900 rows and ships fine as a
+  client-side constant with a citation; a daily series does not. Note that
+  a monthly replay understates daily-reset decay in violent months, and say
+  so on the methodology page.
+- Rolling-window historical results: for every start month in the series,
+  run the N-year DCA on both paths and report the share of windows where
+  the leveraged path ends ahead, the median and worst gap, and the longest
+  stretch the leveraged path spent behind. This is the chart that answers
+  "does cash flow actually help" better than any single path can.
+- The "DCA effect" decomposition from part B: leveraged DCA minus index
+  DCA, compared with leveraged lump sum minus index lump sum on the same
+  total dollars, so the reader can see how much of the advantage is the
+  contribution pattern versus the leverage itself.
+- Inputs that matter here and nowhere else: contribution growth rate
+  (raises with income), whether contributions pause in a drawdown (the
+  behavioral failure mode the automation section exists to prevent), and
+  a de-leveraging rule by age or by balance.
+
+The result cards for the comparison calculator are therefore: ending
+balance distribution (both engines), probability leveraged ends behind,
+rolling-window win rate and worst gap, longest time behind, max drawdown,
+and the DCA-effect decomposition.
+
 ### 5.4 Automation
 
 Mostly a presentation change over existing output. `PayrollSetupGuide` and
