@@ -4,6 +4,7 @@ import React, { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CalculatorLayout, type ShareResult } from '@/components/ui/layouts/CalculatorLayout';
+import { NextSteps } from '@/components/guided/NextSteps';
 import {
   simulateDcaComparison,
   type DcaComparisonInputs,
@@ -87,6 +88,7 @@ export function LeverageComparison({ initialInputs }: LeverageComparisonProps) {
       defaultMobileTab={arrivedWithInputs ? 'results' : 'inputs'}
       inputSections={<LeverageInputs inputs={inputs} onChange={handleChange} />}
       resultSection={<LeverageResults result={result} inputs={deferredInputs} isStale={isStale} />}
+      resultFooter={<NextSteps intent="leverage" />}
       onCalculate={handleCompare}
       onShare={handleShare}
       calculateButtonText="Compare"

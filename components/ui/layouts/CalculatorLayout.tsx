@@ -42,6 +42,12 @@ export interface CalculatorLayoutProps {
   description: string;
   inputSections: React.ReactNode;
   resultSection?: React.ReactNode;
+  /**
+   * Rendered immediately after resultSection inside the results area (the
+   * mobile Results tab and the desktop results column), and only while
+   * resultSection is present. Used for the post-results "What next?" card.
+   */
+  resultFooter?: React.ReactNode;
   isCalculating?: boolean;
   onCalculate?: () => void;
   onShare?: ShareHandler;
@@ -97,6 +103,7 @@ export function CalculatorLayout({
   description,
   inputSections,
   resultSection,
+  resultFooter,
   isCalculating = false,
   onCalculate,
   onShare,
@@ -265,6 +272,7 @@ export function CalculatorLayout({
             >
               <div id={resultsPanelId} className="space-y-6">
                 {resultSection}
+                {resultFooter}
               </div>
             </ResultSection>
           )}

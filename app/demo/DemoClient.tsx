@@ -94,9 +94,13 @@ import {
 import { cn } from '@/lib/utils';
 import { Coins, Scissors, Scale } from 'lucide-react';
 
-// Guided-flow widgets (landing intent picker + intake choice cards)
+// Guided-flow widgets (intent picker, intake choice cards, next steps, core summary)
 import { IntentPicker } from '@/components/guided/IntentPicker';
 import { OptionCard } from '@/components/guided/OptionCard';
+import { NextSteps } from '@/components/guided/NextSteps';
+import { CoreSummary } from '@/components/guided/CoreSummary';
+import { CORE_PATHS } from '@/lib/constants/intake';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { LookupHint } from '@/components/shared/LookupHint';
 import { Compass } from 'lucide-react';
 
@@ -125,6 +129,10 @@ interface DemoState {
     mode: RebalanceMode;
   };
 }
+
+// Sample for the CoreSummary demo: the default profile with every core
+// answer marked as saved, so the summary shows the full one-line recap.
+const DEMO_CORE_PROFILE = { ...getDefaultFinancialProfile(), provided: [...CORE_PATHS] };
 
 export function DemoClient() {
   const { resolvedTheme } = useTheme();
@@ -718,7 +726,7 @@ export function DemoClient() {
           <div>
             <h4 className="text-sm font-medium mb-1">IntentPicker</h4>
             <p className="text-xs text-muted-foreground mb-3">
-              Landing-page question with one full-width OptionCard link per intent
+              One full-width OptionCard link per intent
               (2 columns from <code className="text-xs">md:</code>). Server-renderable.
             </p>
             <IntentPicker />
@@ -768,6 +776,33 @@ export function DemoClient() {
             <p className="text-xs text-muted-foreground mt-2">
               Selected: <span className="font-mono">{guidedChoice}</span>
             </p>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium mb-1">NextSteps</h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              &quot;What next?&quot; card passed to <code className="text-xs">CalculatorLayout</code> as{' '}
+              <code className="text-xs">resultFooter</code>, so it closes every calculator&apos;s results.
+              With a saved profile it offers Finish your profile (See your overview once complete) and
+              Try another calculator; without one, the shared quick questions. Reflects this
+              browser&apos;s saved profile and renders after hydration.
+            </p>
+            <div className="max-w-xl">
+              <NextSteps intent="paycheck" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium mb-1">CoreSummary</h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              One-line recap of the saved basics with an &quot;Edit the basics&quot; link back to the
+              shared core intake. Shown at the top of the &quot;What do you want to learn?&quot; chooser.
+              Pure and server-renderable; this sample uses the default profile with every core answer
+              marked as saved.
+            </p>
+            <div className="max-w-xl">
+              <CoreSummary profile={DEMO_CORE_PROFILE} />
+            </div>
           </div>
 
           <div>

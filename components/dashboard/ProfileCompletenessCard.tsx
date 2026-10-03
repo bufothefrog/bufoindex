@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
+import { remainingIntakeScreens } from '@/lib/constants/intake';
 import { profileCompleteness } from '@/lib/profile/mappers';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { CardLinkButton } from './CardLinkButton';
@@ -17,6 +18,10 @@ export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProp
   const { provided, total, missing } = profileCompleteness(profile);
   const share = total > 0 ? provided / total : 0;
   const shownMissing = missing.slice(0, MAX_MISSING);
+  // /start/profile asks only the questions not answered yet and opens this
+  // page when none are left, so once they run out the action edits the
+  // basics instead of bouncing straight back here.
+  const questionsLeft = remainingIntakeScreens('profile', profile).length > 0;
 
   return (
     <BaseCard title="Profile completeness" icon={UserRound} {...DASHBOARD_CARD_LAYOUT} testId="overview-completeness">
@@ -81,10 +86,13 @@ export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProp
         )}
       </div>
 
-      <div className="mt-4">
-        <CardLinkButton href="/start/profile">
-          {missing.length > 0 ? 'Fill in the rest' : 'Review the profile'}
-        </CardLinkButton>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {questionsLeft ? (
+          <CardLinkButton href="/start/profile">Fill in the rest</CardLinkButton>
+        ) : (
+          <CardLinkButton href="/start">Edit the basics</CardLinkButton>
+        )}
+        <CardLinkButton href="/start/review">Review all answers</CardLinkButton>
       </div>
     </BaseCard>
   );

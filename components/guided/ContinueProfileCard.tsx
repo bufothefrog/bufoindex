@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { LayoutDashboard } from 'lucide-react';
+import type { Route } from 'next';
+import { UserRound } from 'lucide-react';
+import { LEARN_CHOOSER_PATH, coreSummary } from '@/lib/constants/intake';
 import { profileCompleteness } from '@/lib/profile/mappers';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { OptionCard } from './OptionCard';
@@ -11,9 +13,13 @@ export interface ContinueProfileCardProps {
 }
 
 /**
- * "Continue with my profile" shortcut for returning visitors. Renders nothing
- * until the persisted profile has hydrated (so server and client markup
- * match) and nothing when no answers are saved.
+ * "Continue with my profile" shortcut for returning visitors: leads to the
+ * "What do you want to learn?" chooser, with a one-line summary of the
+ * basics answered so far. The chooser owns the "are the basics done?" check
+ * and sends the visitor back to the core intake when they are not.
+ *
+ * Renders nothing until the persisted profile has hydrated (so server and
+ * client markup match) and nothing when no answers are saved.
  */
 export function ContinueProfileCard({ className }: ContinueProfileCardProps) {
   const hasHydrated = useProfileStore((state) => state.hasHydrated);
@@ -23,13 +29,16 @@ export function ContinueProfileCard({ className }: ContinueProfileCardProps) {
   if (!hasHydrated || !hasProfile) return null;
 
   const { provided, total } = profileCompleteness(profile);
+  const saved = `${provided} of ${total} details saved in this browser.`;
+  const summary = coreSummary(profile);
+
   return (
     <OptionCard
-      href="/overview"
+      href={LEARN_CHOOSER_PATH as Route}
       tone="emphasis"
-      icon={LayoutDashboard}
+      icon={UserRound}
       title="Continue with my profile"
-      description={`${provided} of ${total} details saved in this browser.`}
+      description={summary ? `${summary}. ${saved}` : saved}
       className={className}
     />
   );

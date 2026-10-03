@@ -74,7 +74,7 @@ questions that calculator still needs.
 |   "Continue with my profile" (returning visitor) -> /start/choose
 |   "Just show me the tools" -> /tools
 |
-|-- /start   (core intake: about six screens, one question each)
+|-- /start   (core intake: seven shared fields on three short screens)
 |      age, state, filing status, gross pay + frequency, take-home,
 |      must-pay monthly costs. Shared by every calculator.
 |      finish -> /start/<next> when a preview card set one, else:
@@ -114,12 +114,15 @@ Rules that fall out of this:
   calculator needs it.
 - `/start/choose` and `/start/<intent>` redirect to `/start` when the core
   is incomplete, so a bookmarked chooser cannot show an empty summary.
+- Saved answers are changed at `/start/review`, which re-asks every
+  question prefilled; it is linked from the chooser and the overview's
+  completeness card. The calculators do not write back to the profile.
 
 ### 2.2 Landing page
 
 - Above the fold: the name, one sentence of positioning, and the single
-  primary action, "Get started", with a line under it saying it is about
-  six quick questions before picking what to learn.
+  primary action, "Get started", with a line under it saying it is a
+  few quick questions before picking what to learn.
 - Returning visitors with a saved profile see "Continue with my profile"
   with the core summary, leading to the chooser.
 - Below: "What you can learn", one preview card per calculator with the
@@ -138,7 +141,7 @@ anything that requires a document; those fields wait on the calculator.
 
 Two flows share one component:
 
-- **Core** (`/start`): the six shared questions. Heading "A few basics"
+- **Core** (`/start`): the seven shared fields on three screens. Heading "A few basics"
   and a line saying every calculator uses these answers. Finishes to the
   chooser, or to the intent a landing card chose.
 - **Calculator** (`/start/<intent>`): only the intent's own questions

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Route } from 'next';
-import { INTENT_OPTIONS } from '@/lib/constants/intake';
+import { INTENT_OPTIONS, coreStartLink } from '@/lib/constants/intake';
 import { cn } from '@/lib/utils';
 import { OptionCard } from './OptionCard';
 
@@ -11,8 +11,9 @@ export interface IntentPickerProps {
 }
 
 /**
- * The landing-page question: one full-width card per intent, each linking to
- * its intake wizard at /start/<intent>. Server-renderable.
+ * One full-width card per intent. Every card starts with the shared core
+ * intake (/start?next=<intent>), which then continues to that intent's
+ * remaining questions. Server-renderable.
  */
 export function IntentPicker({ leading, className }: IntentPickerProps) {
   const lastIndex = INTENT_OPTIONS.length - 1;
@@ -31,7 +32,7 @@ export function IntentPicker({ leading, className }: IntentPickerProps) {
             className={cn('flex', oddCount && index === lastIndex && 'md:col-span-2')}
           >
             <OptionCard
-              href={`/start/${option.id}` as Route}
+              href={coreStartLink(option.id) as Route}
               title={option.title}
               description={option.description}
               icon={option.icon}

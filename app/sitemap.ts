@@ -5,6 +5,9 @@ const BASE_URL = 'https://bufoindex.com';
 export default function sitemap(): MetadataRoute.Sitemap {
   // /demo stays publicly reachable as a component catalog, but it is a
   // developer surface rather than a page worth submitting to search engines.
+  // The guided-flow steps (/start, /start/choose, /start/<intent>) and
+  // /overview are left out too: they set robots noindex, depend on answers
+  // saved in the visitor's browser, and the landing page links into them.
   const routes = [
     '/',
     '/tools',

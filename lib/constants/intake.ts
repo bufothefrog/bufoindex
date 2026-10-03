@@ -13,12 +13,25 @@
  * Screen budget: every intent except 'profile' fits in 6 screens by grouping
  * related fields on one screen (for example gross pay, pay frequency, and
  * take-home pay all come from the same pay stub line items).
+ *
+ * Guided flow: everyone answers the shared core first (/start, flow 'core'),
+ * then picks what to learn (/start/choose, LEARN_OPTIONS), and each intent
+ * then asks only its remaining questions (/start/<intent>, 'remaining' mode:
+ * non-core questions whose path is not yet in profile.provided).
  */
 
 import type { LucideIcon } from 'lucide-react';
 import { Layers, Scale, Sunset, UserRound, Wallet } from 'lucide-react';
-import { PRESET_EMERGENCY_MONTHS, splitProfilePath } from '@/lib/profile/defaults';
-import type { ProfilePatch, StrategyPreset } from '@/lib/profile/types';
+import { formatCurrency } from '@/lib/calculations/core';
+import { PRESET_EMERGENCY_MONTHS, getProfileValue, splitProfilePath } from '@/lib/profile/defaults';
+import { profileCompleteness } from '@/lib/profile/mappers';
+import type {
+  FinancialProfile,
+  PayFrequency,
+  ProfileFilingStatus,
+  ProfilePatch,
+  StrategyPreset,
+} from '@/lib/profile/types';
 
 // ---------------------------------------------------------------------------
 // Intents
@@ -89,6 +102,28 @@ export const INTENT_OPTIONS: IntentOption[] = [
 
 export function getIntentOption(intent: IntakeIntent): IntentOption {
   return INTENT_OPTIONS.find((o) => o.id === intent) ?? INTENT_OPTIONS[0];
+}
+
+/**
+ * The "What do you want to learn?" chooser shown after the shared core:
+ * finishing the profile first, then each calculator (same entries as
+ * INTENT_OPTIONS).
+ */
+export const LEARN_OPTIONS: IntentOption[] = [
+  {
+    ...getIntentOption('profile'),
+    title: 'Finish your profile',
+    description: 'Answer the rest once; every calculator and your overview use it.',
+  },
+  getIntentOption('paycheck'),
+  getIntentOption('retirement'),
+  getIntentOption('portfolio'),
+  getIntentOption('leverage'),
+];
+
+/** The chooser entry for an intent (the profile entry reads "Finish your profile"). */
+export function getLearnOption(intent: IntakeIntent): IntentOption {
+  return LEARN_OPTIONS.find((o) => o.id === intent) ?? getIntentOption(intent);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,11 +370,13 @@ const CASH: IntakeQuestion[] = [
   q('cash', { id: 'strategy-preset', path: 'strategy.preset', label: 'Strategy preset', kind: 'choice', options: STRATEGY_OPTIONS, screen: 'strategy' }),
 ];
 
+// Age is a core path (dropped in 'remaining' mode); the rest are tagged with
+// the profile section that asks the same path.
 const LEVERAGE: IntakeQuestion[] = [
   q('core', { id: 'age', path: 'person.age', label: 'Your age', kind: 'number', min: 16, max: 100, step: 1, screen: 'horizon' }),
-  q('core', { id: 'retirement-age', path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', min: 30, max: 85, step: 1, screen: 'horizon' }),
-  TAXABLE_CONTRIBUTION('core'),
-  q('core', { id: 'invested-balance', path: 'investing.investedBalance', label: 'Starting balance', help: 'What you already have invested. A rough number is fine.', kind: 'money', min: 0, screen: 'invested' }),
+  q('retirement', { id: 'retirement-age', path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', min: 30, max: 85, step: 1, screen: 'horizon' }),
+  TAXABLE_CONTRIBUTION('portfolio'),
+  q('retirement', { id: 'invested-balance', path: 'investing.investedBalance', label: 'Starting balance', help: 'What you already have invested. A rough number is fine.', kind: 'money', min: 0, screen: 'invested' }),
 ];
 
 export const INTAKE_QUESTIONS: Record<IntakeIntent, IntakeQuestion[]> = {
@@ -353,6 +390,43 @@ export const INTAKE_QUESTIONS: Record<IntakeIntent, IntakeQuestion[]> = {
 /** Every profile path an intent can ask about, in order, deduped. */
 export function intakePaths(intent: IntakeIntent): string[] {
   return Array.from(new Set(INTAKE_QUESTIONS[intent].map((question) => question.path)));
+}
+
+/** Profile dot paths of the shared core questions, in the order they are asked. */
+export const CORE_PATHS: readonly string[] = CORE.map((question) => question.path);
+
+const CORE_PATH_SET: ReadonlySet<string> = new Set(CORE_PATHS);
+
+/** True when every core question has an answer saved in the profile. */
+export function isCoreComplete(profile: FinancialProfile): boolean {
+  const provided = new Set(profile.provided);
+  return CORE_PATHS.every((path) => provided.has(path));
+}
+
+/** What the wizard asks: the shared core, or one intent's question set. */
+export type IntakeFlow = IntakeIntent | 'core';
+
+export function isIntakeFlow(value: string): value is IntakeFlow {
+  return value === 'core' || isIntakeIntent(value);
+}
+
+/** The shared core intake. */
+export const CORE_START_PATH = '/start';
+
+/** The "What do you want to learn?" chooser shown after the core. */
+export const LEARN_CHOOSER_PATH = '/start/choose';
+
+/** The core intake, continuing to `intent`'s remaining questions afterwards. */
+export function coreStartLink(intent: IntakeIntent): string {
+  return `${CORE_START_PATH}?next=${intent}`;
+}
+
+/**
+ * Where the core intake goes once finished: '/start/<next>' when `next` is a
+ * known intent, otherwise the chooser.
+ */
+export function coreDestination(next?: string | null): string {
+  return next && isIntakeIntent(next) ? `/start/${next}` : LEARN_CHOOSER_PATH;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,14 +445,42 @@ function isVisible(question: IntakeQuestion, getValue: IntakeValueGetter): boole
   return !question.showIf || getValue(question.showIf.path) === question.showIf.equals;
 }
 
+export type IntakeMode = 'all' | 'remaining';
+
+export interface IntakeScreenOptions {
+  /**
+   * 'all' (the default) asks every question in the flow. 'remaining' drops
+   * the paths in `provided`, and for an intent also drops the core questions
+   * (the shared core is asked once, on its own).
+   */
+  mode?: IntakeMode;
+  /** Paths already answered (profile.provided); used by 'remaining' mode. */
+  provided?: readonly string[];
+}
+
+function flowQuestions(flow: IntakeFlow, options: IntakeScreenOptions): IntakeQuestion[] {
+  const questions = flow === 'core' ? CORE : INTAKE_QUESTIONS[flow];
+  if (options.mode !== 'remaining') return questions;
+  const provided = new Set(options.provided ?? []);
+  return questions.filter(
+    (question) => !provided.has(question.path) && (flow === 'core' || !CORE_PATH_SET.has(question.path))
+  );
+}
+
 /**
- * Groups an intent's visible questions into screens. Consecutive questions
+ * Groups a flow's visible questions into screens. Consecutive questions
  * with the same screen id share a screen; a screen whose questions are all
- * hidden (showIf not met) is dropped.
+ * hidden (showIf not met) is dropped. Conditional questions follow their
+ * visibility rule in every mode, so in 'remaining' mode the employer-match
+ * screen still appears only when the (saved or new) 401(k) answer is Yes.
  */
-export function getIntakeScreens(intent: IntakeIntent, getValue: IntakeValueGetter): IntakeScreen[] {
+export function getIntakeScreens(
+  flow: IntakeFlow,
+  getValue: IntakeValueGetter,
+  options: IntakeScreenOptions = {}
+): IntakeScreen[] {
   const screens: IntakeScreen[] = [];
-  for (const question of INTAKE_QUESTIONS[intent]) {
+  for (const question of flowQuestions(flow, options)) {
     if (!isVisible(question, getValue)) continue;
     const last = screens[screens.length - 1];
     if (last && last.id === question.screen) {
@@ -393,6 +495,36 @@ export function getIntakeScreens(intent: IntakeIntent, getValue: IntakeValueGett
     }
   }
   return screens;
+}
+
+/**
+ * The screens `intent` still asks in 'remaining' mode given the saved
+ * profile: what /start/<intent> shows on arrival. Empty means that page goes
+ * straight to its destination (the calculator, or the overview for
+ * 'profile').
+ */
+export function remainingIntakeScreens(intent: IntakeIntent, profile: FinancialProfile): IntakeScreen[] {
+  return getIntakeScreens(intent, (path) => getProfileValue(profile, path), {
+    mode: 'remaining',
+    provided: profile.provided,
+  });
+}
+
+/**
+ * Whether "Finish your profile" has nothing left to do, so the guided flow
+ * offers the overview in its place: every profile field is answered
+ * (profileCompleteness lists nothing missing), or the profile intake has no
+ * questions left. The second case matters because a few fields (target
+ * retirement income, your 401(k) contribution rate, the emergency-fund target
+ * months, the leverage ratio) are not asked by any intake, and the match
+ * terms are not asked without a 401(k), so /start/profile would only
+ * redirect to the overview.
+ */
+export function isProfileFinished(profile: FinancialProfile): boolean {
+  return (
+    profileCompleteness(profile).missing.length === 0 ||
+    remainingIntakeScreens('profile', profile).length === 0
+  );
 }
 
 interface IntakeRelation {
@@ -510,4 +642,49 @@ export function buildIntakeSubmission(
     patch: sections as ProfilePatch,
     providedPaths: provided.filter((path) => splitProfilePath(path) !== null),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Core summary
+// ---------------------------------------------------------------------------
+
+const FILING_SUMMARY: Record<ProfileFilingStatus, string> = {
+  single: 'single',
+  marriedJoint: 'married filing jointly',
+};
+
+const FREQUENCY_SUMMARY: Record<PayFrequency, string> = {
+  weekly: 'every week',
+  'bi-weekly': 'every 2 weeks',
+  'semi-monthly': 'twice a month',
+  monthly: 'once a month',
+};
+
+/**
+ * One-line summary of the saved core answers, e.g.
+ * "30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay". Parts the user
+ * has not answered (still placeholders) are left out; an empty string means
+ * none of the summarized answers are saved. Take-home pay is not summarized.
+ */
+export function coreSummary(profile: FinancialProfile): string {
+  const provided = new Set(profile.provided);
+  const has = (path: string) => provided.has(path);
+  const { person, income, spending } = profile;
+  const parts: string[] = [];
+
+  if (has('person.age')) parts.push(String(person.age));
+  if (has('person.state')) parts.push(person.state);
+  if (has('person.filingStatus')) parts.push(FILING_SUMMARY[person.filingStatus]);
+
+  const frequency = has('income.frequency') ? FREQUENCY_SUMMARY[income.frequency] : null;
+  if (has('income.grossPerPaycheck')) {
+    parts.push(`${formatCurrency(income.grossPerPaycheck)} ${frequency ?? 'per paycheck'}`);
+  } else if (frequency) {
+    parts.push(`paid ${frequency}`);
+  }
+
+  if (has('spending.necessaryMonthly')) {
+    parts.push(`${formatCurrency(spending.necessaryMonthly)}/mo must-pay`);
+  }
+  return parts.join(', ');
 }
