@@ -211,12 +211,12 @@ Cards:
 
 ## 3. Shared financial profile
 
-### 3.1 Why a profile, and why not a backend
+### 3.1 Why a profile, and why it comes before any backend
 
-The site is client-side only and that should not change: no accounts, no
-server, no PII leaving the browser. The profile is a single localStorage
-record plus a URL-hash codec so it can be shared or moved between devices
-the same way scenarios are today.
+The profile is first a single localStorage record plus a codec, so the
+client has one record to persist, seed calculators from, and later sync.
+Optional accounts (section 9) build on this record; they do not replace
+it. Until section 9 lands, nothing leaves the browser.
 
 ### 3.2 Schema sketch
 
@@ -582,6 +582,7 @@ change is a useful "large" reference point).
 | 4b. Leverage | lognormal Monte Carlo (own PR), `leveragedReturns.ts`, `'leveraged'` risk profile, leverage-comparison calculator + methodology page | large | lognormal PR first |
 | 4c. Automation | checklist card, persisted checkbox state, copy | small-medium | phase 2 for persistence |
 | 5. Tone and docs | Strategy presets, copy pass, `CLAUDE.md` / `CONTRIBUTING.md` rule update, disclaimers, methodology pages | small, but needs a decision first | section 5.1 decision |
+| 6. Saved scenarios and optional accounts | Named scenarios in the profile, short links replacing visible hashes, auth, server-side storage (plain or end-to-end encrypted), privacy page, export and delete | large; first server-side code in the repo | phase 2, section 9 decisions |
 
 Phases 0 and 1 give the mobile and landing-page wins without touching the
 stores or calculations. Phase 2 is the structural change. Phase 4 is where
@@ -625,7 +626,9 @@ the math and the testing burden live.
 
 Assumptions made in this sketch:
 
-1. Client-side only remains a hard constraint (no accounts, no backend).
+1. Results stay free and account-less. Accounts are optional and exist only
+   to save a profile and named scenarios across visits and devices (section
+   9). Until that lands, client-side only remains the constraint.
 2. The three existing calculators keep their routes and share-link formats.
 3. The philosophy ships as a selectable preset with the comparison always
    visible (Option A), and the "neutral tone" rule is reworded rather than
@@ -650,3 +653,112 @@ Questions that change the plan materially:
 5. Which of the two new calculators (emergency fund, leverage comparison)
    matters more? They are independent and the second is roughly twice the
    work.
+6. For saved data (section 9): is the server allowed to see plaintext
+   financial data, or should saves be end-to-end encrypted so the server
+   only ever holds ciphertext? This decides the auth and storage design and
+   the privacy promise on the landing page.
+
+## 9. Retiring visible hashes, saving results, optional accounts
+
+The goal: anyone can run a calculator and see results with no account; an
+account is optional and exists to keep a profile and named scenarios for
+later, on any device. Visible URL hashes go away as the user-facing share
+and save mechanism.
+
+### 9.1 What the hashes do today, and what must replace each job
+
+| Job the hash does now | Replacement |
+|---|---|
+| Seed a calculator from somewhere else (wizard, dashboard) | Keep the codecs as an internal transport in phase 1; in phase 2 the calculators read the profile store directly (mount order: explicit scenario > profile > store), so the URL can be clean |
+| Persist across reloads on one device | Already localStorage; the profile store makes it one record instead of three |
+| Share a scenario with someone else | Short link: an opaque id (`/s/ab12cd`) that resolves to the encoded scenario, with or without an account; the encoded payload is the same compressed JSON the codecs produce today |
+| Reproducibility for bug reports and methodology | Unchanged: the codecs stay, and a short link or an exported JSON file carries the same inputs |
+
+So the codecs and their tests do not get deleted; they stop being visible.
+
+### 9.2 Data model
+
+- `profiles`: one per account, the `FinancialProfile` JSON from section 3,
+  versioned by the same codec version rules (never break an old payload).
+- `scenarios`: name, calculator id, inputs JSON, created and updated
+  timestamps, optional note. A scenario is a snapshot; the profile is the
+  live record. "Save this result" on a calculator creates a scenario from
+  the current inputs.
+- `short_links`: id, payload, calculator id, optional owner, optional
+  expiry. Created on "Copy link" whether or not the user is signed in.
+- Accounts hold no results, only inputs. Results are recomputed on load,
+  which keeps the methodology honest (same inputs, same seed, same numbers)
+  and means a calculation-engine fix flows to every saved scenario.
+
+### 9.3 Two ways to hold the data
+
+**Plain server-side storage.** Standard auth (magic link or passkeys via
+Auth.js or a hosted provider), Postgres via Drizzle on Vercel, scenario
+rows in the clear, encryption at rest from the database provider. Simplest
+to build and to support (password reset, cross-device, future features
+like email summaries). Cost: the site now holds income, balances and debts
+for real people, which means a privacy policy, deletion and export
+endpoints, breach exposure, and the landing page can no longer say
+"nothing leaves your browser."
+
+**End-to-end encrypted storage.** The browser encrypts the profile and
+scenarios with a key the server never sees, and the server stores
+ciphertext blobs keyed by account. Key options: a user passphrase run
+through PBKDF2 or Argon2 in WebCrypto (losing the passphrase loses the
+data, which must be said plainly), or a passkey-derived key via the WebAuthn
+PRF extension (cleaner, but browser support is still uneven). The site
+keeps its privacy promise almost intact ("we store an encrypted copy you
+can read; we cannot"). Cost: no server-side features that need plaintext,
+a recovery story that is the user's responsibility, and more client code.
+
+Recommendation: decide this before writing any server code. For a site
+whose pitch is sober math and no data collection, the encrypted design
+fits the brand and limits liability; the plain design is the better fit if
+the roadmap includes anything that reads user data server-side.
+
+### 9.4 Client behaviour
+
+- Local-first. The profile store stays the source of truth in the browser.
+  Signing in merges the local profile into the account (newest `updatedAt`
+  per section wins; a conflict screen is not worth building for a demo,
+  but a "keep local / keep account" choice is cheap). Signing out keeps a
+  local copy unless the user asks to clear it.
+- Sync. Push on change (debounced), pull on sign-in and on focus. Stamp
+  each write with `updatedAt`; last write wins.
+- UI. A "Save" action on every result page: without an account it saves to
+  this device and offers "Create an account to keep this on other devices";
+  with an account it names the scenario. A "Scenarios" list on the
+  dashboard. "Copy link" produces a short link.
+
+### 9.5 Engineering shape
+
+```
+app/api/
+  auth/[...nextauth]/route.ts         Auth.js handlers (or provider SDK)
+  profile/route.ts                    GET / PUT the account profile
+  scenarios/route.ts, [id]/route.ts   list / create / rename / delete
+  links/route.ts, [id]/route.ts       create a short link / resolve one
+app/s/[id]/page.tsx                   resolve a short link and open the calculator
+app/account/page.tsx                  sign in, export, delete
+lib/server/                           db client (Drizzle), schema, validation (zod)
+lib/sync/                             client sync engine, encryption (if 9.3 picks E2E)
+test/lib/server/, test/lib/sync/      API handler tests with a mocked db; crypto round-trips
+```
+
+Also required: a privacy page, env vars in Vercel for the database and
+mail provider, migrations in CI, rate limiting on the link and auth routes,
+and the `npm audit` gate now covering server dependencies.
+
+### 9.6 Risks
+
+- Scope. This is the first server-side code in the repo and the first time
+  the site is responsible for someone else's data. It should land after the
+  profile layer (phase 2), never before, so the client has one record to
+  sync rather than three stores.
+- Promise drift. The current copy says scenarios are shareable by URL and
+  nothing is uploaded. Both change. Update the landing page, the README and
+  `CLAUDE.md` in the same PR.
+- Auth cost and spam. Magic links need a mail provider and abuse controls;
+  passkeys avoid mail but need a fallback.
+- Lock-in. Keep export (JSON of profile plus scenarios) from day one so an
+  account is never the only copy.
