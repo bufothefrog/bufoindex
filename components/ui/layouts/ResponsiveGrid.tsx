@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-interface ResponsiveGridProps {
+export interface ResponsiveGridProps {
   children: React.ReactNode;
   hasResults?: boolean;
   className?: string;
@@ -64,7 +64,7 @@ export function ResponsiveGrid({
 /**
  * Grid Section Components
  */
-interface GridSectionProps {
+export interface GridSectionProps {
   children: React.ReactNode;
   className?: string;
   span?: 1 | 2 | 3;
@@ -119,7 +119,7 @@ const featureDotClasses: Record<FeatureDotColor, string> = {
   primary: 'bg-primary'
 };
 
-interface EmptyStateSectionProps {
+export interface EmptyStateSectionProps {
   title: string;
   description: string;
   icon?: React.ComponentType<{ className?: string }>;
@@ -128,6 +128,7 @@ interface EmptyStateSectionProps {
     text: string;
   }>;
   className?: string;
+  id?: string;
 }
 
 export function EmptyStateSection({
@@ -135,23 +136,25 @@ export function EmptyStateSection({
   description, 
   icon: Icon,
   features = [],
-  className
+  className,
+  id
 }: EmptyStateSectionProps) {
   return (
-    <div className={cn("lg:col-span-1", className)}>
+    <div id={id} className={cn("lg:col-span-1", className)}>
       <div className="h-full bg-card border border-border rounded-lg shadow-xs">
-        <div className="p-8 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
+        {/* Shorter on phones so the empty state never reads as dead space */}
+        <div className="p-6 sm:p-8 flex flex-col items-center justify-center text-center h-full min-h-[240px] lg:min-h-[400px]">
           {Icon && (
-            <div className="w-20 h-20 bg-sage-100 rounded-full flex items-center justify-center mb-6">
-              <Icon className="w-10 h-10 text-sage-400" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-sage-100 dark:bg-sage-800 rounded-full flex items-center justify-center mb-4 sm:mb-6">
+              <Icon className="w-8 h-8 sm:w-10 sm:h-10 text-sage-400 dark:text-sage-300" />
             </div>
           )}
           
-          <h3 className="text-xl font-semibold text-foreground mb-4">
+          <h3 className="text-xl font-semibold text-foreground mb-2 sm:mb-4">
             {title}
           </h3>
           
-          <p className="text-muted-foreground mb-6 max-w-sm">
+          <p className="text-muted-foreground mb-4 sm:mb-6 max-w-sm">
             {description}
           </p>
           
@@ -176,7 +179,7 @@ export function EmptyStateSection({
 /**
  * Container wrapper for consistent page layout
  */
-interface ContainerProps {
+export interface ContainerProps {
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
   padding?: 'sm' | 'md' | 'lg' | 'xl';
@@ -217,3 +220,5 @@ export function Container({
     </div>
   );
 }
+
+export default ResponsiveGrid;

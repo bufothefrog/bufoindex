@@ -13,7 +13,10 @@ import {
   Security,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
+import {
+  selectCustomAssetClasses,
+  usePortfolioRebalancingStore,
+} from '@/lib/store/portfolioRebalancingStore';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface HoldingRowProps {
@@ -45,9 +48,7 @@ export function HoldingRow({
   className,
 }: HoldingRowProps) {
   const classTargets = usePortfolioRebalancingStore(s => s.inputs.classTargets);
-  const customAssetClasses = usePortfolioRebalancingStore(
-    s => s.inputs.customAssetClasses ?? [],
-  );
+  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
 
   const ticker = security?.ticker ?? '';
   const price = security?.price ?? 0;

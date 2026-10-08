@@ -19,7 +19,10 @@ import {
   RebalanceResultV2,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
+import {
+  selectCustomAssetClasses,
+  usePortfolioRebalancingStore,
+} from '@/lib/store/portfolioRebalancingStore';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface RebalanceResultsProps {
@@ -46,9 +49,7 @@ function formatPercentPoints(decimal: number, signed = false): string {
 }
 
 export function RebalanceResults({ result }: RebalanceResultsProps) {
-  const customAssetClasses = usePortfolioRebalancingStore(
-    s => s.inputs.customAssetClasses ?? [],
-  );
+  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
   const {
     accounts,
     totalValueBefore,

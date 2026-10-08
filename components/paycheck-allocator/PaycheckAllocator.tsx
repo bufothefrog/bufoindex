@@ -5,6 +5,7 @@ import { useCalculatorStore } from '@/lib/store/calculatorStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
 import { CalculatorLayout, type ShareResult } from '@/components/ui/layouts/CalculatorLayout';
+import { NextSteps } from '@/components/guided/NextSteps';
 
 export function PaycheckAllocator() {
   const {
@@ -62,6 +63,7 @@ export function PaycheckAllocator() {
       description="Allocates your monthly paycheck across fixed costs, tax-advantaged accounts, and flexible spending, in priority order by after-tax return. Each step shows the math behind its placement."
       inputSections={<InputSection />}
       resultSection={result ? <ResultsSection /> : undefined}
+      resultFooter={<NextSteps intent="paycheck" />}
       isCalculating={isCalculating}
       onCalculate={handleCalculate}
       onShare={handleShare}

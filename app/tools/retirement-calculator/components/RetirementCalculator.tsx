@@ -6,6 +6,7 @@ import { useRetirementStore } from '@/lib/store/retirementStore';
 import { InputSection } from './InputSection';
 import { ResultsSection } from './ResultsSection';
 import { CalculatorLayout, type ShareResult } from '@/components/ui/layouts/CalculatorLayout';
+import { NextSteps } from '@/components/guided/NextSteps';
 
 // Main retirement calculator component
 export function RetirementCalculator() {
@@ -65,6 +66,7 @@ export function RetirementCalculator() {
         description="Monte Carlo retirement modeling with Social Security, healthcare costs, and side-by-side scenario comparison."
         inputSections={<InputSection />}
         resultSection={results ? <ResultsSection /> : undefined}
+        resultFooter={<NextSteps intent="retirement" />}
         isCalculating={isCalculating}
         onCalculate={handleCalculate}
         onShare={handleShare}
