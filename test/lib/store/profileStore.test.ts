@@ -58,7 +58,7 @@ describe('setFields', () => {
       ['person.age', 'person.state', 'investing.monthlyContribution']
     );
     const { profile, hasProfile } = getState();
-    expect(profile.person).toEqual({ age: 41, state: 'CA', filingStatus: 'single', retirementAge: 60 });
+    expect(profile.person).toEqual({ age: 41, state: 'CA', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 });
     expect(profile.investing.monthlyContribution).toBe(2000);
     expect(profile.investing.investedBalance).toBe(25000);
     expect(profile.income).toEqual(getDefaultFinancialProfile().income);
@@ -101,18 +101,152 @@ describe('setFields', () => {
 
   it('ignores provided, version and updatedAt inside the patch', () => {
     vi.spyOn(Date, 'now').mockReturnValue(42);
-    getState().setFields({ provided: ['person.age'], version: 1, updatedAt: 7 }, []);
+    getState().setFields({ provided: ['person.age'], version: 2, updatedAt: 7 }, []);
     expect(getState().profile.provided).toEqual([]);
     expect(getState().profile.updatedAt).toBe(42);
-    expect(getState().profile.version).toBe(1);
+    expect(getState().profile.version).toBe(2);
+  });
+
+  it('merges nested sections leaf by leaf and replaces a list whole', () => {
+    const debt = { id: 'd1', name: 'Card', balance: 900, interestRate: 0.24, minimumPayment: 35, extraPayment: 0, taxDeductible: false };
+    getState().setFields(
+      { assumptions: { retirement: { volatility: 0.2 } }, debts: [debt] },
+      ['assumptions.retirement.volatility', 'debts']
+    );
+    const { profile } = getState();
+    expect(profile.assumptions.retirement).toEqual({ ...getDefaultFinancialProfile().assumptions.retirement, volatility: 0.2 });
+    expect(profile.assumptions.paycheck).toEqual(getDefaultFinancialProfile().assumptions.paycheck);
+    expect(profile.debts).toEqual([debt]);
+    expect(profile.provided).toEqual(['assumptions.retirement.volatility', 'debts']);
+  });
+
+  it('drops provided paths that are not profile paths', () => {
+    getState().setFields({ person: { age: 35 } }, ['person.age', 'person.nickname', 'debts.0.balance']);
+    expect(getState().profile.provided).toEqual(['person.age', 'debts']);
+  });
+
+  it('mirrors the intake new-cash answer into the Brokerage deposit', () => {
+    getState().setFields({ investing: { newCashThisMonth: 2400 } }, ['investing.newCashThisMonth']);
+    const { profile } = getState();
+    expect(profile.investing.newCashThisMonth).toBe(2400);
+    expect(profile.portfolio.accounts.find((a) => a.name === 'Brokerage')?.deposit).toBe(2400);
+    expect(profile.provided).toEqual(['investing.newCashThisMonth']);
   });
 
   it('persists only the profile', () => {
     getState().setFields({ person: { age: 50 } }, ['person.age']);
     const persisted = readPersisted();
-    expect(persisted?.version).toBe(1);
+    expect(persisted?.version).toBe(2);
     expect(Object.keys(persisted!.state)).toEqual(['profile']);
     expect((persisted!.state.profile as { person: { age: number } }).person.age).toBe(50);
+  });
+});
+
+describe('setValues', () => {
+  it('writes leaves at any depth and marks the written paths provided', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1760000000000);
+    getState().setValues([
+      { path: 'person.age', value: 44 },
+      { path: 'assumptions.retirement.effectiveTaxRate', value: 0.18 },
+      { path: 'hsa.coverage', value: 'family' },
+    ]);
+    const { profile, hasProfile } = getState();
+    expect(profile.person.age).toBe(44);
+    expect(profile.assumptions.retirement.effectiveTaxRate).toBe(0.18);
+    expect(profile.hsa.coverage).toBe('family');
+    expect(profile.provided).toEqual(['person.age', 'assumptions.retirement.effectiveTaxRate', 'hsa.coverage']);
+    expect(profile.updatedAt).toBe(1760000000000);
+    expect(hasProfile).toBe(true);
+  });
+
+  it('keeps the previous value for invalid writes and does not mark them provided', () => {
+    getState().setValues([
+      { path: 'person.age', value: 'forty' },
+      { path: 'person.nickname', value: 'Bufo' },
+      { path: 'income.frequency', value: 'monthly' },
+    ]);
+    expect(getState().profile.person.age).toBe(30);
+    expect(getState().profile.income.frequency).toBe('monthly');
+    expect(getState().profile.provided).toEqual(['income.frequency']);
+  });
+
+  it('records list rows and row fields by their list path', () => {
+    const debt = { id: 'd1', name: 'Card', balance: 900, interestRate: 0.24, minimumPayment: 35, extraPayment: 0, taxDeductible: false };
+    getState().setValues([{ path: 'debts.0', value: debt }]);
+    getState().setValues([{ path: 'debts.0.balance', value: 750 }, { path: 'portfolio.accounts.0.deposit', value: 300 }]);
+    const { profile } = getState();
+    expect(profile.debts).toEqual([{ ...debt, balance: 750 }]);
+    expect(profile.portfolio.accounts[0].deposit).toBe(300);
+    expect(profile.provided).toEqual(['debts', 'portfolio.accounts']);
+  });
+
+  it('sets a nullable override back to null (derive)', () => {
+    getState().setValues([{ path: 'leverage.years', value: 15 }]);
+    expect(getState().profile.leverage.years).toBe(15);
+    getState().setValues([{ path: 'leverage.years', value: null }]);
+    expect(getState().profile.leverage.years).toBeNull();
+  });
+
+  it('marks only the paths given in provide, which may be empty', () => {
+    getState().setValues(
+      [
+        { path: 'person.age', value: 40 },
+        { path: 'cash.targetMonths', value: 1 },
+      ],
+      { provide: ['person.age'] }
+    );
+    expect(getState().profile.cash.targetMonths).toBe(1);
+    expect(getState().profile.provided).toEqual(['person.age']);
+
+    getState().setValues([{ path: 'strategy.preset', value: 'standard' }], { provide: [] });
+    expect(getState().profile.strategy.preset).toBe('standard');
+    expect(getState().profile.provided).toEqual(['person.age']);
+  });
+
+  it('unprovides paths, and unprovide wins over the written paths (restore defaults)', () => {
+    getState().setValues([
+      { path: 'assumptions.retirement.volatility', value: 0.25 },
+      { path: 'assumptions.retirement.inflationRate', value: 0.04 },
+      { path: 'person.age', value: 33 },
+    ]);
+    const defaults = getDefaultFinancialProfile().assumptions.retirement;
+    getState().setValues(
+      [
+        { path: 'assumptions.retirement.volatility', value: defaults.volatility },
+        { path: 'assumptions.retirement.inflationRate', value: defaults.inflationRate },
+      ],
+      { unprovide: ['assumptions.retirement.volatility', 'assumptions.retirement.inflationRate'] }
+    );
+    const { profile, hasProfile } = getState();
+    expect(profile.assumptions.retirement).toEqual(defaults);
+    expect(profile.provided).toEqual(['person.age']);
+    expect(hasProfile).toBe(true);
+
+    getState().setValues([], { unprovide: ['person.age'] });
+    expect(getState().profile.provided).toEqual([]);
+    expect(getState().hasProfile).toBe(false);
+  });
+
+  it('unprovides a list by any of its row paths', () => {
+    getState().setValues([{ path: 'debts', value: [] }]);
+    expect(getState().profile.provided).toEqual(['debts']);
+    getState().setValues([], { unprovide: ['debts.0.balance'] });
+    expect(getState().profile.provided).toEqual([]);
+  });
+
+  it('stamps updatedAt on every call', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(77);
+    getState().setValues([]);
+    expect(getState().profile.updatedAt).toBe(77);
+  });
+
+  it('leaves untouched sections as the same objects', () => {
+    const before = getState().profile;
+    getState().setValues([{ path: 'person.age', value: 31 }]);
+    const after = getState().profile;
+    expect(after.person).not.toBe(before.person);
+    expect(after.income).toBe(before.income);
+    expect(after.portfolio).toBe(before.portfolio);
   });
 });
 
@@ -139,13 +273,24 @@ describe('setProvidedValue', () => {
     expect(getState().profile.provided).toEqual(['person.age']);
   });
 
+  it('sets values at any depth, including a list row field', () => {
+    getState().setProvidedValue('assumptions.paycheck.riskTolerance', 'optimizer');
+    getState().setProvidedValue('portfolio.holdings.1.shares', 8);
+    const { profile } = getState();
+    expect(profile.assumptions.paycheck.riskTolerance).toBe('optimizer');
+    expect(profile.portfolio.holdings[1].shares).toBe(8);
+    expect(profile.provided).toEqual(['assumptions.paycheck.riskTolerance', 'portfolio.holdings']);
+  });
+
   it('is a no-op for unknown paths and invalid values', () => {
     const before = getState().profile;
     getState().setProvidedValue('person.nickname', 'Bufo');
     getState().setProvidedValue('person.age', '31');
     getState().setProvidedValue('strategy.preset', 'yolo');
     getState().setProvidedValue('provided', ['person.age']);
-    expect(getState().profile).toEqual(before);
+    getState().setProvidedValue('debts.0.balance', 100);
+    getState().setProvidedValue('person', { age: 50 });
+    expect(getState().profile).toBe(before);
     expect(getState().hasProfile).toBe(false);
   });
 });
@@ -177,7 +322,7 @@ describe('rehydration from localStorage', () => {
     saved.investing.targetMix = '60-40';
     saved.provided = ['person.age', 'investing.targetMix'];
     saved.updatedAt = 999;
-    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 1 }));
+    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
 
     expect(getState().hasHydrated).toBe(true);
     expect(getState().profile).toEqual(saved);
@@ -192,7 +337,7 @@ describe('rehydration from localStorage', () => {
       })
     );
     const { profile, hasProfile } = getState();
-    expect(profile.person).toEqual({ age: 52, state: 'TX', filingStatus: 'single', retirementAge: 60 });
+    expect(profile.person).toEqual({ age: 52, state: 'TX', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 });
     expect(profile.cash).toEqual(getDefaultFinancialProfile().cash);
     expect(profile.provided).toEqual(['person.age']);
     expect(hasProfile).toBe(true);
@@ -212,6 +357,51 @@ describe('rehydration from localStorage', () => {
     await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 0 }));
     expect(getState().profile.person.age).toBe(33);
     expect(getState().hasProfile).toBe(true);
+  });
+
+  it('migrates a saved v1 payload to v2 and saves it back as v2', async () => {
+    const v1 = {
+      version: 1,
+      updatedAt: 1761000000000,
+      person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
+      income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
+      spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
+      cash: { emergencyFundBalance: 12000, emergencyFundApy: 0.045, targetMonths: 1 },
+      workplace: { has401k: true, matchPercent: 1, matchLimit: 0.04, contributionPercent: 0.1 },
+      investing: {
+        investedBalance: 140000,
+        monthlyContribution: 2200,
+        taxableMonthlyContribution: 900,
+        targetMix: '60-40',
+        newCashThisMonth: 3000,
+      },
+      strategy: { preset: 'standard', leverageRatio: 1.5 },
+      provided: ['person.age', 'investing.newCashThisMonth', 'not.a.path'],
+    };
+    await rehydrateWith(JSON.stringify({ state: { profile: v1 }, version: 1 }));
+
+    const { profile, hasProfile, hasHydrated } = getState();
+    expect(hasHydrated).toBe(true);
+    expect(hasProfile).toBe(true);
+    expect(profile.version).toBe(2);
+    expect(profile.updatedAt).toBe(1761000000000);
+    expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 85 });
+    expect(profile.investing).toEqual(v1.investing);
+    expect(profile.portfolio.accounts[1]).toEqual({ id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 3000 });
+    expect(profile.assumptions).toEqual(getDefaultFinancialProfile().assumptions);
+    expect(profile.provided).toEqual(['person.age', 'investing.newCashThisMonth']);
+
+    const persisted = readPersisted();
+    expect(persisted?.version).toBe(2);
+    expect(persisted?.state.profile).toEqual(profile);
+  });
+
+  it('keeps a saved v2 deposit that differs from the deprecated new-cash leaf', async () => {
+    const saved = getDefaultFinancialProfile();
+    saved.portfolio.accounts[1].deposit = 400;
+    saved.provided = ['portfolio.accounts'];
+    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
+    expect(getState().profile).toEqual(saved);
   });
 
   it('still marks hydration finished when the stored JSON is corrupt', async () => {
