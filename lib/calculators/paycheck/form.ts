@@ -1,101 +1,187 @@
 /**
- * Paycheck allocator form. Provisional (slice w1): today's intake questions
- * for the paycheck intent, in today's order. Slice c3 grows it to every
- * field the allocator uses (docs/rebuild-plan.md sections 2.12 and 2.14).
+ * Paycheck allocator form (docs/rebuild-plan.md sections 2.12 and 2.14):
+ * every field the allocator uses, in topic screens. The calculator page
+ * shows them all; the paycheck intake asks the seven screens after the
+ * core, debts included (O4) and the assumptions last (O3).
  */
 
 import {
   CORE_FIELDS,
   CORE_SCREENS,
+  EMERGENCY_FUND_APY,
+  EMERGENCY_FUND_BALANCE,
   NET_PAY_AT_MOST_GROSS,
+  TAXABLE_MONTHLY,
   intakeDerivedWrites,
+  withOverrides,
 } from '@/lib/fields/shared';
-import type { CrossFieldRule, FieldSpec, FormSpec, Get } from '@/lib/fields/types';
+import type { FormSpec, ScreenSpec } from '@/lib/fields/types';
+import { formatCurrency, formatPercent } from '@/lib/format';
+import {
+  AFTER_TAX_AVAILABLE,
+  BONUS_AMOUNT,
+  BONUS_FREQUENCY,
+  BONUS_NOTE,
+  CONTRIBUTION_PERCENT,
+  CONTRIBUTION_TYPE,
+  DEBTS,
+  EXPECTED_RETIREMENT_BRACKET,
+  FUN_MONEY_MAX,
+  FUN_MONEY_MIN,
+  FUN_MONEY_RANGE,
+  HAS_401K,
+  HAS_BONUS,
+  HSA_COVERAGE,
+  HSA_ELIGIBLE,
+  HSA_EMPLOYER_CONTRIBUTION,
+  HSA_INVESTING,
+  HSA_MONTHLY_CONTRIBUTION,
+  HSA_NOTES,
+  IRA_ROTH,
+  IRA_ROTH_BALANCE,
+  IRA_ROTH_MONTHLY,
+  IRA_TRADITIONAL,
+  IRA_TRADITIONAL_BALANCE,
+  IRA_TRADITIONAL_MONTHLY,
+  MATCH_LIMIT,
+  MATCH_PERCENT,
+  OPTIMIZATION_GOAL,
+  RISK_TOLERANCE,
+  ROTH_CONTRIBUTION_PERCENT,
+  TARGET_MONTHS,
+  TAXABLE_NOTE,
+  TAX_NOTE,
+} from './fields';
 
-const hasPlan = (get: Get) => get('workplace.has401k') === true;
+const EMERGENCY_BALANCE = withOverrides(EMERGENCY_FUND_BALANCE, {
+  summary: (value) => `${formatCurrency(value as number)} saved`,
+});
+const EMERGENCY_APY = withOverrides(EMERGENCY_FUND_APY, {
+  summary: (value) => `${formatPercent(value as number)} APY`,
+});
+const TAXABLE = withOverrides(TAXABLE_MONTHLY, {
+  summary: (value) => ((value as number) > 0 ? `taxable ${formatCurrency(value as number)}/mo` : 'no taxable investing'),
+});
 
-const FUN_MONEY_MIN: FieldSpec = {
-  path: 'spending.funMoneyMin',
-  kind: 'money',
-  label: 'At least, per month',
-  min: 0,
-  tier: 'details',
-};
-
-const FUN_MONEY_MAX: FieldSpec = {
-  path: 'spending.funMoneyMax',
-  kind: 'money',
-  label: 'At most, per month',
-  min: 0,
-  tier: 'details',
-};
-
-const HAS_401K: FieldSpec = {
-  path: 'workplace.has401k',
-  kind: 'boolean',
-  label: 'Workplace retirement plan',
-  options: [
-    { value: true, label: 'Yes', description: 'Not sure? Pick Yes and check your benefits portal later.' },
-    { value: false, label: 'No' },
-  ],
-  tier: 'details',
-};
-
-const MATCH_PERCENT: FieldSpec = {
-  path: 'workplace.matchPercent',
-  kind: 'percent',
-  label: 'Employer match rate',
-  help: 'What your employer adds per dollar you contribute. 50% means 50 cents per dollar.',
-  min: 0,
-  max: 2,
-  tier: 'details',
-  visibleWhen: hasPlan,
-};
-
-const MATCH_LIMIT: FieldSpec = {
-  path: 'workplace.matchLimit',
-  kind: 'percent',
-  label: 'Matched up to this share of your pay',
-  help: 'In "50% of the first 6%", this is the 6%.',
-  min: 0,
-  max: 1,
-  tier: 'details',
-  visibleWhen: hasPlan,
-};
-
-const FUN_MONEY_RANGE: CrossFieldRule = {
-  lower: FUN_MONEY_MIN.path,
-  upper: FUN_MONEY_MAX.path,
-  strict: false,
-  checkOn: FUN_MONEY_MAX.path,
-  message: 'The minimum is above the maximum. Adjust one of them.',
-};
+/** The core screens, with the tax note (O9) on the one that asks state and filing status. */
+const PAYCHECK_CORE_SCREENS: readonly ScreenSpec[] = CORE_SCREENS.map((screen) =>
+  screen.id === 'about' ? { ...screen, notes: [TAX_NOTE] } : screen
+);
 
 export const PAYCHECK_FORM: FormSpec = {
   id: 'paycheck',
-  fields: [...CORE_FIELDS, FUN_MONEY_MIN, FUN_MONEY_MAX, HAS_401K, MATCH_PERCENT, MATCH_LIMIT],
+  fields: [
+    ...CORE_FIELDS,
+    FUN_MONEY_MIN,
+    FUN_MONEY_MAX,
+    HAS_BONUS,
+    BONUS_AMOUNT,
+    BONUS_FREQUENCY,
+    EMERGENCY_BALANCE,
+    EMERGENCY_APY,
+    HAS_401K,
+    MATCH_PERCENT,
+    MATCH_LIMIT,
+    CONTRIBUTION_TYPE,
+    CONTRIBUTION_PERCENT,
+    ROTH_CONTRIBUTION_PERCENT,
+    AFTER_TAX_AVAILABLE,
+    HSA_ELIGIBLE,
+    HSA_COVERAGE,
+    HSA_MONTHLY_CONTRIBUTION,
+    HSA_EMPLOYER_CONTRIBUTION,
+    HSA_INVESTING,
+    IRA_TRADITIONAL,
+    IRA_TRADITIONAL_MONTHLY,
+    IRA_TRADITIONAL_BALANCE,
+    IRA_ROTH,
+    IRA_ROTH_MONTHLY,
+    IRA_ROTH_BALANCE,
+    TAXABLE,
+    DEBTS,
+    TARGET_MONTHS,
+    RISK_TOLERANCE,
+    OPTIMIZATION_GOAL,
+    EXPECTED_RETIREMENT_BRACKET,
+  ],
   screens: [
-    ...CORE_SCREENS,
+    ...PAYCHECK_CORE_SCREENS,
     {
-      id: 'fun-money',
-      title: 'How much fun money do you want each month?',
+      id: 'spending-bonus',
+      title: 'Fun money and bonuses',
+      question: 'How much fun money do you want each month?',
       description: 'Spending on things you enjoy, beyond the must-pay costs. A range is fine.',
       tier: 'details',
-      fields: [FUN_MONEY_MIN.path, FUN_MONEY_MAX.path],
+      fields: [FUN_MONEY_MIN.path, FUN_MONEY_MAX.path, HAS_BONUS.path, BONUS_AMOUNT.path, BONUS_FREQUENCY.path],
+      notes: [BONUS_NOTE],
     },
     {
-      id: 'workplace',
-      title: 'Does your employer offer a 401(k) or similar plan?',
+      id: 'emergency-fund',
+      title: 'Emergency fund',
+      question: 'What does your emergency fund look like today?',
       tier: 'details',
-      fields: [HAS_401K.path],
+      fields: [EMERGENCY_BALANCE.path, EMERGENCY_APY.path],
     },
     {
-      id: 'match',
-      title: 'How does the employer match work?',
+      id: '401k',
+      title: '401(k) or similar plan',
+      question: 'Does your employer offer a 401(k) or similar plan?',
       description:
-        'Often written as "50% of the first 6% of pay". A guess is fine; your benefits portal has the exact terms.',
+        'Matches are often written as "50% of the first 6% of pay". A guess is fine; your benefits portal has the exact terms.',
       tier: 'details',
-      fields: [MATCH_PERCENT.path, MATCH_LIMIT.path],
+      fields: [
+        HAS_401K.path,
+        MATCH_PERCENT.path,
+        MATCH_LIMIT.path,
+        CONTRIBUTION_TYPE.path,
+        CONTRIBUTION_PERCENT.path,
+        ROTH_CONTRIBUTION_PERCENT.path,
+        AFTER_TAX_AVAILABLE.path,
+      ],
+    },
+    {
+      id: 'hsa',
+      title: 'Health savings account',
+      question: 'Do you have a health savings account (HSA)?',
+      tier: 'details',
+      fields: [
+        HSA_ELIGIBLE.path,
+        HSA_COVERAGE.path,
+        HSA_MONTHLY_CONTRIBUTION.path,
+        HSA_EMPLOYER_CONTRIBUTION.path,
+        HSA_INVESTING.path,
+      ],
+      notes: HSA_NOTES,
+    },
+    {
+      id: 'ira-taxable',
+      title: 'IRAs and taxable investing',
+      question: 'Do you invest in an IRA or a taxable account?',
+      tier: 'details',
+      fields: [
+        IRA_TRADITIONAL.path,
+        IRA_TRADITIONAL_MONTHLY.path,
+        IRA_TRADITIONAL_BALANCE.path,
+        IRA_ROTH.path,
+        IRA_ROTH_MONTHLY.path,
+        IRA_ROTH_BALANCE.path,
+        TAXABLE.path,
+      ],
+      notes: [TAXABLE_NOTE],
+    },
+    {
+      id: 'debts',
+      title: 'Debts',
+      question: 'Do you have any debts?',
+      tier: 'details',
+      fields: [DEBTS.path],
+    },
+    {
+      id: 'assumptions',
+      title: 'Assumptions',
+      question: 'Which assumptions should the allocation use?',
+      tier: 'assumption',
+      fields: [TARGET_MONTHS.path, RISK_TOLERANCE.path, OPTIMIZATION_GOAL.path, EXPECTED_RETIREMENT_BRACKET.path],
     },
   ],
   relations: [NET_PAY_AT_MOST_GROSS, FUN_MONEY_RANGE],

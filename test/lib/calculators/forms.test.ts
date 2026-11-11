@@ -38,6 +38,12 @@ const firstAsker = (path: string): FormSpec | undefined =>
     (form === CORE_FORM ? form.screens : profileEligible(form)).some((screen) => screen.fields.includes(path))
   );
 
+/**
+ * The profile-only screens PROFILE_FORM keeps: the paycheck form asks the
+ * emergency fund (cash-buffer's two fields) first, so only strategy is left.
+ */
+const KEPT_EXTRAS = ['strategy'];
+
 const profileWith = (provided: string[], edits: Partial<FinancialProfile> = {}): FinancialProfile => ({
   ...getDefaultFinancialProfile(),
   ...edits,
@@ -79,9 +85,11 @@ describe('PROFILE_FORM', () => {
     );
     const ids = PROFILE_FORM.screens.map((screen) => screen.id);
     expect(ids.slice(0, CORE_SCREENS.length)).toEqual(CORE_SCREENS.map((screen) => screen.id));
-    expect(ids.slice(-PROFILE_EXTRA_SCREENS.length)).toEqual(PROFILE_EXTRA_SCREENS.map((screen) => screen.id));
+    expect(ids.slice(-KEPT_EXTRAS.length)).toEqual(KEPT_EXTRAS);
+    expect(PROFILE_EXTRA_SCREENS.map((screen) => screen.id).filter((id) => !KEPT_EXTRAS.includes(id))).toEqual(['cash-buffer']);
+    expect(ids).not.toContain('cash-buffer');
     // Every kept screen comes from a form, in form order.
-    const middle = ids.slice(CORE_SCREENS.length, -PROFILE_EXTRA_SCREENS.length);
+    const middle = ids.slice(CORE_SCREENS.length, -KEPT_EXTRAS.length);
     expect(middle).toEqual(Array.from(new Set(fromForms)).filter((id) => middle.includes(id)));
   });
 
@@ -111,14 +119,11 @@ describe('PROFILE_FORM', () => {
         for (const path of added) asked.add(path);
       }
     }
-    const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - PROFILE_EXTRA_SCREENS.length);
+    const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - KEPT_EXTRAS.length);
     expect(middle.map((screen) => [screen.id, screen.fields])).toEqual(expected);
     // Leverage's facts screen keeps only what no earlier screen asks (the age, the retirement age and the
-    // invested balance were asked before it).
-    expect(PROFILE_FORM.screens.find((screen) => screen.id === 'facts')?.fields).toEqual([
-      'investing.taxableMonthlyContribution',
-      'strategy.leverageRatio',
-    ]);
+    // invested balance were asked before it, and the taxable contribution on paycheck's ira-taxable screen).
+    expect(PROFILE_FORM.screens.find((screen) => screen.id === 'facts')?.fields).toEqual(['strategy.leverageRatio']);
   });
 
   it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {
@@ -135,13 +140,13 @@ describe('PROFILE_FORM', () => {
   });
 
   it('labels every screen with its section', () => {
-    const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - PROFILE_EXTRA_SCREENS.length);
+    const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - KEPT_EXTRAS.length);
     const labelOf = (id: string) =>
       PROFILE_PARTS.find(({ form }) => profileEligible(form).some((s) => s.id === id || `${form.id}-${s.id}` === id))!.label;
     expect(PROFILE_FORM.screens.map((screen) => PROFILE_FORM_SECTION_LABELS[profileFormSection(screen.id)!])).toEqual([
       ...CORE_SCREENS.map(() => 'The basics'),
       ...middle.map((screen) => labelOf(screen.id)),
-      ...PROFILE_EXTRA_SCREENS.map(() => 'Cash and strategy'),
+      ...KEPT_EXTRAS.map(() => 'Cash and strategy'),
     ]);
     expect(profileFormSection('nope')).toBeUndefined();
   });
@@ -297,8 +302,10 @@ describe('profileCompleteness (by topic screen)', () => {
     const get = makeGet(noPlan);
     const specs = fieldMap(PROFILE_FORM);
     const hidden = PROFILE_FORM.screens.filter((s) => !s.fields.some((path) => isFieldVisible(specs.get(path)!, get)));
-    // With the provisional forms, the employer match is the one such screen.
-    expect(hidden.length).toBeGreaterThan(0);
+    // Every screen of the grown paycheck form keeps a visible fact (the 401(k)
+    // screen asks has401k itself), so no screen hides; screensFor's own tests
+    // (test/lib/fields/runtime.test.ts) cover a screen with none.
+    expect(hidden.map((s) => s.id)).toEqual([]);
     const result = profileCompleteness(noPlan);
     expect(result.total).toBe(PROFILE_FORM.screens.length - hidden.length);
     for (const screen of hidden) expect(result.missing.map((s) => s.id)).not.toContain(screen.id);

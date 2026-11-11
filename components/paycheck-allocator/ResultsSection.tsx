@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useResult, useProfile, useCalculatorStore } from '@/lib/store/calculatorStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { OpportunityCostCard } from '@/components/shared/cards/OpportunityCostCard';
@@ -11,9 +10,10 @@ import { PayrollSetupGuide } from './PayrollSetupGuide';
 import { PaycheckBreakdown } from './PaycheckBreakdown';
 import { QuickActions } from './QuickActions';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import { formatCurrency, formatYearsAndMonths } from '@/lib/utils';
-import type { AllocationResult } from '@/lib/types';
-import { displayDollars, DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
+import type { AllocationResult, PaycheckProfile } from '@/lib/types';
+import { DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
 import { PROJECTION_YEARS } from '@/lib/calculations/projections';
 import {
   TrendingUp,
@@ -22,35 +22,27 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-export const ResultsSection = React.memo(function ResultsSection() {
-  const result = useResult();
-  const profile = useProfile();
-  const displayMode = useCalculatorStore((state) => state.displayMode);
-  const setDisplayMode = useCalculatorStore((state) => state.setDisplayMode);
+export interface ResultsSectionProps {
+  result: AllocationResult;
+  /** The engine inputs that produced `result`. */
+  inputs: PaycheckProfile;
+  /**
+   * The result predates the latest values. The calculator page already marks
+   * stale results, so nothing here changes with it.
+   */
+  stale: boolean;
+}
+
+export const ResultsSection = React.memo(function ResultsSection({ result, inputs: profile }: ResultsSectionProps) {
+  const dollars = useDollarDisplay(DISPLAY_INFLATION_ASSUMPTION, { basis: 'fixed' });
   const [expandedSkipped, setExpandedSkipped] = React.useState<string | null>(null);
   const [showAllSkipped, setShowAllSkipped] = React.useState(false);
-  
-  // Load from URL on component mount
-  React.useEffect(() => {
-    if (typeof window !== 'undefined' && !result) {
-      const { loadFromUrl } = useCalculatorStore.getState();
-      loadFromUrl();
-    }
-  }, [result]);
-  
-  if (!result) return null;
 
   // Display-only conversion for multi-year projections: per-paycheck
   // allocation amounts are current-year money and are never converted.
   // Deflation is linear, so applying it to each path and to their difference
   // stays internally consistent — the sign of the difference cannot flip.
-  const toDisplayTenYear = (nominalAmount: number) =>
-    displayDollars(
-      nominalAmount,
-      displayMode,
-      DISPLAY_INFLATION_ASSUMPTION,
-      PROJECTION_YEARS
-    );
+  const toDisplayTenYear = (nominalAmount: number) => dollars.fromNominal(nominalAmount, PROJECTION_YEARS);
 
   // The projection compares the same universe of dollars on both paths, but the
   // recommended split can still come out behind — e.g. when part of the paycheck
@@ -167,16 +159,14 @@ export const ResultsSection = React.memo(function ResultsSection() {
               <TrendingUp className="w-5 h-5 text-primary" aria-hidden="true" />
               <span>Long-Term Impact</span>
             </CardTitle>
-            <DollarModeToggle value={displayMode} onChange={setDisplayMode} />
+            <DollarModeToggle value={dollars.mode} onChange={dollars.setMode} />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
             Both paths start from the same balances and payroll contributions and
             assume today&apos;s split continues for ten years.{' '}
-            {displayMode === 'today'
-              ? "Adjusted to today's dollars (assumes 3% inflation)."
-              : 'Shown in future dollars.'}
+            {dollars.caption}
           </p>
           <div className="space-y-3">
             <BreakdownRow
@@ -225,3 +215,5 @@ export const ResultsSection = React.memo(function ResultsSection() {
     </div>
   );
 });
+
+export default ResultsSection;

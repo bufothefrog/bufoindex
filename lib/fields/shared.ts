@@ -17,7 +17,7 @@
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { FILING_STATUS_META, FILING_STATUS_OPTIONS, STRATEGY_PRESET_OPTIONS } from '@/lib/constants/labels';
 import { PAY_FREQUENCIES, PRESET_EMERGENCY_MONTHS, STRATEGY_PRESETS } from '@/lib/profile/defaults';
-import type { FilingStatus, StrategyPreset } from '@/lib/profile/types';
+import type { StrategyPreset } from '@/lib/profile/types';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, ScreenSpec, Write } from './types';
 
 /** A shared spec with a form's own wording or tier; the path and kind stay. */
@@ -49,13 +49,14 @@ function sentenceCase(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function filingOption(value: FilingStatus): FieldOption {
-  return { value, label: sentenceCase(FILING_STATUS_META[value].phrase) };
-}
-
-/** The intake offers the two statuses the retirement engine models (O10). */
-const INTAKE_FILING_OPTIONS: readonly FieldOption[] = (['single', 'marriedJoint'] as const).map(filingOption);
-const ALL_FILING_OPTIONS: readonly FieldOption[] = FILING_STATUS_OPTIONS.map((option) => filingOption(option.value));
+/**
+ * All four statuses (O10): the paycheck allocator models each of them, and
+ * retirement runs the two it lacks as single, with a note on its page.
+ */
+const FILING_OPTIONS: readonly FieldOption[] = FILING_STATUS_OPTIONS.map(({ value }) => ({
+  value,
+  label: sentenceCase(FILING_STATUS_META[value].phrase),
+}));
 
 /** Standard first, as the intake has always listed them. */
 const INTAKE_STRATEGY_ORDER: readonly StrategyPreset[] = ['standard', 'cashflow-investor'];
@@ -88,7 +89,7 @@ export const FILING_STATUS: FieldSpec = {
   path: 'person.filingStatus',
   kind: 'choice',
   label: 'Tax filing status',
-  options: offeredWithSaved('person.filingStatus', INTAKE_FILING_OPTIONS, ALL_FILING_OPTIONS),
+  options: FILING_OPTIONS,
   tier: 'core',
 };
 

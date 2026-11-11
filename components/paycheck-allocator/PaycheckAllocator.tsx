@@ -1,81 +1,27 @@
 'use client';
 
 import React from 'react';
-import { useCalculatorStore } from '@/lib/store/calculatorStore';
-import { InputSection } from './InputSection';
+import { PAYCHECK_RENDERERS } from '@/components/calculators/renderers/paycheck';
+import CalculatorPage, { type CalculatorResultsArgs } from '@/components/calculators/shared/CalculatorPage';
+import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
+import { usePaycheckStore } from '@/lib/store/paycheckStore';
+import type { AllocationResult, PaycheckProfile } from '@/lib/types';
 import { ResultsSection } from './ResultsSection';
-import { CalculatorLayout, type ShareResult } from '@/components/ui/layouts/CalculatorLayout';
-import { NextSteps } from '@/components/guided/NextSteps';
 
+function renderResults({ results, inputs, stale }: CalculatorResultsArgs<PaycheckProfile, AllocationResult>) {
+  return <ResultsSection result={results} inputs={inputs} stale={stale} />;
+}
+
+/** The paycheck allocator: its form over the shared profile, live allocation results. */
 export function PaycheckAllocator() {
-  const {
-    result,
-    isCalculating,
-    errors,
-    calculate,
-    clearErrors,
-    loadFromUrl,
-    generateShareUrl
-  } = useCalculatorStore();
-  
-  React.useEffect(() => {
-    // Clear errors and load from URL if present when component mounts
-    clearErrors();
-    loadFromUrl();
-  }, [clearErrors, loadFromUrl]);
-  
-  const handleCalculate = async () => {
-    await calculate();
-  };
-
-  const handleShare = async (): Promise<ShareResult | void> => {
-    const url = generateShareUrl();
-
-    if (typeof navigator.share === 'function') {
-      try {
-        await navigator.share({
-          title: 'BufoIndex Paycheck Allocator',
-          text: 'A paycheck allocation scenario',
-          url: url
-        });
-        return { status: 'shared' };
-      } catch (error) {
-        // User dismissed the share sheet — nothing to report
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
-        }
-        // Otherwise fall through to the clipboard fallback
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      return { status: 'copied' };
-    } catch {
-      // Clipboard unavailable (insecure context, permissions) — offer manual copy
-      return { status: 'error', url };
-    }
-  };
-
   return (
-    <CalculatorLayout
-      title="Paycheck Allocator Calculator"
-      description="Allocates your monthly paycheck across fixed costs, tax-advantaged accounts, and flexible spending, in priority order by after-tax return. Each step shows the math behind its placement."
-      inputSections={<InputSection />}
-      resultSection={result ? <ResultsSection /> : undefined}
-      resultFooter={<NextSteps intent="paycheck" />}
-      isCalculating={isCalculating}
-      onCalculate={handleCalculate}
-      onShare={handleShare}
-      calculateButtonText="Calculate My Allocation"
-      calculatingText="Calculating Optimal Allocation..."
-      errors={errors}
-      emptyStateConfig={{
-        title: 'Ready to Calculate',
-        description: 'Review your inputs and run the analysis',
-        features: []
-      }}
-      disclaimer="Educational tool only. Tax amounts are estimates from published 2026 federal and state tables applied to the inputs you enter. Not tax or investment advice."
+    <CalculatorPage
+      definition={PAYCHECK_CALCULATOR}
+      store={usePaycheckStore}
+      renderers={PAYCHECK_RENDERERS}
+      renderResults={renderResults}
     />
   );
 }
+
+export default PaycheckAllocator;
