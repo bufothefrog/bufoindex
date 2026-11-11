@@ -18,6 +18,29 @@ type Row = [number, number, number];
 const rows = (inputs: SavingsRateInputs): Row[] =>
   requiredSavingsCurve(inputs).map((p) => [p.retirementAge, p.requiredSavingsRate, p.requiredMonthlySavings]);
 
+// Exponentiation is not bit-identical across JavaScript engine versions (the
+// V8 in Node 24 differs from Node 22 by one ulp for some arguments), so the
+// computed columns are compared to nine significant digits, far tighter than
+// anything the chart shows. Row counts and retirement ages stay exact.
+const REL_TOL = 1e-9;
+const COLUMNS = ['retirementAge', 'requiredSavingsRate', 'requiredMonthlySavings'] as const;
+
+function expectRowsClose(actual: Row[], expected: Row[]): void {
+  expect(actual.length, 'number of rows').toBe(expected.length);
+  expected.forEach((want, i) => {
+    const got = actual[i];
+    expect(got[0], `row ${i} ${COLUMNS[0]}`).toBe(want[0]);
+    for (const col of [1, 2] as const) {
+      const diff = Math.abs(got[col] - want[col]);
+      const ok = diff <= REL_TOL * Math.max(1, Math.abs(want[col]));
+      expect(
+        ok,
+        `row ${i} (age ${want[0]}) ${COLUMNS[col]}: expected ${want[col]}, received ${got[col]}`,
+      ).toBe(true);
+    }
+  });
+}
+
 /** The old retirement store defaults (the calculator's first screen before the rebuild). */
 const DEFAULTS: RetirementInputs = {
   startingAge: 25,
@@ -46,7 +69,7 @@ const DEFAULTS: RetirementInputs = {
 
 describe('requiredSavingsCurve: parity with the old SavingsRateChart numbers', () => {
   it('the old defaults: ages 45 to 70 at an 8% return', () => {
-    expect(rows(DEFAULTS)).toEqual([
+    expectRowsClose(rows(DEFAULTS), [
       [45, 39.796048695539085, 3316.3373912949232],
       [46, 35.97389919186833, 2997.8249326556943],
       [47, 32.57254728096351, 2714.3789400802925],
@@ -85,7 +108,7 @@ describe('requiredSavingsCurve: parity with the old SavingsRateChart numbers', (
       currentIncome: 90000,
       accumulationReturn: 0,
     };
-    expect(rows(inputs)).toEqual([
+    expectRowsClose(rows(inputs), [
       [50, 100, 12083.333333333334],
       [51, 100, 10984.848484848484],
       [52, 100, 10069.444444444445],
@@ -119,7 +142,7 @@ describe('requiredSavingsCurve: parity with the old SavingsRateChart numbers', (
       currentIncome: 1000,
       accumulationReturn: 0.05,
     };
-    expect(rows(inputs)).toEqual([
+    expectRowsClose(rows(inputs), [
       [60, 100, 218.92282893874392],
       [61, 0, 0],
       [62, 0, 0],
