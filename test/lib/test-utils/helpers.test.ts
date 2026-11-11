@@ -1,14 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { screen } from '@testing-library/react'
-import { nextNavigationFactory, resetRouterMock, routerMock } from '@/test/utils/navigation'
+// next/navigation is imported before the helper on purpose: the async
+// factory form works in any import order.
+import { useRouter, useSearchParams, redirect, notFound } from 'next/navigation'
+import { resetRouterMock, routerMock } from '@/test/utils/navigation'
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores'
 import { renderWithProfile } from '@/test/utils/render'
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults'
 import { useProfileStore } from '@/lib/store/profileStore'
-import { useRouter, useSearchParams, redirect, notFound } from 'next/navigation'
 
-vi.mock('next/navigation', () => nextNavigationFactory('a=1&b=two'))
+vi.mock('next/navigation', async () =>
+  (await import('@/test/utils/navigation')).nextNavigationFactory('a=1&b=two')
+)
 
 function AgeProbe() {
   const age = useProfileStore((s) => s.profile.person.age)
@@ -56,6 +60,28 @@ describe('resetProfileStore', () => {
     expect(state.profile.person.age).toBe(52)
     expect(state.profile.person.state).toBe('WA')
     expect(state.profile.provided).toEqual(['person.age', 'person.state'])
+    expect(state.hasProfile).toBe(true)
+  })
+
+  it('marks nested assumption leaves and whole lists as provided', () => {
+    const debt = { id: 'd1', name: 'Card', balance: 1200, interestRate: 0.2, minimumPayment: 40, extraPayment: 0, taxDeductible: false }
+    resetProfileStore({
+      profile: {
+        assumptions: { retirement: { riskProfile: 'custom', volatility: 0.2 } },
+        debts: [debt],
+      },
+    })
+
+    const state = useProfileStore.getState()
+    expect(state.profile.assumptions.retirement.riskProfile).toBe('custom')
+    expect(state.profile.assumptions.retirement.volatility).toBe(0.2)
+    expect(state.profile.debts).toHaveLength(1)
+    // Section order: debts comes before assumptions.
+    expect(state.profile.provided).toEqual([
+      'debts',
+      'assumptions.retirement.riskProfile',
+      'assumptions.retirement.volatility',
+    ])
     expect(state.hasProfile).toBe(true)
   })
 })

@@ -1,11 +1,17 @@
 /**
  * next/navigation mock shared by component tests.
  *
- *   import { nextNavigationFactory, routerMock, resetRouterMock } from '@/test/utils/navigation'
- *   vi.mock('next/navigation', () => nextNavigationFactory())
+ *   import { routerMock, resetRouterMock } from '@/test/utils/navigation'
+ *   vi.mock('next/navigation', async () =>
+ *     (await import('@/test/utils/navigation')).nextNavigationFactory()
+ *   )
  *
- * List this import before any import that loads next/navigation, because the
- * factory runs the first time the mocked module is imported.
+ * Use this async form. vi.mock is hoisted above the imports, so a factory
+ * that calls a statically imported nextNavigationFactory fails to load
+ * ("Cannot access ... before initialization") whenever a module that loads
+ * next/navigation is imported before this helper, e.g. after an editor
+ * sorts the imports. The dynamic import gives the same module instance, so
+ * routerMock is shared with the test.
  */
 
 import { vi } from 'vitest'

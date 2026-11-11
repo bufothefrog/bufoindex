@@ -29,13 +29,13 @@ in retirement.ts.
 - components/ui/results: `StatTile`, `StatGrid`, `KeyValueList`, `KeyValueRow`, `DataTable`, `Disclaimer` (+ prop and option types).
 - components/ui: `SegmentedControl` (`SegmentedControlOption`, `SegmentedControlAppearance`, `SegmentedControlSize`), `ProgressBar`.
 - StatusAlert: `tone`, `appearance` ('muted' | 'tinted'), `role`, `testId`; BreakdownRow: `tone`. `variant` is a deprecated alias on both. DollarModeToggle: same props.
-- lib/profile (via `@/lib/profile`): v2 `FinancialProfile`, `FilingStatus` (4; `ProfileFilingStatus` deprecated), `TargetMixPreset` (+ 'custom'), row aliases (`DebtRow`, `AccountRow`, `SecurityRow`, `HoldingRow`, `ClassTargetRow`, `CustomAssetClassRow`), `ProfileSection`, `ProfileListPath`, `ProfilePatch`; `getDefaultFinancialProfile`, `PROFILE_LEAF_PATHS` (67), `PROFILE_LIST_PATHS`, `PROFILE_LIST_ROW_DEFAULTS`, `PROFILE_ENUM_VALUES`, `isProfilePath`, `providedPathFor`, `normalizeProvided`, `isValidProfileValue`, `getProfileValue`, `normalizeProfile`, `applyProfileWrites`, `newCashDepositWrites`, `BROKERAGE_ACCOUNT_ID`, `TARGET_MIX_WEIGHTS` (moved here from mappers), `presetClassTargets`, `PROFILE_VERSION`, `migrateProfile`; links add `PROFILE_HANDOFF_PARAM`, `PROFILE_HANDOFF_VALUE`. Deprecated until x1: `PROFILE_FIELDS`, `profileCompleteness`, `isProfileFieldPath`, `splitProfilePath`, `investing.newCashThisMonth`.
-- lib/store/profileStore.ts: `setValues(writes, { provide?, unprovide? })`, `SetValuesOptions`; `setFields` and `setProvidedValue` wrap it; persist version 2.
+- lib/profile (via `@/lib/profile`): v2 `FinancialProfile`, `FilingStatus` (4; `ProfileFilingStatus` deprecated), `TargetMixPreset` (+ 'custom'), row aliases (`DebtRow`, `AccountRow`, `SecurityRow`, `HoldingRow`, `ClassTargetRow`, `CustomAssetClassRow`), `ProfileSection`, `ProfileListPath`, `ProfilePatch`; `getDefaultFinancialProfile`, `PROFILE_LEAF_PATHS` (67), `PROFILE_LIST_PATHS`, `PROFILE_LIST_ROW_DEFAULTS`, `PROFILE_ENUM_VALUES`, `isProfilePath`, `providedPathFor`, `normalizeProvided`, `isValidProfileValue`, `getProfileValue`, `normalizeProfile`, `applyProfileWrites`, `patchWrites`, `newCashDepositWrites`, `BROKERAGE_ACCOUNT_ID`, `TARGET_MIX_WEIGHTS` (moved here from mappers), `presetClassTargets`, `PROFILE_VERSION`, `migrateProfile`; links add `PROFILE_HANDOFF_PARAM`, `PROFILE_HANDOFF_VALUE`. Deprecated until x1: `PROFILE_FIELDS`, `profileCompleteness`, `isProfileFieldPath`, `splitProfilePath`, `investing.newCashThisMonth`.
+- lib/store/profileStore.ts: `setValues(writes, { provide?, unprovide? })`, `SetValuesOptions`; `setFields` and `setProvidedValue` wrap it; persist version 2. A payload stored under a later version is read (normalized to v2) but never written back in that session, so a rollback cannot delete the newer fields.
 
 ## Semantics later slices rely on
 
 - Profile paths: a leaf is any non-list value at any depth; a list is one of PROFILE_LIST_PATHS; `<list>.<i>` is a row and `<list>.<i>.<key>` a row field (canonical indices only). Section objects are not paths.
-- `provided` is canonical: leaves by path, lists by list path (a write to `debts.0.balance` marks `debts`). Unknown paths are dropped everywhere.
+- `provided` is canonical: leaves by path, lists by list path (a write to `debts.0.balance` marks `debts`). Unknown paths are dropped everywhere, and so are row paths to rows that do not exist (`normalizeProvided(paths, profile)`; the store and normalizeProfile pass the profile). `patchWrites(patch)` flattens a ProfilePatch to leaf and list writes at any depth; setFields and resetProfileStore use it.
 - setValues applies writes in order; refused writes (unknown path, invalid value, index gap, a row or id that repeats another row's id) keep the old value and are not provided. `provide` defaults to the accepted paths; an explicit `provide` (even []) replaces that; `unprovide` runs last and wins. Every call stamps updatedAt; untouched sections keep their identity.
 - Values: finite numbers, real booleans, enums from PROFILE_ENUM_VALUES; null only for the five nullable overrides and classTargets.accountId. No numeric bounds here; those belong to FieldSpecs.
 - List rows normalize against PROFILE_LIST_ROW_DEFAULTS; rows missing a required field or repeating an id are dropped. Dangling references are kept (c5 reducers own integrity).
@@ -44,11 +44,14 @@ in retirement.ts.
 - Mappers: retirement maps marriedSeparate and headOfHousehold to single (O10); 401(k) split gives roth = min(roth part, total); toRebalanceInputs reads the portfolio lists and uses classTargets only for 'custom'.
 - Links are `${PATH}?from=profile#${hash}` (leverage: `...&from=profile`); unmigrated calculators ignore the query.
 - Tone map: default/neutral -> neutral, success/up -> positive, warning -> caution, danger/error/down -> negative, info -> info, sage/emphasis/selected -> brand. Null or non-finite stat values print U+2014.
-- useChartTheme needs ThemeProvider (and a matchMedia stub in jsdom). ChartFrame defers with rootMargin '100% 0px' and never unmounts once mounted. thinPoints(points, MAX_POINTS + 1) reproduces DcaPathChart's sampling.
+- useChartTheme needs ThemeProvider (and a matchMedia stub in jsdom). ChartFrame defers with rootMargin '100% 0px' and never unmounts once mounted (latched, even if deferUntilVisible turns on later). ProgressBar shows a non-finite value as min and treats max <= min as an empty range (aria-valuemax = min). thinPoints(points, MAX_POINTS + 1) reproduces DcaPathChart's sampling.
+
+- lib/fields: fieldError rejects Infinity and -Infinity ("must be a number"), and an empty list fails a minRows above 0 even when the field is not required. engineErrorsToFields sends an error to the last of equally long bindings, the one whose value toEngineInputs keeps. stableKey keeps -0 apart from 0 and writes array holes as null.
+- test/utils: resetProfileStore and renderWithProfile seed through setValues(patchWrites(profile)), so every valid leaf at any depth and every list given is marked provided. Mock next/navigation with the order-independent form `vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory())`.
 
 ## Tests and coverage
 
-- 60 files, 1465 tests passing. Global statements 89.98%.
+- 60 files, 1481 tests passing (1465 at hand-off, plus the phase 1 review fixes). Global statements 90.04%.
 - lib/calculations 97.30% statements / 89.70% branches (unchanged files).
 - lib/fields 100% statements; lib/profile 100%; lib/design-system 100%; lib/store/profileStore.ts 100%; lib/chart-theme.ts 95%; lib/format.ts 100%.
 
@@ -58,6 +61,7 @@ in retirement.ts.
 - StatTile is a role=group named by its label (a badge cannot sit in a dl). BreakdownRow stays div-based (standalone KeyValueRow).
 - ChartFrame 'tall' is h-96 at every width (the plan leaves it open). chartGridProps uses opacity 0.3; DcaPathChart uses 0.4.
 - TARGET_MIX_WEIGHTS moved to defaults.ts to avoid a cycle. lib/profile imports lib/fields/paths (no runtime cycle).
+- lib/format deviates from legacy output in a few edge cases no option reproduces (listed in the lib/format.ts header): no minus on a percent that rounds to zero, unsigned "NaN%" for signed NaN, "-" from formatMultiple for non-finite values, and U+2212 negative axis ticks ("-$5k" where MonteCarloChart printed "$-5000"). percent-signed without digits is 0 to 1 decimals; c7 passes { digits: 1, signed: true } to keep formatSignedPct output.
 - Integrator fixes: non-ASCII literals in f2 written as \u escapes; row and row-id writes that would duplicate an id are refused, so a reload cannot silently drop a row.
 
 ## Open for phase 2
