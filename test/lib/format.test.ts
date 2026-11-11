@@ -305,6 +305,7 @@ describe('formatValue', () => {
     [-1234, 'currency-signed', `${MINUS}$1,234`],
     [54_800, 'currency-compact-signed', '+$54.8k'],
     [0.075, 'percent', '7.5%'],
+    [0.03, 'percent-1', '3.0%'],
     [-0.1, 'percent-signed', `${MINUS}10%`],
     [2.25, 'multiple', '2.25x'],
     [2.5, 'months', '2.5 months'],

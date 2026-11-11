@@ -11,12 +11,13 @@ import {
   RebalanceInputsV2,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
+import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/labels';
+import { MISSING_VALUE } from '@/lib/design-system/stat';
 
-const ACCOUNT_LABELS: Record<AccountType, string> = {
-  'taxable': 'taxable',
-  'tax-deferred': 'tax-deferred',
-  'tax-free': 'tax-free',
-};
+/** In-sentence account type: "in taxable", "moving to tax-deferred". */
+function accountPhrase(type: AccountType): string {
+  return ACCOUNT_TYPE_LABELS[type].toLowerCase();
+}
 
 /**
  * Tax-efficient placement suggestions. Iterates all holdings and emits
@@ -96,12 +97,12 @@ export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
                 data-testid={`placement-advice-${s.key}`}
               >
                 <div className="text-foreground">
-                  <span className="font-semibold">{s.ticker || '—'}</span>
+                  <span className="font-semibold">{s.ticker || MISSING_VALUE}</span>
                   <span className="text-muted-foreground">
                     {' '}
-                    ({getAssetClassLabel(s.assetClass, customAssetClasses)}, in {ACCOUNT_LABELS[s.accountType]})
+                    ({getAssetClassLabel(s.assetClass, customAssetClasses)}, in {accountPhrase(s.accountType)})
                   </span>{' '}
-                  → consider moving to {ACCOUNT_LABELS[s.advice.preferredAccount]}.
+                  {'\u2192'} consider moving to {accountPhrase(s.advice.preferredAccount)}.
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {s.advice.reason}
@@ -114,3 +115,5 @@ export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
     </div>
   );
 }
+
+export default PlacementAdviceCard;
