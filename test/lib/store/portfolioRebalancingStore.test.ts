@@ -15,7 +15,10 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore'
+import {
+  selectCustomAssetClasses,
+  usePortfolioRebalancingStore,
+} from '@/lib/store/portfolioRebalancingStore'
 import { encodeRebalancingToUrlHash } from '@/lib/utils/portfolioRebalancingState'
 // Side-effect import: registers the toBeCloseToCurrency custom matcher.
 import '@/test/utils/financial-test-helpers'
@@ -346,15 +349,42 @@ describe('share-URL round trip', () => {
     store.getState().loadFromUrl()
 
     const state = store.getState()
-    // An empty custom-class list encodes to an absent key, so it decodes to
-    // an omitted field; every other field must round-trip exactly.
-    const { customAssetClasses: decodedCustom, ...decodedRest } = state.inputs
-    const { customAssetClasses: originalCustom, ...originalRest } = original
-    expect(decodedRest).toEqual(originalRest)
-    expect(decodedCustom ?? []).toEqual(originalCustom ?? [])
-    expect(state.result).toBeNull()
+    // An empty custom-class list encodes to an absent key but must come back
+    // as [] (never undefined), so the whole input object round-trips.
+    expect(state.inputs).toEqual(original)
+    expect(state.inputs.customAssetClasses).toEqual([])
+    // A hash is a complete scenario, so loading it runs the rebalance: the
+    // same worked example as the explicit-calculate test above.
     expect(state.errors).toEqual([])
-    expect(state.hasCalculatedOnce).toBe(false)
+    expect(state.hasCalculatedOnce).toBe(true)
+    expect(state.result).not.toBeNull()
+    expect(state.result!.totalValueBefore).toBe(8775)
+    expect(state.result!.totalDeposit).toBe(2000)
+  })
+
+  it('selectCustomAssetClasses returns a stable reference when the list is absent', () => {
+    // The shape a pre-fix decoded hash produced: the key present but undefined.
+    const state = { inputs: { ...store.getState().inputs, customAssetClasses: undefined } }
+    const first = selectCustomAssetClasses(state)
+    expect(first).toEqual([])
+    // Same reference on every read, so useSyncExternalStore sees no change.
+    expect(selectCustomAssetClasses(state)).toBe(first)
+    // The default store state carries its own list, which is returned as-is.
+    expect(selectCustomAssetClasses(store.getState())).toBe(
+      store.getState().inputs.customAssetClasses,
+    )
+  })
+
+  it('loadFromUrl surfaces validation errors from a hash whose targets do not sum to 100%', () => {
+    store.getState().setClassTarget('us-stock', 0.9) // sum now 1.30
+    const hash = encodeRebalancingToUrlHash(store.getState().inputs)
+    store.getState().reset()
+    window.location.hash = hash
+    store.getState().loadFromUrl()
+    const state = store.getState()
+    expect(state.result).toBeNull()
+    expect(state.hasCalculatedOnce).toBe(true)
+    expect(state.errors.map((e) => e.field)).toContain('classTargets.sum')
   })
 
   it('round-trips mutated inputs including flags and custom asset classes', () => {

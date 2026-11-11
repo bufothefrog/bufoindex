@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { SimpleCalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import { NextSteps } from '@/components/guided/NextSteps';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { AccountsCard } from './AccountsCard';
 import { TargetsCard } from './TargetsCard';
@@ -47,6 +48,7 @@ export function PortfolioRebalancingCalculator() {
           </div>
         ) : undefined
       }
+      resultFooter={<NextSteps intent="portfolio" />}
       disclaimer="Educational tool only. Assumes stated prices are current and executable. Not tax or investment advice."
     />
   );

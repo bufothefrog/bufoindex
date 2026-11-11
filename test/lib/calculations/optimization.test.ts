@@ -964,6 +964,26 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       expect(result.annualEquivalent).toBeCloseTo(4500, 2)
     })
 
+    it('treats a missing ira block (older share links / saved state) as no existing contributions', () => {
+      const profile = createPaycheckProfile({
+        income: createIncomeData({
+          gross: 60000 / 12,
+          monthlyGross: 60000 / 12,
+          monthlyNet: 3800,
+          net: 3800,
+        }),
+        taxes: createTaxData({ federalBracket: 0.12, filingStatus: 'single' }),
+        preferences: createUserPreferences({ age: 25, isPeakEarnings: false }),
+      })
+      const { ira: _omitted, ...benefitsWithoutIra } = emptyIRABenefits()
+      void _omitted
+      const legacy = { ...profile, benefits: benefitsWithoutIra } as unknown as typeof profile
+      const result = calculateRothIRA(legacy, 999)!
+      // Same as an empty IRA: full $7,500 room → 7,500/26 ≈ 288.46 per paycheck
+      expect(result.amount).toBeCloseTo(288.46, 2)
+      expect(result.annualEquivalent).toBeCloseTo(7500, 2)
+    })
+
     it('applies the $1,100 IRA catch-up at age 50 but not at 49', () => {
       const buildProfile = (age: number) =>
         createPaycheckProfile({

@@ -314,10 +314,29 @@ function compressCalculatorData(data: unknown): unknown {
       cc: profile.benefits.hsa.currentContribution
     }
   }
+
+  // IRA (only when the user has one; older payloads omit it and decode to
+  // the no-IRA default block the engine expects)
+  const ira = profile.benefits.ira
+  if (ira?.hasIRA) {
+    p.ira = {
+      t: ira.accountTypes?.traditional ? true : undefined,
+      r: ira.accountTypes?.roth ? true : undefined,
+      ct: ira.currentContributions?.traditional || undefined,
+      cr: ira.currentContributions?.roth || undefined,
+      bt: ira.currentBalances?.traditional || undefined,
+      br: ira.currentBalances?.roth || undefined,
+    }
+  }
   
   // Preferences
   const prefs: Record<string, unknown> = {}
   if (profile.preferences.necessaryExpenses !== 0) prefs.ne = profile.preferences.necessaryExpenses
+  // Emergency-fund target months; elided at 6, which is what payloads
+  // without the key have always decoded to.
+  if (typeof profile.preferences.emergencyFundMonths === 'number' && profile.preferences.emergencyFundMonths !== 6) {
+    prefs.efm = profile.preferences.emergencyFundMonths
+  }
   if (profile.preferences.currentEmergencyFund !== 0) prefs.ef = profile.preferences.currentEmergencyFund
   if (profile.preferences.emergencyFundAPY !== 0.04) prefs.apy = profile.preferences.emergencyFundAPY
   if (profile.preferences.funMoney.min !== 0) prefs.fmn = profile.preferences.funMoney.min
@@ -413,7 +432,23 @@ function decompressCalculatorData(compressed: any): any {
           employerContribution: 0,
           currentContribution: p.hsa?.cc || 0,
           currentYTD: 0,
-          coverageType: p.hsa?.ct || 'individual'
+          coverageType: p.hsa?.ct || 'individual',
+          investmentStrategy: false
+        },
+        ira: {
+          hasIRA: !!p.ira,
+          accountTypes: {
+            traditional: p.ira?.t || false,
+            roth: p.ira?.r || false
+          },
+          currentContributions: {
+            traditional: p.ira?.ct || 0,
+            roth: p.ira?.cr || 0
+          },
+          currentBalances: {
+            traditional: p.ira?.bt || 0,
+            roth: p.ira?.br || 0
+          }
         },
         other: {
           fsaElection: 0,
@@ -432,9 +467,11 @@ function decompressCalculatorData(compressed: any): any {
         taxDeductible: false
       })),
       preferences: {
-        emergencyFundMonths: 6,
+        emergencyFundMonths: typeof p.pr?.efm === 'number' ? p.pr.efm : 6,
         currentEmergencyFund: p.pr?.ef || 0,
-        emergencyFundAPY: p.pr?.apy || 0.04,
+        // `??`-style check: the encoder writes `apy` whenever it differs from
+        // 0.04, so a genuine 0% must survive the round trip.
+        emergencyFundAPY: typeof p.pr?.apy === 'number' ? p.pr.apy : 0.04,
         necessaryExpenses: p.pr?.ne || 0,
         funMoney: {
           min: p.pr?.fmn || 0,

@@ -71,6 +71,21 @@ function defaultInputs(): RebalanceInputsV2 {
   };
 }
 
+/**
+ * Stable fallback for an absent custom-class list. Selectors must never return
+ * a fresh `[]` literal: Zustand 5 reads snapshots through useSyncExternalStore,
+ * which treats a new reference on every read as a change and re-renders until
+ * React throws "Maximum update depth exceeded".
+ */
+const EMPTY_CUSTOM_ASSET_CLASSES: CustomAssetClass[] = [];
+
+/** Selector for the registered custom asset classes (stable when empty). */
+export function selectCustomAssetClasses(state: {
+  inputs: RebalanceInputsV2;
+}): CustomAssetClass[] {
+  return state.inputs.customAssetClasses ?? EMPTY_CUSTOM_ASSET_CLASSES;
+}
+
 let hashUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function clearUrlHash() {
@@ -512,11 +527,16 @@ export const usePortfolioRebalancingStore = create<StoreState>()(
         const decoded = decodeRebalancingFromUrlHash(hash);
         if (!decoded) return;
         set({
-          inputs: decoded,
+          inputs: { ...decoded, customAssetClasses: decoded.customAssetClasses ?? [] },
           result: null,
           errors: [],
           hasCalculatedOnce: false,
         });
+        // A hash is a complete scenario (a share link or a guided-flow
+        // handoff), so run it straight away, as the retirement and paycheck
+        // calculators do. calculate() also sets hasCalculatedOnce, which turns
+        // on live recalculation for later edits.
+        get().calculate();
       },
 
       reset: () => {

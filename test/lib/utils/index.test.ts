@@ -63,6 +63,54 @@ describe('encodeToUrlHash / decodeFromUrlHash round trip', () => {
     expect(decoded.profile.source).toBe('shared')
   })
 
+  it('round-trips the emergency-fund target months, eliding the legacy default of 6', () => {
+    const three = createPaycheckProfile()
+    three.preferences.emergencyFundMonths = 3
+    const six = createPaycheckProfile()
+    six.preferences.emergencyFundMonths = 6
+    const one = createPaycheckProfile()
+    one.preferences.emergencyFundMonths = 1
+
+    expect((decodeFromUrlHash(encodeToUrlHash({ profile: three })) as DecodedShare).profile.preferences.emergencyFundMonths).toBe(3)
+    expect((decodeFromUrlHash(encodeToUrlHash({ profile: one })) as DecodedShare).profile.preferences.emergencyFundMonths).toBe(1)
+    expect((decodeFromUrlHash(encodeToUrlHash({ profile: six })) as DecodedShare).profile.preferences.emergencyFundMonths).toBe(6)
+    // 6 is elided from the payload entirely
+    const sixPayload = JSON.parse(atob(encodeToUrlHash({ profile: six }).replace(/-/g, '+').replace(/_/g, '/')))
+    expect(sixPayload.p.pr?.efm).toBeUndefined()
+  })
+
+  it('round-trips IRA contributions and balances when the user has an IRA', () => {
+    const profile = createPaycheckProfile()
+    profile.benefits.ira = {
+      hasIRA: true,
+      accountTypes: { traditional: false, roth: true },
+      currentContributions: { traditional: 0, roth: 250 },
+      currentBalances: { traditional: 1200, roth: 8000 },
+    }
+    const decoded = decodeFromUrlHash(encodeToUrlHash({ profile })) as DecodedShare
+
+    expect(decoded.profile.benefits.ira).toEqual({
+      hasIRA: true,
+      accountTypes: { traditional: false, roth: true },
+      currentContributions: { traditional: 0, roth: 250 },
+      currentBalances: { traditional: 1200, roth: 8000 },
+    })
+  })
+
+  it('round-trips a 0% emergency-fund APY instead of falling back to 4%', () => {
+    const profile = createPaycheckProfile()
+    profile.preferences.emergencyFundAPY = 0
+    const decoded = decodeFromUrlHash(encodeToUrlHash({ profile })) as DecodedShare
+    expect(decoded.profile.preferences.emergencyFundAPY).toBe(0)
+
+    // The default is elided from the payload and restored on decode.
+    const defaultApy = createPaycheckProfile()
+    defaultApy.preferences.emergencyFundAPY = 0.04
+    const payload = JSON.parse(atob(encodeToUrlHash({ profile: defaultApy }).replace(/-/g, '+').replace(/_/g, '/')))
+    expect(payload.p.pr?.apy).toBeUndefined()
+    expect((decodeFromUrlHash(encodeToUrlHash({ profile: defaultApy })) as DecodedShare).profile.preferences.emergencyFundAPY).toBe(0.04)
+  })
+
   it("preserves 'nominal' display mode and defaults to 'today' when elided", () => {
     const profile = createPaycheckProfile()
     const nominal = decodeFromUrlHash(encodeToUrlHash({ profile, displayMode: 'nominal' })) as DecodedShare
@@ -95,6 +143,21 @@ describe('decodeFromUrlHash legacy payloads (no per-paycheck keys)', () => {
     expect(decoded.profile.income.regularBonus).toBe(true)
     expect(decoded.profile.income.bonusFrequency).toBe('annual')
     expect(decoded.profile.income.bonusAmount).toBe(500 * 12)
+  })
+
+  it('fills the ira and hsa blocks the engine reads, and keeps the 6-month target, for payloads without them', () => {
+    const decoded = decodeFromUrlHash(
+      hashFromPayload({ v: 2, p: { ipg: 3000, ipn: 2250, if: 'bi-weekly', pr: { ne: 2000 } } })
+    ) as DecodedShare
+
+    expect(decoded.profile.benefits.ira).toEqual({
+      hasIRA: false,
+      accountTypes: { traditional: false, roth: false },
+      currentContributions: { traditional: 0, roth: 0 },
+      currentBalances: { traditional: 0, roth: 0 },
+    })
+    expect(decoded.profile.benefits.hsa.investmentStrategy).toBe(false)
+    expect(decoded.profile.preferences.emergencyFundMonths).toBe(6)
   })
 
   it('returns null for empty, garbage, or unsupported-version hashes', () => {

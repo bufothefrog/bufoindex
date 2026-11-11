@@ -344,6 +344,9 @@ function migrateV1OrV2(state: CompressedStateV1V2): RebalanceInputsV2 {
     allowTaxableSelling: version === 2 ? state.s === true : false,
     showPlacementAdvice: version === 2 ? state.p === true : false,
     mode: state.m === 'fractional' ? 'fractional' : 'whole',
+    // Legacy payloads predate custom classes. Always return the list (empty
+    // here) so consumers never see `undefined`; see decodeV3 below.
+    customAssetClasses: [],
   };
 }
 
@@ -418,7 +421,7 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
         .filter(c => c.label.trim().length > 0)
     : [];
 
-  const out: RebalanceInputsV2 = {
+  return {
     setupMode: 'multi-shared',
     securities,
     accounts,
@@ -427,11 +430,12 @@ function decodeV3(raw: unknown): RebalanceInputsV2 | null {
     allowTaxableSelling: r.s === true,
     showPlacementAdvice: r.p === true,
     mode: r.m === 'fractional' ? 'fractional' : 'whole',
+    // Always present, even when empty. The encoder omits `cac` for an empty
+    // list, and a decoded `undefined` here used to reach Zustand selectors
+    // written as `s.inputs.customAssetClasses ?? []`, which return a fresh
+    // array on every snapshot read and loop useSyncExternalStore forever.
+    customAssetClasses,
   };
-  if (customAssetClasses.length > 0) {
-    out.customAssetClasses = customAssetClasses;
-  }
-  return out;
 }
 
 function flattenToPortfolioTargets(targets: ClassTarget[]): ClassTarget[] {

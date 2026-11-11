@@ -10,7 +10,10 @@ import {
   RebalanceAsset,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
+import {
+  selectCustomAssetClasses,
+  usePortfolioRebalancingStore,
+} from '@/lib/store/portfolioRebalancingStore';
 
 const ACCOUNT_LABELS: Record<AccountType, string> = {
   'taxable': 'taxable',
@@ -30,9 +33,7 @@ export function PlacementAdviceCard() {
   const securities = usePortfolioRebalancingStore(s => s.inputs.securities);
   const accounts = usePortfolioRebalancingStore(s => s.inputs.accounts);
   const holdings = usePortfolioRebalancingStore(s => s.inputs.holdings);
-  const customAssetClasses = usePortfolioRebalancingStore(
-    s => s.inputs.customAssetClasses ?? [],
-  );
+  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();

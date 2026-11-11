@@ -57,6 +57,8 @@ function fixtureMultiShared(): RebalanceInputsV2 {
     accounts,
     holdings,
     classTargets,
+    // The encoder drops an empty list; the decoder always restores it.
+    customAssetClasses: [],
     allowTaxableSelling: true,
     showPlacementAdvice: true,
     mode: 'fractional',
@@ -88,6 +90,7 @@ describe('v3 encode/decode roundtrip', () => {
       accounts: [],
       holdings: [],
       classTargets: [],
+      customAssetClasses: [],
       allowTaxableSelling: false,
       showPlacementAdvice: false,
       mode: 'whole',
@@ -445,11 +448,50 @@ describe('empty v3 payload', () => {
       accounts: [],
       holdings: [],
       classTargets: [],
+      customAssetClasses: [],
       allowTaxableSelling: false,
       showPlacementAdvice: false,
       mode: 'whole',
     };
     const decoded = decodeRebalancingFromUrlHash(encodeRebalancingToUrlHash(empty));
     expect(decoded).toEqual(empty);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// customAssetClasses is always present after decoding
+// ---------------------------------------------------------------------------
+
+describe('customAssetClasses after decode', () => {
+  // Regression: the encoder omits `cac` when the list is empty, and the
+  // decoder used to leave the field undefined. Rebalancer selectors then fell
+  // back to a fresh `[]` on every read, which loops useSyncExternalStore
+  // (React error #185) whenever the page loads from a hash.
+  it('decodes a v3 hash with no custom classes to an empty array', () => {
+    const input = fixtureMultiShared();
+    delete input.customAssetClasses;
+    const hash = encodeRebalancingToUrlHash(input);
+    const decoded = decodeRebalancingFromUrlHash(hash);
+    expect(decoded?.customAssetClasses).toEqual([]);
+  });
+
+  it('round-trips a non-empty custom class list and drops blank labels', () => {
+    const input: RebalanceInputsV2 = {
+      ...fixtureMultiShared(),
+      customAssetClasses: [
+        { id: 'cac-crypto', label: 'Crypto' },
+        { id: 'cac-blank', label: '   ' },
+      ],
+    };
+    const decoded = decodeRebalancingFromUrlHash(encodeRebalancingToUrlHash(input));
+    expect(decoded?.customAssetClasses).toEqual([{ id: 'cac-crypto', label: 'Crypto' }]);
+  });
+
+  it.each([1, 2] as const)('decodes a legacy v%i hash to an empty array', (version) => {
+    const hash = encodeRebalancingV1ToUrlHash({
+      version,
+      assets: [{ ticker: 'VTI', currentShares: 1, price: 200, targetAllocation: 1 }],
+    });
+    expect(decodeRebalancingFromUrlHash(hash)?.customAssetClasses).toEqual([]);
   });
 });
