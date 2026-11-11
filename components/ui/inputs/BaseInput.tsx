@@ -7,9 +7,18 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { BaseInputProps, ComponentState, AccessibilityProps } from '@/lib/design-system/types';
 
+/**
+ * Input sizes shared by the input primitives. sm, md and lg size the control
+ * only; xl is the intake wizard's size (a 56px control with large text and a
+ * larger label).
+ */
+export type InputSize = 'sm' | 'md' | 'lg' | 'xl';
+
 export interface BaseInputConfig extends BaseInputProps, AccessibilityProps {
   children: React.ReactNode;
   state?: ComponentState;
+  /** Only xl changes the chrome: the label grows to text-base. */
+  size?: InputSize;
 }
 
 export function BaseInput({
@@ -23,6 +32,7 @@ export function BaseInput({
   testId,
   children,
   state,
+  size = 'md',
   ...ariaProps
 }: BaseInputConfig) {
   const inputId = `input-${name}`;
@@ -38,7 +48,8 @@ export function BaseInput({
       <label 
         htmlFor={inputId}
         className={cn(
-          "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+          "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+          size === 'xl' ? "text-base" : "text-sm",
           hasError && "text-destructive"
         )}
       >

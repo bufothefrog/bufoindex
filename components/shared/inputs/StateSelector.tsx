@@ -95,6 +95,8 @@ export function StateSelector({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
+  const helpId = help && !error ? `${name}-help` : undefined;
+  const errorId = error ? `${name}-error` : undefined;
 
   const selectedState = US_STATES.find(state => state.code === value);
   const displayValue = selectedState ? selectedState.name : '';
@@ -276,6 +278,7 @@ export function StateSelector({
               : undefined
           }
           aria-invalid={!!error}
+          aria-describedby={errorId ?? helpId}
         />
         <ChevronDown className={cn(
           "absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform",
@@ -329,14 +332,14 @@ export function StateSelector({
         </div>
       )}
       
-      {help && !error && (
-        <p className="text-xs text-muted-foreground">
+      {helpId && (
+        <p id={helpId} className="text-xs text-muted-foreground">
           {help}
         </p>
       )}
       
-      {error && (
-        <p className="text-xs text-destructive" role="alert">
+      {errorId && (
+        <p id={errorId} className="text-xs text-destructive" role="alert">
           {error}
         </p>
       )}

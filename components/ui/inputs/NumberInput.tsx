@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { BaseInput } from './BaseInput';
+import { BaseInput, type InputSize } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 
 interface NumberInputProps extends BaseInputProps {
@@ -21,7 +21,8 @@ interface NumberInputProps extends BaseInputProps {
   parseValue?: (displayValue: string) => number;
   prefix?: string;
   suffix?: string;
-  size?: 'sm' | 'md' | 'lg';
+  /** xl is the intake wizard's size. */
+  size?: InputSize;
   textAlign?: 'left' | 'center' | 'right';
 }
 
@@ -177,7 +178,8 @@ export function NumberInput({
   const sizeClasses = {
     sm: 'h-8 text-sm',
     md: 'h-10 text-sm',
-    lg: 'h-12 text-base'
+    lg: 'h-12 text-base',
+    xl: 'h-14 text-2xl'
   };
   
   const textAlignClasses = {
@@ -187,8 +189,9 @@ export function NumberInput({
   };
   
   // Calculate padding based on prefix/suffix
-  const paddingLeft = prefix ? (size === 'lg' ? 'pl-9' : size === 'sm' ? 'pl-7' : 'pl-8') : 'pl-3';
-  const paddingRight = suffix ? (size === 'lg' ? 'pr-9' : size === 'sm' ? 'pr-7' : 'pr-8') : 'pr-3';
+  const large = size === 'lg' || size === 'xl';
+  const paddingLeft = prefix ? (large ? 'pl-9' : size === 'sm' ? 'pl-7' : 'pl-8') : 'pl-3';
+  const paddingRight = suffix ? (large ? 'pr-9' : size === 'sm' ? 'pr-7' : 'pr-8') : 'pr-3';
   
   return (
     <BaseInput
@@ -200,12 +203,13 @@ export function NumberInput({
       disabled={disabled}
       className={className}
       testId={testId}
+      size={size}
     >
       <div className="relative w-full">
         {prefix && (
           <span className={cn(
             "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
-            size === 'lg' ? 'left-3 text-base' : size === 'sm' ? 'left-2.5 text-xs' : 'left-3 text-sm'
+            large ? 'left-3 text-base' : size === 'sm' ? 'left-2.5 text-xs' : 'left-3 text-sm'
           )}>
             {prefix}
           </span>
@@ -237,7 +241,7 @@ export function NumberInput({
         {suffix && (
           <span className={cn(
             "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
-            size === 'lg' ? 'right-3 text-base' : size === 'sm' ? 'right-2.5 text-xs' : 'right-3 text-sm'
+            large ? 'right-3 text-base' : size === 'sm' ? 'right-2.5 text-xs' : 'right-3 text-sm'
           )}>
             {suffix}
           </span>

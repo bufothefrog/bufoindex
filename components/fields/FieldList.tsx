@@ -1,0 +1,191 @@
+'use client';
+
+import React, { useEffect, useId, useRef } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { joinPath } from '@/lib/fields/paths';
+import { isFieldVisible, listRows, resolveText, rowGet } from '@/lib/fields/runtime';
+import type { FieldErrors, FieldSpec, Write } from '@/lib/fields/types';
+import { cn } from '@/lib/utils';
+import { CustomSlot } from './CustomSlot';
+import { FieldInput } from './FieldInput';
+import { FieldMessages, fieldMessageIds } from './FieldMessages';
+import type { FieldListProps } from './types';
+
+/** '{i}' in a test id pattern becomes the row index. */
+function rowTestId(pattern: string | undefined, index: number): string | undefined {
+  return pattern?.split('{i}').join(String(index));
+}
+
+/** The errors under one row, keyed relative to it ('debts.0.balance' -> 'balance'). */
+function rowErrors(errors: FieldErrors, rowPath: string): FieldErrors {
+  const prefix = `${rowPath}.`;
+  const out: FieldErrors = {};
+  for (const [path, message] of Object.entries(errors)) {
+    if (path.startsWith(prefix)) out[path.slice(prefix.length)] = message;
+  }
+  return out;
+}
+
+/** A row's React key: its id when it has one (ids are unique), else its index. */
+function rowKey(row: Record<string, unknown>, index: number): string {
+  return typeof row.id === 'string' && row.id !== '' ? row.id : `row-${index}`;
+}
+
+/**
+ * An editable list of rows (debts, portfolio accounts). Row fields are
+ * FieldSpecs relative to the row; each row renders them through FieldInput
+ * with a row-scoped Get, and their writes are rewritten to absolute paths.
+ *
+ * Writes (all through one onWrite call each):
+ * - a row field change: '<list>.<i>.<field>', then the row spec's onChange
+ *   writes, which are relative to the row like its Get;
+ * - add: '<list>.<n>' = spec.newRow(get) (or {}), appended at the end.
+ *   newRow must give the row an id no other row has, or the profile store
+ *   refuses the write;
+ * - remove: '<list>' = the rows without that one (indices stay canonical),
+ *   then spec.removeRow(get, i), whose Get still sees the row being removed
+ *   so a cascade can read its id.
+ */
+export function FieldList({ spec, get, onWrite, errors, renderers, size = 'md', idPrefix = 'field' }: FieldListProps) {
+  const id = useId();
+  const labelId = `${id}-label`;
+  const addRef = useRef<HTMLButtonElement>(null);
+  const focusAdd = useRef(false);
+  const rows = listRows(get(spec.path));
+  const help = resolveText(spec.help, get);
+  const error = errors[spec.path];
+  const { describedBy } = fieldMessageIds(id, help, error);
+  const minRows = spec.minRows ?? 0;
+  const canAdd = spec.maxRows === undefined || rows.length < spec.maxRows;
+  const canRemove = rows.length > minRows;
+  const large = size === 'lg';
+
+  const add = () => {
+    onWrite([{ path: joinPath(spec.path, rows.length), value: spec.newRow?.(get) ?? {} }]);
+  };
+
+  const remove = (index: number) => {
+    const prompt = spec.confirmRemove?.(rows[index], index);
+    if (prompt && !window.confirm(prompt)) return;
+    onWrite([
+      { path: spec.path, value: rows.filter((_, i) => i !== index) },
+      ...(spec.removeRow?.(get, index) ?? []),
+    ]);
+    focusAdd.current = true;
+  };
+
+  // The removed row's button is gone; once the list re-renders without it,
+  // focus moves to the add button (enabled again if maxRows had disabled it).
+  useEffect(() => {
+    if (!focusAdd.current) return;
+    focusAdd.current = false;
+    addRef.current?.focus();
+  });
+
+  return (
+    <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-3">
+      <p
+        id={labelId}
+        className={cn('font-medium leading-none', large ? 'text-base' : 'text-sm', error && 'text-destructive')}
+      >
+        {spec.label}
+      </p>
+
+      {rows.length === 0 && spec.emptyText && (
+        <p className="text-sm text-muted-foreground">{spec.emptyText}</p>
+      )}
+
+      {rows.map((row, index) => {
+        const rowPath = joinPath(spec.path, index);
+        const scope = rowGet(get, spec.path, index);
+        const scoped = rowErrors(errors, rowPath);
+        const rowWrite = (writes: Write[]) =>
+          onWrite(writes.map((w) => ({ path: joinPath(rowPath, w.path), value: w.value })));
+        const rowLabel = spec.itemLabel?.(row, index) || `${spec.label} ${index + 1}`;
+        return (
+          <div
+            key={rowKey(row, index)}
+            role="group"
+            aria-label={rowLabel}
+            data-testid={rowTestId(spec.testId, index)}
+            className="space-y-4 rounded-lg border border-border bg-background p-4"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate text-sm font-medium text-foreground">{rowLabel}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                {spec.rowAdornment && (
+                  <CustomSlot
+                    rendererId={spec.rowAdornment}
+                    renderers={renderers}
+                    spec={spec}
+                    get={scope}
+                    value={row}
+                    onWrite={rowWrite}
+                    size={size}
+                  />
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(index)}
+                  disabled={!canRemove}
+                  aria-label={`Remove ${rowLabel}`}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {(spec.row ?? []).map((rowSpec: FieldSpec) =>
+                isFieldVisible(rowSpec, scope) ? (
+                  <FieldInput
+                    key={rowSpec.path}
+                    spec={rowSpec.testId ? { ...rowSpec, testId: rowTestId(rowSpec.testId, index) } : rowSpec}
+                    get={scope}
+                    onWrite={rowWrite}
+                    error={scoped[rowSpec.path]}
+                    errors={scoped}
+                    size={size}
+                    renderers={renderers}
+                    idPrefix={`${idPrefix}-${rowPath}`}
+                  />
+                ) : null
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {spec.footer && (
+        <CustomSlot
+          rendererId={spec.footer}
+          renderers={renderers}
+          spec={spec}
+          get={get}
+          value={rows}
+          onWrite={onWrite}
+          size={size}
+        />
+      )}
+
+      <Button
+        ref={addRef}
+        type="button"
+        variant="outline"
+        onClick={add}
+        disabled={!canAdd}
+        className={cn('gap-2', large && 'h-12 w-full text-base')}
+      >
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        {spec.addLabel ?? `Add to ${spec.label.toLowerCase()}`}
+      </Button>
+
+      <FieldMessages id={id} help={help} error={error} />
+    </div>
+  );
+}
+
+export default FieldList;

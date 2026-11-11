@@ -33,6 +33,7 @@
  *   over a relation error on the same path.
  */
 
+import { formatCount } from '@/lib/format';
 import { joinPath } from './paths';
 import type {
   CrossFieldRule,
@@ -173,15 +174,20 @@ export function isEmptyValue(value: unknown): boolean {
 }
 
 const NUMERIC_KINDS: ReadonlySet<FieldSpec['kind']> = new Set(['money', 'number', 'percent', 'slider']);
-const BOUND_FORMAT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+const FIELD_DIGITS = { maxDigits: 2 } as const;
 
-/** A bound as the field displays it: percent as 0-100 %, money with $, otherwise the unit. */
-function formatBound(spec: FieldSpec, bound: number): string {
-  if (spec.kind === 'percent') return `${BOUND_FORMAT.format(bound * 100)}%`;
+/**
+ * A number as the field displays it, with up to 2 decimals: a percent as
+ * 0-100 with "%", money with "$", otherwise the spec's unit prefix and
+ * suffix ("-$0.5", "0.5 mo", "200%"). Validation messages print their bounds
+ * with it, and the field renderers print a nullable field's auto value.
+ */
+export function formatFieldValue(spec: FieldSpec, value: number): string {
+  if (spec.kind === 'percent') return `${formatCount(value * 100, FIELD_DIGITS)}%`;
   const prefix = spec.unit?.prefix ?? (spec.kind === 'money' ? '$' : '');
   const suffix = spec.unit?.suffix ?? '';
-  const sign = bound < 0 ? '-' : '';
-  return `${sign}${prefix}${BOUND_FORMAT.format(Math.abs(bound))}${suffix}`;
+  const sign = value < 0 ? '-' : '';
+  return `${sign}${prefix}${formatCount(Math.abs(value), FIELD_DIGITS)}${suffix}`;
 }
 
 function entries(count: number): string {
@@ -211,11 +217,11 @@ export function fieldError(spec: FieldSpec, value: unknown, get: Get): string | 
     const above = max !== undefined && value > max;
     if (below || above) {
       if (min !== undefined && max !== undefined) {
-        return `${spec.label} must be between ${formatBound(spec, min)} and ${formatBound(spec, max)}.`;
+        return `${spec.label} must be between ${formatFieldValue(spec, min)} and ${formatFieldValue(spec, max)}.`;
       }
       return below
-        ? `${spec.label} must be at least ${formatBound(spec, min as number)}.`
-        : `${spec.label} must be at most ${formatBound(spec, max as number)}.`;
+        ? `${spec.label} must be at least ${formatFieldValue(spec, min as number)}.`
+        : `${spec.label} must be at most ${formatFieldValue(spec, max as number)}.`;
     }
   } else if (NUMERIC_KINDS.has(spec.kind)) {
     return `${spec.label} must be a number.`;
