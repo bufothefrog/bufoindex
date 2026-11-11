@@ -28,6 +28,10 @@
  * (takeHomeAtShare).
  *
  * What follows, and is accepted:
+ * - For any path (pay, age, state, must-pay costs) both old keys changed to
+ *   different values, the paycheck key's value wins because it is imported
+ *   first; the retirement key's value is dropped (paycheck age 31,
+ *   retirement starting age 45 gives person.age 31).
  * - Both old keys hold the visitor's own pay: the paycheck record (gross,
  *   take-home, frequency) stays; the retirement salary is dropped unless it
  *   writes the same values.
@@ -41,13 +45,20 @@
  *   is not).
  * - Both keys untouched on pay: the later key's old default may replace the
  *   earlier one's (both unprovided).
- * - Only take-home pay answered: a retirement salary with a frequency of its
- *   own (monthly, semi-monthly, bi-weekly) meets no answered path, so it
- *   moves the unanswered frequency and the answered amount stays as it is.
+ * - Only take-home pay answered, and an old retirement salary with a
+ *   frequency of its own (monthly, bi-weekly, semi-monthly): accepted in
+ *   this design as a consequence of the generic rule; it is listed for the
+ *   site owner in the pull request. The salary and its frequency are
+ *   imported, the answered take-home number is kept as it is under the new
+ *   frequency, and a salary below the answered take-home is still refused. It is not reachable through the normal UI: the wizard's
+ *   pay screen marks gross, take-home and frequency together, and every
+ *   calculator page runs the import before any edit.
  *
  * A saved future-dollars display mode in any old key becomes the shared
- * preference once (importDisplayMode). Never throws; a corrupt or foreign
- * payload is removed unread and does not stop the other key.
+ * preference once (importDisplayMode). It is read from any old key whose
+ * envelope has state.displayMode, even when the rest of the payload is not
+ * a calculator payload; nothing else is read from such a payload. Never
+ * throws; a corrupt or foreign payload does not stop the other key.
  */
 
 import type { LegacyImport, LegacyStorage } from '@/lib/calculators/types';
