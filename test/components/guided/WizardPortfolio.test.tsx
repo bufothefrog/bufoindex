@@ -136,6 +136,25 @@ describe('Wizard, portfolio intent', () => {
     expect(saved.provided).not.toContain('portfolio.accounts');
   });
 
+  it('keeps custom targets that do not total 100% on their screen, with the calculator page message', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="portfolio" />);
+    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+
+    const editor = screen.getByRole('group', { name: 'Target allocation' });
+    fireEvent.change(within(editor).getByRole('textbox', { name: 'US Stock target' }), { target: { value: '90' } });
+    expect(within(editor).getByTestId('target-sum-portfolio')).toHaveTextContent('Targets total: 130.0%');
+    await user.click(next());
+
+    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Target allocations must sum to 100% (currently 130.00%).')).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+
+    fireEvent.change(within(editor).getByRole('textbox', { name: 'US Stock target' }), { target: { value: '60' } });
+    await user.click(next());
+    expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
+  });
+
   it('replaces itself with the rebalancer on "Skip the rest", leaving every screen unanswered', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);

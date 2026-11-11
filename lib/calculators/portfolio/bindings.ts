@@ -14,7 +14,7 @@
  * the class-targets editor.
  */
 
-import type { ClassTarget, RebalanceInputsV2 } from '@/lib/calculations/portfolioRebalancing';
+import { validateRebalanceInputsV2, type ClassTarget, type RebalanceInputsV2 } from '@/lib/calculations/portfolioRebalancing';
 import type { Binding } from '@/lib/fields/binding';
 import type { Get } from '@/lib/fields/types';
 import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/lib/profile/defaults';
@@ -44,6 +44,27 @@ export function classTargetsFor(get: Get): ClassTarget[] | undefined {
   const mix = get(TARGET_MIX_PATH);
   if (mix === 'custom') return get(CLASS_TARGETS_PATH) as ClassTarget[] | undefined;
   return isPresetMix(mix) ? presetClassTargets(mix) : undefined;
+}
+
+/**
+ * The engine's own check on the portfolio-wide targets (their scope, then
+ * their 100% sum), the message the calculator page shows on the
+ * class-targets field; undefined when they pass. The intake runs it on the
+ * screen that edits the custom targets, so Next stops there too.
+ */
+export function classTargetsError(get: Get): string | undefined {
+  const errors = validateRebalanceInputsV2({
+    setupMode: 'multi-shared',
+    securities: [],
+    accounts: [],
+    holdings: [],
+    classTargets: classTargetsFor(get) ?? [],
+    customAssetClasses: [],
+    allowTaxableSelling: false,
+    showPlacementAdvice: false,
+    mode: 'whole',
+  });
+  return errors.find(({ field }) => field === 'classTargets' || field.startsWith('classTargets.'))?.message;
 }
 
 export const PORTFOLIO_BINDINGS: readonly Binding<RebalanceInputsV2>[] = [

@@ -283,6 +283,23 @@ describe('validateIntakeScreen', () => {
     expect(validateIntakeScreen('core', screen('core', 'pay'), equal)).toEqual({});
   });
 
+  it('flags custom portfolio targets that do not total 100% on the targets screen, as the engine words it', () => {
+    const targets = (us: number) => [
+      { accountId: null, assetClass: 'us-stock', target: us },
+      { accountId: null, assetClass: 'bonds', target: 0.4 },
+    ];
+    const custom = fromDefaults({ 'investing.targetMix': 'custom', 'portfolio.classTargets': targets(0.9) });
+    const targetsScreen = getIntakeScreens('portfolio', custom)[0];
+    expect(validateIntakeScreen('portfolio', targetsScreen, custom)).toEqual({
+      'portfolio.classTargets': 'Target allocations must sum to 100% (currently 130.00%).',
+    });
+    const whole = fromDefaults({ 'investing.targetMix': 'custom', 'portfolio.classTargets': targets(0.6) });
+    expect(validateIntakeScreen('portfolio', targetsScreen, whole)).toEqual({});
+    // A preset mix never shows the editor, so its stale custom rows are not checked.
+    const preset = fromDefaults({ 'investing.targetMix': '60-40', 'portfolio.classTargets': targets(0.9) });
+    expect(validateIntakeScreen('portfolio', getIntakeScreens('portfolio', preset)[0], preset)).toEqual({});
+  });
+
   it('checks each field against its bounds', () => {
     const get = fromDefaults({ 'person.age': 12 });
     expect(validateIntakeScreen('core', screen('core', 'about'), get)).toEqual({
