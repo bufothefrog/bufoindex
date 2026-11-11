@@ -204,6 +204,28 @@ function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, p
 }
 
 /**
+ * The take-home pay of a skipped income group, carried over to the pay
+ * answered since. When a group writes the whole per-paycheck income record
+ * but the answered gross and frequency describe another income (e.g. the
+ * retirement key's newer salary), the group is skipped and its take-home pay
+ * would be lost with the old key. If the take-home pay itself is still
+ * unanswered, it is kept at the share of gross pay the visitor saved
+ * (net / gross, the same in any frequency) applied to the answered gross.
+ * Undefined when the group is not such a record or the share cannot be
+ * formed.
+ */
+function takeHomeShareOfAnsweredPay(group: readonly Write[], answered: readonly boolean[], profile: FinancialProfile): Write | undefined {
+  const at = (path: string) => group.findIndex((write) => write.path === path);
+  const [gross, net, frequency] = [at(GROSS_PATH), at(NET_PATH), at(FREQUENCY_PATH)];
+  if (gross < 0 || net < 0 || frequency < 0 || answered[net] || !answered[gross] || !answered[frequency]) return undefined;
+  const ownGross = group[gross].value;
+  const ownNet = group[net].value;
+  if (typeof ownGross !== 'number' || typeof ownNet !== 'number' || !(ownGross > 0) || !Number.isFinite(ownNet)) return undefined;
+  const value = Math.round(((ownNet / ownGross) * profile.income.grossPerPaycheck) * 100) / 100;
+  return Number.isFinite(value) ? { path: NET_PATH, value } : undefined;
+}
+
+/**
  * Imports `def.legacy.storageKey` into the profile, then removes the key.
  *
  * The writes are taken per group of coupled paths (writeGroups), and a
@@ -225,7 +247,10 @@ function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, p
  *   answered pay and frequency describe the same annual income as the
  *   group's own per-paycheck record and its take-home pay is unanswered
  *   (finerIncomeRecord), the group's gross, take-home and frequency are all
- *   written, so the take-home pay keeps the pay it was saved with.
+ *   written, so the take-home pay keeps the pay it was saved with. When
+ *   they describe another income instead, the group is skipped but its
+ *   take-home pay, if unanswered, is written unprovided at the saved share
+ *   of gross pay applied to the answered gross (takeHomeShareOfAnsweredPay).
  * - A group that moves the pay frequency without a take-home pay of its own
  *   (the retirement income group) also writes the profile's take-home pay,
  *   unprovided, converted to the new frequency at the same annual amount; it
@@ -273,7 +298,11 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
         // the group would write (e.g. the same pay and frequency imported
         // from the other old calculator), or describes the same income.
         const agrees = group.every((write, j) => !answered[j] || replaces(write) || holds(write));
-        if (!agrees) continue;
+        if (!agrees) {
+          const share = changed ? takeHomeShareOfAnsweredPay(group, answered, profile) : undefined;
+          if (share) untouched.push(share);
+          continue;
+        }
         const takeHome = takeHomeAlongside(group, profile, provided);
         if (takeHome === null) continue;
         if (takeHome) untouched.push(takeHome);

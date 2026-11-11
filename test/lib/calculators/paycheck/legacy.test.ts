@@ -523,6 +523,39 @@ describe('importLegacyCalculatorStorage: the retirement key imported first', () 
     expect(useProfileStore.getState().profile.income.netPerPaycheck).not.toBe(3050);
   });
 
+  it('keeps the saved take-home share of pay, unprovided, when the retirement key set a different income', () => {
+    // The old allocator kept 3,050 of a 4,200 semi-monthly paycheck. The
+    // retirement key's 120,000 a year (10,000 monthly) wins, and the take-home
+    // pay follows it at the same share instead of the profile default.
+    storeRetirement({ incomeAmount: 120000, incomePeriod: 'yearly' });
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).not.toContain('income.netPerPaycheck');
+    const { profile } = useProfileStore.getState();
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 10000, frequency: 'monthly' });
+    expect(profile.income.netPerPaycheck).toBeCloseTo((3050 / 4200) * 10000, 2);
+    expect(profile.provided).not.toContain('income.netPerPaycheck');
+  });
+
+  it('never carries the saved take-home share over a take-home pay answered since', () => {
+    storeRetirement({ incomeAmount: 120000, incomePeriod: 'yearly' });
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    useProfileStore.getState().setValues([{ path: 'income.netPerPaycheck', value: 7000 }]);
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(useProfileStore.getState().profile.income.netPerPaycheck).toBe(7000);
+  });
+
   it("imports the paycheck key's own pay over the retirement key's untouched old default salary", () => {
     // The old retirement default (100,000 a year) comes in unprovided, so it
     // does not hold back the pay the visitor saved in the allocator.
