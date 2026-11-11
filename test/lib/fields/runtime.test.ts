@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeGet, setAt } from '@/lib/fields/paths';
 import {
+  fieldWrites,
   fieldError,
   fieldMap,
   formatFieldValue,
@@ -574,5 +575,30 @@ describe('screenPaths', () => {
 
   it('adds the covers of a custom field after its own path, deduplicated', () => {
     expect(screenPaths(FORM, SCREENS.holdings, getWith())).toEqual(['portfolio.holdings', 'portfolio.securities']);
+  });
+});
+
+describe('fieldWrites', () => {
+  const HAS_401K: FieldSpec = {
+    path: 'workplace.has401k',
+    kind: 'boolean',
+    label: 'Has a 401(k)',
+    tier: 'core',
+    onChange: (value, get) =>
+      value === false ? [{ path: 'workplace.contributionPercent', value: get('workplace.has401k') === false ? 0 : 1 }] : [],
+  };
+  const get = makeGet({ workplace: { has401k: true, contributionPercent: 0.06 } });
+
+  it('writes the field, then its coupled writes, which see the new value', () => {
+    expect(fieldWrites(HAS_401K, false, get)).toEqual([
+      { path: 'workplace.has401k', value: false },
+      { path: 'workplace.contributionPercent', value: 0 },
+    ]);
+  });
+
+  it('writes only the field when it has no coupled writes', () => {
+    expect(fieldWrites({ ...HAS_401K, onChange: undefined }, false, get)).toEqual([
+      { path: 'workplace.has401k', value: false },
+    ]);
   });
 });

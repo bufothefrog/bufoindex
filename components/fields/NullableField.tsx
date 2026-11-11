@@ -51,7 +51,7 @@ export function NullableField({
     <div role="group" aria-label={label} className="space-y-2" data-testid={testId}>
       {isAuto ? (
         <div className="space-y-2">
-          <p className={cn('font-medium leading-none', large ? 'text-base' : 'text-sm')}>{label}</p>
+          <p className={cn(large ? 'text-base' : 'text-sm', 'font-medium leading-none')}>{label}</p>
           <p className={cn('text-muted-foreground', large ? 'text-base' : 'text-sm')}>
             {autoLabel}
             {autoLabel && autoValue ? ': ' : null}

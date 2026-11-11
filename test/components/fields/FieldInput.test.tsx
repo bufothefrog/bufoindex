@@ -408,6 +408,11 @@ describe('FieldInput: size lg', () => {
     renderField(NAME, { account: { name: 'Roth' } }, { size: 'lg' });
     expect(screen.getByRole('textbox', { name: 'Account name' })).toHaveValue('Roth');
   });
+
+  it('passes the wizard size to the state combobox', () => {
+    renderField(STATE, { person: { state: 'TX' } }, { size: 'lg' });
+    expect(screen.getByRole('combobox', { name: 'State' })).toHaveClass('h-14', 'text-lg');
+  });
 });
 
 describe('FieldInput: custom renderers', () => {

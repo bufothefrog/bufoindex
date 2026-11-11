@@ -3,6 +3,16 @@
 import React, { useState, useRef, useEffect, useId } from 'react';
 import { ChevronDown, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
+import type { InputSize } from '@/components/ui/inputs/BaseInput';
+
+/** Combobox height and text per size, as SelectInput sizes its select. */
+const COMBOBOX_SIZE: Record<InputSize, string> = {
+  sm: 'h-8 text-sm',
+  md: 'h-10 text-sm',
+  lg: 'h-12 text-base',
+  xl: 'h-14 text-lg',
+};
 
 export interface StateOption {
   code: string;
@@ -76,6 +86,8 @@ interface StateSelectorProps {
   required?: boolean;
   help?: string;
   error?: string;
+  /** md (default) is a 40px combobox; xl is the intake wizard's size (56px, text-lg, a text-base label). */
+  size?: InputSize;
 }
 
 export function StateSelector({ 
@@ -87,7 +99,8 @@ export function StateSelector({
   placeholder = "Select state...",
   required = false,
   help,
-  error
+  error,
+  size = 'md'
 }: StateSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,8 +108,7 @@ export function StateSelector({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
-  const helpId = help && !error ? `${name}-help` : undefined;
-  const errorId = error ? `${name}-error` : undefined;
+  const { describedBy } = fieldMessageIds(name, help, error);
 
   const selectedState = US_STATES.find(state => state.code === value);
   const displayValue = selectedState ? selectedState.name : '';
@@ -233,7 +245,13 @@ export function StateSelector({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <label htmlFor={name} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+        <label
+          htmlFor={name}
+          className={cn(
+            size === 'xl' ? "text-base" : "text-sm",
+            "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          )}
+        >
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
         </label>
@@ -262,7 +280,8 @@ export function StateSelector({
           onBlur={handleBlur}
           placeholder={placeholder}
           className={cn(
-            "w-full h-10 pl-10 pr-10 py-2 border border-input bg-background rounded-md text-sm",
+            "w-full pl-10 pr-10 py-2 border border-input bg-background rounded-md",
+            COMBOBOX_SIZE[size],
             "focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring",
             "hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
             error && "border-destructive focus-visible:ring-destructive"
@@ -278,7 +297,7 @@ export function StateSelector({
               : undefined
           }
           aria-invalid={!!error}
-          aria-describedby={errorId ?? helpId}
+          aria-describedby={describedBy}
         />
         <ChevronDown className={cn(
           "absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform",
@@ -332,17 +351,8 @@ export function StateSelector({
         </div>
       )}
       
-      {helpId && (
-        <p id={helpId} className="text-xs text-muted-foreground">
-          {help}
-        </p>
-      )}
-      
-      {errorId && (
-        <p id={errorId} className="text-xs text-destructive" role="alert">
-          {error}
-        </p>
-      )}
+      {/* A plain error line (no glyph), as these selects have always shown it. */}
+      <FieldMessages id={name} help={help} error={error} glyph={false} />
     </div>
     </div>
   );

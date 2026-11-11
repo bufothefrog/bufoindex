@@ -1,7 +1,8 @@
 /**
- * Help text and the error under a field group (choice groups, lists), with
- * the same look as BaseInput's: help is hidden while an error shows, and
- * the error is announced. Pair it with fieldMessageIds so the group's
+ * Help text and the error under a field: the one rule every input primitive
+ * and field group uses (BaseInput, Checkbox, SelectInput, StateSelector,
+ * ChoiceGroup, FieldList). Help is hidden while an error shows, and the
+ * error is announced. Pair it with fieldMessageIds so the control's
  * aria-describedby points at whichever of the two is rendered.
  */
 
@@ -28,9 +29,14 @@ export interface FieldMessagesProps {
   help?: string;
   error?: string;
   className?: string;
+  /**
+   * Prefix the error with the warning glyph (default). SelectInput and
+   * StateSelector have always shown a plain error line and pass false.
+   */
+  glyph?: boolean;
 }
 
-export function FieldMessages({ id, help, error, className }: FieldMessagesProps) {
+export function FieldMessages({ id, help, error, className, glyph = true }: FieldMessagesProps) {
   const { helpId, errorId } = fieldMessageIds(id, help, error);
   if (!helpId && !errorId) return null;
   return (
@@ -40,14 +46,19 @@ export function FieldMessages({ id, help, error, className }: FieldMessagesProps
           {help}
         </p>
       )}
-      {errorId && (
-        <p id={errorId} role="alert" className="flex items-start space-x-1 text-xs text-destructive">
-          <span className="font-bold" aria-hidden="true">
-            {'\u26a0'}
-          </span>
-          <span>{error}</span>
-        </p>
-      )}
+      {errorId &&
+        (glyph ? (
+          <p id={errorId} role="alert" className="flex items-start space-x-1 text-xs text-destructive">
+            <span className="font-bold" aria-hidden="true">
+              {'\u26a0'}
+            </span>
+            <span>{error}</span>
+          </p>
+        ) : (
+          <p id={errorId} role="alert" className="text-xs text-destructive">
+            {error}
+          </p>
+        ))}
     </div>
   );
 }

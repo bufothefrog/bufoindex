@@ -219,7 +219,7 @@ describe('FieldList', () => {
     const { onWrite } = renderList(debts, { debts: [] });
     expect(screen.getByText('No debts added yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add to debts' }));
-    expect(onWrite).toHaveBeenLastCalledWith([{ path: 'debts.0', value: {} }]);
+    expect(onWrite).toHaveBeenLastCalledWith([{ path: 'debts.0', value: { id: 'debts-1' } }]);
     expect(screen.getByRole('group', { name: 'Debts 1' })).toBeInTheDocument();
   });
 
@@ -313,5 +313,34 @@ describe('FieldList', () => {
     expect(profile.debts).toEqual([{ ...PROFILE_LIST_ROW_DEFAULTS.debts, id: 'debt-2', name: 'Car loan', balance: 4500 }]);
     expect(profile.provided).toContain('debts');
     expect(screen.getByRole('group', { name: 'Car loan' })).toBeInTheDocument();
+  });
+
+  it('without newRow, adds a row the profile store accepts, with an id no other row has', async () => {
+    const user = userEvent.setup();
+    resetProfileStore({
+      profile: { debts: [{ ...PROFILE_LIST_ROW_DEFAULTS.debts, id: 'debts-2', name: 'Card' }] },
+    });
+    const debts: FieldSpec = {
+      path: 'debts',
+      kind: 'list',
+      label: 'Debts',
+      tier: 'details',
+      row: [{ path: 'balance', kind: 'money', label: 'Balance', tier: 'details' }],
+    };
+    function ProfileDebts() {
+      const profile = useProfileStore((state) => state.profile);
+      return (
+        <FieldList
+          spec={debts}
+          get={makeGet(profile)}
+          onWrite={(writes) => useProfileStore.getState().setValues(writes)}
+          errors={{}}
+        />
+      );
+    }
+    render(<ProfileDebts />);
+    await user.click(screen.getByRole('button', { name: 'Add to debts' }));
+    await user.click(screen.getByRole('button', { name: 'Add to debts' }));
+    expect(useProfileStore.getState().profile.debts.map((debt) => debt.id)).toEqual(['debts-2', 'debts-3', 'debts-4']);
   });
 });

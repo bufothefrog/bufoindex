@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import type { InputSize } from '@/components/ui/inputs/BaseInput';
 
 interface SelectOption {
@@ -61,16 +62,16 @@ export function SelectInput({
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onChange(e.target.value);
   };
-  const helpId = help && !error ? `${name}-help` : undefined;
-  const errorId = error ? `${name}-error` : undefined;
+  const { describedBy } = fieldMessageIds(name, help, error);
 
   return (
     <div className={cn("space-y-2", className)}>
       <label
         htmlFor={name}
         className={cn(
-          "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-          size === 'xl' ? "text-base" : "text-sm"
+          // Size first: tailwind-merge drops leading-none when a text-* class follows it.
+          size === 'xl' ? "text-base" : "text-sm",
+          "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
         )}
       >
         {label}
@@ -86,7 +87,7 @@ export function SelectInput({
           disabled={disabled}
           required={required}
           aria-label={ariaLabel}
-          aria-describedby={errorId ?? helpId}
+          aria-describedby={describedBy}
           aria-invalid={!!error}
           className={cn(
             "flex w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background",
@@ -117,17 +118,8 @@ export function SelectInput({
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
       </div>
       
-      {helpId && (
-        <p id={helpId} className="text-xs text-muted-foreground">
-          {help}
-        </p>
-      )}
-      
-      {errorId && (
-        <p id={errorId} className="text-xs text-destructive" role="alert">
-          {error}
-        </p>
-      )}
+      {/* A plain error line (no glyph), as these selects have always shown it. */}
+      <FieldMessages id={name} help={help} error={error} glyph={false} />
     </div>
   );
 }

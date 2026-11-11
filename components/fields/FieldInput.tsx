@@ -5,21 +5,23 @@ import { BaseInput, MoneyInput, NumberInput, PercentInput, SliderField, StateSel
 import type { InputSize } from '@/components/ui/inputs';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { fieldMessageIds } from '@/components/ui/FieldMessages';
 import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import { LookupHint } from '@/components/shared/LookupHint';
 import {
+  fieldWrites,
   formatFieldValue,
   isFieldVisible,
   resolveOptions,
   resolveOverrideDefault,
   resolveText,
 } from '@/lib/fields/runtime';
-import type { FieldOption, Get } from '@/lib/fields/types';
+import type { FieldOption } from '@/lib/fields/types';
 import { ChoiceGroup } from './ChoiceGroup';
 import { CustomSlot } from './CustomSlot';
-import { FieldList } from './FieldList';
+import { FieldListBase } from './FieldList';
 import { NullableField } from './NullableField';
-import type { FieldInputProps, FieldSize } from './types';
+import type { FieldInputProps, FieldListProps, FieldSize } from './types';
 
 /** The wizard's lg is the primitives' xl; md renders them exactly as before. */
 const INPUT_SIZE: Record<FieldSize, InputSize> = { md: 'md', lg: 'xl' };
@@ -71,14 +73,8 @@ export function FieldInput({
   const inputSize = INPUT_SIZE[size];
   const testId = spec.testId;
 
-  // One onWrite call per change: the field's own write, then the spec's
-  // coupled writes. The Get handed to onChange already sees the new value
-  // (the phase 1 hand-off recommends this), so a coupled write derives from
-  // what the visitor just entered, not from the value it replaces.
-  const write = (next: unknown) => {
-    const after: Get = (path) => (path === spec.path ? next : get(path));
-    onWrite([{ path: spec.path, value: next }, ...(spec.onChange?.(next, after) ?? [])]);
-  };
+  // One onWrite call per change: the field's own write, then its coupled writes.
+  const write = (next: unknown) => onWrite(fieldWrites(spec, next, get));
 
   const choice = (options: readonly FieldOption[]) => (
     <ChoiceGroup
@@ -248,6 +244,7 @@ export function FieldInput({
               value={asString(value)}
               onChange={write}
               placeholder={spec.placeholder}
+              size={inputSize}
             />
           </TestIdBox>
         );
@@ -255,7 +252,7 @@ export function FieldInput({
         // BaseInput links only a direct <input> child, so the Input gets the
         // ids BaseInput derives from the name, for the help or error it renders.
         const inputId = `input-${name}`;
-        const describedBy = error ? `${inputId}-error` : help ? `${inputId}-help` : undefined;
+        const { describedBy } = fieldMessageIds(inputId, help, error);
         return (
           <BaseInput name={name} label={label} help={help} error={error} testId={testId} size={inputSize}>
             <div className="relative w-full">
@@ -276,7 +273,8 @@ export function FieldInput({
       }
       case 'list':
         return (
-          <FieldList
+          <FieldListBase
+            renderField={FieldInput}
             spec={spec}
             get={get}
             onWrite={onWrite}
@@ -326,6 +324,11 @@ export function FieldInput({
       <LookupHint>{hint}</LookupHint>
     </div>
   );
+}
+
+/** An editable list of rows whose fields render through FieldInput (see FieldListBase). */
+export function FieldList(props: FieldListProps) {
+  return <FieldListBase {...props} renderField={FieldInput} />;
 }
 
 export default FieldInput;

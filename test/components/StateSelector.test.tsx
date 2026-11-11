@@ -22,6 +22,18 @@ describe('StateSelector', () => {
     expect(screen.getByRole('combobox', { name: 'State' })).toBeInTheDocument();
   });
 
+  it('is a 40px combobox with a text-sm label by default, and 56px with a text-base label at xl', () => {
+    const { rerender } = render(<StateSelector label="State" value="TX" onChange={vi.fn()} />);
+    let box = screen.getByRole('combobox', { name: 'State' });
+    expect(box).toHaveClass('h-10', 'text-sm');
+    expect(screen.getByText('State').closest('label')).toHaveClass('text-sm', 'leading-none');
+    rerender(<StateSelector label="State" value="TX" onChange={vi.fn()} size="xl" />);
+    box = screen.getByRole('combobox', { name: 'State' });
+    expect(box).toHaveClass('h-14', 'text-lg');
+    expect(box).not.toHaveClass('h-10');
+    expect(screen.getByText('State').closest('label')).toHaveClass('text-base', 'leading-none');
+  });
+
   it('points aria-activedescendant at the highlighted option while arrowing', () => {
     render(<StateSelector label="State" value="" onChange={vi.fn()} />);
     const input = screen.getByRole('combobox', { name: 'State' });

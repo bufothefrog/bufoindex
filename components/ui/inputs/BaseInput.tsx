@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import { BaseInputProps, ComponentState, AccessibilityProps } from '@/lib/design-system/types';
 
 /**
@@ -36,11 +37,9 @@ export function BaseInput({
   ...ariaProps
 }: BaseInputConfig) {
   const inputId = `input-${name}`;
-  const helpId = help ? `${inputId}-help` : undefined;
-  const errorId = error ? `${inputId}-error` : undefined;
-  
   const hasError = !!(error || (state && !state.isValid && state.error));
-  const errorMessage = error || (state?.error);
+  const errorMessage = hasError ? error || state?.error : undefined;
+  const { describedBy } = fieldMessageIds(inputId, help, errorMessage);
   
   return (
     <div className={cn("space-y-2", className)} data-testid={testId}>
@@ -48,8 +47,9 @@ export function BaseInput({
       <label 
         htmlFor={inputId}
         className={cn(
-          "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+          // Size first: tailwind-merge drops leading-none when a text-* class follows it.
           size === 'xl' ? "text-base" : "text-sm",
+          "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
           hasError && "text-destructive"
         )}
       >
@@ -70,7 +70,7 @@ export function BaseInput({
                   name,
                   disabled,
                   required,
-                  'aria-describedby': [helpId, errorId].filter(Boolean).join(' ') || undefined,
+                  'aria-describedby': describedBy,
                   'aria-invalid': hasError,
                   className: cn(
                     "w-full border bg-background rounded-md text-sm transition-colors",
@@ -90,27 +90,7 @@ export function BaseInput({
         })()}
       </div>
       
-      {/* Help Text */}
-      {help && !hasError && (
-        <p
-          id={helpId}
-          className="text-xs text-muted-foreground"
-        >
-          {help}
-        </p>
-      )}
-      
-      {/* Error Message */}
-      {hasError && errorMessage && (
-        <p 
-          id={errorId}
-          className="text-xs text-destructive flex items-start space-x-1"
-          role="alert"
-        >
-          <span className="text-destructive font-bold">⚠</span>
-          <span>{errorMessage}</span>
-        </p>
-      )}
+      <FieldMessages id={inputId} help={help} error={errorMessage} />
     </div>
   );
 }

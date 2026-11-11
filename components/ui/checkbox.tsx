@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { FieldMessages, fieldMessageIds } from "@/components/ui/FieldMessages"
 
 export interface CheckboxProps {
   /** Also the base of the input id (`checkbox-${name}`). */
@@ -32,8 +33,7 @@ function Checkbox({
   testId,
 }: CheckboxProps) {
   const id = `checkbox-${name}`
-  const helpId = help && !error ? `${id}-help` : undefined
-  const errorId = error ? `${id}-error` : undefined
+  const { describedBy } = fieldMessageIds(id, help, error)
 
   return (
     <div className={cn("space-y-1", className)} data-testid={testId}>
@@ -45,7 +45,7 @@ function Checkbox({
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
           disabled={disabled}
-          aria-describedby={[helpId, errorId].filter(Boolean).join(" ") || undefined}
+          aria-describedby={describedBy}
           aria-invalid={error ? true : undefined}
           className={cn(
             "h-4 w-4 shrink-0 rounded border-input accent-sage-600 dark:accent-sage-400",
@@ -64,16 +64,7 @@ function Checkbox({
           {label}
         </label>
       </div>
-      {helpId && (
-        <p id={helpId} className="pl-7 text-xs text-muted-foreground">
-          {help}
-        </p>
-      )}
-      {errorId && (
-        <p id={errorId} role="alert" className="pl-7 text-xs text-destructive">
-          {error}
-        </p>
-      )}
+      <FieldMessages id={id} help={help} error={error} className="pl-7" />
     </div>
   )
 }

@@ -56,6 +56,17 @@ describe('SliderField', () => {
     expect(slider).toHaveAttribute('aria-valuenow', '1');
   });
 
+  it('describes the slider by the help, or by the error and marks it invalid', () => {
+    const { rerender } = render(<Harness help="Times the average cost" />);
+    expect(screen.getByRole('slider', { name: 'Healthcare cost multiplier' })).toHaveAccessibleDescription(
+      'Times the average cost'
+    );
+    rerender(<Harness help="Times the average cost" error="Too high." />);
+    const slider = screen.getByRole('slider', { name: 'Healthcare cost multiplier' });
+    expect(slider).toHaveAccessibleDescription(expect.stringContaining('Too high.'));
+    expect(slider).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('prints the bounds and the current value', () => {
     render(<Harness initial={1.5} />);
     expect(screen.getByText('0.5x')).toBeInTheDocument();

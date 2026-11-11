@@ -4,14 +4,15 @@
  * section 2.10).
  */
 
-export { FieldInput } from './FieldInput';
-export { FieldList } from './FieldList';
+export { FieldInput, FieldList } from './FieldInput';
 export { FieldSection, screenHasError } from './FieldSection';
 export { FieldSections } from './FieldSections';
 export { ChoiceGroup } from './ChoiceGroup';
 export type { ChoiceGroupLayout, ChoiceGroupProps } from './ChoiceGroup';
 export { NullableField } from './NullableField';
 export type { NullableFieldProps } from './NullableField';
+export { ScreenNotes } from './ScreenNotes';
+export type { ScreenNotesProps } from './ScreenNotes';
 export { SectionToggle } from './SectionToggle';
 export type { SectionToggleProps } from './SectionToggle';
 export type {

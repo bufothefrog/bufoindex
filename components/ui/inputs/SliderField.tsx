@@ -2,11 +2,13 @@
  * Slider Field Component
  * A bounded number set by dragging a slider or by typing it. The typed box
  * is a NumberInput, so the label, help text and error come from BaseInput
- * and are linked to it; the slider carries the same accessible name.
+ * and are linked to it; the slider carries the same accessible name and is
+ * described by the same help or error.
  */
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { fieldMessageIds } from '@/components/ui/FieldMessages';
 import { formatCount } from '@/lib/format';
 import { Slider } from '@/components/ui/slider';
 import { NumberInput } from './NumberInput';
@@ -56,6 +58,8 @@ export function SliderField({
   const decimals = stepDecimals(step);
   // Steps such as 0.1 accumulate binary noise (0.5 + 6 * 0.1); round it off.
   const commit = (next: number) => onChange(Number(next.toFixed(decimals)));
+  // The ids BaseInput gives the NumberInput's help and error text.
+  const { describedBy } = fieldMessageIds(`input-${name}`, help, error);
 
   return (
     <div className={cn('space-y-2', className)} data-testid={testId}>
@@ -87,6 +91,8 @@ export function SliderField({
           disabled={disabled}
           className="w-full"
           aria-label={label}
+          aria-describedby={describedBy}
+          aria-invalid={error ? true : undefined}
         />
         <div className="mt-1 flex justify-between text-xs text-muted-foreground">
           <span>{formatValue(min)}</span>

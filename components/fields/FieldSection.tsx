@@ -2,14 +2,14 @@
 
 import React, { useId } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, FileSearch, Info, RotateCcw, SlidersHorizontal, User } from 'lucide-react';
+import { FileSearch, RotateCcw, SlidersHorizontal, User } from 'lucide-react';
 import { InputCard } from '@/components/ui/cards';
 import { Button } from '@/components/ui/button';
-import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
-import { summarizeScreen, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
+import { summarizeScreen, visibleScreenFields } from '@/lib/fields/runtime';
 import type { FieldErrors, FieldKind, FieldSpec, FormSpec, Get, ScreenSpec, Tier } from '@/lib/fields/types';
 import { cn } from '@/lib/utils';
 import { FieldInput } from './FieldInput';
+import { ScreenNotes } from './ScreenNotes';
 import { SectionToggle } from './SectionToggle';
 import type { FieldSectionProps } from './types';
 
@@ -24,8 +24,6 @@ const TIER_TOGGLE: Record<Tier, { expand: string; collapse: string; icon: 'edit'
   details: { expand: 'Show', collapse: 'Hide', icon: 'chevron' },
   assumption: { expand: 'Show', collapse: 'Hide', icon: 'chevron' },
 };
-
-const NOTE_ICON = { info: Info, caution: AlertTriangle } as const;
 
 /** Kinds that take the full width of the two-column field grid. */
 const WIDE_KINDS: ReadonlySet<FieldKind> = new Set(['choice', 'list', 'custom']);
@@ -53,7 +51,8 @@ export function screenHasError(form: FormSpec, screen: ScreenSpec, get: Get, err
 /**
  * One topic screen as an input card: its visible fields, its notes, and a
  * one-line summary while collapsed. A field error forces it open, so a
- * collapsed card never hides an error.
+ * collapsed card never hides an error; while it does, the toggle is
+ * disabled, since hiding the card would have no effect.
  */
 export function FieldSection({
   form,
@@ -68,7 +67,8 @@ export function FieldSection({
 }: FieldSectionProps) {
   const bodyId = useId();
   const fields = visibleScreenFields(form, screen, get);
-  const open = !collapsed || fields.some((spec) => fieldHasError(spec, errors));
+  const hasError = fields.some((spec) => fieldHasError(spec, errors));
+  const open = !collapsed || hasError;
   const toggle = TIER_TOGGLE[screen.tier];
   const canRestore = screen.tier === 'assumption' && onRestoreDefaults !== undefined;
   const sectionName = screen.title.toLowerCase();
@@ -98,6 +98,7 @@ export function FieldSection({
             collapseLabel={toggle.collapse}
             expandIcon={toggle.icon}
             sectionName={sectionName}
+            disabled={hasError}
           />
         )}
       </>
@@ -130,11 +131,7 @@ export function FieldSection({
                   </div>
                 ))}
               </div>
-              {visibleScreenNotes(screen, get).map((note) => (
-                <StatusAlert key={note.text} tone={note.tone} appearance="tinted" icon={NOTE_ICON[note.tone]}>
-                  {note.text}
-                </StatusAlert>
-              ))}
+              <ScreenNotes screen={screen} get={get} />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

@@ -14,6 +14,8 @@ export interface SectionToggleProps {
   expandIcon?: 'edit' | 'chevron';
   /** Completes the accessible name: "Show assumptions". */
   sectionName: string;
+  /** Set while the section cannot change state (a field error holds it open). */
+  disabled?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export function SectionToggle({
   collapseLabel,
   expandIcon = 'chevron',
   sectionName,
+  disabled = false,
 }: SectionToggleProps) {
   const ExpandIcon = expandIcon === 'edit' ? Pencil : ChevronDown;
   return (
@@ -36,6 +39,7 @@ export function SectionToggle({
       variant="ghost"
       size="sm"
       onClick={onToggle}
+      disabled={disabled}
       aria-expanded={expanded}
       aria-controls={controls}
       aria-label={`${expanded ? collapseLabel : expandLabel} ${sectionName}`}

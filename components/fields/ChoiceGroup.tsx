@@ -4,7 +4,7 @@ import React, { useId, useRef } from 'react';
 import { OptionCard } from '@/components/guided/OptionCard';
 import type { FieldOption } from '@/lib/fields/types';
 import { cn } from '@/lib/utils';
-import { FieldMessages, fieldMessageIds } from './FieldMessages';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import type { FieldSize } from './types';
 
 export type ChoiceGroupLayout = 'stack' | 'grid';

@@ -151,6 +151,11 @@ describe('FieldSection', () => {
     expect(screen.getByRole('button', { name: 'Done about you' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('disables the toggle while an error holds the card open, since hiding it would do nothing', () => {
+    renderSection(SCREENS.about, { 'person.age': 'Age must be between 16 and 100.' }, true);
+    expect(screen.getByRole('button', { name: 'Done about you' })).toBeDisabled();
+  });
+
   it('ignores errors of fields that are not on it', () => {
     renderSection(SCREENS.about, { 'hsa.monthly': 'Too much.' }, true);
     expect(screen.queryByRole('textbox', { name: 'Age' })).not.toBeInTheDocument();

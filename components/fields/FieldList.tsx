@@ -8,9 +8,17 @@ import { isFieldVisible, listRows, resolveText, rowGet } from '@/lib/fields/runt
 import type { FieldErrors, FieldSpec, Write } from '@/lib/fields/types';
 import { cn } from '@/lib/utils';
 import { CustomSlot } from './CustomSlot';
-import { FieldInput } from './FieldInput';
-import { FieldMessages, fieldMessageIds } from './FieldMessages';
-import type { FieldListProps } from './types';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
+import type { FieldInputProps, FieldListProps } from './types';
+
+export interface FieldListBaseProps extends FieldListProps {
+  /**
+   * Renders one row field. FieldInput passes itself, so this module never
+   * imports FieldInput (lists hold fields and fields hold lists; injecting
+   * the renderer keeps that recursion out of the import graph).
+   */
+  renderField: React.ComponentType<FieldInputProps>;
+}
 
 /** '{i}' in a test id pattern becomes the row index. */
 function rowTestId(pattern: string | undefined, index: number): string | undefined {
@@ -33,21 +41,47 @@ function rowKey(row: Record<string, unknown>, index: number): string {
 }
 
 /**
- * An editable list of rows (debts, portfolio accounts). Row fields are
- * FieldSpecs relative to the row; each row renders them through FieldInput
- * with a row-scoped Get, and their writes are rewritten to absolute paths.
+ * A row id no current row has: '<last path segment>-<n>'. Used when the spec
+ * has no newRow, so Add still gives the profile store a row it accepts
+ * (rows of lists such as debts and portfolio accounts need a non-empty id).
+ */
+function freshRowId(listPath: string, rows: readonly Record<string, unknown>[]): string {
+  const base = listPath.split('.').pop() ?? 'row';
+  const taken = new Set(rows.map((row) => row.id));
+  let n = rows.length + 1;
+  while (taken.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
+/**
+ * An editable list of rows (debts, portfolio accounts). Use FieldList
+ * (exported from FieldInput.tsx and the components/fields index), which
+ * renders row fields through FieldInput. Row fields are FieldSpecs relative
+ * to the row; each row renders them through renderField with a row-scoped
+ * Get, and their writes are rewritten to absolute paths.
  *
  * Writes (all through one onWrite call each):
  * - a row field change: '<list>.<i>.<field>', then the row spec's onChange
  *   writes, which are relative to the row like its Get;
- * - add: '<list>.<n>' = spec.newRow(get) (or {}), appended at the end.
- *   newRow must give the row an id no other row has, or the profile store
- *   refuses the write;
+ * - add: '<list>.<n>' = spec.newRow(get), appended at the end. newRow must
+ *   give the row an id no other row has, or the profile store refuses the
+ *   write. Without newRow the row is { id: freshRowId(...) }; the profile
+ *   store fills the other fields from the list's row defaults (and drops the
+ *   id for a list whose rows have none);
  * - remove: '<list>' = the rows without that one (indices stay canonical),
  *   then spec.removeRow(get, i), whose Get still sees the row being removed
  *   so a cascade can read its id.
  */
-export function FieldList({ spec, get, onWrite, errors, renderers, size = 'md', idPrefix = 'field' }: FieldListProps) {
+export function FieldListBase({
+  spec,
+  get,
+  onWrite,
+  errors,
+  renderers,
+  size = 'md',
+  idPrefix = 'field',
+  renderField: RowField,
+}: FieldListBaseProps) {
   const id = useId();
   const labelId = `${id}-label`;
   const addRef = useRef<HTMLButtonElement>(null);
@@ -62,7 +96,7 @@ export function FieldList({ spec, get, onWrite, errors, renderers, size = 'md', 
   const large = size === 'lg';
 
   const add = () => {
-    onWrite([{ path: joinPath(spec.path, rows.length), value: spec.newRow?.(get) ?? {} }]);
+    onWrite([{ path: joinPath(spec.path, rows.length), value: spec.newRow?.(get) ?? { id: freshRowId(spec.path, rows) } }]);
   };
 
   const remove = (index: number) => {
@@ -87,7 +121,7 @@ export function FieldList({ spec, get, onWrite, errors, renderers, size = 'md', 
     <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-3">
       <p
         id={labelId}
-        className={cn('font-medium leading-none', large ? 'text-base' : 'text-sm', error && 'text-destructive')}
+        className={cn(large ? 'text-base' : 'text-sm', 'font-medium leading-none', error && 'text-destructive')}
       >
         {spec.label}
       </p>
@@ -141,7 +175,7 @@ export function FieldList({ spec, get, onWrite, errors, renderers, size = 'md', 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {(spec.row ?? []).map((rowSpec: FieldSpec) =>
                 isFieldVisible(rowSpec, scope) ? (
-                  <FieldInput
+                  <RowField
                     key={rowSpec.path}
                     spec={rowSpec.testId ? { ...rowSpec, testId: rowTestId(rowSpec.testId, index) } : rowSpec}
                     get={scope}
@@ -188,4 +222,4 @@ export function FieldList({ spec, get, onWrite, errors, renderers, size = 'md', 
   );
 }
 
-export default FieldList;
+export default FieldListBase;

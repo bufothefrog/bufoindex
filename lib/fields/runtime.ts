@@ -47,6 +47,7 @@ import type {
   Surface,
   Text,
   Tier,
+  Write,
 } from './types';
 
 const FIELD_MAPS = new WeakMap<FormSpec, ReadonlyMap<string, FieldSpec>>();
@@ -349,4 +350,15 @@ export function screenPaths(form: FormSpec, screen: ScreenSpec, get: Get): strin
     for (const covered of spec.covers ?? []) paths.add(covered);
   }
   return Array.from(paths);
+}
+
+/**
+ * The writes for setting `spec` to `value`: its own write, then the spec's
+ * coupled writes (onChange). The Get handed to onChange already sees the new
+ * value, so a coupled write derives from what the visitor just entered. The
+ * calculator's FieldInput and the intake wizard both build writes with this.
+ */
+export function fieldWrites(spec: FieldSpec, value: unknown, get: Get): Write[] {
+  const after: Get = (path) => (path === spec.path ? value : get(path));
+  return [{ path: spec.path, value }, ...(spec.onChange?.(value, after) ?? [])];
 }
