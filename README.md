@@ -54,7 +54,7 @@ Node 22.22.2+ is required — see `engines` in `package.json` for the exact rang
 | `npm run test:ui`       | Vitest browser UI                |
 | `npm run test:coverage` | Vitest one-shot + v8 coverage    |
 
-Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, a zero-warning lint gate (`--max-warnings=0`), and the tests on a Node 22/24 matrix (coverage on Node 22), plus separate Node 22 production-build and dependency-audit jobs.
+Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, a zero-warning lint gate (`--max-warnings=0`), and the tests on a Node 22/24 matrix (coverage on Node 22), plus separate Node 22 production-build and dependency-audit jobs (the audit blocks on high or critical advisories in production dependencies and reports dev-dependency advisories without failing).
 
 ## Project layout
 
