@@ -54,10 +54,10 @@ function renderActions(profile: PaycheckProfile) {
   return render(<QuickActions profile={profile} />);
 }
 
-/** The label (dt) and value (dd) of the row whose label is `label`, within one action card. */
 /** Classes that would clip or refuse to wrap the impact phrase. */
 const CLIPPING_CLASSES = ['truncate', 'overflow-hidden', 'whitespace-nowrap', 'text-nowrap'];
 
+/** The label (dt) and value (dd) of the row whose label is `label`, within one action card. */
 function rowFor(label: string, card: HTMLElement = document.body) {
   const term = within(card).getByText(label).closest('dt');
   expect(term).not.toBeNull();
