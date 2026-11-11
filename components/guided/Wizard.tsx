@@ -239,6 +239,9 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
   const [provided, setProvided] = useState<string[]>([]);
   // Coupled-write paths each screen touched, by screen id (see coupledPaths).
   const [coupled, setCoupled] = useState<Readonly<Record<string, readonly string[]>>>({});
+  // The values each answered screen gave, by screen id: its own paths and its
+  // coupled writes, as they stood when the visitor moved on from it.
+  const [answered, setAnswered] = useState<Readonly<Record<string, Readonly<Record<string, unknown>>>>>({});
   const [index, setIndex] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [alert, setAlert] = useState<string[]>([]);
@@ -337,27 +340,49 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     const nextProvided = Array.from(new Set([...provided, ...own, ...touched]));
     if (writes) setAnswers(nextAnswers);
     setProvided(nextProvided);
+    setAnswered((prev) => ({
+      ...prev,
+      [current.id]: Object.fromEntries([...own, ...touched].map((path) => [path, getAt(nextAnswers, path)])),
+    }));
     clearErrors();
 
     if (step >= nextScreens.length - 1) finish(nextAnswers, nextProvided);
     else setIndex(step + 1);
   };
 
-  /** Restores the given screens' answers to their starting values and unmarks them. */
+  /**
+   * Restores the given screens' answers and unmarks them. A path that another
+   * answered screen also gave (a coupled write over an earlier answer) goes
+   * back to that screen's value and stays marked; any other path goes back to
+   * its value on arrival.
+   */
   const revert = (skipped: readonly ScreenSpec[]) => {
+    const skippedIds = new Set(skipped.map((s) => s.id));
     const skippedPaths = skipped.flatMap((s) => [...screenPaths(form, s, get), ...(coupled[s.id] ?? [])]);
+    const kept = Object.entries(answered).filter(([id]) => !skippedIds.has(id));
+    const keptValue = (path: string) => {
+      // The latest screen in flow order wins, as it did when it was answered.
+      const order = (id: string) => screens.findIndex((s) => s.id === id);
+      const holders = kept.filter(([, values]) => path in values).sort(([a], [b]) => order(a) - order(b));
+      return holders.length > 0 ? { value: holders[holders.length - 1][1][path] } : undefined;
+    };
     const reverted = applyWrites(
       answers,
-      skippedPaths.map((path) => ({ path, value: getAt(seed, path) }))
+      skippedPaths.map((path) => {
+        const earlier = keptValue(path);
+        return { path, value: earlier ? earlier.value : getAt(seed, path) };
+      })
     );
-    const remaining = provided.filter((path) => !skippedPaths.includes(path));
+    const remaining = provided.filter((path) => !skippedPaths.includes(path) || keptValue(path) !== undefined);
     setAnswers(reverted);
     setProvided(remaining);
-    setCoupled((prev) => {
+    const drop = <T,>(prev: Readonly<Record<string, T>>) => {
       const next = { ...prev };
-      for (const s of skipped) delete next[s.id];
+      for (const id of skippedIds) delete next[id];
       return next;
-    });
+    };
+    setCoupled(drop);
+    setAnswered(drop);
     clearErrors();
     return { reverted, remaining };
   };

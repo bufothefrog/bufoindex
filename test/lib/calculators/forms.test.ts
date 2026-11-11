@@ -13,12 +13,30 @@ import {
 } from '@/lib/calculators/forms';
 import { CORE_SCREENS, PROFILE_EXTRA_SCREENS } from '@/lib/fields/shared';
 import { makeGet } from '@/lib/fields/paths';
-import { fieldMap, screensFor } from '@/lib/fields/runtime';
+import { fieldMap, isFieldVisible, screensFor } from '@/lib/fields/runtime';
 import type { CrossFieldRule, FieldSpec, FormSpec, Get, ScreenSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 
 const ALL_FORMS: readonly FormSpec[] = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM];
+
+/** The calculator forms in profile order, each with the label of the section its screens take. */
+const PROFILE_PARTS = PROFILE_FORM_ORDER.map((id) => ({
+  form: FORMS[id],
+  label: id === 'leverage' ? PROFILE_FORM_SECTION_LABELS.portfolio : PROFILE_FORM_SECTION_LABELS[id],
+}));
+
+/** A calculator form's screens that the profile form draws from. */
+const profileEligible = (form: FormSpec) =>
+  form.screens.filter(
+    (screen) => screen.tier !== 'core' && screen.tier !== 'assumption' && (screen.surface ?? 'both') !== 'calculator'
+  );
+
+/** The form whose eligible screens ask `path` first, in profile order (the core first). */
+const firstAsker = (path: string): FormSpec | undefined =>
+  [CORE_FORM, ...PROFILE_PARTS.map((part) => part.form)].find((form) =>
+    (form === CORE_FORM ? form.screens : profileEligible(form)).some((screen) => screen.fields.includes(path))
+  );
 
 const profileWith = (provided: string[], edits: Partial<FinancialProfile> = {}): FinancialProfile => ({
   ...getDefaultFinancialProfile(),
@@ -70,37 +88,54 @@ describe('PROFILE_FORM', () => {
   it('asks each profile path once, keeping the first form that asks it', () => {
     const paths = PROFILE_FORM.screens.flatMap((screen) => screen.fields);
     expect(new Set(paths).size).toBe(paths.length);
-    // Retirement asks the invested balance before leverage rewords it as "Starting balance".
-    expect(fieldMap(PROFILE_FORM).get('investing.investedBalance')?.label).toBe('Invested balance');
-    expect(fieldMap(PROFILE_FORM).get('person.retirementAge')?.label).toBe('Target retirement age');
+    // With the provisional forms, retirement asks the invested balance and the
+    // retirement age before leverage rewords them.
+    const profileSpecs = fieldMap(PROFILE_FORM);
+    for (const path of paths) {
+      const source = firstAsker(path);
+      if (source) expect(profileSpecs.get(path), path).toBe(fieldMap(source).get(path));
+    }
   });
 
-  it('drops a screen whose fields were all asked earlier', () => {
-    // Leverage's horizon (age, stop age) and balance screens are covered by the core and retirement.
-    const leverageIds = PROFILE_FORM.screens.filter((screen) => profileFormSection(screen.id) === 'portfolio');
-    expect(leverageIds.map((screen) => screen.id)).toEqual(['new-cash', 'target-mix', 'taxable-investing']);
-    expect(PROFILE_FORM.screens.some((screen) => screen.id === 'horizon')).toBe(false);
+  it('drops a screen whose fields were all asked earlier, and keeps one that adds a field', () => {
+    const asked = new Set(CORE_SCREENS.flatMap((screen) => screen.fields));
+    const ids = new Set(CORE_SCREENS.map((screen) => screen.id));
+    const expected: [string, string[]][] = [];
+    for (const { form } of PROFILE_PARTS) {
+      for (const screen of profileEligible(form)) {
+        const added = screen.fields.filter((path) => !asked.has(path));
+        if (added.length === 0) continue;
+        const id = ids.has(screen.id) ? `${form.id}-${screen.id}` : screen.id;
+        ids.add(id);
+        expected.push([id, added]);
+        for (const path of added) asked.add(path);
+      }
+    }
+    const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - PROFILE_EXTRA_SCREENS.length);
+    expect(middle.map((screen) => [screen.id, screen.fields])).toEqual(expected);
+    // Some calculator screen is covered by earlier ones (leverage's horizon and balance, with the provisional forms).
+    expect(expected.length).toBeLessThan(PROFILE_PARTS.flatMap(({ form }) => profileEligible(form)).length);
   });
 
   it('labels every screen with its section', () => {
+    const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - PROFILE_EXTRA_SCREENS.length);
+    const labelOf = (id: string) =>
+      PROFILE_PARTS.find(({ form }) => profileEligible(form).some((s) => s.id === id || `${form.id}-${s.id}` === id))!.label;
     expect(PROFILE_FORM.screens.map((screen) => PROFILE_FORM_SECTION_LABELS[profileFormSection(screen.id)!])).toEqual([
-      'The basics', 'The basics', 'The basics',
-      'Retirement', 'Retirement', 'Retirement',
-      'Paycheck', 'Paycheck', 'Paycheck',
-      'Portfolio', 'Portfolio', 'Portfolio',
-      'Cash and strategy', 'Cash and strategy',
+      ...CORE_SCREENS.map(() => 'The basics'),
+      ...middle.map((screen) => labelOf(screen.id)),
+      ...PROFILE_EXTRA_SCREENS.map(() => 'Cash and strategy'),
     ]);
     expect(profileFormSection('nope')).toBeUndefined();
   });
 
-  it('keeps one copy of each cross-field rule', () => {
-    const keys = (PROFILE_FORM.relations ?? []).map((rule) => `${rule.lower}|${rule.upper}|${rule.checkOn}`);
+  it('keeps one copy of each cross-field rule, in profile order', () => {
+    const key = (rule: CrossFieldRule) => `${rule.lower}|${rule.upper}|${rule.checkOn}`;
+    const keys = (PROFILE_FORM.relations ?? []).map(key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual([
-      'income.netPerPaycheck|income.grossPerPaycheck|income.netPerPaycheck',
-      'person.age|person.retirementAge|person.retirementAge',
-      'spending.funMoneyMin|spending.funMoneyMax|spending.funMoneyMax',
-    ]);
+    const sources = [CORE_FORM, ...PROFILE_PARTS.map((part) => part.form)];
+    expect(keys).toEqual(Array.from(new Set(sources.flatMap((form) => (form.relations ?? []).map(key)))));
+    expect(keys[0]).toBe('income.netPerPaycheck|income.grossPerPaycheck|income.netPerPaycheck');
   });
 
   it('runs the shared derived writes once', () => {
@@ -207,7 +242,11 @@ describe('fieldRegistry', () => {
     const registry = fieldRegistry();
     const all = new Set([CORE_FORM, ...Object.values(FORMS), PROFILE_FORM].flatMap((form) => form.fields.map((spec) => spec.path)));
     expect(new Set(registry.keys())).toEqual(all);
-    expect(registry.get('investing.investedBalance')?.label).toBe('Invested balance');
+    const sources = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM];
+    for (const path of registry.keys()) {
+      const first = sources.find((form) => form.fields.some((spec) => spec.path === path))!;
+      expect(registry.get(path), path).toBe(fieldMap(first).get(path));
+    }
     expect(registry.get('person.age')?.label).toBe('Your age');
     expect(fieldRegistry()).toBe(registry);
   });
@@ -227,19 +266,25 @@ describe('profileCompleteness (by topic screen)', () => {
 
   it('counts a screen once every fact on it is answered', () => {
     const core = CORE_SCREENS.flatMap((s) => s.fields);
-    const result = profileCompleteness(profileWith([...core, 'spending.funMoneyMin']));
+    const partial = PROFILE_FORM.screens.slice(CORE_SCREENS.length).find((s) => s.fields.length > 1)!;
+    const result = profileCompleteness(profileWith([...core, partial.fields[0]]));
     expect(result.provided).toBe(CORE_SCREENS.length);
     // A partly answered screen still counts as missing.
-    expect(result.missing.map((s) => s.id)).toContain('fun-money');
+    expect(result.missing.map((s) => s.id)).toContain(partial.id);
     expect(result.provided + result.missing.length).toBe(result.total);
   });
 
   it('leaves out a screen with no visible fact', () => {
     const base = getDefaultFinancialProfile();
     const noPlan = profileWith([], { workplace: { ...base.workplace, has401k: false } });
+    const get = makeGet(noPlan);
+    const specs = fieldMap(PROFILE_FORM);
+    const hidden = PROFILE_FORM.screens.filter((s) => !s.fields.some((path) => isFieldVisible(specs.get(path)!, get)));
+    // With the provisional forms, the employer match is the one such screen.
+    expect(hidden.length).toBeGreaterThan(0);
     const result = profileCompleteness(noPlan);
-    expect(result.total).toBe(PROFILE_FORM.screens.length - 1);
-    expect(result.missing.map((s) => s.id)).not.toContain('match');
+    expect(result.total).toBe(PROFILE_FORM.screens.length - hidden.length);
+    for (const screen of hidden) expect(result.missing.map((s) => s.id)).not.toContain(screen.id);
   });
 
   it('is complete when every profile path is answered', () => {
