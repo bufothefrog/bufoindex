@@ -291,6 +291,14 @@ describe('paycheck form: visibility', () => {
     expect(investing[3].tone).toBe('info');
   });
 
+  it('states the HSA limit the step card uses: the coverage tier plus the catch-up at 55 and over (bug 4)', () => {
+    const limitNote = (overrides: Record<string, unknown>) =>
+      notes('hsa', fromDefaults({ 'hsa.eligible': true, ...overrides }))[1].text;
+    expect(limitNote({ 'person.age': 54 })).toBe('$4,400/year limit: $367 per month');
+    expect(limitNote({ 'person.age': 55 })).toBe('$5,400/year limit: $450 per month');
+    expect(limitNote({ 'person.age': 58, 'hsa.coverage': 'family' })).toBe('$9,750/year limit: $813 per month');
+  });
+
   it('shows each IRA amount only with that IRA, and the taxable note only with a taxable contribution', () => {
     expect(visible('ira-taxable', fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toEqual([
       'ira.traditional',
@@ -383,7 +391,11 @@ describe('paycheck intake: validation', () => {
 describe('paycheck intake: every old question is still asked', () => {
   it('asks each old paycheck question with its old wording, kind and help; the matched share is capped at 25% now', () => {
     const old = oldScreens(OLD_FLOW, { ...OLD_CORE_SCREENS, ...OLD_SCREENS }, { ...OLD_CORE_QUESTIONS, ...OLD_QUESTIONS });
-    const asked = new Map(askedScreens('paycheck').flatMap((s) => s.questions).map((q) => [q.path, q]));
+    // The intake asks the shared core, then the paycheck screens ('remaining'
+    // mode); the paycheck form's own basics show on the calculator page only.
+    const asked = new Map(
+      [...askedScreens('core'), ...askedScreens('paycheck').slice(3)].flatMap((s) => s.questions).map((q) => [q.path, q])
+    );
     const oldQuestions = old.flatMap((s) => s.questions);
     expect(oldQuestions).toHaveLength(12);
     for (const question of oldQuestions) {
@@ -392,9 +404,20 @@ describe('paycheck intake: every old question is still asked', () => {
     }
   });
 
-  it('keeps the old core screens word for word', () => {
+  it('keeps the old core screens word for word, and the page\'s basics differ only in the old cards\' help', () => {
     const old = oldScreens(OLD_CORE_FLOW, OLD_CORE_SCREENS, OLD_CORE_QUESTIONS);
-    expect(askedScreens('paycheck').slice(0, 3)).toEqual(old);
+    expect(askedScreens('core')).toEqual(old);
+    const page = askedScreens('paycheck').slice(0, 3);
+    const OLD_CARD_HELP: Record<string, string> = {
+      'person.age': 'Used for catch-up contribution eligibility',
+      'spending.necessaryMonthly': 'Rent, utilities, groceries, minimum debt payments, insurance, etc.',
+    };
+    expect(page).toEqual(
+      old.map((screen) => ({
+        ...screen,
+        questions: screen.questions.map((q) => (q.path in OLD_CARD_HELP ? { ...q, help: OLD_CARD_HELP[q.path] } : q)),
+      }))
+    );
   });
 });
 

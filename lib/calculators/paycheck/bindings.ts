@@ -18,7 +18,10 @@
  * Everything else the engine reads with no profile home keeps its value
  * from the engine base (getDefaultProfile); PAYCHECK_ENGINE_ONLY lists each
  * one with the reason. The reverse direction (`write`) serves only the
- * one-time import of the old calculator's localStorage (O7).
+ * one-time import of the old calculator's localStorage (O7). Coupled paths
+ * are written back by one derived binding as well as by their 1:1 ones (pay
+ * with its frequency; the 401(k) type, total and Roth part), which is what
+ * makes the import keep or skip them together.
  */
 
 import { updateLegacyIncomeFields } from '@/lib/calculations/core';
@@ -27,9 +30,12 @@ import type { Get, Write } from '@/lib/fields/types';
 import type { ContributionType } from '@/lib/profile/types';
 import type { IncomeData, PaycheckProfile } from '@/lib/types';
 
-const CONTRIBUTION_TYPE_PATH = 'workplace.contributionType';
-const CONTRIBUTION_PATH = 'workplace.contributionPercent';
-const ROTH_PART_PATH = 'workplace.rothContributionPercent';
+export const CONTRIBUTION_TYPE_PATH = 'workplace.contributionType';
+export const CONTRIBUTION_PATH = 'workplace.contributionPercent';
+export const ROTH_PART_PATH = 'workplace.rothContributionPercent';
+const GROSS_PATH = 'income.grossPerPaycheck';
+const NET_PATH = 'income.netPerPaycheck';
+const FREQUENCY_PATH = 'income.frequency';
 
 /** The traditional and Roth shares of a 401(k) election. */
 export interface Election401k {
@@ -62,9 +68,9 @@ function electionFrom(get: Get): Election401k {
 /** The engine's income: the per-paycheck facts plus the monthly figures updateLegacyIncomeFields derives. */
 function incomeFrom(get: Get): IncomeData {
   return updateLegacyIncomeFields({
-    grossPaycheck: get('income.grossPerPaycheck') as number,
-    netPaycheck: get('income.netPerPaycheck') as number,
-    frequency: get('income.frequency') as IncomeData['frequency'],
+    grossPaycheck: get(GROSS_PATH) as number,
+    netPaycheck: get(NET_PATH) as number,
+    frequency: get(FREQUENCY_PATH) as IncomeData['frequency'],
     regularBonus: get('income.hasBonus') as boolean,
     bonusAmount: get('income.bonusAmount') as number,
     bonusFrequency: get('income.bonusFrequency') as IncomeData['bonusFrequency'],
@@ -78,10 +84,25 @@ function incomeFrom(get: Get): IncomeData {
 
 export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   // Income: the derived figures first, then the leaves the profile owns.
-  { engine: 'income', read: incomeFrom, errorPath: 'income.grossPerPaycheck' },
-  { profile: 'income.grossPerPaycheck', engine: 'income.grossPaycheck' },
-  { profile: 'income.netPerPaycheck', engine: 'income.netPaycheck' },
-  { profile: 'income.frequency', engine: 'income.frequency' },
+  // The pay amounts only mean something with their frequency, so the income
+  // binding writes the three back together (the legacy import keeps or
+  // skips paths written by one binding as one group).
+  {
+    engine: 'income',
+    read: incomeFrom,
+    write: (value): Write[] => {
+      const income = value as IncomeData;
+      return [
+        { path: GROSS_PATH, value: income.grossPaycheck },
+        { path: NET_PATH, value: income.netPaycheck },
+        { path: FREQUENCY_PATH, value: income.frequency },
+      ];
+    },
+    errorPath: GROSS_PATH,
+  },
+  { profile: GROSS_PATH, engine: 'income.grossPaycheck' },
+  { profile: NET_PATH, engine: 'income.netPaycheck' },
+  { profile: FREQUENCY_PATH, engine: 'income.frequency' },
   { profile: 'income.hasBonus', engine: 'income.regularBonus' },
   { profile: 'income.bonusAmount', engine: 'income.bonusAmount' },
   { profile: 'income.bonusFrequency', engine: 'income.bonusFrequency' },
@@ -104,9 +125,17 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   {
     engine: 'benefits.employer401k.rothContribution',
     read: (get) => electionFrom(get).roth,
-    // Only a split stores its Roth part; the other types derive it from the total.
-    write: (value, engine): Write[] =>
-      engine.benefits.employer401k.contributionType === 'split' ? [{ path: ROTH_PART_PATH, value }] : [],
+    // The election is the type, the total and (only for a split) the Roth
+    // part; the other types derive the Roth share from the total. Written
+    // back together, so the legacy import never splits them.
+    write: (value, engine): Write[] => {
+      const plan = engine.benefits.employer401k;
+      return [
+        { path: CONTRIBUTION_TYPE_PATH, value: plan.contributionType },
+        { path: CONTRIBUTION_PATH, value: plan.currentContribution },
+        ...(plan.contributionType === 'split' ? [{ path: ROTH_PART_PATH, value }] : []),
+      ];
+    },
     errorPath: ROTH_PART_PATH,
   },
   { profile: 'workplace.afterTaxAvailable', engine: 'benefits.employer401k.afterTaxAvailable' },

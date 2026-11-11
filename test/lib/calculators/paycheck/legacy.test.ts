@@ -8,7 +8,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_LEGACY, readPaycheckStorage } from '@/lib/calculators/paycheck/legacy';
+import { engineInputsFor } from '@/lib/calculators/runtime';
 import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
+import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import type { PaycheckProfile } from '@/lib/types';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -123,6 +125,7 @@ const store = (value: unknown) => localStorage.setItem(KEY, JSON.stringify(value
 beforeEach(() => {
   clearBrowserState();
   resetProfileStore();
+  usePreferencesStore.setState({ displayMode: 'today' });
 });
 
 describe('PAYCHECK_LEGACY', () => {
@@ -253,6 +256,9 @@ describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)', () => {
     expect(imported.sort()).toEqual(
       [
         'income.grossPerPaycheck',
+        // The pay amounts and their frequency are one group: the untouched
+        // take-home pay comes along so the three stay the old store's.
+        'income.netPerPaycheck',
         'income.frequency',
         'person.state',
         'workplace.contributionType',
@@ -267,7 +273,7 @@ describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)', () => {
       ].sort()
     );
     const { profile } = useProfileStore.getState();
-    expect(profile.income).toMatchObject({ grossPerPaycheck: 4200, frequency: 'semi-monthly' });
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 4200, netPerPaycheck: 1900, frequency: 'semi-monthly' });
     expect(profile.person.state).toBe('NY');
     expect(profile.workplace).toMatchObject({ contributionType: 'split', contributionPercent: 0.1, rothContributionPercent: 0.04 });
     expect(profile.hsa.eligible).toBe(true);
@@ -308,5 +314,75 @@ describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)', () => {
     localStorage.setItem(KEY, '{not json');
     expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+});
+
+describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR): coupled values', () => {
+  const plan = () => engineInputsFor(PAYCHECK_CALCULATOR, useProfileStore.getState().profile).benefits.employer401k;
+
+  it('imports a switch to a split election whole, so the plan runs as the old store did', () => {
+    // What the old BenefitsInputCard stored on a switch to Split: the 3%
+    // default halved, the total itself unchanged.
+    store(
+      envelope(
+        oldProfile((profile) => {
+          profile.benefits.employer401k.contributionType = 'split';
+          profile.benefits.employer401k.traditionalContribution = 0.015;
+          profile.benefits.employer401k.rothContribution = 0.015;
+        })
+      )
+    );
+
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR).sort()).toEqual(
+      ['workplace.contributionType', 'workplace.contributionPercent', 'workplace.rothContributionPercent'].sort()
+    );
+    expect(plan()).toMatchObject({
+      contributionType: 'split',
+      currentContribution: 0.03,
+      traditionalContribution: 0.015,
+      rothContribution: 0.015,
+    });
+  });
+
+  it('imports a changed pay frequency with the pay amounts it goes with', () => {
+    store(envelope(oldProfile((profile) => {
+      profile.income.frequency = 'monthly';
+    })));
+
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR).sort()).toEqual(
+      ['income.frequency', 'income.grossPerPaycheck', 'income.netPerPaycheck'].sort()
+    );
+    const { income } = engineInputsFor(PAYCHECK_CALCULATOR, useProfileStore.getState().profile);
+    expect(income).toMatchObject({ grossPaycheck: 2500, netPaycheck: 1900, frequency: 'monthly', monthlyGross: 2500 });
+  });
+
+  it('skips the whole group when one of its paths was answered since', () => {
+    resetProfileStore({ profile: { income: { grossPerPaycheck: 4100 } } });
+    store(envelope(oldProfile((profile) => {
+      profile.income.frequency = 'monthly';
+    })));
+
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
+    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 4100, frequency: 'bi-weekly' });
+  });
+});
+
+describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR): the dollar display mode (O15)', () => {
+  const withMode = (displayMode: unknown) => ({ state: { profile: OLD_DEFAULTS, displayMode }, version: 0 });
+
+  it('carries a saved future-dollars choice into the shared preference', () => {
+    store(withMode('nominal'));
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('nominal');
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("leaves the preference alone for today's dollars or an unknown mode", () => {
+    store(withMode('today'));
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('today');
+    store(withMode('sideways'));
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('today');
   });
 });

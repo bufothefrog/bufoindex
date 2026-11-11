@@ -10,7 +10,7 @@
  * O18) live on as these bounds and the fun-money relation.
  */
 
-import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
+import { limitHsa } from '@/lib/calculations/contributionLimits';
 import {
   BONUS_FREQUENCY_LABELS,
   BONUS_FREQUENCY_OPTIONS,
@@ -25,17 +25,11 @@ import {
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
 import type { CrossFieldRule, FieldSpec, Get, ScreenNote } from '@/lib/fields/types';
 import type { BonusFrequency, ContributionType, HsaCoverage, OptimizationGoal, RiskTolerance } from '@/lib/profile/types';
+import { CONTRIBUTION_PATH, CONTRIBUTION_TYPE_PATH, ROTH_PART_PATH } from './bindings';
 
 const isTrue = (path: string) => (get: Get) => get(path) === true;
 const money = (value: unknown) => formatCurrency(value as number);
 const percent = (value: unknown) => formatPercent(value as number);
-
-/**
- * The rate above which the allocator treats a debt as high-interest
- * (calculateHighInterestDebt in lib/calculations/optimization.ts, which
- * keeps it private).
- */
-export const HIGH_INTEREST_DEBT_RATE = 0.07;
 
 // ---------------------------------------------------------------------------
 // Fun money and bonuses
@@ -110,7 +104,6 @@ export const BONUS_NOTE: ScreenNote = {
 // ---------------------------------------------------------------------------
 
 const HAS_401K_PATH = 'workplace.has401k';
-const CONTRIBUTION_TYPE_PATH = 'workplace.contributionType';
 const hasPlan = isTrue(HAS_401K_PATH);
 const isSplit = (get: Get) => hasPlan(get) && get(CONTRIBUTION_TYPE_PATH) === 'split';
 
@@ -167,7 +160,7 @@ export const CONTRIBUTION_TYPE: FieldSpec = {
 };
 
 export const CONTRIBUTION_PERCENT: FieldSpec = {
-  path: 'workplace.contributionPercent',
+  path: CONTRIBUTION_PATH,
   kind: 'percent',
   label: 'Your contribution',
   help: 'The share of each paycheck you put into the plan, all types together.',
@@ -181,7 +174,7 @@ export const CONTRIBUTION_PERCENT: FieldSpec = {
 };
 
 export const ROTH_CONTRIBUTION_PERCENT: FieldSpec = {
-  path: 'workplace.rothContributionPercent',
+  path: ROTH_PART_PATH,
   kind: 'percent',
   label: 'Roth part of your contribution',
   help: 'The rest of your contribution is traditional (pre-tax). A Roth part above the total counts as the whole contribution.',
@@ -258,9 +251,12 @@ export const HSA_INVESTING: FieldSpec = {
   summary: (value) => (value === true ? 'invested' : null),
 };
 
-/** The 2026 annual HSA limit for the coverage in effect. */
+/**
+ * The 2026 annual HSA limit for the coverage and age in effect, the 55-and-over
+ * catch-up included: the same figure the HSA step card shows (bug 4).
+ */
 function hsaLimit(get: Get): number {
-  return CONTRIBUTION_LIMITS_2026.hsa[get(HSA_COVERAGE.path) as HsaCoverage];
+  return limitHsa(get(HSA_COVERAGE.path) as HsaCoverage, get('person.age') as number);
 }
 
 /** The old HSA card's explanatory copy, word for word, as notes (plan section 2.13). */

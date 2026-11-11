@@ -320,15 +320,31 @@ describe('the reverse direction (legacy import)', () => {
   };
   const valueAt = (writes: Write[], path: string) => writes.filter((write) => write.path === path).map((write) => write.value);
 
-  it('writes each 1:1 leaf once to its profile path, and nothing for the derived ones', () => {
+  it('writes each 1:1 leaf to its profile path, and the coupled paths again from their derived binding', () => {
     const writes = writesFor(() => undefined);
     const paths = writes.map((write) => write.path);
-    expect(new Set(paths).size).toBe(paths.length);
-    expect(paths).toHaveLength(PAYCHECK_BINDINGS.filter((binding) => !isDerivedBinding(binding)).length);
+    const direct = PAYCHECK_BINDINGS.filter((binding) => !isDerivedBinding(binding));
+    expect(new Set(paths)).toEqual(new Set(direct.map((binding) => (binding as { profile: string }).profile)));
+    // The pay amounts with their frequency (the income binding), and the
+    // 401(k) type with its total (the Roth binding; the Roth part only for a
+    // split): written twice, with the same values, so the import keeps them together.
+    const coupled = [
+      'income.grossPerPaycheck',
+      'income.netPerPaycheck',
+      'income.frequency',
+      'workplace.contributionType',
+      'workplace.contributionPercent',
+    ];
+    expect(paths).toHaveLength(direct.length + coupled.length);
+    for (const path of coupled) {
+      const values = valueAt(writes, path);
+      expect(values, path).toHaveLength(2);
+      expect(values[1], path).toEqual(values[0]);
+    }
     expect(valueAt(writes, 'person.state')).toEqual(['CA']);
-    expect(valueAt(writes, 'income.grossPerPaycheck')).toEqual([2500]);
+    expect(valueAt(writes, 'income.grossPerPaycheck')).toEqual([2500, 2500]);
     expect(valueAt(writes, 'cash.targetMonths')).toEqual([3]);
-    expect(valueAt(writes, 'workplace.contributionPercent')).toEqual([0.03]);
+    expect(valueAt(writes, 'workplace.contributionPercent')).toEqual([0.03, 0.03]);
   });
 
   it('writes the Roth part only for a split election', () => {

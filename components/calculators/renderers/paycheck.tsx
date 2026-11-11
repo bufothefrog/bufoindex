@@ -15,23 +15,26 @@ import React from 'react';
 import type { CustomRendererProps, CustomRenderers } from '@/components/fields/types';
 import { Button } from '@/components/ui/button';
 import { KeyValueList } from '@/components/ui/results';
-import { DEBT_RATE_RENDERER, DEBT_TOTALS_RENDERER, HIGH_INTEREST_DEBT_RATE } from '@/lib/calculators/paycheck/fields';
+import { HIGH_INTEREST_THRESHOLD } from '@/lib/calculations/contributionLimits';
+import { DEBT_RATE_RENDERER, DEBT_TOTALS_RENDERER } from '@/lib/calculators/paycheck/fields';
 import { calculatorHref } from '@/lib/calculators/registry';
+import { isRecord } from '@/lib/fields/paths';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 import { TONE_BORDER, TONE_SURFACE, TONE_TEXT, type Tone } from '@/lib/design-system/tone';
 import { formatPercent } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { cn } from '@/lib/utils';
 
-const LINE = formatPercent(HIGH_INTEREST_DEBT_RATE, { digits: 0 });
+const LINE = formatPercent(HIGH_INTEREST_THRESHOLD, { digits: 0 });
 
 function numberIn(row: unknown, key: string): number {
-  const value = typeof row === 'object' && row !== null ? (row as Record<string, unknown>)[key] : undefined;
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  const value = isRecord(row) ? row[key] : undefined;
+  return isFiniteNumber(value) ? value : 0;
 }
 
 /** The rate badge on a debt row (the row is the value). */
 function DebtRate({ value }: CustomRendererProps) {
-  const high = numberIn(value, 'interestRate') > HIGH_INTEREST_DEBT_RATE;
+  const high = numberIn(value, 'interestRate') > HIGH_INTEREST_THRESHOLD;
   const tone: Tone = high ? 'caution' : 'neutral';
   return (
     <span

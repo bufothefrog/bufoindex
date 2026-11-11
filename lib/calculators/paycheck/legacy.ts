@@ -9,7 +9,7 @@
 import { updateLegacyIncomeFields } from '@/lib/calculations/core';
 import type { LegacyStorage } from '@/lib/calculators/types';
 import { isDerivedBinding } from '@/lib/fields/binding';
-import { getAt, setAt } from '@/lib/fields/paths';
+import { getAt, isRecord, setAt } from '@/lib/fields/paths';
 import { PROFILE_ENUM_VALUES, PROFILE_LIST_ROW_DEFAULTS } from '@/lib/profile/defaults';
 import type { DebtData, PaycheckProfile } from '@/lib/types';
 import { PAYCHECK_BINDINGS } from './bindings';
@@ -88,10 +88,6 @@ const OLD_STORE_DEFAULTS: Readonly<PaycheckProfile> = Object.freeze({
   source: 'user_input',
 } satisfies PaycheckProfile);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /** A deep copy of the frozen defaults (plain data, so JSON round-trips it). */
 function oldDefaults(): PaycheckProfile {
   return JSON.parse(JSON.stringify(OLD_STORE_DEFAULTS)) as PaycheckProfile;
@@ -139,8 +135,10 @@ export function readPaycheckStorage(raw: unknown): PaycheckProfile | null {
   const stored = raw.state.profile;
   let profile = oldDefaults();
   for (const binding of PAYCHECK_BINDINGS) {
-    // A derived leaf is read only when its binding writes it back (the Roth share of a split).
-    if (isDerivedBinding(binding) && !binding.write) continue;
+    // A derived leaf is read only when its binding writes it back (the Roth
+    // share of a split); a derived section (income) is read leaf by leaf
+    // through its 1:1 bindings instead.
+    if (isDerivedBinding(binding) && (!binding.write || isRecord(getAt(profile, binding.engine)))) continue;
     const value = getAt(stored, binding.engine);
     if (binding.engine === 'debts') {
       const debts = readDebts(value);

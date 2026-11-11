@@ -6,16 +6,20 @@
  */
 
 import {
+  AGE,
   CORE_FIELDS,
   CORE_SCREENS,
   EMERGENCY_FUND_APY,
   EMERGENCY_FUND_BALANCE,
+  GROSS_PAY,
+  NECESSARY_MONTHLY,
+  NET_PAY,
   NET_PAY_AT_MOST_GROSS,
   TAXABLE_MONTHLY,
   intakeDerivedWrites,
   withOverrides,
 } from '@/lib/fields/shared';
-import type { FormSpec, ScreenSpec } from '@/lib/fields/types';
+import type { FieldSpec, FormSpec, ScreenSpec } from '@/lib/fields/types';
 import { formatCurrency, formatPercent } from '@/lib/format';
 import {
   AFTER_TAX_AVAILABLE,
@@ -53,7 +57,26 @@ import {
   TAX_NOTE,
 } from './fields';
 
+// The basics as the allocator page asks them: the old input cards' help and
+// placeholders. Core screens show on the calculator page only (the intake
+// asks the shared core), so this copy never reaches the wizard.
+const BASICS_OWN: readonly FieldSpec[] = [
+  withOverrides(AGE, { help: 'Used for catch-up contribution eligibility', placeholder: '30' }),
+  withOverrides(GROSS_PAY, { placeholder: '2,500' }),
+  withOverrides(NET_PAY, { placeholder: '1,900' }),
+  withOverrides(NECESSARY_MONTHLY, {
+    help: 'Rent, utilities, groceries, minimum debt payments, insurance, etc.',
+    placeholder: '2,500',
+  }),
+];
+const BASICS: readonly FieldSpec[] = CORE_FIELDS.map(
+  (spec) => BASICS_OWN.find((own) => own.path === spec.path) ?? spec
+);
+
+// Placeholders show only while a field is empty; help on the screens the
+// wizard also asks stays the intake's, word for word.
 const EMERGENCY_BALANCE = withOverrides(EMERGENCY_FUND_BALANCE, {
+  placeholder: '10,000',
   summary: (value) => `${formatCurrency(value as number)} saved`,
 });
 const EMERGENCY_APY = withOverrides(EMERGENCY_FUND_APY, {
@@ -71,7 +94,7 @@ const PAYCHECK_CORE_SCREENS: readonly ScreenSpec[] = CORE_SCREENS.map((screen) =
 export const PAYCHECK_FORM: FormSpec = {
   id: 'paycheck',
   fields: [
-    ...CORE_FIELDS,
+    ...BASICS,
     FUN_MONEY_MIN,
     FUN_MONEY_MAX,
     HAS_BONUS,

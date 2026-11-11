@@ -208,7 +208,7 @@ describe('Wizard, remaining questions of an intent', () => {
       await user.click(screen.getByRole('button', { name: /Next/ }));
     }
     expect(screen.getByText(label(cashAt))).toBeInTheDocument();
-    expect(label(cashAt).startsWith('Paycheck · ')).toBe(true);
+    expect(label(cashAt).startsWith('Paycheck \u00b7 ')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Skip the rest of this section' }));
 
     expect(replace).toHaveBeenCalledWith('/overview');
