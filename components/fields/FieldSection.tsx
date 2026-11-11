@@ -73,9 +73,11 @@ export function FieldSection({
   const canRestore = screen.tier === 'assumption' && onRestoreDefaults !== undefined;
   const sectionName = screen.title.toLowerCase();
 
+  // The controls wrap onto a second line rather than push the header past
+  // the card on a phone; on wider screens they stay on one line.
   const actions =
     canRestore || onToggle ? (
-      <>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {canRestore && (
           <Button
             type="button"
@@ -101,7 +103,7 @@ export function FieldSection({
             disabled={hasError}
           />
         )}
-      </>
+      </div>
     ) : undefined;
 
   return (

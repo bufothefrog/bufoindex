@@ -174,6 +174,22 @@ describe('FieldSection', () => {
     expect(screen.queryByRole('button', { name: /Restore defaults/ })).not.toBeInTheDocument();
   });
 
+  it('keeps both header controls, named, beside a long title', () => {
+    // A phone can only fit them by wrapping (checked in a browser; jsdom has
+    // no layout): neither control may be dropped to make room.
+    const long: ScreenSpec = {
+      ...SCREENS.assumptions,
+      title: 'Market, inflation, healthcare and tax assumptions for the whole plan',
+    };
+    renderSection(long, {}, true, vi.fn());
+    const region = screen.getByRole('region', { name: long.title });
+    expect(within(region).getByRole('heading', { name: long.title })).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: `Restore defaults for ${long.title.toLowerCase()}` })).toHaveTextContent(
+      'Restore defaults'
+    );
+    expect(within(region).getByRole('button', { name: `Show ${long.title.toLowerCase()}` })).toHaveTextContent('Show');
+  });
+
   it('passes field writes through', () => {
     const onWrite = renderSection(SCREENS.about);
     fireEvent.change(screen.getByRole('textbox', { name: 'Gross pay' }), { target: { value: '4000' } });
