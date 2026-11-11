@@ -6,45 +6,47 @@ import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import { AlertTriangle, ArrowRight, ChevronLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
+import { ALL_RENDERERS, INTAKE_PREWARM, RENDERERS } from '@/components/calculators/renderers';
+import { FieldInput } from '@/components/fields/FieldInput';
+import type { CustomRenderers } from '@/components/fields/types';
+import { PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
 import {
-  INTAKE_SECTION_LABELS,
   buildIntakeSubmission,
   coreDestination,
   coreStartLink,
   getIntakeScreens,
   getLearnOption,
+  intakeForm,
   isCoreComplete,
   isIntakeIntent,
+  skipLabelFor,
   validateIntakeScreen,
   type IntakeFlow,
   type IntakeIntent,
   type IntakeMode,
-  type IntakeOptionValue,
-  type IntakeScreen,
-  type IntakeValueGetter,
 } from '@/lib/constants/intake';
-import { PROFILE_FIELDS, getProfileValue } from '@/lib/profile/defaults';
+import { applyWrites, getAt, makeGet } from '@/lib/fields/paths';
+import { relationErrors, screenPaths, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
+import type { FieldErrors, FieldOption, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import { leverageLink, paycheckLink, portfolioLink, retirementLink } from '@/lib/profile/links';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
 import { ProgressDots } from './ProgressDots';
-import { WizardStep } from './WizardStep';
 
 export interface WizardProps {
-  /** 'core' asks the shared basics; an intent asks that intent's questions. */
+  /** 'core' asks the shared basics; an intent asks that intent's form. */
   flow: IntakeFlow;
   /**
-   * 'all' asks every question in the flow; 'remaining' skips what the saved
-   * profile already answers (and, for an intent, the core). Defaults to
-   * 'all' for the core and 'remaining' for intents.
+   * 'all' asks every screen of the flow; 'remaining' skips the screens the
+   * saved profile already answers (and, for an intent, the core). Defaults
+   * to 'all' for the core and 'remaining' for intents.
    */
   mode?: IntakeMode;
   /** Core flow only: the intent to continue to (an IntakeIntent); otherwise the chooser. */
   next?: string;
 }
-
-type Answers = Record<string, unknown>;
 
 // The basics can be finished with questions skipped (skipped answers keep
 // their typical value and stay out of profile.provided), so a strict
@@ -103,15 +105,44 @@ function resolveMode(flow: IntakeFlow, mode?: IntakeMode): IntakeMode {
   return mode ?? (flow === 'core' ? 'all' : 'remaining');
 }
 
-/** Every profile leaf, so cross-field checks see the full picture. */
-function seedAnswers(profile: FinancialProfile): Answers {
-  const answers: Answers = {};
-  for (const field of PROFILE_FIELDS) answers[field.path] = getProfileValue(profile, field.path);
-  return answers;
+/** The custom renderers a flow's fields can name: the intent's own, or all four for the profile. */
+function renderersFor(flow: IntakeFlow): CustomRenderers | undefined {
+  if (flow === 'core') return undefined;
+  return flow === 'profile' ? ALL_RENDERERS : RENDERERS[flow];
 }
 
-function screenPaths(screen: IntakeScreen): string[] {
-  return screen.questions.map((question) => question.path);
+/**
+ * Runs `task` once the browser is idle (requestIdleCallback, or a timeout
+ * where it is missing). Returns the cancel function for an effect cleanup.
+ */
+function whenIdle(task: () => void): () => void {
+  if (typeof window.requestIdleCallback === 'function') {
+    const handle = window.requestIdleCallback(() => task());
+    return () => window.cancelIdleCallback(handle);
+  }
+  const handle = window.setTimeout(task, 1);
+  return () => window.clearTimeout(handle);
+}
+
+/** The writes for choosing `value` on a choice field: its own, then its coupled ones. */
+function choiceWrites(spec: FieldSpec, value: FieldOption['value'], get: Get): Write[] {
+  const after: Get = (path) => (path === spec.path ? value : get(path));
+  return [{ path: spec.path, value }, ...(spec.onChange?.(value, after) ?? [])];
+}
+
+/**
+ * Splits a screen's errors: field errors show inline, and the cross-field
+ * (relation) messages show once, as the screen-level alert. A field's own
+ * error wins over a relation on the same path, as in validateFields.
+ */
+function splitErrors(errors: FieldErrors, relations: FieldErrors): { inline: FieldErrors; alert: string[] } {
+  const inline: FieldErrors = {};
+  const alert: string[] = [];
+  for (const [path, message] of Object.entries(errors)) {
+    if (relations[path] === message) alert.push(message);
+    else inline[path] = message;
+  }
+  return { inline, alert };
 }
 
 function WizardSkeleton() {
@@ -149,7 +180,7 @@ function WizardHeader({ flow, mode, next }: WizardHeaderProps) {
       mode === 'remaining'
         ? flow === 'profile'
           ? 'Just the questions your profile still needs.'
-          : 'Just the questions this calculator still needs.'
+          : 'Everything this calculator uses, a few related questions per screen.'
         : option.description;
   }
 
@@ -165,6 +196,9 @@ function WizardHeader({ flow, mode, next }: WizardHeaderProps) {
   );
 }
 
+const SKIP_BUTTON_CLASS =
+  'min-h-11 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50';
+
 interface WizardFlowProps {
   flow: IntakeFlow;
   mode: IntakeMode;
@@ -174,13 +208,16 @@ interface WizardFlowProps {
 
 function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
   const router = useRouter();
-  const setFields = useProfileStore((state) => state.setFields);
+  const setValues = useProfileStore((state) => state.setValues);
 
-  const [seed] = useState<Answers>(() => seedAnswers(initialProfile));
-  const [answers, setAnswers] = useState<Answers>(seed);
+  // The answers are a working copy of the profile as it was on arrival;
+  // fields write into it by path, so lists edit in place.
+  const [seed] = useState<FinancialProfile>(initialProfile);
+  const [answers, setAnswers] = useState<FinancialProfile>(seed);
   const [provided, setProvided] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [alert, setAlert] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -190,12 +227,15 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
   // not on answers given here (or saved on finish), so screens do not vanish
   // mid-flow.
   const [initiallyProvided] = useState<readonly string[]>(() => initialProfile.provided);
-  const screensFor = (getValue: IntakeValueGetter) =>
-    getIntakeScreens(flow, getValue, { mode, provided: initiallyProvided });
+  const form = intakeForm(flow, mode);
+  const renderers = renderersFor(flow);
+  const screensAt = (values: FinancialProfile) =>
+    getIntakeScreens(flow, makeGet(values), { mode, provided: initiallyProvided });
 
+  const get = useMemo(() => makeGet(answers), [answers]);
   const screens = useMemo(
-    () => getIntakeScreens(flow, (path) => answers[path], { mode, provided: initiallyProvided }),
-    [flow, mode, initiallyProvided, answers]
+    () => getIntakeScreens(flow, get, { mode, provided: initiallyProvided }),
+    [flow, mode, initiallyProvided, get]
   );
   const step = Math.min(index, screens.length - 1);
   const screen = screens[step];
@@ -204,9 +244,8 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
   // Returning visitors reach the core again through the landing-page cards;
   // their saved basics are prefilled, and they can keep them as they are.
   const coreSavedOnArrival = flow === 'core' && isCoreComplete(initialProfile);
-  const screenIsPlaceholder = screenPaths(screen).every(
-    (path) => !initiallyProvided.includes(path) && !provided.includes(path)
-  );
+  const paths = screenPaths(form, screen, get);
+  const screenIsPlaceholder = paths.every((path) => !initiallyProvided.includes(path) && !provided.includes(path));
 
   // Move focus to the new question (and back to the top on phones) whenever
   // the screen changes, but not on first load.
@@ -219,10 +258,17 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     window.scrollTo({ top: 0 });
   }, [step]);
 
-  const finish = (finalAnswers: Answers, finalProvided: string[]) => {
+  // Start the intent's warm-up (audit H5) while the visitor answers, once,
+  // when the browser is idle; an unmount before then cancels it.
+  useEffect(() => {
+    const prewarm = flow === 'core' || flow === 'profile' ? undefined : INTAKE_PREWARM[flow];
+    return prewarm ? whenIdle(prewarm) : undefined;
+  }, [flow]);
+
+  const finish = (finalAnswers: FinancialProfile, finalProvided: string[]) => {
     const alreadyProvided = useProfileStore.getState().profile.provided;
-    const { patch, providedPaths } = buildIntakeSubmission(finalAnswers, finalProvided, alreadyProvided);
-    setFields(patch, providedPaths);
+    const { writes, providedPaths } = buildIntakeSubmission(flow, finalAnswers, finalProvided, alreadyProvided);
+    setValues(writes, { provide: providedPaths });
     setSubmitting(true);
     const saved = useProfileStore.getState().profile;
     const destination = destinationFor(flow, saved, next) as Route;
@@ -240,72 +286,85 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     }
   };
 
-  const advance = (overrides?: Answers) => {
-    if (submitting) return;
-    const nextAnswers = overrides ? { ...answers, ...overrides } : answers;
-    const nextScreens = overrides ? screensFor((path) => nextAnswers[path]) : screens;
-    const current = nextScreens[Math.min(step, nextScreens.length - 1)];
+  const clearErrors = () => {
+    setErrors({});
+    setAlert([]);
+  };
 
-    const issue = validateIntakeScreen(current.questions, (path) => nextAnswers[path]);
-    if (issue) {
-      if (overrides) setAnswers(nextAnswers);
-      setError(issue);
+  const advance = (writes?: Write[]) => {
+    if (submitting) return;
+    const nextAnswers = writes ? applyWrites(answers, writes) : answers;
+    const nextScreens = writes ? screensAt(nextAnswers) : screens;
+    const current = nextScreens[Math.min(step, nextScreens.length - 1)];
+    const nextGet = makeGet(nextAnswers);
+
+    const found = validateIntakeScreen(flow, current, nextGet);
+    if (Object.keys(found).length > 0) {
+      const split = splitErrors(found, relationErrors(form, nextGet, { screen: current }));
+      if (writes) setAnswers(nextAnswers);
+      setErrors(split.inline);
+      setAlert(split.alert);
       return;
     }
 
-    const nextProvided = Array.from(new Set([...provided, ...screenPaths(current)]));
-    if (overrides) setAnswers(nextAnswers);
+    const nextProvided = Array.from(new Set([...provided, ...screenPaths(form, current, nextGet)]));
+    if (writes) setAnswers(nextAnswers);
     setProvided(nextProvided);
-    setError(null);
+    clearErrors();
 
     if (step >= nextScreens.length - 1) finish(nextAnswers, nextProvided);
     else setIndex(step + 1);
   };
 
-  /** Restore the given paths to their starting values and unmark them. */
-  const revert = (paths: string[]) => {
-    const reverted = { ...answers };
-    for (const path of paths) reverted[path] = seed[path];
-    const remaining = provided.filter((path) => !paths.includes(path));
+  /** Restores the given screens' answers to their starting values and unmarks them. */
+  const revert = (skipped: readonly ScreenSpec[]) => {
+    const skippedPaths = skipped.flatMap((s) => screenPaths(form, s, get));
+    const reverted = applyWrites(
+      answers,
+      skippedPaths.map((path) => ({ path, value: getAt(seed, path) }))
+    );
+    const remaining = provided.filter((path) => !skippedPaths.includes(path));
+    setAnswers(reverted);
+    setProvided(remaining);
+    clearErrors();
     return { reverted, remaining };
   };
 
   const skip = () => {
     if (submitting) return;
-    const { reverted, remaining } = revert(screenPaths(screen));
-    setAnswers(reverted);
-    setProvided(remaining);
-    setError(null);
-    const nextScreens = screensFor((path) => reverted[path]);
+    const { reverted, remaining } = revert([screen]);
+    const nextScreens = screensAt(reverted);
     if (step >= nextScreens.length - 1) finish(reverted, remaining);
     else setIndex(step + 1);
   };
 
+  const skipRest = () => {
+    if (submitting) return;
+    const { reverted, remaining } = revert(screens.slice(step));
+    finish(reverted, remaining);
+  };
+
+  const section = isProfileIntent ? profileFormSection(screen.id) : undefined;
+
   const skipSection = () => {
     if (submitting) return;
-    const section = screen.section;
-    const sectionPaths = screens
-      .slice(step)
-      .filter((s) => s.section === section)
-      .flatMap(screenPaths);
-    const { reverted, remaining } = revert(sectionPaths);
-    setAnswers(reverted);
-    setProvided(remaining);
-    setError(null);
-    const nextScreens = screensFor((path) => reverted[path]);
-    const nextIndex = nextScreens.findIndex((s, i) => i > step && s.section !== section);
+    const { reverted, remaining } = revert(
+      screens.slice(step).filter((s) => profileFormSection(s.id) === section)
+    );
+    const nextScreens = screensAt(reverted);
+    const nextIndex = nextScreens.findIndex((s, i) => i > step && profileFormSection(s.id) !== section);
     if (nextIndex < 0) finish(reverted, remaining);
     else setIndex(nextIndex);
   };
 
   const back = () => {
-    setError(null);
+    clearErrors();
     setIndex(Math.max(0, step - 1));
   };
 
-  const setValue = (path: string, value: unknown) => {
-    setAnswers((prev) => ({ ...prev, [path]: value }));
-    setError(null);
+  const write = (writes: Write[]) => {
+    setAnswers((prev) => applyWrites(prev, writes));
+    clearErrors();
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -322,10 +381,14 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     }
   };
 
-  const singleQuestion = screen.questions.length === 1;
+  const fields = visibleScreenFields(form, screen, get);
+  const singleQuestion = fields.length === 1;
   const showSectionSkip =
-    isProfileIntent && screen.section !== 'core' && screens.slice(step + 1).some((s) => s.section === screen.section);
-  const sectionLabel = isProfileIntent ? INTAKE_SECTION_LABELS[screen.section] : undefined;
+    section !== undefined &&
+    section !== 'core' &&
+    screens.slice(step + 1).some((s) => profileFormSection(s.id) === section);
+  const showSkipRest = flow !== 'core' && !isLast;
+  const sectionLabel = section ? PROFILE_FORM_SECTION_LABELS[section] : undefined;
   const errorId = `intake-error-${screen.id}`;
 
   return (
@@ -367,7 +430,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
           onKeyDown={handleHeadingKeyDown}
           className="text-2xl font-semibold tracking-tight focus:outline-hidden md:text-3xl"
         >
-          {screen.title}
+          {screen.question ?? screen.title}
         </h2>
         {screen.description && <p className="text-sm text-muted-foreground">{screen.description}</p>}
         {screenIsPlaceholder && (
@@ -378,19 +441,30 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
       </div>
 
       <div className="space-y-5">
-        {screen.questions.map((question) => (
-          <WizardStep
-            key={question.id}
-            question={question}
-            value={answers[question.path]}
-            onChange={(value) => setValue(question.path, value)}
-            onChooseAndAdvance={(value: IntakeOptionValue) => advance({ [question.path]: value })}
+        {fields.map((spec) => (
+          <FieldInput
+            key={spec.path}
+            spec={spec}
+            get={get}
+            onWrite={write}
+            error={errors[spec.path]}
+            errors={errors}
+            size="lg"
             hideLabel={singleQuestion}
+            renderers={renderers}
+            onChooseAndAdvance={(value) => advance(choiceWrites(spec, value, get))}
+            idPrefix="intake"
           />
         ))}
       </div>
 
-      {error && (
+      {visibleScreenNotes(screen, get).map((note) => (
+        <StatusAlert key={note.text} tone={note.tone} appearance="tinted">
+          {note.text}
+        </StatusAlert>
+      ))}
+
+      {alert.length > 0 && (
         // Dark mode's --destructive is a deep red (about 1.8:1 on the page
         // background), so the message text switches to foreground there and
         // the red stays on the border, tint, and icon.
@@ -400,7 +474,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
           className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:border-destructive dark:bg-destructive/25 dark:text-foreground"
         >
           <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
+          <span>{alert.join(' ')}</span>
         </p>
       )}
 
@@ -410,7 +484,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
             ? 'Good enough to start. You can edit the basics later.'
             : isProfileIntent
               ? 'Good enough to start. You can refine the details from your overview.'
-              : 'Good enough to start. You can refine the details on the calculator.'}
+              : 'Good enough to start. You can change any answer on the calculator.'}
         </p>
       )}
 
@@ -426,22 +500,17 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
             on first paint; outside it they sat under the bar until the user
             scrolled. */}
         <div className="mb-1 flex flex-wrap items-center gap-x-4">
-          <button
-            type="button"
-            onClick={skip}
-            disabled={submitting}
-            className="min-h-11 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50"
-          >
-            {screen.questions[0].skipLabel ?? 'Skip'}
+          <button type="button" onClick={skip} disabled={submitting} className={SKIP_BUTTON_CLASS}>
+            {skipLabelFor(screen)}
           </button>
           {showSectionSkip && (
-            <button
-              type="button"
-              onClick={skipSection}
-              disabled={submitting}
-              className="min-h-11 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50"
-            >
+            <button type="button" onClick={skipSection} disabled={submitting} className={SKIP_BUTTON_CLASS}>
               Skip the rest of this section
+            </button>
+          )}
+          {showSkipRest && (
+            <button type="button" onClick={skipRest} disabled={submitting} className={SKIP_BUTTON_CLASS}>
+              Skip the rest
             </button>
           )}
         </div>
@@ -483,8 +552,7 @@ function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
   const [redirect] = useState<string | null>(() => {
     if (mode !== 'remaining') return null;
     if (flow !== 'core' && !isCoreReady(profileOnArrival)) return coreStartLink(flow);
-    const seed = seedAnswers(profileOnArrival);
-    const screens = getIntakeScreens(flow, (path) => seed[path], {
+    const screens = getIntakeScreens(flow, makeGet(profileOnArrival), {
       mode,
       provided: profileOnArrival.provided,
     });
@@ -500,10 +568,11 @@ function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
 }
 
 /**
- * Intake wizard. Seeds its answers from the persisted profile once the store
- * has hydrated (rendering a skeleton until then so server and client markup
- * match), asks one screen at a time, and on finish writes the answers to the
- * profile. The core flow then continues to the chosen intent or the
+ * Intake wizard. Runs the flow's FormSpec (lib/constants/intake.ts) one
+ * topic screen at a time over a working copy of the persisted profile, taken
+ * once the store has hydrated (a skeleton renders until then so server and
+ * client markup match), and on finish writes the answered screens and the
+ * form's derived values to the profile. The core flow then continues to the chosen intent or the
  * "What do you want to learn?" chooser; an intent opens the matching
  * calculator through its URL-hash deep link (or the overview for 'profile'),
  * replacing its own history entry so Back returns to the chooser.

@@ -11,8 +11,6 @@ export { IntentPicker } from './IntentPicker';
 export type { IntentPickerProps } from './IntentPicker';
 export { ProgressDots } from './ProgressDots';
 export type { ProgressDotsProps } from './ProgressDots';
-export { WizardStep } from './WizardStep';
-export type { WizardStepProps } from './WizardStep';
 export { Wizard, isCoreReady } from './Wizard';
 export type { WizardProps } from './Wizard';
 export { LearnChooser } from './LearnChooser';
