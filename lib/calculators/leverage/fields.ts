@@ -8,6 +8,7 @@
 
 import { LEVERAGE_INPUT_BOUNDS, LEVERAGE_RATIO_OPTIONS } from '@/lib/constants/leverage';
 import { leverageRatioOptions } from '@/lib/constants/labels';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 import type { FieldSpec, Get } from '@/lib/fields/types';
 import { formatCurrency, formatMultiple, formatPercent } from '@/lib/format';
 import {
@@ -23,19 +24,15 @@ import {
 
 const BOUNDS = LEVERAGE_INPUT_BOUNDS;
 
-function isNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
 /** The leverage ratio the profile holds, for labels that name the fund ("2x"). */
 function ratioLabel(get: Get): string {
   const ratio = get(LEVERAGE_RATIO_PATH);
-  return formatMultiple(isNumber(ratio) ? ratio : 0);
+  return formatMultiple(isFiniteNumber(ratio) ? ratio : 0);
 }
 
 /** A nullable field's summary: its override, or the value it derives. */
 function overrideSummary(derive: (get: Get) => number, format: (value: number) => string) {
-  return (value: unknown, get: Get): string => format(isNumber(value) ? value : derive(get));
+  return (value: unknown, get: Get): string => format(isFiniteNumber(value) ? value : derive(get));
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +95,7 @@ export const LEVERAGE_RATIO: FieldSpec = {
   // The offered ratios, plus the saved one when it is not among them.
   options: (get) => {
     const ratio = get(LEVERAGE_RATIO_PATH);
-    return leverageRatioOptions(isNumber(ratio) ? ratio : undefined);
+    return leverageRatioOptions(isFiniteNumber(ratio) ? ratio : undefined);
   },
   help: (get) =>
     get(LEVERAGE_RATIO_PATH) === 1
@@ -107,7 +104,7 @@ export const LEVERAGE_RATIO: FieldSpec = {
   min: Math.min(...LEVERAGE_RATIO_OPTIONS),
   max: Math.max(...LEVERAGE_RATIO_OPTIONS),
   tier: 'details',
-  summary: (value) => (isNumber(value) ? `${formatMultiple(value)} fund` : null),
+  summary: (value) => (isFiniteNumber(value) ? `${formatMultiple(value)} fund` : null),
 };
 
 // ---------------------------------------------------------------------------
@@ -123,7 +120,7 @@ export const INDEX_MEAN_RETURN: FieldSpec = {
   max: BOUNDS.maxReturn,
   precision: 1,
   tier: 'assumption',
-  summary: (value) => (isNumber(value) ? `${formatPercent(value, { digits: 1 })} return` : null),
+  summary: (value) => (isFiniteNumber(value) ? `${formatPercent(value, { digits: 1 })} return` : null),
 };
 
 export const INDEX_VOLATILITY: FieldSpec = {
@@ -138,7 +135,7 @@ export const INDEX_VOLATILITY: FieldSpec = {
   max: BOUNDS.maxVolatility,
   precision: 1,
   tier: 'assumption',
-  summary: (value) => (isNumber(value) ? `${formatPercent(value, { digits: 1 })} volatility` : null),
+  summary: (value) => (isFiniteNumber(value) ? `${formatPercent(value, { digits: 1 })} volatility` : null),
 };
 
 export const FINANCING_RATE: FieldSpec = {
@@ -150,7 +147,7 @@ export const FINANCING_RATE: FieldSpec = {
   max: BOUNDS.maxFinancingRate,
   precision: 2,
   tier: 'assumption',
-  summary: (value) => (isNumber(value) ? `${formatPercent(value, { digits: 2 })} financing` : null),
+  summary: (value) => (isFiniteNumber(value) ? `${formatPercent(value, { digits: 2 })} financing` : null),
 };
 
 export const EXPENSE_RATIO: FieldSpec = {

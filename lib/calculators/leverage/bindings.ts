@@ -19,23 +19,22 @@
 import { LEVERAGE_INPUT_BOUNDS } from '@/lib/constants/leverage';
 import type { DcaComparisonInputs } from '@/lib/calculations/leverageComparison';
 import type { Binding } from '@/lib/fields/binding';
+import { isFiniteNumber } from '@/lib/fields/runtime';
+import { TAXABLE_MONTHLY } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
+import { clamp } from '@/lib/utils';
 
 export const MONTHLY_CONTRIBUTION_PATH = 'leverage.monthlyContribution';
 export const YEARS_PATH = 'leverage.years';
 export const STARTING_BALANCE_PATH = 'leverage.startingBalance';
 export const LEVERAGE_RATIO_PATH = 'strategy.leverageRatio';
-export const TAXABLE_MONTHLY_PATH = 'investing.taxableMonthlyContribution';
+export const TAXABLE_MONTHLY_PATH = TAXABLE_MONTHLY.path;
 
 const BOUNDS = LEVERAGE_INPUT_BOUNDS;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 function numberAt(get: Get, path: string): number {
   const value = get(path);
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return isFiniteNumber(value) ? value : 0;
 }
 
 /** True when the profile has a taxable monthly contribution, which the derived contribution then uses. */

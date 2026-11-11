@@ -172,3 +172,16 @@ describe('LeverageResults model and caveats', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('LeverageResults announcements', () => {
+  it('puts the headline figures, and only them, in a polite live region', () => {
+    const { inputs, result } = atReturn(0.1);
+    const { container } = render(<LeverageResults result={result} inputs={inputs} />);
+    const live = container.querySelectorAll('[aria-live]');
+    expect(live).toHaveLength(1);
+    expect(live[0]).toHaveAttribute('aria-live', 'polite');
+    expect(live[0]).toHaveTextContent('Index fund, median ending balance');
+    expect(live[0]).toHaveTextContent('Share of simulated paths where the 2x fund ends behind the index fund');
+    expect(live[0]).not.toHaveTextContent('Cash flow vs lump sum');
+  });
+});

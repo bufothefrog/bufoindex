@@ -9,8 +9,9 @@ import { formatCurrency, formatPercent } from '@/lib/format';
 
 const MINUS = '\u2212';
 
-const COMPACT = { compact: true } as const;
-const COMPACT_SIGNED = { compact: true, signed: true } as const;
+/** formatCurrency options shared by the leverage results: "$1.2M", and "+$1.2M" with a sign. */
+export const COMPACT = { compact: true } as const;
+export const COMPACT_SIGNED = { compact: true, signed: true } as const;
 const SIGNED_ONE_DECIMAL = { digits: 1, signed: true } as const;
 
 /** A gap as a share of its base; 0 when the base is not positive. */

@@ -76,7 +76,7 @@ describe('LeverageComparison page', () => {
     act(() => useProfileStore.setState({ hasHydrated: true }));
     expect(screen.queryByRole('status', { name: 'Loading results' })).not.toBeInTheDocument();
     // The default profile: $500 taxable a month for 30 years plus $25,000.
-    expect(tile('Paths where the 2x fund ends behind the index fund')).toHaveTextContent(
+    expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent(
       '$205,000 contributed to each over 30 years, 500 paths'
     );
     expect(results()).toHaveTextContent('Index fund, median ending balance');
@@ -100,7 +100,7 @@ describe('LeverageComparison page', () => {
     render(page());
     expect(window.location.search).toBe('');
     expect(tile('2x fund, median ending balance')).toBeInTheDocument();
-    expect(tile('Paths where the 2x fund ends behind the index fund')).toHaveTextContent('over 30 years');
+    expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent('over 30 years');
   });
 
   it('shows where each auto value comes from, and the ratio and assumptions it uses', () => {
@@ -131,7 +131,7 @@ describe('LeverageComparison page', () => {
     expect(profile.leverage.years).toBe(12);
     expect(profile.provided).toContain('leverage.years');
     await act(() => useLeverageStore.getState().flush());
-    expect(tile('Paths where the 2x fund ends behind the index fund')).toHaveTextContent(
+    expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent(
       '$97,000 contributed to each over 12 years, 500 paths'
     );
 

@@ -12,10 +12,10 @@ import {
 } from '@/lib/calculations/leverageComparison';
 import type { StatSpec } from '@/lib/design-system/stat';
 import { formatCurrency, formatMultiple } from '@/lib/format';
-import { yearsText } from './narrative';
+import { COMPACT, yearsText } from './narrative';
 
 function range(p10: number, p90: number): string {
-  return `10th to 90th: ${formatCurrency(p10, { compact: true })} to ${formatCurrency(p90, { compact: true })}`;
+  return `10th to 90th: ${formatCurrency(p10, COMPACT)} to ${formatCurrency(p90, COMPACT)}`;
 }
 
 export function leverageHeadline(result: DcaComparisonResult, inputs: DcaComparisonInputs): StatSpec[] {
@@ -38,7 +38,9 @@ export function leverageHeadline(result: DcaComparisonResult, inputs: DcaCompari
     },
     {
       id: 'behind',
-      label: `Paths where the ${L} fund ends behind the index fund`,
+      // The old tile printed the value first ("43% of simulated paths where
+      // ..."); the label now sits above the value, so it names the share.
+      label: `Share of simulated paths where the ${L} fund ends behind the index fund`,
       // Rounded to a whole percent, as the results have always shown it
       // ('percent' alone prints one decimal).
       value: Math.round(result.probLeveragedBehindDca * 100) / 100,

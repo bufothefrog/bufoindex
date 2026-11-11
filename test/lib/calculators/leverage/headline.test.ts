@@ -1,8 +1,12 @@
 /**
- * leverageHeadline: the three headline figures, labelled and formatted the
- * way the results header printed them before the rebuild (the figures below
- * are the seeded engine's at the default inputs, as the old SummaryCards
- * showed them), and the narrative figures the results print beside them.
+ * leverageHeadline: the three headline figures and their hints, formatted
+ * the way the results header printed them before the rebuild (the figures
+ * below are the seeded engine's at the default inputs, as the old
+ * SummaryCards showed them), and the narrative figures the results print
+ * beside them. The two median labels are the old ones; the third was a
+ * fragment after its value ("43% of simulated paths where the 2x fund ends
+ * behind the index fund") and, now that a tile's label sits above its value,
+ * starts with "Share" instead.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -41,7 +45,7 @@ describe('leverageHeadline', () => {
       },
       {
         id: 'behind',
-        label: 'Paths where the 2x fund ends behind the index fund',
+        label: 'Share of simulated paths where the 2x fund ends behind the index fund',
         value: '43%',
         hint: '$221,000 contributed to each over 20 years, 500 paths',
       },
@@ -62,7 +66,7 @@ describe('leverageHeadline', () => {
     // 7.5 years: $900 x 90 months + $5,000 = $86,000.
     expect(behind).toEqual({
       id: 'behind',
-      label: 'Paths where the 1.5x fund ends behind the index fund',
+      label: 'Share of simulated paths where the 1.5x fund ends behind the index fund',
       value: '44%',
       hint: '$86,000 contributed to each over 7.5 years, 500 paths',
     });

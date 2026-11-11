@@ -12,6 +12,7 @@ import {
   useChartTheme,
 } from '@/components/ui/charts';
 import type { MedianPathPoint } from '@/lib/calculations/leverageComparison';
+import { COMPACT } from '@/lib/calculators/leverage/narrative';
 import { formatCurrency, formatMultiple } from '@/lib/format';
 
 export interface DcaPathChartProps {
@@ -30,7 +31,6 @@ interface ChartRow {
 /** Keep the chart light on phones: about 120 steps plus the last point. */
 const MAX_POINTS = 121;
 
-const COMPACT = { compact: true } as const;
 
 function toRow(p: MedianPathPoint): ChartRow {
   return {

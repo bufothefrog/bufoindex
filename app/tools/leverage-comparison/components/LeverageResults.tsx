@@ -14,6 +14,8 @@ import {
 } from '@/lib/calculations/leverageComparison';
 import { leverageHeadline } from '@/lib/calculators/leverage/headline';
 import {
+  COMPACT,
+  COMPACT_SIGNED,
   dcaEffectSentence,
   dragParts,
   lumpSumScaleSentence,
@@ -32,8 +34,6 @@ export interface LeverageResultsProps {
   inputs: DcaComparisonInputs;
 }
 
-const COMPACT = { compact: true } as const;
-const COMPACT_SIGNED = { compact: true, signed: true } as const;
 const SIGNED_ONE_DECIMAL = { digits: 1, signed: true } as const;
 const WHOLE = { digits: 0 } as const;
 const TWO_DECIMALS = { digits: 2 } as const;
@@ -140,13 +140,17 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
 
   return (
     <div className="space-y-6">
-      <StatGrid
-        stats={leverageHeadline(result, inputs)}
-        columns={1}
-        fullWidth={['behind']}
-        size="lg"
-        className="gap-4 md:grid-cols-2"
-      />
+      {/* Results recalculate on every edit; screen readers hear the headline
+          figures, not the whole comparison. */}
+      <div aria-live="polite" data-testid="leverage-headline">
+        <StatGrid
+          stats={leverageHeadline(result, inputs)}
+          columns={1}
+          fullWidth={['behind']}
+          size="lg"
+          className="gap-4 md:grid-cols-2"
+        />
+      </div>
 
       <ResultCard title="Balance over time" icon={LineChart}>
         <ChartFrame
