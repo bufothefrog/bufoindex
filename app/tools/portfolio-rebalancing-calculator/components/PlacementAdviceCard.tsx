@@ -8,12 +8,9 @@ import {
   AccountType,
   AssetClass,
   RebalanceAsset,
+  RebalanceInputsV2,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import {
-  selectCustomAssetClasses,
-  usePortfolioRebalancingStore,
-} from '@/lib/store/portfolioRebalancingStore';
 
 const ACCOUNT_LABELS: Record<AccountType, string> = {
   'taxable': 'taxable',
@@ -29,11 +26,13 @@ const ACCOUNT_LABELS: Record<AccountType, string> = {
  * Duplicate suggestions (same ticker in same account type held twice) are
  * collapsed to a single entry.
  */
-export function PlacementAdviceCard() {
-  const securities = usePortfolioRebalancingStore(s => s.inputs.securities);
-  const accounts = usePortfolioRebalancingStore(s => s.inputs.accounts);
-  const holdings = usePortfolioRebalancingStore(s => s.inputs.holdings);
-  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
+export interface PlacementAdviceCardProps {
+  /** The inputs of the rebalance on display. */
+  inputs: RebalanceInputsV2;
+}
+
+export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
+  const { securities, accounts, holdings, customAssetClasses } = inputs;
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();

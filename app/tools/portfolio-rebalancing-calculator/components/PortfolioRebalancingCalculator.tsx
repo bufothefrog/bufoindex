@@ -1,55 +1,34 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { SimpleCalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
-import { NextSteps } from '@/components/guided/NextSteps';
+import React from 'react';
+import { PORTFOLIO_RENDERERS } from '@/components/calculators/renderers/portfolio';
+import CalculatorPage, { type CalculatorResultsArgs } from '@/components/calculators/shared/CalculatorPage';
+import type { RebalanceInputsV2, RebalanceResultV2 } from '@/lib/calculations/portfolioRebalancing';
+import { PORTFOLIO_CALCULATOR } from '@/lib/calculators/portfolio/definition';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
-import { AccountsCard } from './AccountsCard';
-import { TargetsCard } from './TargetsCard';
-import { SettingsCard } from './SettingsCard';
-import { RebalanceResults } from './RebalanceResults';
 import { PlacementAdviceCard } from './PlacementAdviceCard';
+import { RebalanceResults } from './RebalanceResults';
 
-export function PortfolioRebalancingCalculator() {
-  const result = usePortfolioRebalancingStore(s => s.result);
-  const errors = usePortfolioRebalancingStore(s => s.errors);
-  const calculate = usePortfolioRebalancingStore(s => s.calculate);
-  const loadFromUrl = usePortfolioRebalancingStore(s => s.loadFromUrl);
-
-  useEffect(() => {
-    loadFromUrl();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const errorMap = errors.reduce<Record<string, string>>((acc, err) => {
-    acc[err.field] = err.message;
-    return acc;
-  }, {});
-
+/** Module scope, so the memoized results body sees one function across renders. */
+function renderResults({ results, inputs }: CalculatorResultsArgs<RebalanceInputsV2, RebalanceResultV2>) {
   return (
-    <SimpleCalculatorLayout
-      title="Portfolio Rebalancing Calculator"
-      description="Rebalance toward your asset-class targets using new deposits across one or more accounts, with whole or fractional shares and tax-aware placement advice."
-      onCalculate={calculate}
-      calculateButtonText="Rebalance"
-      errors={errorMap}
-      inputSections={
-        <div className="space-y-6">
-          <TargetsCard />
-          <AccountsCard />
-          <SettingsCard />
-        </div>
-      }
-      resultSection={
-        result ? (
-          <div className="space-y-6">
-            <RebalanceResults result={result} />
-            <PlacementAdviceCard />
-          </div>
-        ) : undefined
-      }
-      resultFooter={<NextSteps intent="portfolio" />}
-      disclaimer="Educational tool only. Assumes stated prices are current and executable. Not tax or investment advice."
+    <>
+      <RebalanceResults result={results} customAssetClasses={inputs.customAssetClasses} />
+      {inputs.showPlacementAdvice && <PlacementAdviceCard inputs={inputs} />}
+    </>
+  );
+}
+
+/** The portfolio rebalancer on the shared calculator page, reading and writing the profile. */
+export function PortfolioRebalancingCalculator() {
+  return (
+    <CalculatorPage
+      definition={PORTFOLIO_CALCULATOR}
+      store={usePortfolioRebalancingStore}
+      renderers={PORTFOLIO_RENDERERS}
+      renderResults={renderResults}
     />
   );
 }
+
+export default PortfolioRebalancingCalculator;

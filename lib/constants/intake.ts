@@ -144,6 +144,18 @@ export function isCoreComplete(profile: FinancialProfile): boolean {
   return CORE_PATHS.every((path) => provided.has(path));
 }
 
+/**
+ * Intents whose calculator reads none of the core fields, so their intake does
+ * not send a visitor without the basics to the core first (O5: the rebalancer
+ * asks its holdings and needs no income, state or spending).
+ */
+const CORE_FREE_INTENTS: ReadonlySet<IntakeIntent> = new Set<IntakeIntent>(['portfolio']);
+
+/** Whether an intent's intake sends a visitor without the basics to the core first. */
+export function intentNeedsCore(intent: IntakeIntent): boolean {
+  return !CORE_FREE_INTENTS.has(intent);
+}
+
 /** The shared core intake. */
 export const CORE_START_PATH = '/start';
 

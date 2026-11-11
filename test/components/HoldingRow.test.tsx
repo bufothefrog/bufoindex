@@ -224,6 +224,54 @@ describe('HoldingRow', () => {
     expect(preview.textContent).toContain('1,000'); // 250 * 4
   });
 
+  it('offers the default classes without targets or custom classes', () => {
+    render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={security}
+        securities={[security]}
+        index={0}
+        canRemove
+        {...noops}
+      />,
+    );
+    const classSelect = within(screen.getByTestId('holding-class-0')).getByRole('combobox');
+    expect(within(classSelect).getAllByRole('option').map(o => o.textContent)).toEqual([
+      'US Stock',
+      'Intl Stock',
+      'Bonds',
+      'Cash',
+    ]);
+  });
+
+  it('offers the classes of the portfolio-wide targets and the custom classes, built-ins first', () => {
+    render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={{ ...security, assetClass: 'cac-1' }}
+        securities={[security]}
+        index={0}
+        canRemove
+        {...noops}
+        classTargets={[
+          { accountId: null, assetClass: 'bonds', target: 0.4 },
+          { accountId: null, assetClass: 'us-stock', target: 0.6 },
+          { accountId: 'acc1', assetClass: 'reits', target: 1 },
+        ]}
+        customAssetClasses={[{ id: 'cac-1', label: 'Crypto' }]}
+      />,
+    );
+    const classSelect = within(screen.getByTestId('holding-class-0')).getByRole(
+      'combobox',
+    ) as HTMLSelectElement;
+    expect(within(classSelect).getAllByRole('option').map(o => o.textContent)).toEqual([
+      'US Stock',
+      'Bonds',
+      'Crypto',
+    ]);
+    expect(classSelect.value).toBe('cac-1');
+  });
+
   it('renders gracefully with a missing security', () => {
     render(
       <HoldingRow

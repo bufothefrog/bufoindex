@@ -19,14 +19,12 @@ import {
   RebalanceResultV2,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import {
-  selectCustomAssetClasses,
-  usePortfolioRebalancingStore,
-} from '@/lib/store/portfolioRebalancingStore';
 import { cn, formatCurrency } from '@/lib/utils';
 
-interface RebalanceResultsProps {
+export interface RebalanceResultsProps {
   result: RebalanceResultV2;
+  /** The custom classes of the inputs that produced `result`, for class labels. */
+  customAssetClasses?: CustomAssetClass[];
 }
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
@@ -48,8 +46,7 @@ function formatPercentPoints(decimal: number, signed = false): string {
   return `${str}%`;
 }
 
-export function RebalanceResults({ result }: RebalanceResultsProps) {
-  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
+export function RebalanceResults({ result, customAssetClasses }: RebalanceResultsProps) {
   const {
     accounts,
     totalValueBefore,
@@ -170,7 +167,7 @@ interface AccountPlanBlockProps {
   mode: RebalanceMode;
   classDrift: ClassDrift[];
   showDrift: boolean;
-  customAssetClasses: CustomAssetClass[];
+  customAssetClasses?: CustomAssetClass[];
 }
 
 function AccountPlanBlock({
@@ -263,7 +260,7 @@ function AccountPlanBlock({
 interface HoldingPlanRowProps {
   holding: HoldingRebalancePlan;
   mode: RebalanceMode;
-  customAssetClasses: CustomAssetClass[];
+  customAssetClasses?: CustomAssetClass[];
 }
 
 function HoldingPlanRow({ holding, mode, customAssetClasses }: HoldingPlanRowProps) {
@@ -317,7 +314,7 @@ function HoldingPlanRow({ holding, mode, customAssetClasses }: HoldingPlanRowPro
 interface ClassDriftCardProps {
   title: string;
   drifts: ClassDrift[];
-  customAssetClasses: CustomAssetClass[];
+  customAssetClasses?: CustomAssetClass[];
 }
 
 function ClassDriftCard({ title, drifts, customAssetClasses }: ClassDriftCardProps) {
@@ -330,7 +327,7 @@ function ClassDriftCard({ title, drifts, customAssetClasses }: ClassDriftCardPro
 
 interface ClassDriftTableProps {
   drifts: ClassDrift[];
-  customAssetClasses: CustomAssetClass[];
+  customAssetClasses?: CustomAssetClass[];
 }
 
 function ClassDriftTable({ drifts, customAssetClasses }: ClassDriftTableProps) {

@@ -45,7 +45,7 @@ describe('LearnChooser', () => {
       '/start/leverage',
     ]);
     expect(links[0]).toHaveTextContent('Finish your profile');
-    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 13 more questions.');
+    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 14 more questions.');
     expect(links[2]).toHaveTextContent('See if I am on track to retire');
     expect(links[2]).toHaveTextContent('4 more questions.');
     expect(replace).not.toHaveBeenCalled();
@@ -65,15 +65,16 @@ describe('LearnChooser', () => {
 
     const links = optionLinks();
     expect(links[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
-    expect(links[3]).toHaveTextContent('1 more question.');
+    // The deprecated new cash answers no portfolio screen: targets, accounts, holdings and settings are left.
+    expect(links[3]).toHaveTextContent('4 more questions.');
     // Retirement covered the leverage horizon and balance; the taxable contribution and the
     // ratio are left, then the market assumptions.
     expect(links[4]).toHaveTextContent('2 more questions.');
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
-    // The intake never asks one profile field, so profileCompleteness still
-    // lists it; /start/profile would only redirect, so link the overview.
+    // The intake never asks two profile fields, so profileCompleteness still
+    // lists them; /start/profile would only redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
 
@@ -81,7 +82,7 @@ describe('LearnChooser', () => {
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
     expect(first).toHaveTextContent(
-      'No questions left to ask. The overview runs each calculator from your profile and lists the 1 detail that still uses a typical value.'
+      'No questions left to ask. The overview runs each calculator from your profile and lists the 2 details that still use a typical value.'
     );
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
   });

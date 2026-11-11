@@ -1,14 +1,10 @@
 'use client';
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Plus, Target as TargetIcon, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { InputCard } from '@/components/ui/cards/BaseCard';
 import { PercentInput } from '@/components/ui/inputs';
-import {
-  selectCustomAssetClasses,
-  usePortfolioRebalancingStore,
-} from '@/lib/store/portfolioRebalancingStore';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import {
   AssetClass,
   BUILTIN_ASSET_CLASS_LABELS,
@@ -19,6 +15,13 @@ import {
   Security,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
+import {
+  addCustomAssetClass,
+  ensureAssetClassVisible,
+  removeClassTarget,
+  setClassTarget,
+  type PortfolioUpdate,
+} from '@/lib/calculators/portfolio/reducers';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_VISIBLE_CLASSES: AssetClass[] = ['us-stock', 'intl-stock', 'bonds', 'cash'];
@@ -66,13 +69,36 @@ function relevantClasses(
   return ordered;
 }
 
-export function TargetsCard() {
-  const securities = usePortfolioRebalancingStore(s => s.inputs.securities);
-  const holdings = usePortfolioRebalancingStore(s => s.inputs.holdings);
-  const classTargets = usePortfolioRebalancingStore(s => s.inputs.classTargets);
-  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
-  const setClassTarget = usePortfolioRebalancingStore(s => s.setClassTarget);
-  const removeAssetClass = usePortfolioRebalancingStore(s => s.removeAssetClass);
+export interface TargetsCardProps {
+  /** The group's label (the field's). */
+  label: string;
+  holdings: Holding[];
+  securities: Security[];
+  classTargets: ClassTarget[];
+  customAssetClasses: CustomAssetClass[];
+  /** Applies one reducer to the portfolio lists. */
+  update: PortfolioUpdate;
+  /** A target error from the rebalance (the 100% sum). */
+  error?: string;
+}
+
+/**
+ * The portfolio-wide target of each asset class, with a running total, a
+ * remove button per class and a control that adds a built-in or a new custom
+ * class. The custom target mix shows it.
+ */
+export function TargetsCard({
+  label,
+  holdings,
+  securities,
+  classTargets,
+  customAssetClasses,
+  update,
+  error,
+}: TargetsCardProps) {
+  const id = useId();
+  const labelId = `${id}-label`;
+  const { describedBy } = fieldMessageIds(id, undefined, error);
 
   const classes = useMemo(
     () => relevantClasses(holdings, securities, classTargets, customAssetClasses),
@@ -97,7 +123,10 @@ export function TargetsCard() {
   };
 
   return (
-    <InputCard title="Target Allocation" icon={TargetIcon}>
+    <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-3">
+      <p id={labelId} className="text-sm font-medium leading-none">
+        {label}
+      </p>
       <div className="space-y-3">
         <div className="space-y-2">
           {classes.map(cls => (
@@ -115,7 +144,7 @@ export function TargetsCard() {
                   label=""
                   ariaLabel={`${getAssetClassLabel(cls, customAssetClasses)} target`}
                   value={targetFor(cls)}
-                  onChange={value => setClassTarget(cls, value)}
+                  onChange={value => update(p => setClassTarget(p, cls, value))}
                   min={0}
                   max={1}
                   precision={1}
@@ -127,7 +156,7 @@ export function TargetsCard() {
                 onClick={() => {
                   const label = getAssetClassLabel(cls, customAssetClasses);
                   if (window.confirm(`Remove ${label} from your target allocation?`)) {
-                    removeAssetClass(cls);
+                    update(p => removeClassTarget(p, cls));
                   }
                 }}
                 disabled={!isClassRemovable(cls)}
@@ -141,7 +170,11 @@ export function TargetsCard() {
           ))}
         </div>
 
-        <AddAssetClassControl shownClasses={classes} />
+        <AddAssetClassControl
+          shownClasses={classes}
+          customAssetClasses={customAssetClasses}
+          update={update}
+        />
 
         <div
           className={cn(
@@ -161,12 +194,15 @@ export function TargetsCard() {
           )}
         </div>
       </div>
-    </InputCard>
+      <FieldMessages id={id} error={error} />
+    </div>
   );
 }
 
 interface AddAssetClassControlProps {
   shownClasses: AssetClass[];
+  customAssetClasses: CustomAssetClass[];
+  update: PortfolioUpdate;
 }
 
 interface AssetClassOption {
@@ -182,13 +218,7 @@ interface AssetClassOption {
  * + custom classes; typing filters; pressing Enter (or blurring) on an
  * unmatched query creates a new custom class with that label.
  */
-function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
-  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
-  const ensureAssetClassVisible = usePortfolioRebalancingStore(
-    s => s.ensureAssetClassVisible,
-  );
-  const addCustomAssetClass = usePortfolioRebalancingStore(s => s.addCustomAssetClass);
-
+function AddAssetClassControl({ shownClasses, customAssetClasses, update }: AddAssetClassControlProps) {
   const generatedId = useId();
   const inputId = `add-asset-class-${generatedId}`;
   const listboxId = `${inputId}-listbox`;
@@ -241,7 +271,7 @@ function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
   };
 
   const selectOption = (option: AssetClassOption) => {
-    ensureAssetClassVisible(option.id);
+    update(p => ensureAssetClassVisible(p, option.id));
     reset();
     inputRef.current?.blur();
   };
@@ -255,9 +285,9 @@ function AddAssetClassControl({ shownClasses }: AddAssetClassControlProps) {
     // custom), pick that. Case-insensitive match against the label.
     const exact = availableOptions.find(o => o.label.toLowerCase() === lowerQuery);
     if (exact) {
-      ensureAssetClassVisible(exact.id);
+      update(p => ensureAssetClassVisible(p, exact.id));
     } else {
-      addCustomAssetClass(query);
+      update(p => addCustomAssetClass(p, query)[0]);
     }
     reset();
   };

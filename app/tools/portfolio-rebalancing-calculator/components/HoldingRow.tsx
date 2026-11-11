@@ -9,17 +9,21 @@ import { SelectInput } from '@/components/shared/inputs/SelectInput';
 import {
   AssetClass,
   BUILTIN_ASSET_CLASSES,
+  ClassTarget,
+  CustomAssetClass,
   Holding,
   Security,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import {
-  selectCustomAssetClasses,
-  usePortfolioRebalancingStore,
-} from '@/lib/store/portfolioRebalancingStore';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { cn, formatCurrency } from '@/lib/utils';
 
-interface HoldingRowProps {
+// Stable fallbacks, so the asset-class options memo holds when a caller passes
+// neither list. Without targets the row offers the default profile's classes.
+const DEFAULT_CLASS_TARGETS: ClassTarget[] = getDefaultFinancialProfile().portfolio.classTargets;
+const NO_CUSTOM_ASSET_CLASSES: CustomAssetClass[] = [];
+
+export interface HoldingRowProps {
   holding: Holding;
   security: Security | null;
   securities: Security[];
@@ -31,6 +35,10 @@ interface HoldingRowProps {
   onSelectSecurity: (securityId: string) => void;
   onCommitTicker: (ticker: string) => void;
   onRemove: () => void;
+  /** Targets whose portfolio-wide classes the Asset class dropdown offers (default: the default profile's). */
+  classTargets?: ClassTarget[];
+  /** Registered custom classes, offered and labelled in the Asset class dropdown. */
+  customAssetClasses?: CustomAssetClass[];
   className?: string;
 }
 
@@ -45,10 +53,10 @@ export function HoldingRow({
   onSelectSecurity,
   onCommitTicker,
   onRemove,
+  classTargets = DEFAULT_CLASS_TARGETS,
+  customAssetClasses = NO_CUSTOM_ASSET_CLASSES,
   className,
 }: HoldingRowProps) {
-  const classTargets = usePortfolioRebalancingStore(s => s.inputs.classTargets);
-  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
 
   const ticker = security?.ticker ?? '';
   const price = security?.price ?? 0;
@@ -56,8 +64,8 @@ export function HoldingRow({
   const totalValue = price * holding.shares;
 
   /**
-   * The Asset class dropdown mirrors the active set from the Target Allocation
-   * card: every class with a portfolio-wide target row, plus every registered
+   * The Asset class dropdown mirrors the active set from the class targets:
+   * every class with a portfolio-wide target row, plus every registered
    * custom class. The current security's class is included even when it has
    * no target row, so the user never sees an empty selection.
    */

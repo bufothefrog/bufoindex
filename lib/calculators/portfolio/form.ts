@@ -1,60 +1,78 @@
 /**
- * Portfolio rebalancer form. Provisional (slice w1): today's intake
- * questions for the portfolio intent, in today's order, the shared core
- * included. Slice c5 grows it to every field the rebalancer uses and drops
- * the core screens (O5; docs/rebuild-plan.md sections 2.12 and 2.14).
+ * Portfolio rebalancer form (docs/rebuild-plan.md sections 2.12 and 2.14):
+ * every field the rebalancer uses, on four screens that the calculator page
+ * shows and the portfolio intake asks, settings last (O3).
  *
- * The new-cash question still writes the deprecated
- * investing.newCashThisMonth, which the profile store mirrors into the
- * Brokerage deposit; c5 decides how a deposit counts as provided.
+ * - targets: the target mix, Custom included; Custom shows the class-targets
+ *   editor (which also registers custom asset classes).
+ * - accounts: each account's name, type and new cash. The deposits are the
+ *   one record of the new cash: an account list in profile.provided means
+ *   they are answered. The deprecated investing.newCashThisMonth is no
+ *   longer asked; a saved answer to it already sits in the Brokerage deposit
+ *   (migrateProfile), and the accounts screen shows it prefilled until the
+ *   list itself is answered.
+ * - holdings: what each account holds, at what price.
+ * - settings: whole or fractional shares, taxable selling and placement
+ *   advice.
+ *
+ * There is no core screen: the rebalancer uses none of the basics, so
+ * /start/portfolio does not ask them first (O5).
  */
 
-import { TARGET_MIX_OPTIONS } from '@/lib/constants/labels';
+import { intakeDerivedWrites } from '@/lib/fields/shared';
+import type { FormSpec } from '@/lib/fields/types';
 import {
-  CORE_FIELDS,
-  CORE_SCREENS,
-  NET_PAY_AT_MOST_GROSS,
-  intakeDerivedWrites,
-  offeredWithSaved,
-} from '@/lib/fields/shared';
-import type { FieldSpec, FormSpec } from '@/lib/fields/types';
-
-const NEW_CASH: FieldSpec = {
-  path: 'investing.newCashThisMonth',
-  kind: 'money',
-  label: 'New cash to invest this month',
-  help: 'Money you are ready to put into your accounts now.',
-  min: 0,
-  tier: 'details',
-};
-
-/** The three presets; a custom mix is set on the calculator (and kept here once saved). */
-const TARGET_MIX: FieldSpec = {
-  path: 'investing.targetMix',
-  kind: 'choice',
-  label: 'Target mix',
-  options: offeredWithSaved(
-    'investing.targetMix',
-    TARGET_MIX_OPTIONS.filter((option) => option.value !== 'custom'),
-    TARGET_MIX_OPTIONS
-  ),
-  tier: 'details',
-};
+  ACCOUNTS,
+  ALLOW_TAXABLE_SELLING,
+  CLASS_TARGETS,
+  HOLDINGS,
+  MODE,
+  SETTINGS_FIELDS,
+  SHOW_PLACEMENT_ADVICE,
+  TARGET_MIX,
+} from './fields';
 
 export const PORTFOLIO_FORM: FormSpec = {
   id: 'portfolio',
-  fields: [...CORE_FIELDS, NEW_CASH, TARGET_MIX],
+  fields: [TARGET_MIX, CLASS_TARGETS, ACCOUNTS, HOLDINGS, ...SETTINGS_FIELDS],
   screens: [
-    ...CORE_SCREENS,
-    { id: 'new-cash', title: 'How much new cash are you investing this month?', tier: 'details', fields: [NEW_CASH.path] },
     {
-      id: 'target-mix',
-      title: 'Which stock and bond mix are you aiming for?',
-      description: 'You can set a custom mix on the calculator.',
+      id: 'targets',
+      title: 'Target allocation',
+      question: 'Which stock and bond mix are you aiming for?',
       tier: 'details',
-      fields: [TARGET_MIX.path],
+      fields: [TARGET_MIX.path, CLASS_TARGETS.path],
+    },
+    {
+      id: 'accounts',
+      title: 'Accounts',
+      question: 'How much new cash are you investing this month?',
+      description: 'List each account you invest through and the new cash going into it.',
+      tier: 'details',
+      fields: [ACCOUNTS.path],
+    },
+    {
+      id: 'holdings',
+      title: 'Holdings',
+      question: 'What does each account hold today?',
+      description: 'A ticker, its current price and your shares. Prices are taken as current and executable.',
+      tier: 'details',
+      fields: [HOLDINGS.path],
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      question: 'How should the rebalance trade?',
+      tier: 'assumption',
+      fields: [MODE.path, ALLOW_TAXABLE_SELLING.path, SHOW_PLACEMENT_ADVICE.path],
+      notes: [
+        {
+          text: 'Selling in taxable may trigger capital gains tax.',
+          tone: 'caution',
+          visibleWhen: (get) => get(ALLOW_TAXABLE_SELLING.path) === true,
+        },
+      ],
     },
   ],
-  relations: [NET_PAY_AT_MOST_GROSS],
   onSubmit: intakeDerivedWrites,
 };
