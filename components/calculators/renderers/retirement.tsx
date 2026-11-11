@@ -1,27 +1,22 @@
 /**
  * The retirement form's custom renderers, by renderer id (FieldSpec.renderer,
- * rowAdornment and footer). Slice c1 adds its renderers here; the wizard
- * and the calculator page pick them up through RENDERERS in ./index.ts.
+ * rowAdornment and footer), and its intake hooks. The retirement form needs
+ * no custom renderer: every field is a generic kind. The wizard and the
+ * calculator page pick these up through RENDERERS in ./index.ts.
  */
 
 import type { CustomRenderers } from '@/components/fields/types';
-import { retirementLink } from '@/lib/profile/links';
-import type { FinancialProfile } from '@/lib/profile/types';
+import { calculatorHref } from '@/lib/calculators/registry';
+import { retirementRunner } from '@/lib/store/retirementStore';
 
 export const RETIREMENT_RENDERERS: CustomRenderers = {};
 
 /**
  * Called once while the visitor answers the retirement intake, when the
- * browser is idle (audit H5), so the first run on the calculator does not
- * wait for the worker to start. Slice c1 points it at the retirement worker
- * runner's prewarm(); while it is undefined the intake does nothing.
+ * browser is idle (audit H5): starts the retirement worker, so the first run
+ * on the calculator does not wait for it to load.
  */
-export const RETIREMENT_INTAKE_PREWARM: (() => void) | undefined = undefined;
+export const RETIREMENT_INTAKE_PREWARM = (): void => retirementRunner.prewarm();
 
-/**
- * Where the retirement intake leads once finished, from the saved profile. Slice
- * c1 switches it to calculatorHref('retirement', { fromProfile: true }) when
- * the calculator reads the profile; the wizard reads it through
- * INTAKE_DESTINATION in ./index.ts.
- */
-export const RETIREMENT_INTAKE_DESTINATION: (profile: FinancialProfile) => string = retirementLink;
+/** Where the retirement intake leads once finished: the calculator, which reads the saved profile. */
+export const RETIREMENT_INTAKE_DESTINATION = (): string => calculatorHref('retirement', { fromProfile: true });

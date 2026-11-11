@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { useRetirementResults, useRetirementStore } from '@/lib/store/retirementStore';
 import { ResultCard, SummaryCard } from '@/components/ui/cards';
 import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
+import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
 import { formatCurrency, formatPercent } from '@/lib/utils';
-import { displayDollars, displayRealDollars } from '@/lib/utils/displayDollars';
 import {
   TrendingUp,
   Calculator,
@@ -16,7 +16,17 @@ import {
 } from 'lucide-react';
 import { MonteCarloChart } from './MonteCarloChart';
 import { SavingsRateChart } from './SavingsRateChart';
-import { useRetirementInputs } from '@/lib/store/retirementStore';
+
+export interface ResultsSectionProps {
+  results: RetirementResults;
+  /** The engine inputs that produced `results`. */
+  inputs: RetirementInputs;
+  /**
+   * The results predate the latest values. The calculator page already marks
+   * stale results, so nothing here changes with it.
+   */
+  stale: boolean;
+}
 
 function mapProbabilityToVariant(successProbability: number): CardVariant {
   if (successProbability >= 0.7) return 'success';
@@ -38,37 +48,21 @@ function getScenarioIcon(successProbability: number) {
   return AlertTriangle;
 }
 
-export function ResultsSection() {
-  const results = useRetirementResults();
-  const inputs = useRetirementInputs();
-  const displayMode = useRetirementStore(state => state.displayMode);
-  const setDisplayMode = useRetirementStore(state => state.setDisplayMode);
+export function ResultsSection({ results, inputs }: ResultsSectionProps) {
+  // Display-only conversions (CLAUDE.md display-dollar boundary): nominal
+  // figures deflate to today's dollars, and figures already in today's
+  // dollars inflate in the future-dollar mode.
+  const dollars = useDollarDisplay(inputs.inflationRate);
+  const toDisplay = dollars.fromNominal;
+  const toDisplayFromToday = dollars.fromReal;
   const [expandedScenario, setExpandedScenario] = React.useState<string | null>(null);
-
-  if (!results) {
-    return null;
-  }
-
-  // Display-only conversion: deflate a nominal future-dollar amount back to
-  // today's purchasing power when the 'today' mode is active.
-  const toDisplay = (nominalAmount: number, yearsFromNow: number) =>
-    displayDollars(nominalAmount, displayMode, inputs.inflationRate, yearsFromNow);
-
-  // Mirror conversion for figures that are already in today's dollars: they
-  // move only when the future-dollar mode is active.
-  const toDisplayFromToday = (realAmount: number, yearsFromNow: number) =>
-    displayRealDollars(realAmount, displayMode, inputs.inflationRate, yearsFromNow);
 
   return (
     <div className="space-y-4">
       {/* Results Header - Dollar display mode */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {displayMode === 'today'
-            ? "Amounts adjusted to today's dollars using your inflation rate"
-            : 'Amounts in future dollars, as of the year they occur'}
-        </p>
-        <DollarModeToggle value={displayMode} onChange={setDisplayMode} />
+        <p className="text-sm text-muted-foreground">{dollars.caption}</p>
+        <DollarModeToggle value={dollars.mode} onChange={dollars.setMode} />
       </div>
 
       {/* Results Header - Key Metrics */}
@@ -161,7 +155,6 @@ export function ResultsSection() {
         <MonteCarloChart
           netWorthByAge={results.netWorthByAge}
           withdrawalsByAge={results.withdrawalsByAge}
-          displayMode={displayMode}
           inflationRate={inputs.inflationRate}
           startingAge={inputs.startingAge}
         />
@@ -178,3 +171,5 @@ export function ResultsSection() {
     </div>
   );
 }
+
+export default ResultsSection;

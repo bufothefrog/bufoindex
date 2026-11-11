@@ -1,0 +1,278 @@
+/**
+ * Field specs only the retirement calculator asks (docs/rebuild-plan.md
+ * section 2.14): the retirement target, Social Security and healthcare, and
+ * the model assumptions. The facts other forms also ask come from
+ * lib/fields/shared.ts. Pure.
+ *
+ * Bounds follow plan section 2.3: life expectancy 50-110 and at least the
+ * retirement age, Social Security from 62 to 70, and the assumption bounds
+ * of the calculator's sliders.
+ */
+
+import {
+  calculateEffectiveTaxRate,
+  calculateTDFAllocation,
+  calculateTDFReturnForAge,
+  calculateTDFVolatilityForAge,
+} from '@/lib/calculations/retirement';
+import { RetirementConstants } from '@/lib/constants/retirement';
+import { formatCurrency, formatPercent } from '@/lib/format';
+import { RETIREMENT_AGE } from '@/lib/fields/shared';
+import type { CrossFieldRule, FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
+import type { FilingStatus } from '@/lib/profile/types';
+import { retirementFilingStatus } from './bindings';
+
+const RISK_PROFILE_PATH = 'assumptions.retirement.riskProfile';
+
+const num = (get: Get, path: string): number => get(path) as number;
+
+const isCustomProfile = (get: Get): boolean => get(RISK_PROFILE_PATH) === 'custom';
+
+// ---------------------------------------------------------------------------
+// Target
+// ---------------------------------------------------------------------------
+
+export const TARGET_RETIREMENT_INCOME: FieldSpec = {
+  path: 'spending.targetRetirementIncome',
+  kind: 'money',
+  label: 'Target annual income in retirement',
+  help: (get) => {
+    const years = num(get, RETIREMENT_AGE.path) - num(get, 'person.age');
+    const inflation = num(get, 'assumptions.retirement.inflationRate');
+    const future = num(get, 'spending.targetRetirementIncome') * Math.pow(1 + inflation, years);
+    return `That's ${formatCurrency(Math.round(future))} in future dollars`;
+  },
+  hint: 'Think about what you would spend per year; many people start near 70\u201380% of current income.',
+  placeholder: '80,000',
+  min: 0,
+  tier: 'details',
+  summary: (value) => `${formatCurrency(value as number)}/yr target`,
+};
+
+export const LIFE_EXPECTANCY: FieldSpec = {
+  path: 'person.lifeExpectancy',
+  kind: 'number',
+  label: 'Life expectancy',
+  help: 'Age you expect to live to',
+  hint: 'ssa.gov has a life expectancy calculator by birth date and sex.',
+  min: 50,
+  max: RetirementConstants.MAX_LIFE_EXPECTANCY,
+  step: 1,
+  unit: { suffix: ' years' },
+  tier: 'details',
+  summary: (value) => `plan to age ${value as number}`,
+};
+
+/** The projection runs to the life expectancy, so it cannot end before retirement. */
+export const LIFE_EXPECTANCY_AFTER_RETIREMENT: CrossFieldRule = {
+  lower: RETIREMENT_AGE.path,
+  upper: LIFE_EXPECTANCY.path,
+  strict: false,
+  checkOn: LIFE_EXPECTANCY.path,
+  message: 'Life expectancy needs to be at least your retirement age.',
+};
+
+// ---------------------------------------------------------------------------
+// Social Security and healthcare
+// ---------------------------------------------------------------------------
+
+export const SOCIAL_SECURITY_BENEFIT: FieldSpec = {
+  path: 'retirementIncome.socialSecurityBenefit',
+  kind: 'money',
+  label: 'Social Security benefit',
+  help: 'Annual benefit estimate',
+  hint: 'ssa.gov/myaccount shows your estimate.',
+  placeholder: '30,000',
+  min: 0,
+  tier: 'details',
+  summary: (value, get) =>
+    `Social Security ${formatCurrency(value as number)}/yr at ${num(get, 'retirementIncome.socialSecurityAge')}`,
+};
+
+export const SOCIAL_SECURITY_AGE: FieldSpec = {
+  path: 'retirementIncome.socialSecurityAge',
+  kind: 'number',
+  label: 'Social Security age',
+  help: 'When to claim benefits',
+  hint: 'Benefits can start between 62 and 70; the same ssa.gov statement lists the amount by claiming age.',
+  min: RetirementConstants.SS_MIN_AGE,
+  max: RetirementConstants.SS_MAX_AGE,
+  step: 1,
+  tier: 'details',
+};
+
+export const ANNUAL_HEALTHCARE_COST: FieldSpec = {
+  path: 'retirementIncome.annualHealthcareCost',
+  kind: 'money',
+  label: 'Annual healthcare cost',
+  help: 'Override estimated annual cost',
+  hint: 'Premiums plus typical out-of-pocket costs for a year.',
+  placeholder: '7,500',
+  min: 0,
+  // null runs the model's own base cost, which is also where an override starts.
+  nullable: { autoLabel: 'Typical cost the model uses', overrideDefault: RetirementConstants.HEALTHCARE_BASE_COST },
+  tier: 'details',
+  summary: (value) => (value === null ? 'typical healthcare cost' : `${formatCurrency(value as number)}/yr healthcare`),
+};
+
+// ---------------------------------------------------------------------------
+// Assumptions
+// ---------------------------------------------------------------------------
+
+/** What the target-date glide path uses at `age`, as the risk-profile choice shows it. */
+export interface TdfProfile {
+  /** Stock share of the allocation at `age`. */
+  stocks: number;
+  accumulationReturn: number;
+  /** The glide-path return about 30 years ahead, a retirement-phase figure. */
+  retirementReturn: number;
+  volatility: number;
+}
+
+export function tdfProfileFor(age: number): TdfProfile {
+  return {
+    stocks: calculateTDFAllocation(age).stocks,
+    accumulationReturn: calculateTDFReturnForAge(age),
+    retirementReturn: calculateTDFReturnForAge(Math.min(100, age + 30)),
+    volatility: calculateTDFVolatilityForAge(age),
+  };
+}
+
+const ACCUMULATION_RETURN_PATH = 'assumptions.retirement.accumulationReturn';
+const RETIREMENT_RETURN_PATH = 'assumptions.retirement.retirementReturn';
+const VOLATILITY_PATH = 'assumptions.retirement.volatility';
+
+const wholePercent = (fraction: number) => formatPercent(fraction, { digits: 0 });
+
+function riskProfileOptions(get: Get): readonly FieldOption[] {
+  const tdf = tdfProfileFor(num(get, 'person.age'));
+  return [
+    {
+      value: 'tdf',
+      label: 'Target Date Fund',
+      description: `Age-based: ${wholePercent(tdf.stocks)} stocks, ${wholePercent(tdf.accumulationReturn)} / ${wholePercent(tdf.retirementReturn)} returns`,
+    },
+    { value: 'custom', label: 'Custom', description: 'Set your own values' },
+  ];
+}
+
+export const RISK_PROFILE: FieldSpec = {
+  path: RISK_PROFILE_PATH,
+  kind: 'choice',
+  label: 'Risk profile',
+  help: 'Target Date Fund adjusts allocation automatically based on your age. Custom lets you set return and volatility yourself.',
+  options: riskProfileOptions,
+  tier: 'assumption',
+  // Choosing the glide path fills the custom inputs with its figures for the
+  // current age, so switching back to Custom starts from them.
+  onChange: (value, get): Write[] => {
+    if (value !== 'tdf') return [];
+    const tdf = tdfProfileFor(num(get, 'person.age'));
+    return [
+      { path: ACCUMULATION_RETURN_PATH, value: tdf.accumulationReturn },
+      { path: RETIREMENT_RETURN_PATH, value: tdf.retirementReturn },
+      { path: VOLATILITY_PATH, value: tdf.volatility },
+    ];
+  },
+  summary: (value, get) =>
+    value === 'tdf'
+      ? 'Target-date glide path'
+      : `${formatPercent(num(get, ACCUMULATION_RETURN_PATH))} / ${formatPercent(num(get, RETIREMENT_RETURN_PATH))} returns, ${formatPercent(num(get, VOLATILITY_PATH))} volatility`,
+};
+
+export const ACCUMULATION_RETURN: FieldSpec = {
+  path: ACCUMULATION_RETURN_PATH,
+  kind: 'percent',
+  label: 'Accumulation return',
+  help: "Nominal (before inflation) annual return while saving \u2014 the today's-dollars view handles inflation",
+  min: 0,
+  max: 0.25,
+  step: 0.001,
+  precision: 2,
+  slider: true,
+  tier: 'assumption',
+  visibleWhen: isCustomProfile,
+};
+
+export const RETIREMENT_RETURN: FieldSpec = {
+  path: RETIREMENT_RETURN_PATH,
+  kind: 'percent',
+  label: 'Retirement return',
+  help: 'Nominal (before inflation) annual return after retiring',
+  min: 0,
+  max: 0.25,
+  step: 0.001,
+  precision: 2,
+  slider: true,
+  tier: 'assumption',
+  visibleWhen: isCustomProfile,
+};
+
+export const VOLATILITY: FieldSpec = {
+  path: VOLATILITY_PATH,
+  kind: 'percent',
+  label: 'Portfolio volatility',
+  help: 'Annual standard deviation of returns in the Monte Carlo draws',
+  min: 0.05,
+  max: 0.25,
+  step: 0.005,
+  precision: 2,
+  slider: true,
+  tier: 'assumption',
+  visibleWhen: isCustomProfile,
+};
+
+export const INFLATION_RATE: FieldSpec = {
+  path: 'assumptions.retirement.inflationRate',
+  kind: 'percent',
+  label: 'Inflation rate',
+  help: "Grows spending in the simulation and sets the today's-dollars conversion",
+  min: 0.01,
+  max: 0.05,
+  step: 0.001,
+  precision: 2,
+  slider: true,
+  tier: 'assumption',
+  summary: (value) => `${formatPercent(value as number)} inflation`,
+};
+
+/**
+ * The rate the model estimates when the tax rate is left on auto: the
+ * effective federal rate on the target income for the filing status the
+ * model runs (the base plan's withdrawal; other scenarios estimate their own).
+ */
+export function estimatedEffectiveTaxRate(get: Get): number {
+  return calculateEffectiveTaxRate(
+    num(get, TARGET_RETIREMENT_INCOME.path),
+    retirementFilingStatus(get('person.filingStatus') as FilingStatus)
+  );
+}
+
+export const EFFECTIVE_TAX_RATE: FieldSpec = {
+  path: 'assumptions.retirement.effectiveTaxRate',
+  kind: 'percent',
+  label: 'Effective tax rate',
+  min: 0,
+  max: 0.4,
+  step: 0.01,
+  precision: 2,
+  slider: true,
+  nullable: {
+    autoLabel: 'Estimated from your target income and filing status',
+    overrideDefault: estimatedEffectiveTaxRate,
+  },
+  tier: 'assumption',
+  summary: (value) => (value === null ? 'tax rate estimated from income' : `${formatPercent(value as number)} tax rate`),
+};
+
+export const HEALTHCARE_COST_MULTIPLIER: FieldSpec = {
+  path: 'assumptions.retirement.healthcareCostMultiplier',
+  kind: 'slider',
+  label: 'Healthcare cost multiplier',
+  min: 0.5,
+  max: 3,
+  step: 0.1,
+  unit: { suffix: 'x' },
+  tier: 'assumption',
+  summary: (value) => `${value as number}x healthcare`,
+};

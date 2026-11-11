@@ -14,13 +14,12 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
 import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
-import { DollarDisplayMode, displayDollars } from '@/lib/utils/displayDollars';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 
 interface MonteCarloChartProps {
   netWorthByAge: { [age: number]: number };
   withdrawalsByAge: { [age: number]: number };
-  /** Display-only: deflates nominal simulation output when set to 'today' */
-  displayMode: DollarDisplayMode;
+  /** Sets the today's-dollars conversion (display only; the mode is the shared preference) */
   inflationRate: number;
   startingAge: number;
 }
@@ -62,10 +61,10 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
 export function MonteCarloChart({
   netWorthByAge,
   withdrawalsByAge,
-  displayMode,
   inflationRate,
   startingAge
 }: MonteCarloChartProps) {
+  const { fromNominal, chartCaption, axisSuffix: modeAxisSuffix } = useDollarDisplay(inflationRate);
   const [chartTheme, setChartTheme] = useState(() => getChartTheme());
 
   // Update theme when it changes
@@ -96,21 +95,19 @@ export function MonteCarloChart({
       const yearsFromNow = age - startingAge;
       return {
         age,
-        netWorth: displayDollars(netWorthByAge[age], displayMode, inflationRate, yearsFromNow),
+        netWorth: fromNominal(netWorthByAge[age], yearsFromNow),
         // Only show withdrawals when they actually start (not null/undefined)
         withdrawals: withdrawalsByAge[age] !== undefined
-          ? displayDollars(withdrawalsByAge[age], displayMode, inflationRate, yearsFromNow)
+          ? fromNominal(withdrawalsByAge[age], yearsFromNow)
           : null
       };
     });
-  }, [netWorthByAge, withdrawalsByAge, displayMode, inflationRate, startingAge]);
-
-  const modeAxisSuffix = displayMode === 'today' ? " (today's $)" : ' (future $)';
+  }, [netWorthByAge, withdrawalsByAge, fromNominal, startingAge]);
 
   return (
     <div>
       <p className="text-xs text-muted-foreground text-right">
-        {displayMode === 'today' ? "in today's dollars" : 'in future dollars'}
+        {chartCaption}
       </p>
       <div className="h-96">
       <ResponsiveContainer width="100%" height="100%">

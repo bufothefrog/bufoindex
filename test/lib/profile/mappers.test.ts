@@ -42,7 +42,7 @@ import {
   rebalancePortfolioV2,
   validateRebalanceInputsV2,
 } from '@/lib/calculations/portfolioRebalancing';
-import { useRetirementStore } from '@/lib/store/retirementStore';
+import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 
 /**
@@ -156,7 +156,7 @@ describe('toRetirementInputs', () => {
   });
 
   it('defaults the fields v1 did not carry to the retirement store defaults', () => {
-    const storeDefaults = useRetirementStore.getInitialState().inputs;
+    const storeDefaults = RETIREMENT_LEGACY.storageDefaults();
     const inputs = toRetirementInputs(getDefaultFinancialProfile());
     for (const key of [
       'lifeExpectancy',

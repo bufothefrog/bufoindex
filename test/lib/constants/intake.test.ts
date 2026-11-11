@@ -29,7 +29,13 @@ import {
   type IntakeScreenOptions,
 } from '@/lib/constants/intake';
 import type { ScreenSpec } from '@/lib/fields/types';
-import { PROFILE_FIELDS, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
+import {
+  PROFILE_FIELDS,
+  PROFILE_LEAF_PATHS,
+  PROFILE_LIST_PATHS,
+  getDefaultFinancialProfile,
+  isProfilePath,
+} from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 import {
   OLD_CORE_FLOW,
@@ -212,7 +218,7 @@ describe('intake screens', () => {
   it('offers the typical-value skip, and keeps the defaults on an assumption screen', () => {
     for (const intent of INTAKE_INTENTS) {
       for (const screen of getIntakeScreens(intent, fromDefaults())) {
-        expect(skipLabelFor(screen)).toBe(INTAKE_SKIP_LABEL);
+        expect(skipLabelFor(screen)).toBe(screen.tier === 'assumption' ? KEEP_ASSUMPTIONS_LABEL : INTAKE_SKIP_LABEL);
       }
     }
     const assumptions: ScreenSpec = { id: 'a', title: 'Assumptions', tier: 'assumption', fields: [] };
@@ -521,14 +527,14 @@ describe('isProfileFinished', () => {
   });
 
   it('is true once every profile field is answered', () => {
-    expect(isProfileFinished(profileWith(PROFILE_FIELDS.map((field) => field.path)))).toBe(true);
+    expect(isProfileFinished(profileWith([...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS]))).toBe(true);
   });
 
   it('is true once the profile intake has nothing left, though a few fields are never asked', () => {
     const asked = intakePaths('profile');
     const neverAsked = PROFILE_FIELDS.map((field) => field.path).filter((path) => !asked.includes(path));
     // The derived emergency-month target is never asked; with the provisional
-    // forms neither are the target income, the contribution rate and the ratio.
+    // forms neither are the contribution rate and the ratio.
     expect(neverAsked).toContain('cash.targetMonths');
     expect(isProfileFinished(profileWith(asked))).toBe(true);
     expect(isProfileFinished(profileWith(asked.filter((path) => path !== asked[asked.length - 1])))).toBe(false);

@@ -1,21 +1,23 @@
 /**
- * Retirement Store Test Suite
- *
- * Exercises the Zustand store's actions directly through
- * useRetirementStore.getState() — no React rendering. jsdom has no Worker,
- * so these tests run the store's synchronous fallback path; the worker and
- * fallback share the memoization and sequence-counter logic under test here.
+ * The retirement run store on the shared factory (createCalculatorStore)
+ * with the worker runner. jsdom has no Worker, so runs take the runner's
+ * in-thread fallback; it still resolves asynchronously, like the worker, so
+ * the sequence guard is exercised for real.
  *
  * calculateRetirementAnalysis is wrapped (not replaced) with a spy so call
- * counts are observable while results stay real — the memoization tests
- * assert "no recompute" via the spy, never via timing.
+ * counts are observable while results stay real: the memo tests assert "no
+ * recompute" through the spy, never through timing.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useRetirementStore } from '@/lib/store/retirementStore';
 import { calculateRetirementAnalysis } from '@/lib/calculations/retirement';
-import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
-import { encodeRetirementToUrlHash } from '@/lib/utils/retirementState';
+import type { RetirementResults } from '@/lib/calculations/retirement';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { applyProfileWrites, getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import type { Write } from '@/lib/fields/types';
+import type { FinancialProfile } from '@/lib/profile/types';
+import { retirementRunner, useRetirementStore } from '@/lib/store/retirementStore';
 
 vi.mock('@/lib/calculations/retirement', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/calculations/retirement')>();
@@ -27,14 +29,8 @@ vi.mock('@/lib/calculations/retirement', async (importOriginal) => {
 
 const analysisSpy = vi.mocked(calculateRetirementAnalysis);
 
-// Store defaults captured before any test mutates state (localStorage is
-// empty at module load, so persist rehydration leaves the defaults intact).
-const defaultInputs: RetirementInputs = useRetirementStore.getState().inputs;
-
-const baseInputs = (overrides: Partial<RetirementInputs> = {}): RetirementInputs => ({
-  ...defaultInputs,
-  ...overrides,
-});
+const profileWith = (writes: Write[] = []): FinancialProfile =>
+  applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
 
 /** Minimal structurally-valid results object with a distinguishing marker. */
 const fakeResults = (marker: string): RetirementResults => ({
@@ -47,29 +43,35 @@ const fakeResults = (marker: string): RetirementResults => ({
 
 const getState = () => useRetirementStore.getState();
 
+/** Submits now and waits for the run to settle. */
+async function run(profile: FinancialProfile): Promise<void> {
+  getState().submit(profile, { immediate: true });
+  await getState().flush();
+}
+
 beforeEach(() => {
   vi.useRealTimers();
   analysisSpy.mockClear();
-  window.location.hash = '';
-  useRetirementStore.setState({
-    inputs: baseInputs(),
-    results: null,
-    lastCalculationHash: null,
-    isCalculating: false,
-    hasCalculatedOnce: false,
-    errors: {},
-  });
+  getState().reset();
 });
 
-describe('calculate — synchronous fallback path (no Worker in jsdom)', () => {
-  it('runs the analysis and populates results, flags, and empty errors', async () => {
-    await getState().calculate();
+describe('the retirement run store', () => {
+  it('starts with no inputs and no results, and persists nothing', () => {
+    expect(getState().inputs).toBeNull();
+    expect(getState().results).toBeNull();
+    expect(getState().hasCalculatedOnce).toBe(false);
+    expect(localStorage.getItem('retirement-calculator')).toBeNull();
+  });
+
+  it('runs the analysis on the profile\'s engine inputs (the in-thread fallback without a Worker)', async () => {
+    const profile = profileWith();
+    await run(profile);
 
     const state = getState();
     expect(analysisSpy).toHaveBeenCalledTimes(1);
-    expect(state.results).not.toBeNull();
+    expect(analysisSpy).toHaveBeenCalledWith(engineInputsFor(RETIREMENT_CALCULATOR, profile));
+    expect(state.inputs).toEqual(engineInputsFor(RETIREMENT_CALCULATOR, profile));
     expect(state.results!.scenarios.length).toBeGreaterThan(0);
-    // Seeded Monte Carlo: probabilities are real numbers in [0, 1].
     for (const scenario of state.results!.scenarios) {
       expect(scenario.successProbability).toBeGreaterThanOrEqual(0);
       expect(scenario.successProbability).toBeLessThanOrEqual(1);
@@ -77,71 +79,76 @@ describe('calculate — synchronous fallback path (no Worker in jsdom)', () => {
     expect(state.isCalculating).toBe(false);
     expect(state.hasCalculatedOnce).toBe(true);
     expect(state.errors).toEqual({});
+    expect(state.stale).toBe(false);
   });
 
-  it('maps RetirementInputValidationError onto per-field errors', async () => {
-    useRetirementStore.setState({
-      inputs: baseInputs({ startingAge: 40, retirementAge: 35 }),
-    });
+  it('debounces by 300 ms', async () => {
+    vi.useFakeTimers();
+    getState().submit(profileWith());
+    await vi.advanceTimersByTimeAsync(299);
+    expect(analysisSpy).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(analysisSpy).toHaveBeenCalledTimes(1);
+  });
 
-    await getState().calculate();
-
-    const state = getState();
-    expect(state.results).toBeNull();
-    expect(state.errors.retirementAge).toMatch(/greater than/i);
-    expect(state.isCalculating).toBe(false);
-    // Error path leaves hasCalculatedOnce untouched (matches pre-worker behavior).
-    expect(state.hasCalculatedOnce).toBe(false);
+  it('exposes the worker runner, whose prewarm is safe without Worker support', () => {
+    expect(() => retirementRunner.prewarm()).not.toThrow();
   });
 });
 
 describe('memoization', () => {
-  it('a second calculate with identical inputs does not recompute', async () => {
-    await getState().calculate();
+  it('does not recompute for the same engine inputs', async () => {
+    await run(profileWith());
+    const first = getState().results;
+
+    // A different profile that feeds the engine the same values: the
+    // take-home pay is not a retirement input.
+    await run(profileWith([{ path: 'income.netPerPaycheck', value: 2000 }]));
+
     expect(analysisSpy).toHaveBeenCalledTimes(1);
-    const firstResults = getState().results;
-
-    await getState().calculate();
-
-    expect(analysisSpy).toHaveBeenCalledTimes(1); // memo hit — no second run
-    expect(getState().results).toBe(firstResults); // exact cached object
-    expect(getState().isCalculating).toBe(false);
+    expect(getState().results).toBe(first);
   });
 
-  it('recomputes when a calculation-relevant input changes', async () => {
-    await getState().calculate();
-    useRetirementStore.setState({ inputs: baseInputs({ monthlySavings: 2500 }) });
-
-    await getState().calculate();
-
+  it('recomputes when an engine input changes', async () => {
+    await run(profileWith());
+    await run(profileWith([{ path: 'investing.monthlyContribution', value: 2500 }]));
     expect(analysisSpy).toHaveBeenCalledTimes(2);
+    expect(getState().inputs?.monthlySavings).toBe(2500);
+  });
+});
+
+describe('errors keep the last results', () => {
+  it('marks the results stale on an invalid field and runs nothing', async () => {
+    await run(profileWith());
+    const results = getState().results;
+
+    getState().submit(
+      profileWith([
+        { path: 'person.age', value: 60 },
+        { path: 'person.retirementAge', value: 60 },
+      ]),
+      { immediate: true }
+    );
+
+    const state = getState();
+    expect(analysisSpy).toHaveBeenCalledTimes(1);
+    expect(state.results).toBe(results);
+    expect(state.stale).toBe(true);
+    expect(state.errors).toEqual({ 'person.retirementAge': 'The retirement age needs to be above your current age.' });
   });
 
-  it('a displayMode toggle does not invalidate the memo cache', async () => {
-    await getState().calculate();
-    getState().setDisplayMode('nominal');
+  it('keeps the results and reports a failed run under calculation', async () => {
+    await run(profileWith());
+    const results = getState().results;
+    analysisSpy.mockImplementationOnce(() => {
+      throw new Error('Simulation failed');
+    });
 
-    await getState().calculate();
+    await run(profileWith([{ path: 'investing.monthlyContribution', value: 2500 }]));
 
-    expect(analysisSpy).toHaveBeenCalledTimes(1);
-    expect(getState().displayMode).toBe('nominal');
-  });
-
-  it('debounced auto-recalculation skips identical inputs (focus churn)', async () => {
-    await getState().calculate();
-    expect(analysisSpy).toHaveBeenCalledTimes(1);
-
-    vi.useFakeTimers();
-    // Re-emitting the same value, as focus/blur churn does, is a memo hit.
-    getState().updateInputs({ monthlySavings: defaultInputs.monthlySavings });
-    await vi.runAllTimersAsync();
-    expect(analysisSpy).toHaveBeenCalledTimes(1);
-
-    // A real change recomputes through the same debounce.
-    getState().updateInputs({ monthlySavings: 2500 });
-    await vi.runAllTimersAsync();
-    expect(analysisSpy).toHaveBeenCalledTimes(2);
-    expect(getState().results).not.toBeNull();
+    expect(getState().results).toBe(results);
+    expect(getState().stale).toBe(true);
+    expect(getState().errors).toEqual({ calculation: 'Simulation failed' });
   });
 });
 
@@ -149,63 +156,26 @@ describe('stale-response dropping', () => {
   it('never applies a superseded run, even transiently', async () => {
     const resultsA = fakeResults('A');
     const resultsB = fakeResults('B');
-    analysisSpy
-      .mockImplementationOnce(() => resultsA)
-      .mockImplementationOnce(() => resultsB);
+    analysisSpy.mockImplementationOnce(() => resultsA).mockImplementationOnce(() => resultsB);
 
-    // Record every results value the store ever publishes: without the
-    // sequence guard the history would contain resultsA before resultsB.
+    // Every results value the store publishes: without the sequence guard the
+    // history would hold resultsA before resultsB.
     const seen: (RetirementResults | null)[] = [];
     const unsubscribe = useRetirementStore.subscribe((state) => {
       seen.push(state.results);
     });
 
     try {
-      const first = getState().calculate(); // run 1 (superseded below)
-      useRetirementStore.setState({ inputs: baseInputs({ monthlySavings: 3000 }) });
-      const second = getState().calculate(); // run 2 supersedes run 1
-      await Promise.all([first, second]);
+      getState().submit(profileWith(), { immediate: true });
+      getState().submit(profileWith([{ path: 'investing.monthlyContribution', value: 3000 }]), { immediate: true });
+      await getState().flush();
     } finally {
       unsubscribe();
     }
 
     expect(analysisSpy).toHaveBeenCalledTimes(2);
     expect(getState().results).toBe(resultsB);
-    expect(seen).not.toContain(resultsA); // stale result was dropped, not overwritten
+    expect(seen).not.toContain(resultsA);
     expect(getState().isCalculating).toBe(false);
-  });
-});
-
-describe('loadFromUrl', () => {
-  it('adopts shared inputs synchronously and resolves results asynchronously', async () => {
-    const shared = baseInputs({ monthlySavings: 1234 });
-    window.location.hash = `#${encodeRetirementToUrlHash(shared, 'nominal')}`;
-
-    getState().loadFromUrl();
-
-    // Inputs land immediately; the heavy analysis settles on a later tick.
-    const immediate = getState();
-    expect(immediate.inputs.monthlySavings).toBe(1234);
-    expect(immediate.displayMode).toBe('nominal');
-    expect(immediate.hasCalculatedOnce).toBe(true);
-    expect(immediate.isCalculating).toBe(true);
-    expect(immediate.results).toBeNull();
-
-    await vi.waitFor(() => {
-      expect(getState().results).not.toBeNull();
-    });
-    expect(getState().isCalculating).toBe(false);
-    expect(analysisSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores an unparseable hash', () => {
-    window.location.hash = '#not-a-valid-hash!!!';
-    const before = getState().inputs;
-
-    getState().loadFromUrl();
-
-    expect(getState().inputs).toBe(before);
-    expect(getState().hasCalculatedOnce).toBe(false);
-    expect(analysisSpy).not.toHaveBeenCalled();
   });
 });
