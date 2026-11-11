@@ -198,6 +198,52 @@ describe('ChartFrame', () => {
     expect(IntersectionObserverStub.instances).toHaveLength(1);
   });
 
+  it('stays mounted when deferUntilVisible turns on after the chart mounted', () => {
+    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+    const { rerender } = render(
+      <ChartFrame caption="Flag flip" deferUntilVisible={false}>
+        <div>chart body</div>
+      </ChartFrame>
+    );
+    expect(screen.getByText('chart body')).toBeInTheDocument();
+    rerender(
+      <ChartFrame caption="Flag flip" deferUntilVisible>
+        <div>chart body</div>
+      </ChartFrame>
+    );
+    expect(screen.getByText('chart body')).toBeInTheDocument();
+    expect(IntersectionObserverStub.instances).toHaveLength(0);
+  });
+
+  it('mounts at once when deferUntilVisible turns off before the chart was seen, and stays mounted', () => {
+    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+    const frame = (defer: boolean) => (
+      <ChartFrame caption="Flag flip" deferUntilVisible={defer}>
+        <div>chart body</div>
+      </ChartFrame>
+    );
+    const { rerender } = render(frame(true));
+    expect(screen.queryByText('chart body')).not.toBeInTheDocument();
+    rerender(frame(false));
+    expect(screen.getByText('chart body')).toBeInTheDocument();
+    expect(IntersectionObserverStub.instances[0].disconnected).toBe(true);
+    rerender(frame(true));
+    expect(screen.getByText('chart body')).toBeInTheDocument();
+  });
+
+  it('disconnects the observer when unmounted before the chart was seen', () => {
+    vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+    const { unmount } = render(
+      <ChartFrame caption="Deferred chart" deferUntilVisible>
+        <div>chart body</div>
+      </ChartFrame>
+    );
+    const [observer] = IntersectionObserverStub.instances;
+    expect(observer.disconnected).toBe(false);
+    unmount();
+    expect(observer.disconnected).toBe(true);
+  });
+
   it('mounts immediately where IntersectionObserver is unavailable', () => {
     vi.stubGlobal('IntersectionObserver', undefined);
     render(

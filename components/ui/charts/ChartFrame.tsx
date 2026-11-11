@@ -47,8 +47,10 @@ export function ChartFrame({
 }: ChartFrameProps) {
   const captionId = useId();
   const plotRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(mountsImmediately);
-  const mounted = visible || !deferUntilVisible;
+  // Latched: once true it stays true, so a chart never unmounts, even when
+  // deferUntilVisible turns on after the chart has mounted.
+  const [mounted, setMounted] = useState(() => !deferUntilVisible || mountsImmediately());
+  if (!mounted && !deferUntilVisible) setMounted(true);
 
   useEffect(() => {
     const node = plotRef.current;
@@ -57,7 +59,7 @@ export function ChartFrame({
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           observer.disconnect();
-          setVisible(true);
+          setMounted(true);
         }
       },
       { rootMargin: DEFER_ROOT_MARGIN }
