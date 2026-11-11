@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { cn } from '@/lib/utils';
 import { CHART_HEIGHT_CLASS, CHART_MODE_NOTE_CLASS, type ChartHeight } from './sizes';
 
@@ -65,6 +65,9 @@ export function chartLoading(
   return ChartLoading;
 }
 
+const subscribeNever = () => () => {};
+const isObserverMissing = () => typeof IntersectionObserver === 'undefined';
+
 export interface ChartViewportMountProps extends Omit<ChartPlaceholderProps, 'label'> {
   /** The chart, normally a next/dynamic component. Mounted once near the viewport. */
   children: React.ReactNode;
@@ -75,7 +78,9 @@ export interface ChartViewportMountProps extends Omit<ChartPlaceholderProps, 'la
 /**
  * Renders the placeholder until it comes within `rootMargin` of the viewport,
  * then mounts `children` and stays mounted. Without IntersectionObserver
- * (old browsers, tests) the children mount immediately.
+ * (old browsers, tests) the children mount right after hydration. The first
+ * render is always the placeholder, on the server and the client alike, so
+ * hydration never sees different markup.
  */
 export function ChartViewportMount({
   children,
@@ -86,10 +91,15 @@ export function ChartViewportMount({
   className,
 }: ChartViewportMountProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [near, setNear] = useState(() => typeof IntersectionObserver === 'undefined');
+  // The server snapshot is false, so hydration renders the placeholder on
+  // both sides; the client then re-renders with its real support.
+  const observerMissing = useSyncExternalStore(subscribeNever, isObserverMissing, () => false);
+  const [seen, setNear] = useState(false);
+  const near = seen || observerMissing;
 
   useEffect(() => {
-    if (near) return;
+    // The hydration pass commits with the server snapshot, so check support here too.
+    if (near || isObserverMissing()) return;
     const node = ref.current;
     if (!node) return;
     const observer = new IntersectionObserver(
@@ -105,10 +115,13 @@ export function ChartViewportMount({
     return () => observer.disconnect();
   }, [near, rootMargin]);
 
-  if (near) return <>{children}</>;
   return (
     <div ref={ref}>
-      <ChartPlaceholder height={height} modeNote={modeNote} caption={caption} className={className} />
+      {near ? (
+        children
+      ) : (
+        <ChartPlaceholder height={height} modeNote={modeNote} caption={caption} className={className} />
+      )}
     </div>
   );
 }

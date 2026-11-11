@@ -25,11 +25,12 @@ export interface StatGridProps {
   testId?: string;
 }
 
+/** One column below md (the rebuild's mobile rule), widening from there. */
 const COLUMN_CLASSES: Record<StatGridColumns, string> = {
   1: 'grid-cols-1',
-  2: 'grid-cols-2',
-  3: 'grid-cols-1 sm:grid-cols-3',
-  4: 'grid-cols-2 md:grid-cols-4',
+  2: 'grid-cols-1 md:grid-cols-2',
+  3: 'grid-cols-1 md:grid-cols-3',
+  4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
 };
 
 /** A responsive grid of StatTiles; numbers are formatted from each spec's FormatKind. */

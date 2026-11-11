@@ -88,6 +88,14 @@
   --color-info: hsl(var(--info));
   --color-info-foreground: hsl(var(--info-foreground));
 
+  /* Status text reads its own token (like --primary-text) so text-success,
+     text-warning, text-destructive and text-info meet 4.5:1 on background,
+     card and muted, while bg-* and border-* keep the fill colors. */
+  --text-color-success: hsl(var(--success-text));
+  --text-color-warning: hsl(var(--warning-text));
+  --text-color-destructive: hsl(var(--destructive-text));
+  --text-color-info: hsl(var(--info-text));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -144,6 +152,11 @@
     --warning-foreground: 0 0% 10%; /* dark ink: white on amber is ~2.2:1, below WCAG AA */
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
+    /* Status text: on white / muted. The fills above are 2.1 to 3.8:1 as text. */
+    --success-text: 142 72% 27%; /* 5.68:1 / 5.18:1 */
+    --warning-text: 32 95% 30%; /* 6.05:1 / 5.51:1 */
+    --destructive-text: 0 72% 42%; /* 6.47:1 / 5.89:1 */
+    --info-text: 217 80% 42%; /* 6.63:1 / 6.04:1 */
   }
 
   .dark {
@@ -176,6 +189,11 @@
     --warning-foreground: 0 0% 8%;
     --info: 217 91% 70%;
     --info-foreground: 0 0% 8%;
+    /* Status text: on background / card / muted. The destructive fill was 1.8:1 as text. */
+    --success-text: 142 69% 58%; /* 10.52:1 / 10.02:1 / 8.64:1 */
+    --warning-text: 45 93% 58%; /* 11.42:1 / 10.88:1 / 9.39:1 */
+    --destructive-text: 0 85% 68%; /* 6.11:1 / 5.82:1 / 5.02:1 */
+    --info-text: 217 91% 70%; /* 7.16:1 / 6.82:1 / 5.88:1 */
   }
 }
  

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   TONES,
   TONE_TEXT,
@@ -73,4 +75,59 @@ describe('StatSpec helpers', () => {
     expect(findStat(specs, 'balance')?.label).toBe('Balance');
     expect(findStat(specs, 'missing')).toBeUndefined();
   });
+});
+
+/** Parses one theme block of app/globals.css into { token: [h, s, l] }. */
+function readTheme(selector: RegExp): Record<string, [number, number, number]> {
+  const css = readFileSync(resolve(__dirname, '../../../app/globals.css'), 'utf8');
+  const block = css.match(selector)?.[1] ?? '';
+  const tokens: Record<string, [number, number, number]> = {};
+  for (const m of block.matchAll(/--([\w-]+):\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/g)) {
+    tokens[m[1]] = [Number(m[2]), Number(m[3]), Number(m[4])];
+  }
+  return tokens;
+}
+
+function luminance([h, s, l]: [number, number, number]): number {
+  const sat = s / 100;
+  const light = l / 100;
+  const a = sat * Math.min(light, 1 - light);
+  const channel = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const v = light - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(8) + 0.0722 * channel(4);
+}
+
+function contrast(a: [number, number, number], b: [number, number, number]): number {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+describe('tone text contrast (app/globals.css)', () => {
+  const themes = {
+    light: readTheme(/:root,\s*\.light\s*\{([^}]*)\}/),
+    dark: readTheme(/\.dark\s*\{([^}]*)\}/),
+  };
+  const textTokens = ['primary-text', 'success-text', 'warning-text', 'destructive-text', 'info-text', 'muted-foreground'];
+
+  it('maps status tones to text-* utilities backed by text tokens', () => {
+    const css = readFileSync(resolve(__dirname, '../../../app/globals.css'), 'utf8');
+    for (const name of ['success', 'warning', 'destructive', 'info']) {
+      expect(css).toContain(`--text-color-${name}: hsl(var(--${name}-text));`);
+    }
+  });
+
+  for (const [theme, tokens] of Object.entries(themes)) {
+    for (const token of textTokens) {
+      it(`${theme} --${token} is at least 4.5:1 on background, card and muted`, () => {
+        expect(tokens[token]).toBeDefined();
+        for (const surface of ['background', 'card', 'muted']) {
+          expect(tokens[surface]).toBeDefined();
+          expect(contrast(tokens[token], tokens[surface])).toBeGreaterThanOrEqual(4.5);
+        }
+      });
+    }
+  }
 });

@@ -2,6 +2,8 @@ import React from 'react'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Line, LineChart } from 'recharts'
+import { renderToString } from 'react-dom/server'
+import { hydrateRoot } from 'react-dom/client'
 import {
   CHART_HEIGHT_CLASS,
   ChartFrame,
@@ -132,6 +134,49 @@ describe('ChartViewportMount', () => {
     expect(screen.getByText('chart')).toBeInTheDocument()
     expect(screen.queryByRole('status')).toBeNull()
     expect(disconnect).toHaveBeenCalled()
+  })
+})
+
+describe('ChartViewportMount hydration', () => {
+  it('server and client first render match, with or without IntersectionObserver', async () => {
+    class IO {
+      observe() {}
+      disconnect() {}
+    }
+    for (const clientIO of [IO, undefined]) {
+      const tree = (
+        <ChartViewportMount height="tall">
+          <p>chart</p>
+        </ChartViewportMount>
+      )
+      vi.stubGlobal('IntersectionObserver', undefined)
+      const html = renderToString(tree)
+      expect(html).toContain('data-chart-placeholder')
+      expect(html).not.toContain('<p>chart</p>')
+
+      vi.stubGlobal('IntersectionObserver', clientIO)
+      const container = document.createElement('div')
+      container.innerHTML = html
+      document.body.appendChild(container)
+      const errors: unknown[] = []
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      let root: ReturnType<typeof hydrateRoot> | undefined
+      await act(async () => {
+        root = hydrateRoot(container, tree, {
+          onRecoverableError: (error) => errors.push(error),
+        })
+      })
+      expect(errors).toEqual([])
+      expect(consoleError).not.toHaveBeenCalled()
+      consoleError.mockRestore()
+      if (clientIO === undefined) {
+        expect(container.querySelector('p')?.textContent).toBe('chart')
+      } else {
+        expect(container.querySelector('[data-chart-placeholder]')).not.toBeNull()
+      }
+      act(() => root?.unmount())
+      container.remove()
+    }
   })
 })
 

@@ -17,7 +17,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-lg py-16">
+    <div className="mx-auto max-w-lg px-4 py-16">
       <Card>
         <CardHeader>
           <CardTitle>Something went wrong</CardTitle>
@@ -27,7 +27,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={reset}>Try again</Button>
+          <Button onClick={reset} className="min-h-11">Try again</Button>
         </CardContent>
       </Card>
     </div>
