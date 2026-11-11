@@ -28,6 +28,35 @@ const PAGE_METADATA = {
   leverage: leverageMetadata,
 } as const;
 
+/**
+ * Each page's metadata as it shipped before the rebuild (6fb0576), as golden
+ * strings: once phase 3 makes the pages export calculatorMetadata(id), the
+ * comparison above compares the registry with itself, and these still pin
+ * the titles and meta descriptions.
+ */
+const GOLDEN_METADATA: Record<CalculatorId, { title: string; description: string }> = {
+  paycheck: {
+    title: 'Paycheck Allocator',
+    description:
+      'Allocate a monthly paycheck across fixed costs, tax-advantaged accounts, and flexible spending, with the arithmetic shown at each step.',
+  },
+  retirement: {
+    title: 'Retirement Calculator',
+    description:
+      'Monte Carlo retirement modeling with Social Security, healthcare costs, and side-by-side scenario comparison.',
+  },
+  portfolio: {
+    title: 'Portfolio Rebalancer',
+    description:
+      'Compute the trades needed to bring a multi-account portfolio back to its target allocation, with custom asset classes and account-placement guidance.',
+  },
+  leverage: {
+    title: 'Leverage Comparison',
+    description:
+      'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the lump-sum framing shown side by side.',
+  },
+};
+
 /** What each shell renders today (CalculatorLayout title, description and disclaimer). */
 const SHELLS: Record<CalculatorId, { path: string; title: string; description: string; disclaimer: string }> = {
   paycheck: {
@@ -75,6 +104,10 @@ describe('calculator registry', () => {
 
   it.each(CALCULATOR_IDS)('%s: metadata equals what the page exports', (id) => {
     expect(calculatorMetadata(id)).toEqual(PAGE_METADATA[id]);
+  });
+
+  it.each(CALCULATOR_IDS)('%s: metadata equals the golden title and description', (id) => {
+    expect(calculatorMetadata(id)).toEqual(GOLDEN_METADATA[id]);
   });
 
   it.each(CALCULATOR_IDS)('%s: path, heading and description equal the shell', (id) => {

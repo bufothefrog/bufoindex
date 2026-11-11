@@ -7,15 +7,17 @@
  */
 
 import React from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CalculatorPage from '@/components/calculators/shared/CalculatorPage';
 import { calculatorDisclaimer, calculatorMeta } from '@/lib/calculators/registry';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import type { FieldErrors, FormSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { createCalculatorStore, type CalculatorStore } from '@/lib/store/createCalculatorStore';
-import { useProfileStore } from '@/lib/store/profileStore';
+import { PROFILE_STORAGE_KEY, useProfileStore } from '@/lib/store/profileStore';
 import { renderWithProfile } from '@/test/utils/render';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 
@@ -220,5 +222,94 @@ describe('CalculatorPage', () => {
     expect(screen.getByText('10 years left from age 50')).toBeInTheDocument();
     act(() => useProfileStore.getState().setValues([{ path: 'person.retirementAge', value: 70 }]));
     expect(screen.getByText('20 years left from age 50')).toBeInTheDocument();
+  });
+
+  it('does not re-render the results while typing in a field the calculation does not use', () => {
+    definition = {
+      ...fakeDefinition(),
+      form: {
+        ...FORM,
+        fields: [
+          ...FORM.fields,
+          { path: 'assumptions.retirement.inflationRate', kind: 'percent', label: 'Inflation', min: 0, max: 0.1, tier: 'details' },
+        ],
+        screens: [
+          ...FORM.screens,
+          { id: 'more', title: 'More', tier: 'details', fields: ['assumptions.retirement.inflationRate'] },
+        ],
+      },
+    };
+    store = createCalculatorStore({ definition });
+    let renders = 0;
+    function Counted({ years }: { years: number }) {
+      renders += 1;
+      return <p>{years} years left</p>;
+    }
+    renderWithProfile(
+      <CalculatorPage definition={definition} store={store} renderResults={({ results }) => <Counted years={results.yearsLeft} />} />
+    );
+    expect(screen.getByText('30 years left')).toBeInTheDocument();
+    const before = renders;
+    const inflation = screen.getByRole('textbox', { name: 'Inflation' });
+    for (const value of ['3', '3.', '3.5']) fireEvent.change(inflation, { target: { value } });
+    expect(useProfileStore.getState().profile.assumptions.retirement.inflationRate).toBe(0.035);
+    expect(renders).toBe(before);
+
+    fireEvent.change(ageBox(), { target: { value: '35' } });
+    expect(screen.getByText('25 years left')).toBeInTheDocument();
+    expect(renders).toBe(before + 1);
+  });
+
+  it('reports a failed run in the results only, not as a field needing attention', () => {
+    let fail = false;
+    definition = fakeDefinition((inputs) => {
+      if (fail) throw new Error('Boom');
+      return { yearsLeft: inputs.retirementAge - inputs.age };
+    });
+    store = createCalculatorStore({ definition });
+    renderWithProfile(page());
+    fail = true;
+    fireEvent.change(ageBox(), { target: { value: '35' } });
+    expect(store.getState().errors).toEqual({ calculation: 'Boom' });
+    expect(screen.getByText('Results out of date')).toBeInTheDocument();
+    expect(screen.queryByText(/needs? attention/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Please fix the following errors:')).not.toBeInTheDocument();
+  });
+
+  it('hydrates the server markup without a mismatch, then shows the stored profile', async () => {
+    resetProfileStore({ hydrated: false });
+    const html = renderToString(page());
+    expect(html).toContain('Loading results');
+
+    const stored = getDefaultFinancialProfile();
+    stored.person.age = 44;
+    stored.provided = ['person.age'];
+    window.localStorage.setItem(
+      PROFILE_STORAGE_KEY,
+      JSON.stringify({ state: { profile: stored }, version: useProfileStore.persist.getOptions().version })
+    );
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    const recoverable = vi.fn();
+    const consoleError = vi.spyOn(console, 'error');
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, page(), { onRecoverableError: recoverable });
+      });
+      await act(async () => {
+        await useProfileStore.persist.rehydrate();
+      });
+      expect(recoverable).not.toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(useProfileStore.getState().hasHydrated).toBe(true);
+      expect(container.textContent).toContain('16 years left from age 44');
+    } finally {
+      consoleError.mockRestore();
+      act(() => root?.unmount());
+      container.remove();
+    }
   });
 });

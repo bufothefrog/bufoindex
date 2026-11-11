@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { AlertTriangle, History } from 'lucide-react';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { FieldSections } from '@/components/fields';
@@ -11,7 +11,7 @@ import { calculatorDisclaimer, calculatorMeta } from '@/lib/calculators/registry
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { makeGet } from '@/lib/fields/paths';
 import { screenPaths } from '@/lib/fields/runtime';
-import type { ScreenSpec } from '@/lib/fields/types';
+import type { FieldErrors, ScreenSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
@@ -24,6 +24,12 @@ export interface CalculatorResultsArgs<E, R> {
   results: R;
   /** The engine inputs that produced `results` (not the latest values). */
   inputs: E;
+  /**
+   * The profile as of the last change to results, inputs or stale. It is
+   * read, not subscribed to, so typing in a field that does not change the
+   * engine inputs does not re-render the results; anything the results show
+   * should come from inputs, or from profile values the bindings feed.
+   */
   values: FinancialProfile;
   /** The results predate the latest values (an invalid field or a failed run). */
   stale: boolean;
@@ -54,6 +60,30 @@ function ResultsSkeleton() {
       ))}
     </div>
   );
+}
+
+interface ResultsBodyProps<E, R> {
+  results: R;
+  inputs: E;
+  stale: boolean;
+  renderResults: (args: CalculatorResultsArgs<E, R>) => React.ReactNode;
+}
+
+/**
+ * renderResults behind React.memo: the page body re-renders on every
+ * keystroke (its fields read the profile), but the results (charts on some
+ * calculators) re-render only when the run store's results, inputs or stale
+ * change (D29).
+ */
+const ResultsBody = React.memo(function ResultsBody<E, R>({ results, inputs, stale, renderResults }: ResultsBodyProps<E, R>) {
+  const values = useProfileStore.getState().profile;
+  return <>{renderResults({ results, inputs, values, stale })}</>;
+}) as <E, R>(props: ResultsBodyProps<E, R>) => React.ReactElement;
+
+/** Errors without the run error, which the results column shows itself. */
+function fieldErrorsOnly(errors: FieldErrors): FieldErrors {
+  if (!(RUN_ERROR_PATH in errors)) return errors;
+  return Object.fromEntries(Object.entries(errors).filter(([path]) => path !== RUN_ERROR_PATH));
 }
 
 /**
@@ -105,6 +135,9 @@ export default function CalculatorPage<E, R>({
   };
 
   const hasErrors = Object.keys(errors).length > 0;
+  // The layout's error summary asks the visitor to fix fields; a failed run
+  // is not a field, and the results column already reports it.
+  const fieldErrors = useMemo(() => fieldErrorsOnly(errors), [errors]);
   // A failed run, or an engine error with no field to show it on.
   const runError = errors[RUN_ERROR_PATH];
   let resultSection: React.ReactNode;
@@ -117,7 +150,7 @@ export default function CalculatorPage<E, R>({
           </StatusAlert>
         )}
         <div aria-busy={stale} className={cn('space-y-6 transition-opacity', stale && 'opacity-60')}>
-          {renderResults({ results, inputs, values, stale })}
+          <ResultsBody results={results} inputs={inputs} stale={stale} renderResults={renderResults} />
         </div>
       </>
     );
@@ -153,7 +186,7 @@ export default function CalculatorPage<E, R>({
         resultSection={resultSection}
         resultFooter={<NextSteps intent={definition.id} />}
         isCalculating={isCalculating}
-        errors={errors}
+        errors={fieldErrors}
         disclaimer={calculatorDisclaimer(definition.id)}
       />
       {afterLayout}
