@@ -15,7 +15,10 @@
  *   (filingStatusNote).
  *
  * The reverse direction (`write`) serves only the one-time import of the old
- * calculator's localStorage (O7).
+ * calculator's localStorage (O7). An old income entry whose period has no
+ * pay frequency (yearly, hourly) is written as gross pay in the frequency
+ * the profile already holds, at the same annual income, so it never moves
+ * the frequency.
  */
 
 import { annualizeIncome, type IncomePeriod, type RetirementInputs } from '@/lib/calculations/retirement';
@@ -58,10 +61,12 @@ function incomeEntry(get: Get): IncomeEntry {
 
 /**
  * Profile writes for an old income entry. A period with a pay frequency
- * keeps its amount; hourly and yearly amounts become a monthly paycheck of
- * the same annual income, rounded to the cent.
+ * keeps its amount and writes that frequency. Hourly and yearly amounts have
+ * no frequency of their own: they become gross pay per paycheck of `held`
+ * (the frequency the profile holds) at the same annual income, rounded to
+ * the cent, and leave the frequency alone.
  */
-function incomeWrites(amount: number, period: IncomePeriod): Write[] {
+function incomeWrites(amount: number, period: IncomePeriod, held: PayFrequency): Write[] {
   const frequency = FREQUENCY_FOR_PERIOD[period];
   if (frequency) {
     return [
@@ -69,10 +74,8 @@ function incomeWrites(amount: number, period: IncomePeriod): Write[] {
       { path: FREQUENCY_PATH, value: frequency },
     ];
   }
-  return [
-    { path: GROSS_PATH, value: Math.round((annualizeIncome(amount, period) / 12) * 100) / 100 },
-    { path: FREQUENCY_PATH, value: 'monthly' satisfies PayFrequency },
-  ];
+  const perPaycheck = annualizeIncome(amount, period) / PAY_FREQUENCY_META[held].perYear;
+  return [{ path: GROSS_PATH, value: Math.round(perPaycheck * 100) / 100 }];
 }
 
 /** The filing status the retirement engine runs for a profile status (O10). */
@@ -106,7 +109,7 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   {
     engine: 'incomeAmount',
     read: (get) => incomeEntry(get).amount,
-    write: (_value, engine) => incomeWrites(engine.incomeAmount, engine.incomePeriod),
+    write: (_value, engine, get) => incomeWrites(engine.incomeAmount, engine.incomePeriod, get(FREQUENCY_PATH) as PayFrequency),
     errorPath: GROSS_PATH,
   },
   { engine: 'incomePeriod', read: (get) => incomeEntry(get).period },

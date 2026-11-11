@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { RetirementInputs } from '@/lib/calculations/retirement';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_LEGACY, readRetirementStorage } from '@/lib/calculators/retirement/legacy';
+import { engineInputsFor } from '@/lib/calculators/runtime';
 import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -138,10 +139,12 @@ describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)', () => {
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 
-  it('turns an old yearly salary into a monthly paycheck', () => {
+  it('turns an old yearly salary into a paycheck of the frequency the profile holds', () => {
+    // 120,000 a year / 26 = 4,615.38 bi-weekly (the profile default), to the cent.
     store(envelope({ ...OLD_DEFAULTS, incomeAmount: 120000, incomePeriod: 'yearly' }));
-    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
-    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 10000, frequency: 'monthly' });
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['income.grossPerPaycheck']);
+    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 4615.38, frequency: 'bi-weekly' });
+    expect(useProfileStore.getState().profile.provided).not.toContain('income.frequency');
   });
 
   it('never overrides an answer given since, and is idempotent', () => {
@@ -168,8 +171,61 @@ describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)', () => {
     expect(profile.person.age).toBe(25);
     expect(profile.investing).toMatchObject({ investedBalance: 10000, monthlyContribution: 2000 });
     expect(profile.spending.necessaryMonthly).toBe(4000);
-    expect(profile.income).toMatchObject({ grossPerPaycheck: 8333.33, frequency: 'monthly' });
+    // 100,000 a year in the profile's bi-weekly pay: 3,846.15.
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 3846.15, frequency: 'bi-weekly' });
     expect(profile.provided).toEqual([]);
+  });
+});
+
+/**
+ * An old yearly or hourly income has no pay frequency of its own: it comes
+ * in as gross pay in the frequency the profile holds, so a frequency or a
+ * take-home pay answered on the new paycheck page never makes it drop the
+ * salary. Only the visitor's own monthly, bi-weekly or semi-monthly period
+ * against a different answered frequency is a true conflict.
+ */
+describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR): a salary with no pay frequency of its own', () => {
+  const currentIncome = () => engineInputsFor(RETIREMENT_CALCULATOR, useProfileStore.getState().profile).currentIncome;
+  const income = () => useProfileStore.getState().profile.income;
+
+  it('keeps an hourly wage under an answered weekly frequency', () => {
+    resetProfileStore({ profile: { income: { frequency: 'weekly' } } });
+    store(envelope({ ...OLD_DEFAULTS, incomeAmount: 30, incomePeriod: 'hourly' }));
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['income.grossPerPaycheck']);
+    // 30 x 2,080 = 62,400 a year = 1,200 a week.
+    expect(income()).toMatchObject({ grossPerPaycheck: 1200, frequency: 'weekly' });
+    expect(currentIncome()).toBeCloseTo(62400, 6);
+  });
+
+  it('keeps a yearly salary under an answered semi-monthly frequency', () => {
+    resetProfileStore({ profile: { income: { frequency: 'semi-monthly' } } });
+    store(envelope({ ...OLD_DEFAULTS, incomeAmount: 100800, incomePeriod: 'yearly' }));
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['income.grossPerPaycheck']);
+    expect(income()).toMatchObject({ grossPerPaycheck: 4200, frequency: 'semi-monthly' });
+    expect(currentIncome()).toBeCloseTo(100800, 6);
+  });
+
+  it('keeps a yearly salary under an answered bi-weekly frequency', () => {
+    resetProfileStore({ profile: { income: { frequency: 'bi-weekly' } } });
+    store(envelope({ ...OLD_DEFAULTS, incomeAmount: 90000, incomePeriod: 'yearly' }));
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    // 90,000 / 26 = 3,461.54 (to the cent): 90,000.04 a year.
+    expect(income()).toMatchObject({ grossPerPaycheck: 3461.54, frequency: 'bi-weekly' });
+    expect(currentIncome()).toBeCloseTo(90000, 1);
+  });
+
+  it('keeps a yearly salary and an answered take-home pay that it stays above', () => {
+    resetProfileStore({ profile: { income: { netPerPaycheck: 2800 } } });
+    store(envelope({ ...OLD_DEFAULTS, incomeAmount: 90000, incomePeriod: 'yearly' }));
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['income.grossPerPaycheck']);
+    expect(income()).toMatchObject({ grossPerPaycheck: 3461.54, netPerPaycheck: 2800, frequency: 'bi-weekly' });
+  });
+
+  it("skips the visitor's own monthly period against a different answered frequency", () => {
+    resetProfileStore({ profile: { income: { frequency: 'weekly' } } });
+    store(envelope({ ...OLD_DEFAULTS, incomeAmount: 5000, incomePeriod: 'monthly' }));
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
+    expect(income()).toMatchObject({ grossPerPaycheck: 3500, frequency: 'weekly' });
   });
 });
 

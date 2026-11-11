@@ -14,6 +14,7 @@ import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
 import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
 import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
+import { makeGet } from '@/lib/fields/paths';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
 import { migrateProfile } from '@/lib/profile/migrate';
 import type { Write } from '@/lib/fields/types';
@@ -213,30 +214,45 @@ describe('the definition', () => {
 });
 
 describe('the reverse direction (legacy import)', () => {
-  const writesFor = (overrides: Partial<RetirementInputs>) =>
-    fromEngineInputs(RETIREMENT_BINDINGS, { ...RETIREMENT_LEGACY.storageDefaults(), ...overrides });
-  const valueAt = (overrides: Partial<RetirementInputs>, path: string) =>
-    writesFor(overrides).filter((write) => write.path === path).map((write) => write.value);
+  /** The writes for the old inputs `overrides` into a profile paid `held` (the profile default otherwise). */
+  const writesFor = (overrides: Partial<RetirementInputs>, held?: PayFrequency) => {
+    const profile = getDefaultFinancialProfile();
+    const target = held ? { ...profile, income: { ...profile.income, frequency: held } } : profile;
+    return fromEngineInputs(RETIREMENT_BINDINGS, { ...RETIREMENT_LEGACY.storageDefaults(), ...overrides }, makeGet(target));
+  };
+  const valueAt = (overrides: Partial<RetirementInputs>, path: string, held?: PayFrequency) =>
+    writesFor(overrides, held).filter((write) => write.path === path).map((write) => write.value);
 
   it('keeps a period that has a pay frequency', () => {
     expect(valueAt({ incomeAmount: 4200, incomePeriod: 'semimonthly' }, 'income.grossPerPaycheck')).toEqual([4200]);
     expect(valueAt({ incomeAmount: 4200, incomePeriod: 'semimonthly' }, 'income.frequency')).toEqual(['semi-monthly']);
     expect(valueAt({ incomeAmount: 3000, incomePeriod: 'biweekly' }, 'income.frequency')).toEqual(['bi-weekly']);
+    // Whatever frequency the profile holds.
+    expect(valueAt({ incomeAmount: 3000, incomePeriod: 'monthly' }, 'income.frequency', 'weekly')).toEqual(['monthly']);
   });
 
-  it('turns yearly and hourly amounts into a monthly paycheck of the same annual income', () => {
-    // 100,000 a year / 12 = 8,333.33 (to the cent).
-    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.grossPerPaycheck')).toEqual([8333.33]);
-    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.frequency')).toEqual(['monthly']);
-    // 30 an hour x 2,080 = 62,400 a year = 5,200 a month.
-    expect(valueAt({ incomeAmount: 30, incomePeriod: 'hourly' }, 'income.grossPerPaycheck')).toEqual([5200]);
+  it('turns yearly and hourly amounts into a paycheck of the frequency the profile holds, at the same annual income', () => {
+    // 100,000 a year / 26 = 3,846.15 bi-weekly (the profile default), to the cent.
+    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.grossPerPaycheck')).toEqual([3846.15]);
+    // 100,000 a year / 12 = 8,333.33 a month.
+    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.grossPerPaycheck', 'monthly')).toEqual([8333.33]);
+    // 30 an hour x 2,080 = 62,400 a year = 1,200 a week.
+    expect(valueAt({ incomeAmount: 30, incomePeriod: 'hourly' }, 'income.grossPerPaycheck', 'weekly')).toEqual([1200]);
+    // 100,800 a year = 4,200 semi-monthly.
+    expect(valueAt({ incomeAmount: 100800, incomePeriod: 'yearly' }, 'income.grossPerPaycheck', 'semi-monthly')).toEqual([4200]);
+  });
+
+  it('leaves the frequency alone for a yearly or hourly amount', () => {
+    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.frequency', 'monthly')).toEqual([]);
+    expect(valueAt({ incomeAmount: 30, incomePeriod: 'hourly' }, 'income.frequency', 'weekly')).toEqual([]);
   });
 
   it('writes the filing status and skips the one-way income leaves', () => {
     expect(valueAt({ filingStatus: 'marriedJoint' }, 'person.filingStatus')).toEqual(['marriedJoint']);
     const paths = writesFor({}).map((write) => write.path);
     expect(new Set(paths).size).toBe(paths.length);
-    expect(paths).toHaveLength(21);
+    // The old default yearly income writes gross pay only, in the profile's frequency.
+    expect(paths).toHaveLength(20);
   });
 });
 
