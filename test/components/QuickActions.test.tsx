@@ -55,6 +55,9 @@ function renderActions(profile: PaycheckProfile) {
 }
 
 /** The label (dt) and value (dd) of the row whose label is `label`, within one action card. */
+/** Classes that would clip or refuse to wrap the impact phrase. */
+const CLIPPING_CLASSES = ['truncate', 'overflow-hidden', 'whitespace-nowrap', 'text-nowrap'];
+
 function rowFor(label: string, card: HTMLElement = document.body) {
   const term = within(card).getByText(label).closest('dt');
   expect(term).not.toBeNull();
@@ -484,6 +487,26 @@ describe('QuickActions', () => {
       ).toBeInTheDocument();
       // The label must not share a node with the phrase or the figure.
       expect(within(term).getByText('Impact').textContent).toBe('Impact');
+    });
+
+    it('puts the phrase in a container that can wrap rather than clip', () => {
+      renderActions(matchOnlyProfile());
+
+      const { row, term } = rowFor('Impact');
+      const phrase = within(term).getByText('unclaimed match per bi-weekly paycheck');
+
+      // Nothing between the phrase and the row clips or forbids wrapping.
+      let current: HTMLElement | null = phrase;
+      while (current && current !== row.parentElement) {
+        for (const className of CLIPPING_CLASSES) {
+          expect(Array.from(current.classList), `"${current.className}" must not clip the impact text`).not.toContain(
+            className
+          );
+        }
+        current = current.parentElement;
+      }
+      // The label column is the shrinkable half of the row.
+      expect(phrase.closest('.min-w-0')).not.toBeNull();
     });
 
     it('renders the impact and time-to-implement rows as separate rows', () => {
