@@ -12,6 +12,7 @@ import {
   buildIntakeSubmission,
   coreDestination,
   coreStartLink,
+  intentStartLink,
   coreSummary,
   getIntakeScreens,
   getIntentOption,
@@ -127,6 +128,11 @@ describe('intake flows', () => {
     expect(CORE_START_PATH).toBe('/start');
     expect(LEARN_CHOOSER_PATH).toBe('/start/choose');
     expect(coreStartLink('retirement')).toBe('/start?next=retirement');
+    expect(intentStartLink('retirement')).toBe('/start?next=retirement');
+    expect(intentStartLink('paycheck')).toBe('/start?next=paycheck');
+    expect(intentStartLink('leverage')).toBe('/start?next=leverage');
+    // The rebalancer reads none of the basics (O5).
+    expect(intentStartLink('portfolio')).toBe('/start/portfolio');
     expect(coreDestination('leverage')).toBe('/start/leverage');
     expect(coreDestination('choose')).toBe('/start/choose');
     expect(coreDestination(null)).toBe('/start/choose');

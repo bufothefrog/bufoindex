@@ -55,6 +55,14 @@ describe('CalculatorPage', () => {
     expect(await screen.findByTestId('fake-results')).toHaveTextContent('Years to go: 25');
   });
 
+  it('builds the placeholder from the shared loading tiles and chart placeholder', () => {
+    const { container } = renderPage({ profile: fakeProfile(40, 65), hydrated: false });
+    const placeholder = container.querySelector('[data-results-placeholder]') as HTMLElement;
+    expect(placeholder).not.toBeNull();
+    expect(within(placeholder).getAllByRole('group', { busy: true })).toHaveLength(2);
+    expect(placeholder.querySelector('[data-chart-placeholder]')).not.toBeNull();
+  });
+
   it('reads the profile when the URL has no hand-off marker, and leaves the URL alone', async () => {
     window.history.replaceState(null, '', '/tools/retirement-calculator?tab=x#keep');
     renderPage({ profile: fakeProfile(30, 62) });
@@ -115,6 +123,17 @@ describe('CalculatorPage', () => {
     expect(screen.getByTestId('fake-results')).toHaveTextContent('Years to go: 30');
   });
 
+  it('marks stale results with a border cue, never by dimming the text', async () => {
+    renderPage({ profile: fakeProfile(40, 65) });
+    const results = await screen.findByTestId('fake-results');
+    act(() => useProfileStore.getState().setValues([{ path: 'person.retirementAge', value: 35 }]));
+    await screen.findByTestId('stale-results');
+    const wrapper = results.closest('[data-stale]') as HTMLElement;
+    expect(wrapper).not.toBeNull();
+    expect(wrapper.className).not.toMatch(/opacity-/);
+    expect(wrapper.className).toContain('border-warning');
+  });
+
   it('shows the empty state when the inputs are invalid before any result', async () => {
     renderPage({ profile: fakeProfile(40, 35) });
     await waitFor(() => expect(screen.getByText('Results appear here')).toBeInTheDocument());
@@ -126,6 +145,24 @@ describe('CalculatorPage', () => {
     await screen.findByTestId('fake-results');
     expect(screen.getByRole('button', { name: 'Edit basics' })).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /^Age/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the core screen open (and the input mounted) while the last core field is filled in', async () => {
+    const user = userEvent.setup();
+    renderPage({ profile: fakeProfile(40, 65, ['person.age']) });
+    await screen.findByTestId('fake-results');
+
+    const input = screen.getByRole('textbox', { name: /^Retirement age/ });
+    await user.clear(input);
+    await user.type(input, '7');
+    expect(useProfileStore.getState().profile.provided).toContain('person.retirementAge');
+    expect(document.body.contains(input)).toBe(true);
+    expect(input).toHaveFocus();
+
+    await user.type(input, '0');
+    expect(document.body.contains(input)).toBe(true);
+    expect(useProfileStore.getState().profile.person.retirementAge).toBe(70);
+    expect(screen.queryByRole('button', { name: 'Edit basics' })).not.toBeInTheDocument();
   });
 
   it('restores an assumption screen to its defaults and un-marks it', async () => {

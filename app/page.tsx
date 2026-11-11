@@ -7,7 +7,7 @@ import { calculatorMeta } from '@/lib/calculators/registry'
 import { composeDisclaimer } from '@/lib/constants/disclaimers'
 import {
   CORE_START_PATH,
-  coreStartLink,
+  intentStartLink,
   getIntentOption,
   type IntakeIntent,
 } from '@/lib/constants/intake'
@@ -82,7 +82,7 @@ function CalculatorPreviewCard({ intent, question }: (typeof PREVIEWS)[number]) 
   const name = calculatorMeta(intent).shortTitle
   return (
     <Link
-      href={coreStartLink(intent) as Route}
+      href={intentStartLink(intent) as Route}
       className={cn(
         'group flex h-full w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-card-foreground transition-colors md:p-5',
         'hover:border-sage-400 dark:hover:border-sage-500',

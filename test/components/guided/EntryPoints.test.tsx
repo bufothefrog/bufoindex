@@ -30,7 +30,7 @@ describe('landing page', () => {
     expect(started[0]).toHaveAttribute('href', '/start');
   });
 
-  it('previews each calculator and routes it through the core first', () => {
+  it('previews each calculator, routing all but the rebalancer through the core first', () => {
     render(<HomePage />);
     const section = screen.getByRole('region', { name: 'What you can learn' });
     const hrefs = within(section)
@@ -39,7 +39,7 @@ describe('landing page', () => {
     expect(hrefs).toEqual([
       '/start?next=paycheck',
       '/start?next=retirement',
-      '/start?next=portfolio',
+      '/start/portfolio',
       '/start?next=leverage',
       '/tools',
     ]);
@@ -106,12 +106,15 @@ describe('ContinueProfileCard', () => {
 });
 
 describe('EmptyOverview', () => {
-  it('starts with the basics, then offers each calculator through the core', () => {
+  it('starts with the basics, then offers each calculator (the rebalancer without the core)', () => {
     render(<EmptyOverview />);
     expect(screen.getByRole('link', { name: /Start with the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.getByRole('link', { name: /Then a paycheck/ })).toHaveAttribute('href', '/start?next=paycheck');
     expect(screen.getByRole('link', { name: /Then retirement/ })).toHaveAttribute('href', '/start?next=retirement');
-    expect(screen.getByRole('link', { name: /Then a portfolio/ })).toHaveAttribute('href', '/start?next=portfolio');
+    expect(screen.getByRole('link', { name: /Or go straight to a portfolio/ })).toHaveAttribute(
+      'href',
+      '/start/portfolio'
+    );
     expect(screen.getByRole('link', { name: /Then the leverage comparison/ })).toHaveAttribute(
       'href',
       '/start?next=leverage'

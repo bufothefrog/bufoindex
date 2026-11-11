@@ -13,7 +13,7 @@
  * | percent | PercentInput (with its slider when spec.slider)              |
  * | slider  | SliderField                                                  |
  * | select  | SelectInput                                                  |
- * | choice  | ChoiceGroup (two-column grid on the calculator, stacked lg)  |
+ * | choice  | ChoiceGroup (two columns from md on the calculator; lg stack)|
  * | boolean | Checkbox (md); Yes/No ChoiceGroup (lg, the wizard)           |
  * | state   | StateSelector                                                |
  * | text    | BaseInput around a text input                                |

@@ -7,7 +7,8 @@ import { BaseCard } from '@/components/ui/cards';
 import { profileCompleteness } from '@/lib/calculators/forms';
 import {
   LEARN_CHOOSER_PATH,
-  coreStartLink,
+  intentRequiresCore,
+  intentStartLink,
   isProfileFinished,
   type IntakeIntent,
 } from '@/lib/constants/intake';
@@ -53,11 +54,15 @@ export function NextSteps({ intent, className }: NextStepsProps) {
             Answer once and the answers carry across every calculator.
           </p>
           <OptionCard
-            href={coreStartLink(intent) as Route}
+            href={intentStartLink(intent) as Route}
             tone="emphasis"
             icon={ClipboardList}
             title="Answer a few quick questions"
-            description="A few questions on age, state, filing status, pay, and must-pay costs. Saved only in this browser."
+            description={
+              intentRequiresCore(intent)
+                ? 'A few questions on age, state, filing status, pay, and must-pay costs. Saved only in this browser.'
+                : 'A few questions on your accounts, holdings, and target mix. Saved only in this browser.'
+            }
           />
         </div>
       </BaseCard>

@@ -40,6 +40,14 @@ describe('NextSteps', () => {
     expect(linkNamed(/Answer a few quick questions/)).toHaveAttribute('href', '/start?next=leverage');
   });
 
+  it('sends the rebalancer straight to its own intake, skipping the core basics (O5)', () => {
+    render(<NextSteps intent="portfolio" />);
+    const link = linkNamed(/Answer a few quick questions/);
+    expect(link).toHaveAttribute('href', '/start/portfolio');
+    expect(link).toHaveTextContent(/accounts, holdings, and target mix/);
+    expect(link).not.toHaveTextContent(/filing status/);
+  });
+
   it('offers to finish the profile and try another calculator when a partial profile exists', () => {
     useProfileStore.getState().setValues(
       [

@@ -174,6 +174,15 @@ export function coreStartLink(intent: IntakeIntent): string {
 }
 
 /**
+ * Where an entry point for `intent` starts: the core intake first for intents
+ * that read the basics, straight to '/start/<intent>' for the portfolio
+ * rebalancer, which reads none of them (O5).
+ */
+export function intentStartLink(intent: IntakeIntent): string {
+  return intentRequiresCore(intent) ? coreStartLink(intent) : `/start/${intent}`;
+}
+
+/**
  * Where the core intake goes once finished: '/start/<next>' when `next` is a
  * known intent, otherwise the chooser.
  */

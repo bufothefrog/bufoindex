@@ -67,7 +67,7 @@ describe('ChoiceGroup', () => {
   it('ignores other keys and supports a grid layout', async () => {
     const user = userEvent.setup();
     render(<Controlled layout="grid" initial="single" />);
-    expect(screen.getByRole('radiogroup').className).toContain('sm:grid-cols-2');
+    expect(screen.getByRole('radiogroup').className).toContain('md:grid-cols-2');
     screen.getAllByRole('radio')[0].focus();
     await user.keyboard('a');
     expect(screen.getAllByRole('radio')[0]).toHaveAttribute('aria-checked', 'true');

@@ -25,9 +25,13 @@
  * from a whole-store subscription.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 import { BaseCard } from '@/components/ui/cards/BaseCard';
+import { StatGrid } from '@/components/ui/results/StatGrid';
+import { StatTile } from '@/components/ui/results/StatTile';
+import { ChartPlaceholder } from '@/components/ui/charts/ChartPlaceholder';
+import type { ChartHeight } from '@/components/ui/charts/sizes';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { FieldSections, defaultCollapsed, type CustomRenderers } from '@/components/fields';
 import { NextSteps } from '@/components/guided/NextSteps';
@@ -66,17 +70,33 @@ export interface CalculatorPageProps<E, R> {
   testId?: string;
 }
 
-/** Shown in the results column until the first run after hydration. */
-export function ResultsPlaceholder({ label }: { label: string }) {
+export interface ResultsPlaceholderProps {
+  /** Accessible name of the placeholder (the calculator's live-results label). */
+  label: string;
+  /** Labels of the two headline tiles, shown while their values load. */
+  statLabels?: readonly [string, string];
+  /** Height of the chart the results open with (ChartFrame sizes). */
+  chartHeight?: ChartHeight;
+}
+
+/**
+ * Shown in the results column until the first run after hydration. Built
+ * from the shared loading primitives (StatTile loading, ChartPlaceholder) so
+ * its height tracks the real tiles and chart.
+ */
+export function ResultsPlaceholder({
+  label,
+  statLabels = ['Headline figure', 'Second figure'],
+  chartHeight = 'compact',
+}: ResultsPlaceholderProps) {
   return (
     <BaseCard>
       <div role="status" aria-label={label} className="space-y-4" data-results-placeholder="">
-        <div className="h-6 w-1/2 animate-pulse rounded-md bg-muted" aria-hidden="true" />
-        <div className="grid grid-cols-2 gap-3" aria-hidden="true">
-          <div className="h-20 animate-pulse rounded-lg bg-muted/70" />
-          <div className="h-20 animate-pulse rounded-lg bg-muted/70" />
-        </div>
-        <div className="h-56 animate-pulse rounded-lg bg-muted/50" aria-hidden="true" />
+        <StatGrid columns={2} loading>
+          <StatTile label={statLabels[0]} loading />
+          <StatTile label={statLabels[1]} loading />
+        </StatGrid>
+        <ChartPlaceholder height={chartHeight} />
       </div>
     </BaseCard>
   );
@@ -107,15 +127,23 @@ export function CalculatorPage<E, R>({
   const stale = store((s) => s.stale);
   const isCalculating = store((s) => s.isCalculating);
 
-  // Core screens start collapsed once every core field has been answered.
-  const coreComplete =
-    ready &&
-    form.screens
-      .filter((screen) => screen.tier === 'core')
-      .every((screen) => isScreenComplete(form, screen, get, provided));
+  // Core screens start collapsed when every core field was already answered
+  // on arrival. The decision is taken once, the first render `ready` is true,
+  // and then frozen: every edit marks its path provided, so recomputing it
+  // would collapse the core card (unmounting the focused input) on the first
+  // keystroke into the last unanswered core field.
+  const [coreCollapsedAtReady, setCoreCollapsedAtReady] = useState<boolean | null>(null);
+  if (ready && coreCollapsedAtReady === null) {
+    setCoreCollapsedAtReady(
+      form.screens
+        .filter((screen) => screen.tier === 'core')
+        .every((screen) => isScreenComplete(form, screen, get, provided))
+    );
+  }
+  const coreCollapsed = coreCollapsedAtReady ?? false;
   const initiallyCollapsed = useCallback(
-    (screen: ScreenSpec) => (screen.tier === 'core' ? coreComplete : defaultCollapsed(screen)),
-    [coreComplete]
+    (screen: ScreenSpec) => (screen.tier === 'core' ? coreCollapsed : defaultCollapsed(screen)),
+    [coreCollapsed]
   );
   const handleRestoreDefaults = useCallback(
     (screen: ScreenSpec) => restoreDefaults(form, screen),
@@ -137,7 +165,7 @@ export function CalculatorPage<E, R>({
         <div
           data-stale={stale ? '' : undefined}
           aria-busy={isCalculating || undefined}
-          className={cn('space-y-6 transition-opacity', stale && 'opacity-60')}
+          className={cn('space-y-6', stale && 'border-l-4 border-dashed border-warning pl-3')}
         >
           {renderResults({ results, inputs: resultsInputs, values, stale })}
         </div>

@@ -27,7 +27,7 @@ export interface ChoiceGroupProps {
   hideLabel?: boolean;
   help?: React.ReactNode;
   error?: string;
-  /** 'stack' is one card per row; 'grid' is two columns from the sm breakpoint. */
+  /** 'stack' is one card per row; 'grid' is two columns from the md breakpoint (one column below, the mobile rule). */
   layout?: 'stack' | 'grid';
   /** 'lg' uses a larger group label (guided intake). */
   size?: 'md' | 'lg';
@@ -106,7 +106,7 @@ export function ChoiceGroup({
         aria-describedby={[helpId, errorId].filter(Boolean).join(' ') || undefined}
         aria-invalid={error ? true : undefined}
         onKeyDown={handleKeyDown}
-        className={layout === 'grid' ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : 'space-y-2'}
+        className={layout === 'grid' ? 'grid grid-cols-1 gap-2 md:grid-cols-2' : 'space-y-2'}
       >
         {options.map((option, index) => (
           <OptionCard
