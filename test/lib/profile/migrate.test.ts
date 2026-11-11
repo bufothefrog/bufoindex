@@ -128,8 +128,9 @@ describe('migrateProfile from v1', () => {
     expect(p).not.toHaveProperty('extras');
     // Negative new cash deposits nothing, as the v1 mapper clamped it.
     expect(p.portfolio.accounts[1].deposit).toBe(0);
-    // A row path is recorded by its list path; junk paths are dropped.
-    expect(p.provided).toEqual(['person.age', 'debts', 'strategy.leverageRatio']);
+    // Junk paths are dropped, and so is a row path whose row does not exist
+    // (v1 had no debts list, so 'debts.0.balance' was never a real answer).
+    expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
   });
 
   it('treats any version below 2 as v1', () => {

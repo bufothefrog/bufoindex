@@ -12,19 +12,20 @@
  *
  * Persisted data under an older version goes through migrateProfile, then
  * every payload is normalized, so a hand-edited value can never break the
- * mappers.
+ * mappers. A payload saved under a later version is read (normalized to v2)
+ * but never overwritten in that session, so a rollback cannot delete the
+ * fields the later version added.
  */
 
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import type { Write } from '@/lib/fields/types';
 import {
   applyProfileWrites,
   getDefaultFinancialProfile,
-  isProfilePath,
   normalizeProfile,
   normalizeProvided,
-  PROFILE_SECTIONS,
+  patchWrites,
 } from '@/lib/profile/defaults';
 import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
 import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
@@ -66,31 +67,37 @@ export interface ProfileState {
 
 export const PROFILE_STORAGE_KEY = 'bufo-profile';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Flattens a patch into writes: objects recurse until a profile path is reached. */
-function patchWrites(value: unknown, path: string, out: Write[]): Write[] {
-  if (isRecord(value) && !isProfilePath(path)) {
-    for (const [key, child] of Object.entries(value)) patchWrites(child, `${path}.${key}`, out);
-  } else {
-    out.push({ path, value });
-  }
-  return out;
-}
-
 /** Records the provided paths of applied writes and stamps updatedAt. */
 function commit(
   { profile: written, accepted }: ReturnType<typeof applyProfileWrites>,
   opts: SetValuesOptions
 ): Pick<ProfileState, 'profile' | 'hasProfile'> {
   const removed = new Set(normalizeProvided(opts.unprovide ?? []));
-  const provided = normalizeProvided([...written.provided, ...(opts.provide ?? accepted)]).filter(
+  const provided = normalizeProvided([...written.provided, ...(opts.provide ?? accepted)], written).filter(
     (path) => !removed.has(path)
   );
   const profile = { ...written, provided, updatedAt: Date.now() };
   return { profile, hasProfile: provided.length > 0 };
+}
+
+// True while the stored payload was saved by a later version (e.g. after a
+// rollback). That payload is kept as it is: the session works on its
+// normalized v2 copy, but nothing is written back, so the fields the later
+// version added survive. Reset at the start of every hydration.
+let storedPayloadIsNewer = false;
+
+/** localStorage, minus the writes that would overwrite a newer payload. */
+function profileStorage(): StateStorage {
+  // Read eagerly, so that on the server this throws here and persist runs
+  // without storage, exactly as createJSONStorage(() => localStorage) did.
+  const storage = localStorage;
+  return {
+    getItem: (name) => storage.getItem(name),
+    setItem: (name, value) => {
+      if (!storedPayloadIsNewer) storage.setItem(name, value);
+    },
+    removeItem: (name) => storage.removeItem(name),
+  };
 }
 
 // Assigned inside the store creator so the rehydration callback can flip
@@ -111,13 +118,7 @@ export const useProfileStore = create<ProfileState>()(
         setValues: (writes, opts = {}) => set((state) => commit(applyProfileWrites(state.profile, writes), opts)),
 
         setFields: (patch, providedPaths) =>
-          set((state) => {
-            const writes: Write[] = [];
-            for (const section of PROFILE_SECTIONS) {
-              if (patch[section] !== undefined) patchWrites(patch[section], section, writes);
-            }
-            return commit(applyProfileWrites(state.profile, writes), { provide: providedPaths });
-          }),
+          set((state) => commit(applyProfileWrites(state.profile, patchWrites(patch)), { provide: providedPaths })),
 
         setProvidedValue: (path, value) =>
           set((state) => {
@@ -131,7 +132,7 @@ export const useProfileStore = create<ProfileState>()(
     {
       name: PROFILE_STORAGE_KEY,
       version: PROFILE_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(profileStorage),
       partialize: (state) => ({ profile: state.profile }),
       // Persisted data is untrusted: normalize it against the defaults so a
       // missing section or a hand-edited value can never break the mappers.
@@ -141,13 +142,17 @@ export const useProfileStore = create<ProfileState>()(
         return { ...current, profile, hasProfile: profile.provided.length > 0 };
       },
       migrate: (persisted, version) => {
+        storedPayloadIsNewer = version > PROFILE_VERSION;
         const raw = (persisted as { profile?: unknown } | undefined)?.profile;
         return { profile: raw === undefined ? undefined : migrateProfile(raw, version) } as {
           profile: FinancialProfile;
         };
       },
-      onRehydrateStorage: () => () => {
-        markHydrated();
+      onRehydrateStorage: () => {
+        storedPayloadIsNewer = false;
+        return () => {
+          markHydrated();
+        };
       },
     }
   )

@@ -291,6 +291,14 @@ describe('path registry', () => {
     ]);
   });
 
+  it('drops row paths whose row does not exist when given the profile', () => {
+    const p = getDefaultFinancialProfile();
+    expect(normalizeProvided(['debts.7.balance', 'portfolio.holdings.3', 'portfolio.holdings.4', 'person.age'], p))
+      .toEqual(['portfolio.holdings', 'person.age']);
+    // A list path itself is an answer even when the list is empty ("I have no debts").
+    expect(normalizeProvided(['debts'], p)).toEqual(['debts']);
+  });
+
   it('reads any profile path and nothing else', () => {
     const p = getDefaultFinancialProfile();
     expect(getProfileValue(p, 'income.grossPerPaycheck')).toBe(3500);

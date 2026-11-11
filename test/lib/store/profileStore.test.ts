@@ -120,9 +120,13 @@ describe('setFields', () => {
     expect(profile.provided).toEqual(['assumptions.retirement.volatility', 'debts']);
   });
 
-  it('drops provided paths that are not profile paths', () => {
+  it('drops provided paths that are not profile paths, and row paths to rows that do not exist', () => {
     getState().setFields({ person: { age: 35 } }, ['person.age', 'person.nickname', 'debts.0.balance']);
-    expect(getState().profile.provided).toEqual(['person.age', 'debts']);
+    // debts is empty, so 'debts.0.balance' names no row and does not mark debts.
+    expect(getState().profile.provided).toEqual(['person.age']);
+    // A row path to a row that exists is recorded by its list path.
+    getState().setFields({}, ['portfolio.accounts.1.deposit']);
+    expect(getState().profile.provided).toEqual(['person.age', 'portfolio.accounts']);
   });
 
   it('mirrors the intake new-cash answer into the Brokerage deposit', () => {
@@ -402,6 +406,50 @@ describe('rehydration from localStorage', () => {
     saved.provided = ['portfolio.accounts'];
     await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
     expect(getState().profile).toEqual(saved);
+  });
+
+  it('reads a payload saved by a later version but never overwrites it', async () => {
+    const saved = {
+      ...getDefaultFinancialProfile(),
+      version: 3,
+      newSection: { x: 1 },
+      person: { ...getDefaultFinancialProfile().person, age: 44, extra: 1 },
+      provided: ['person.age'],
+    };
+    const raw = JSON.stringify({ state: { profile: saved }, version: 3 });
+    await rehydrateWith(raw);
+
+    expect(getState().hasHydrated).toBe(true);
+    expect(getState().profile.version).toBe(2);
+    expect(getState().profile.person.age).toBe(44);
+    expect(getState().profile).not.toHaveProperty('newSection');
+    expect(window.localStorage.getItem(PROFILE_STORAGE_KEY)).toBe(raw);
+
+    // Edits in this session stay in memory; the newer payload survives them.
+    getState().setFields({ person: { age: 45 } }, ['person.age']);
+    expect(getState().profile.person.age).toBe(45);
+    expect(window.localStorage.getItem(PROFILE_STORAGE_KEY)).toBe(raw);
+
+    // The next hydration of a current payload saves normally again.
+    await rehydrateWith(JSON.stringify({ state: { profile: getDefaultFinancialProfile() }, version: 2 }));
+    getState().setFields({ person: { age: 46 } }, ['person.age']);
+    expect(readPersisted()?.version).toBe(2);
+    expect((readPersisted()?.state.profile as { person: { age: number } }).person.age).toBe(46);
+  });
+
+  it('clears the stored payload through persist.clearStorage', () => {
+    getState().setProvidedValue('person.age', 41);
+    expect(readPersisted()).not.toBeNull();
+    store.persist.clearStorage();
+    expect(readPersisted()).toBeNull();
+  });
+
+  it('drops provided row paths whose row does not exist', async () => {
+    const saved = getDefaultFinancialProfile();
+    saved.provided = ['debts.7.balance', 'portfolio.holdings.0', 'person.age'];
+    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
+    expect(getState().profile.debts).toEqual([]);
+    expect(getState().profile.provided).toEqual(['portfolio.holdings', 'person.age']);
   });
 
   it('still marks hydration finished when the stored JSON is corrupt', async () => {

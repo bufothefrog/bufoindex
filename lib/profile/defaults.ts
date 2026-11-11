@@ -20,13 +20,17 @@ import {
   type ClassTarget,
 } from '@/lib/calculations/portfolioRebalancing';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
+import { PAY_FREQUENCY_OPTIONS } from '@/lib/constants/frequency';
 import {
   ACCOUNT_TYPE_OPTIONS,
   BONUS_FREQUENCY_OPTIONS,
   CONTRIBUTION_TYPE_OPTIONS,
+  FILING_STATUS_OPTIONS,
   HSA_COVERAGE_OPTIONS,
   OPTIMIZATION_GOAL_OPTIONS,
   RISK_TOLERANCE_OPTIONS,
+  STRATEGY_PRESET_OPTIONS,
+  TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
 import { applyWrites, getAt, setAt } from '@/lib/fields/paths';
@@ -42,6 +46,7 @@ import type {
   PayFrequency,
   ProfileFieldMeta,
   ProfileListPath,
+  ProfilePatch,
   ProfileSection,
   RiskProfile,
   SecurityRow,
@@ -317,19 +322,15 @@ export const PRESET_EMERGENCY_MONTHS: Record<StrategyPreset, number> = {
   'cashflow-investor': 1,
 };
 
-export const PAY_FREQUENCIES: readonly PayFrequency[] = ['weekly', 'bi-weekly', 'semi-monthly', 'monthly'];
-export const PROFILE_FILING_STATUSES: readonly FilingStatus[] = [
-  'single',
-  'marriedJoint',
-  'marriedSeparate',
-  'headOfHousehold',
-];
-export const STRATEGY_PRESETS: readonly StrategyPreset[] = ['standard', 'cashflow-investor'];
-export const TARGET_MIX_PRESETS: readonly TargetMixPreset[] = ['100-0', '80-20', '60-40', 'custom'];
-const RISK_PROFILES: readonly RiskProfile[] = ['tdf', 'custom'];
-
 const optionValues = <V extends string | number>(options: readonly { value: V }[]): readonly V[] =>
   options.map((option) => option.value);
+
+// Vocabularies with a label table take their values from it (one table per vocabulary).
+export const PAY_FREQUENCIES: readonly PayFrequency[] = optionValues(PAY_FREQUENCY_OPTIONS);
+export const PROFILE_FILING_STATUSES: readonly FilingStatus[] = optionValues(FILING_STATUS_OPTIONS);
+export const STRATEGY_PRESETS: readonly StrategyPreset[] = optionValues(STRATEGY_PRESET_OPTIONS);
+export const TARGET_MIX_PRESETS: readonly TargetMixPreset[] = optionValues(TARGET_MIX_OPTIONS);
+const RISK_PROFILES: readonly RiskProfile[] = ['tdf', 'custom'];
 
 /**
  * Allowed values for the enum-typed fields, keyed by leaf path, or by list
@@ -509,6 +510,26 @@ export function isProfilePath(path: string): boolean {
 }
 
 /**
+ * Flattens a patch into writes in section order: objects recurse until a
+ * profile path is reached, so a list is written whole and a leaf at any
+ * depth ('assumptions.retirement.volatility') gets its own write.
+ */
+export function patchWrites(patch: ProfilePatch): Write[] {
+  const out: Write[] = [];
+  const visit = (value: unknown, path: string): void => {
+    if (isRecord(value) && !isProfilePath(path)) {
+      for (const [key, child] of Object.entries(value)) visit(child, `${path}.${key}`);
+    } else {
+      out.push({ path, value });
+    }
+  };
+  for (const section of PROFILE_SECTIONS) {
+    if (patch[section] !== undefined) visit(patch[section], section);
+  }
+  return out;
+}
+
+/**
  * The path `provided` records for a profile path: the path itself for a
  * leaf or a list, the list path for a row or a row field, and null for
  * anything that is not a profile path.
@@ -627,14 +648,23 @@ function normalizeNode(template: unknown, input: unknown, base: unknown, path: s
 
 /**
  * Canonical `provided` list: profile paths only, rows recorded by their list
- * path, first occurrence kept.
+ * path, first occurrence kept. With `profile`, a row or row field path whose
+ * row does not exist in it is dropped, so a list nobody answered is never
+ * marked provided through a phantom row.
  */
-export function normalizeProvided(paths: readonly unknown[]): string[] {
+export function normalizeProvided(paths: readonly unknown[], profile?: FinancialProfile): string[] {
   const out = new Set<string>();
   for (const path of paths) {
     if (typeof path !== 'string') continue;
-    const canonical = providedPathFor(path);
-    if (canonical) out.add(canonical);
+    const info = classifyPath(path);
+    if (!info) continue;
+    if (info.kind === 'leaf' || info.kind === 'list') {
+      out.add(path);
+      continue;
+    }
+    const rows = profile ? (getAt(profile, info.list) as readonly unknown[]) : undefined;
+    if (rows && info.index >= rows.length) continue;
+    out.add(info.list);
   }
   return [...out];
 }
@@ -649,7 +679,8 @@ export function normalizeProvided(paths: readonly unknown[]): string[] {
  *   normalized against the row defaults, and invalid rows are dropped. A
  *   list that is missing or not an array keeps the base list.
  * - Unknown keys are dropped, so a later leaf deletion needs no version bump.
- * - `provided` keeps profile paths only (see normalizeProvided).
+ * - `provided` keeps profile paths only, and row paths only for rows that
+ *   exist in the result (see normalizeProvided).
  *
  * The result shares no objects with `input` or `base`.
  */
@@ -664,8 +695,9 @@ export function normalizeProfile(
   for (const section of PROFILE_SECTIONS) {
     out[section] = normalizeNode(SECTION_TEMPLATE[section], source[section], base[section], section);
   }
-  out.provided = Array.isArray(source.provided) ? normalizeProvided(source.provided) : [...base.provided];
-  return out as unknown as FinancialProfile;
+  const profile = out as unknown as FinancialProfile;
+  out.provided = Array.isArray(source.provided) ? normalizeProvided(source.provided, profile) : [...base.provided];
+  return profile;
 }
 
 // ---------------------------------------------------------------------------
