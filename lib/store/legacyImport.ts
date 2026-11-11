@@ -15,8 +15,7 @@
 import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { fromEngineInputs, stableKey } from '@/lib/fields/binding';
 import { getAt, isRecord } from '@/lib/fields/paths';
-import type { Write } from '@/lib/fields/types';
-import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
+import type { Get, Write } from '@/lib/fields/types';
 import { GROSS_PAY, NET_PAY, PAY_FREQUENCY } from '@/lib/fields/shared';
 import { getDefaultFinancialProfile, providedPathFor } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -25,15 +24,16 @@ import { DEFAULT_DOLLAR_DISPLAY_MODE } from '@/lib/utils/displayDollars';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 /**
- * The writes that reproduce `engine` and `defaults`, side by side, one pair
- * per group of coupled paths. Each binding starts a group; groups that write
+ * The writes that reproduce `engine` and `defaults` in the profile `get`
+ * reads, side by side, one pair per group of coupled paths. Each binding
+ * starts a group; groups that write
  * a common path (the 1:1 binding of an amount and the derived binding that
  * writes the amount with its unit) are merged, so coupled paths are always
  * compared, kept or skipped together. Within a group the first write to a
  * path wins.
  */
-function writeGroups<E, R>(def: CalculatorDefinition<E, R>, engine: E, defaults: E): [Write[], Write[]][] {
-  const pairs = def.bindings.map((binding) => [fromEngineInputs([binding], engine), fromEngineInputs([binding], defaults)]);
+function writeGroups<E, R>(def: CalculatorDefinition<E, R>, engine: E, defaults: E, get: Get): [Write[], Write[]][] {
+  const pairs = def.bindings.map((binding) => [fromEngineInputs([binding], engine, get), fromEngineInputs([binding], defaults, get)]);
   let groups: { paths: Set<string>; members: number[] }[] = [];
   pairs.forEach(([fromEngine, fromDefaults], i) => {
     const merged = { paths: new Set([...fromEngine, ...fromDefaults].map((write) => write.path)), members: [i] };
@@ -141,7 +141,7 @@ export function legacyDefaultGaps<E, R>(def: CalculatorDefinition<E, R>): string
   if (!def.legacy) return [];
   const defaults = def.legacy.storageDefaults();
   const profileDefaults = getDefaultFinancialProfile();
-  return writeGroups(def, defaults, defaults).flatMap(([, writes]) =>
+  return writeGroups(def, defaults, defaults, (path) => getAt(profileDefaults, path)).flatMap(([, writes]) =>
     profileDefaultGaps(writes, profileDefaults).map((write) => write.path)
   );
 }
@@ -149,42 +149,6 @@ export function legacyDefaultGaps<E, R>(def: CalculatorDefinition<E, R>): string
 const GROSS_PATH = GROSS_PAY.path;
 const NET_PATH = NET_PAY.path;
 const FREQUENCY_PATH = PAY_FREQUENCY.path;
-const PAY_RATE_PATHS: ReadonlySet<string> = new Set([GROSS_PATH, FREQUENCY_PATH]);
-
-/** Paychecks per year for a stored frequency; null when it is not one. */
-function paychecksPerYear(frequency: unknown): number | null {
-  return typeof frequency === 'string' && Object.prototype.hasOwnProperty.call(PAY_FREQUENCY_META, frequency)
-    ? PAY_FREQUENCY_META[frequency as PayFrequency].perYear
-    : null;
-}
-
-/**
- * True when the group writes the whole per-paycheck income record (gross,
- * take-home and frequency), the take-home pay is still unanswered, and the
- * answered gross and frequency describe the same annual income in another
- * form (e.g. the retirement import's monthly paycheck for an old yearly
- * salary). The per-paycheck record is the finer one of the same income, so
- * the group then replaces the gross and frequency with its own and keeps
- * its take-home pay. The annual incomes are compared within one cent per
- * paycheck of the more frequent pay (each side was rounded to the cent per
- * paycheck), never for exact equality.
- */
-function finerIncomeRecord(group: readonly Write[], answered: readonly boolean[], profile: FinancialProfile): boolean {
-  const at = (path: string) => group.findIndex((write) => write.path === path);
-  const [gross, net, frequency] = [at(GROSS_PATH), at(NET_PATH), at(FREQUENCY_PATH)];
-  if (gross < 0 || net < 0 || frequency < 0 || answered[net] || !answered[gross] || !answered[frequency]) return false;
-  const ownPerYear = paychecksPerYear(group[frequency].value);
-  const heldPerYear = paychecksPerYear(profile.income.frequency);
-  const ownGross = group[gross].value;
-  if (ownPerYear === null || heldPerYear === null || typeof ownGross !== 'number' || !Number.isFinite(ownGross)) return false;
-  const tolerance = 0.01 * Math.max(ownPerYear, heldPerYear);
-  return Math.abs(ownGross * ownPerYear - profile.income.grossPerPaycheck * heldPerYear) <= tolerance;
-}
-
-/** The value `group` writes at `path`; undefined when it does not write it. */
-function valueAt(group: readonly Write[], path: string): unknown {
-  return group.find((write) => write.path === path)?.value;
-}
 
 /** Gross and take-home pay per paycheck of `frequency`, as stored (unchecked). */
 interface PayRecord {
@@ -193,58 +157,56 @@ interface PayRecord {
   frequency: unknown;
 }
 
-/**
- * The one rule for a take-home pay that has to follow a pay it was not
- * saved with: it keeps the share of gross pay it had (net / gross, which is
- * the same in any frequency), applied to the new gross per paycheck of the
- * new frequency, rounded to the cent and never above the new gross. When
- * that share cannot be formed (the held gross is not positive, or the share
- * is not finite or is above 1), it is the smaller of the take-home pay
- * converted to the new frequency at the same yearly amount and the new
- * gross. Undefined when the new gross or the take-home pay is not a finite
- * number, or the fallback has no frequency to convert between.
- */
-function takeHomeAtShare(held: PayRecord, gross: unknown, frequency: unknown): Write | undefined {
-  if (typeof gross !== 'number' || !Number.isFinite(gross)) return undefined;
-  if (typeof held.net !== 'number' || !Number.isFinite(held.net)) return undefined;
-  const cents = (value: number) => Math.min(Math.round(value * 100) / 100, gross);
-  const share = typeof held.gross === 'number' && held.gross > 0 ? held.net / held.gross : Number.NaN;
-  if (Number.isFinite(share) && share <= 1) return { path: NET_PATH, value: cents(share * gross) };
-  const heldPerYear = paychecksPerYear(held.frequency);
-  const newPerYear = paychecksPerYear(frequency);
-  if (heldPerYear === null || newPerYear === null) return undefined;
-  return { path: NET_PATH, value: cents((held.net * heldPerYear) / newPerYear) };
+/** The pay record `profile` holds. */
+const payRecord = (profile: FinancialProfile): PayRecord => ({
+  gross: profile.income.grossPerPaycheck,
+  net: profile.income.netPerPaycheck,
+  frequency: profile.income.frequency,
+});
+
+/** The value `group` writes at `path`; undefined when it does not write it. */
+function valueAt(group: readonly Write[], path: string): unknown {
+  return group.find((write) => write.path === path)?.value;
 }
 
 /**
- * The take-home pay that goes with a group that changes the pay (gross or
- * frequency) but writes no take-home pay of its own (the retirement income
- * group): the profile's take-home pay at its share of the profile's gross
- * (takeHomeAtShare), so it is never above the new gross nor under another
- * frequency's unit. Undefined when the group leaves the pay alone or writes
- * the take-home pay itself. Null when the group must be skipped: the
- * take-home pay was answered and the group would move it to another
- * frequency or leave it above the new gross (an answer given since wins
- * and is never changed), or no take-home pay can be formed.
+ * False when `group` would change the pay under an answered amount. An
+ * answered gross or take-home pay is an amount per paycheck of the
+ * frequency the profile holds, so it pins that frequency (even where the
+ * group writes the same number for another one), and an answered take-home
+ * pay stays at most the gross pay.
  */
-function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, provided: ReadonlySet<string>): Write | null | undefined {
-  if (group.some((write) => write.path === NET_PATH)) return undefined;
-  const held = profile.income;
-  const gross = valueAt(group, GROSS_PATH) ?? held.grossPerPaycheck;
-  const frequency = valueAt(group, FREQUENCY_PATH) ?? held.frequency;
-  const movesFrequency = stableKey(frequency) !== stableKey(held.frequency);
-  if (!movesFrequency && stableKey(gross) === stableKey(held.grossPerPaycheck)) return undefined;
-  if (provided.has(NET_PATH)) {
-    return movesFrequency || !(typeof gross === 'number' && gross >= held.netPerPaycheck) ? null : undefined;
-  }
-  return takeHomeAtShare({ gross: held.grossPerPaycheck, net: held.netPerPaycheck, frequency: held.frequency }, gross, frequency) ?? null;
+function keepsAnsweredPay(group: readonly Write[], profile: FinancialProfile, provided: ReadonlySet<string>): boolean {
+  const { grossPerPaycheck, netPerPaycheck, frequency } = profile.income;
+  const movesFrequency = stableKey(valueAt(group, FREQUENCY_PATH) ?? frequency) !== stableKey(frequency);
+  if (movesFrequency && (provided.has(GROSS_PATH) || provided.has(NET_PATH))) return false;
+  if (!provided.has(NET_PATH)) return true;
+  const gross = valueAt(group, GROSS_PATH) ?? grossPerPaycheck;
+  const net = valueAt(group, NET_PATH) ?? netPerPaycheck;
+  return typeof gross === 'number' && typeof net === 'number' && gross >= net;
+}
+
+/**
+ * The take-home pay of `record` carried to the pay `profile` now holds: the
+ * share of gross pay it had (net / gross, the same in any frequency, capped
+ * at 1) applied to the new gross, rounded to the cent and never above it.
+ * Null when the profile still holds the record's own gross and frequency,
+ * or the share cannot be formed (the record's gross is not above zero).
+ */
+function takeHomeAtShare(record: PayRecord, profile: FinancialProfile): Write | null {
+  const { grossPerPaycheck: gross, frequency } = profile.income;
+  if (stableKey(record.gross) === stableKey(gross) && stableKey(record.frequency) === stableKey(frequency)) return null;
+  if (typeof record.gross !== 'number' || !(record.gross > 0) || typeof record.net !== 'number' || !Number.isFinite(record.net)) return null;
+  const share = Math.min(record.net / record.gross, 1);
+  return { path: NET_PATH, value: Math.min(Math.round(share * gross * 100) / 100, gross) };
 }
 
 /**
  * Imports `def.legacy.storageKey` into the profile, then removes the key.
  *
- * The writes are taken per group of coupled paths (writeGroups), and a
- * group is imported or skipped whole:
+ * The writes are taken per group of coupled paths (writeGroups), each in
+ * the profile as it is before the import, and a group is imported or
+ * skipped whole:
  *
  * - A group whose writes differ from what the same bindings write for
  *   def.legacy.storageDefaults() holds the visitor's own values: it is
@@ -256,23 +218,27 @@ function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, p
  *   still asks for them, and a later import of the other old key (which
  *   may hold the visitor's own answer) can still write them.
  * - A path already marked provided is never written (an answer given since
- *   always wins); its group's other paths are imported only when every such
- *   provided path already holds the value the group would write, so coupled
- *   paths (an amount and its unit) never split. One exception: when the
- *   answered pay and frequency describe the same annual income as the
- *   group's own per-paycheck record and its take-home pay is unanswered
- *   (finerIncomeRecord), the group's gross, take-home and frequency are all
- *   written, so the take-home pay keeps the pay it was saved with.
- * - The take-home pay follows one rule whenever the gross pay and frequency
- *   the profile ends up with are not the ones it was saved with
- *   (takeHomeAtShare): an unanswered take-home pay is written, unprovided,
- *   at the share of gross pay it had, applied to the gross pay that stays.
- *   That covers a group that changes the pay without a take-home pay of its
- *   own (the retirement income group; the profile's take-home pay follows
- *   it, takeHomeAlongside) and a skipped paycheck income group whose pay
- *   lost to an answered one (its own take-home pay follows the answered
- *   pay). An answered take-home pay is never moved: a group that would put
- *   it under another frequency or above the gross pay is skipped.
+ *   always wins), and a group is skipped when one of its provided paths
+ *   holds another value than the group would write, so coupled paths (an
+ *   amount and its unit) never split. An answered gross or take-home pay
+ *   also pins the frequency, and an answered take-home pay must stay at
+ *   most the gross pay: a group that would break either is skipped
+ *   (keepsAnsweredPay).
+ *
+ * Pay is gross pay per paycheck of a frequency. An old amount with no pay
+ * frequency of its own (the retirement calculator's yearly or hourly
+ * income) is written by its binding in the frequency the profile holds, at
+ * the same annual income, so it never moves the frequency.
+ *
+ * Take-home pay: after the groups, an unanswered take-home pay is carried
+ * to the gross pay and frequency the profile ends up with at the share of
+ * gross pay it had in its record (takeHomeAtShare), written unprovided. Its
+ * record is the old key's own pay record when the key has one (the paycheck
+ * income group, imported or skipped), else the profile's before the import.
+ * That is the one exception to keeping the visitor's numbers: when the old
+ * key's pay lost to a pay answered before it (by the visitor, or by the
+ * other old key imported first), its take-home pay is kept as the same
+ * share of the gross pay that stays.
  *
  * setValues refuses any value that is not a valid profile value. A saved
  * future-dollars display mode is carried into the shared preference once,
@@ -282,7 +248,7 @@ function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, p
  * Idempotent: once the key is gone a call does nothing. Never throws.
  * Returns the profile paths it passed to setValues as the visitor's answers
  * (a refused value among them stays unprovided); the unprovided writes of
- * untouched old defaults are not listed.
+ * untouched old defaults and of the take-home pay's share are not listed.
  */
 export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E, R>): string[] {
   const legacy = def.legacy;
@@ -298,37 +264,26 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
     const engine = payload === null ? null : readEngine(legacy, payload);
     const answers: Write[] = [];
     const untouched: Write[] = [];
+    const { profile } = profileStore;
+    let takeHome = payRecord(profile);
     if (engine !== null) {
-      const { profile } = profileStore;
       const provided = new Set(profile.provided);
       const profileDefaults = getDefaultFinancialProfile();
-      for (const [group, defaults] of writeGroups(def, engine, legacy.storageDefaults())) {
+      const get = (path: string) => getAt(profile, path);
+      for (const [group, defaults] of writeGroups(def, engine, legacy.storageDefaults(), get)) {
         if (group.length === 0) continue;
         const changed = groupKey(group) !== groupKey(defaults);
         if (!changed && profileDefaultGaps(defaults, profileDefaults).length === 0) continue;
+        if (group.some((write) => write.path === NET_PATH)) {
+          takeHome = { gross: valueAt(group, GROSS_PATH), net: valueAt(group, NET_PATH), frequency: valueAt(group, FREQUENCY_PATH) };
+        }
         const providedPaths = group.map((write) => providedPathFor(write.path));
         const answered = providedPaths.map((path) => path !== null && provided.has(path));
         const holds = (write: Write) => stableKey(getAt(profile, write.path)) === stableKey(write.value);
-        const finer = finerIncomeRecord(group, answered, profile);
-        const replaces = (write: Write) => finer && PAY_RATE_PATHS.has(write.path) && !holds(write);
-        // An answer given since wins, and the group stays whole: its other
-        // paths come along only when every answered path already holds what
-        // the group would write (e.g. the same pay and frequency imported
-        // from the other old calculator), or describes the same income.
-        const agrees = group.every((write, j) => !answered[j] || replaces(write) || holds(write));
-        if (!agrees) {
-          // The group's own take-home pay (if any) follows the answered pay.
-          const own = { gross: valueAt(group, GROSS_PATH), net: valueAt(group, NET_PATH), frequency: valueAt(group, FREQUENCY_PATH) };
-          const { grossPerPaycheck, frequency } = profile.income;
-          const share = changed && !provided.has(NET_PATH) ? takeHomeAtShare(own, grossPerPaycheck, frequency) : undefined;
-          if (share) untouched.push(share);
-          continue;
-        }
-        const takeHome = takeHomeAlongside(group, profile, provided);
-        if (takeHome === null) continue;
-        if (takeHome) untouched.push(takeHome);
+        if (!group.every((write, j) => !answered[j] || holds(write))) continue;
+        if (!keepsAnsweredPay(group, profile, provided)) continue;
         group.forEach((write, j) => {
-          if (providedPaths[j] !== null && (!answered[j] || replaces(write))) (changed ? answers : untouched).push(write);
+          if (providedPaths[j] !== null && !answered[j]) (changed ? answers : untouched).push(write);
         });
       }
     }
@@ -336,6 +291,9 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
     // Already provided paths stay provided; untouched old defaults add none.
     if (untouched.length > 0) profileStore.setValues(untouched, { provide: [] });
     if (answers.length > 0) profileStore.setValues(answers);
+    const imported = useProfileStore.getState().profile;
+    const share = imported.provided.includes(NET_PATH) ? null : takeHomeAtShare(takeHome, imported);
+    if (share) profileStore.setValues([share], { provide: [] });
     storage.removeItem(legacy.storageKey);
     return [...new Set(answers.map((write) => write.path))];
   } catch {

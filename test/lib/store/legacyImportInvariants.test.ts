@@ -1,13 +1,17 @@
 /**
- * The legacy import's invariants over a fixed grid of old payloads and
- * import orders (no randomness). Each case stores the old retirement and
- * paycheck keys (absent, untouched or changed), optionally a take-home pay
- * answered since, imports the keys in one order and checks:
+ * The legacy import's invariants over a fixed grid of old payloads, import
+ * orders and profiles (no randomness). Each case seeds the profile (fresh,
+ * or with a take-home pay, a pay frequency, or a gross pay and frequency
+ * answered since), stores the old retirement and paycheck keys (absent,
+ * untouched or changed), imports the keys in one order and checks:
  *
  * I1 take-home pay never above gross pay (and no NET_PAY_AT_MOST_GROSS error);
  * I2 gross, take-home and frequency come from one record or a documented
  *    rule, and a 401(k) total keeps the split it was saved with;
- * I3 the visitor's own values survive (where the case changed any);
+ * I3 the visitor's own values survive (where the case changed any), unless
+ *    a newer answer for the same pay existed (payAnsweredSince); an old
+ *    yearly or hourly income has no frequency of its own and survives as the
+ *    same annual income in the frequency the profile holds;
  * I4 an untouched old key alone reproduces the old calculator's run;
  * I5 nothing unanswered becomes provided, nothing provided is overwritten;
  * I6 a second import is a no-op; a corrupt payload changes nothing.
@@ -26,7 +30,7 @@ import { stableKey } from '@/lib/fields/binding';
 import { getAt } from '@/lib/fields/paths';
 import { NET_PAY_AT_MOST_GROSS } from '@/lib/fields/shared';
 import { getDefaultFinancialProfile } from '@/lib/profile';
-import type { ContributionType, FinancialProfile } from '@/lib/profile/types';
+import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -45,6 +49,12 @@ interface Pay {
   frequency: PayFrequency;
 }
 
+/**
+ * The pay an old key stands for: a per-paycheck record, or (an old yearly
+ * or hourly retirement income) an annual income with no frequency of its own.
+ */
+type OldPay = Pay | { annual: number };
+
 /** A 401(k) election as the profile holds it. */
 interface Election {
   type: ContributionType;
@@ -58,8 +68,8 @@ interface OldKey {
   id: 'retirement' | 'paycheck';
   storageKey: string;
   payload: unknown;
-  /** The pay this payload stands for in the profile (changed or the old default). */
-  pay: Pay;
+  /** The pay this payload stands for (changed or the old default). */
+  pay: OldPay;
   /** Set when the visitor changed the pay. */
   payChanged: boolean;
   /** The 401(k) election this payload stands for (paycheck key only). */
@@ -71,27 +81,37 @@ interface OldKey {
 
 type Order = 'retirement first' | 'paycheck first';
 
+/** A profile the visitor answered some pay facts in before the import. */
+interface Seed {
+  label: string;
+  patch: ProfilePatch;
+}
+
 interface Case {
   name: string;
   retirement?: OldKey;
   paycheck?: OldKey;
   order: Order;
-  /** A take-home pay the visitor answered before the import. */
-  answeredNet?: number;
+  seed: Seed;
 }
 
 const PROFILE_DEFAULTS = getDefaultFinancialProfile();
-const DEFAULT_PAY: Pay = {
-  gross: PROFILE_DEFAULTS.income.grossPerPaycheck,
-  net: PROFILE_DEFAULTS.income.netPerPaycheck,
-  frequency: PROFILE_DEFAULTS.income.frequency,
-};
 const DEFAULT_ELECTION: Election = {
   type: PROFILE_DEFAULTS.workplace.contributionType,
   percent: PROFILE_DEFAULTS.workplace.contributionPercent,
   roth: PROFILE_DEFAULTS.workplace.rothContributionPercent,
 };
-const ANSWERED_NET = 2800;
+
+const SEEDS: readonly Seed[] = [
+  { label: 'fresh profile', patch: {} },
+  { label: 'take-home 2,800 answered', patch: { income: { netPerPaycheck: 2800 } } },
+  // Only the frequency, as the paycheck page's frequency select alone marks it.
+  { label: 'frequency weekly answered', patch: { income: { frequency: 'weekly' } } },
+  // 100,800 a year (the retirement grid's yearly 100,800) is 4,200 semi-monthly.
+  { label: 'frequency semi-monthly answered', patch: { income: { frequency: 'semi-monthly' } } },
+  // 100,800 a year again, as 8,400 monthly; the take-home pay stays unanswered.
+  { label: 'gross 8,400 monthly answered', patch: { income: { grossPerPaycheck: 8400, frequency: 'monthly' } } },
+];
 
 /** Imports the old key of calculator `id`. */
 const importKey = (id: OldKey['id']): string[] =>
@@ -101,27 +121,27 @@ const importKey = (id: OldKey['id']): string[] =>
 // Building the old keys
 // ---------------------------------------------------------------------------
 
-/** The profile pay for an old retirement entry, computed here independently of the bindings. */
-function retirementPay(amount: number, period: IncomePeriod): Pay {
+/** The pay an old retirement entry stands for, computed here independently of the bindings. */
+function retirementPay(amount: number, period: IncomePeriod): OldPay {
   const kept: Partial<Record<IncomePeriod, PayFrequency>> = { biweekly: 'bi-weekly', semimonthly: 'semi-monthly', monthly: 'monthly' };
   const frequency = kept[period];
-  if (frequency) return { gross: amount, frequency };
-  return { gross: Math.round((annualizeIncome(amount, period) / 12) * 100) / 100, frequency: 'monthly' };
+  return frequency ? { gross: amount, frequency } : { annual: annualizeIncome(amount, period) };
 }
 
 /** The old retirement key with `inputs` changed over the old defaults ({} is untouched). */
 function retirementKey(label: string, inputs: Partial<RetirementInputs>): OldKey {
   const stored = { ...RETIREMENT_LEGACY.storageDefaults(), ...inputs };
   const payChanged = 'incomeAmount' in inputs || 'incomePeriod' in inputs;
+  const pay = retirementPay(stored.incomeAmount, stored.incomePeriod);
   return {
     label: `retirement ${label}`,
     id: 'retirement',
     storageKey: RETIREMENT_LEGACY.storageKey,
     payload: { state: { inputs: stored, showAdvanced: true }, version: 3 },
-    pay: retirementPay(stored.incomeAmount, stored.incomePeriod),
+    pay,
     payChanged,
     electionChanged: false,
-    touched: payChanged ? [GROSS, FREQUENCY] : [],
+    touched: payChanged ? ('annual' in pay ? [GROSS] : [GROSS, FREQUENCY]) : [],
   };
 }
 
@@ -188,7 +208,7 @@ const PAYCHECK_KEYS: readonly (OldKey | undefined)[] = [
 
 function buildCases(): Case[] {
   const cases = new Map<string, Case>();
-  for (const answeredNet of [undefined, ANSWERED_NET]) {
+  for (const seed of SEEDS) {
     for (const retirement of RETIREMENT_KEYS) {
       for (const paycheck of PAYCHECK_KEYS) {
         for (const order of ['retirement first', 'paycheck first'] as const) {
@@ -198,9 +218,9 @@ function buildCases(): Case[] {
             retirement?.label ?? 'no retirement key',
             paycheck?.label ?? 'no paycheck key',
             effective,
-            answeredNet === undefined ? 'fresh profile' : `take-home ${answeredNet} answered`,
+            seed.label,
           ].join(' | ');
-          if (!cases.has(name)) cases.set(name, { name, retirement, paycheck, order, answeredNet });
+          if (!cases.has(name)) cases.set(name, { name, retirement, paycheck, order, seed });
         }
       }
     }
@@ -220,19 +240,29 @@ function importOrder(c: Case): OldKey[] {
   return keys.filter((key): key is OldKey => key !== undefined);
 }
 
-/** Seeds the profile, stores the old keys, imports them in order and returns the profile before and after. */
-function runCase(c: Case): { before: FinancialProfile; after: FinancialProfile } {
+interface Run {
+  /** The seeded profile, before any import. */
+  before: FinancialProfile;
+  /** The profile just before each key's import, in import order. */
+  steps: FinancialProfile[];
+  after: FinancialProfile;
+}
+
+/** Seeds the profile, stores the old keys, imports them in order and returns the profiles along the way. */
+function runCase(c: Case): Run {
   clearBrowserState();
-  resetProfileStore(c.answeredNet === undefined ? {} : { profile: { income: { netPerPaycheck: c.answeredNet } } });
+  resetProfileStore({ profile: c.seed.patch });
   for (const key of importOrder(c)) localStorage.setItem(key.storageKey, JSON.stringify(key.payload));
   const before = profile();
+  const steps: FinancialProfile[] = [];
   for (const key of importOrder(c)) {
+    steps.push(profile());
     // I6: the old key is still there until its own import runs, and gone after.
     expect(localStorage.getItem(key.storageKey)).not.toBeNull();
     expect(() => importKey(key.id)).not.toThrow();
     expect(localStorage.getItem(key.storageKey)).toBeNull();
   }
-  return { before, after: profile() };
+  return { before, steps, after: profile() };
 }
 
 // ---------------------------------------------------------------------------
@@ -241,15 +271,43 @@ function runCase(c: Case): { before: FinancialProfile; after: FinancialProfile }
 
 const CENT = 0.005 + 1e-9;
 const same = (a: number, b: number) => Math.abs(a - b) <= 1e-9;
-const annual = (pay: { gross: number; frequency: PayFrequency }) => pay.gross * PAY_FREQUENCY_META[pay.frequency].perYear;
+const perYear = (frequency: PayFrequency) => PAY_FREQUENCY_META[frequency].perYear;
 const holdsPay = (income: FinancialProfile['income'], pay: Pay) =>
   income.frequency === pay.frequency && same(income.grossPerPaycheck, pay.gross) && (pay.net === undefined || same(income.netPerPaycheck, pay.net));
 const holdsElection = (after: FinancialProfile, election: Election) =>
   after.workplace.contributionType === election.type &&
   same(after.workplace.contributionPercent, election.percent) &&
   (election.type !== 'split' || same(after.workplace.rothContributionPercent, election.roth));
+/** The share of gross pay a record's take-home pay is, capped at 1 (the documented rule). */
+const shareOf = (pay: Pay) => Math.min((pay.net ?? 0) / pay.gross, 1);
+const seedPay = (seeded: FinancialProfile): Pay => ({
+  gross: seeded.income.grossPerPaycheck,
+  net: seeded.income.netPerPaycheck,
+  frequency: seeded.income.frequency,
+});
 
-function expectInvariants(c: Case, before: FinancialProfile, after: FinancialProfile): void {
+/**
+ * True when an answer in `held` (the profile just before the key's import)
+ * is a newer answer for the pay the key stands for: an answered gross pay or
+ * frequency that differs from what the key would write, an answered amount
+ * (gross or take-home pay, per paycheck of the held frequency) the key would
+ * put under another frequency, or an answered take-home pay the key would
+ * change or leave above its gross pay. An annual income has no frequency of
+ * its own: it stands for gross pay in the frequency the profile holds.
+ */
+function payAnsweredSince(pay: OldPay, held: FinancialProfile): boolean {
+  const answered = new Set(held.provided);
+  const { income } = held;
+  const gross = 'annual' in pay ? pay.annual / perYear(income.frequency) : pay.gross;
+  const movesFrequency = !('annual' in pay) && pay.frequency !== income.frequency;
+  if (answered.has(GROSS) && (movesFrequency || Math.abs(income.grossPerPaycheck - gross) > CENT)) return true;
+  if (answered.has(FREQUENCY) && movesFrequency) return true;
+  if (!answered.has(NET)) return false;
+  const net = 'annual' in pay || pay.net === undefined ? income.netPerPaycheck : pay.net;
+  return movesFrequency || !same(net, income.netPerPaycheck) || gross < net;
+}
+
+function expectInvariants(c: Case, { before, steps, after }: Run): void {
   const keys = importOrder(c);
   const { income } = after;
   const provided = new Set(after.provided);
@@ -259,15 +317,21 @@ function expectInvariants(c: Case, before: FinancialProfile, after: FinancialPro
   expect(Object.values(validateFor(PAYCHECK_CALCULATOR, after))).not.toContain(NET_PAY_AT_MOST_GROSS.message);
   expect(Object.values(validateFor(RETIREMENT_CALCULATOR, after))).not.toContain(NET_PAY_AT_MOST_GROSS.message);
 
-  // I2: gross and frequency are one record's pair; the take-home pay is that
-  // record's own, the answered one under the frequency it was answered for,
-  // or a record's share of gross pay applied to this gross (to the cent).
-  const records: Pay[] = [DEFAULT_PAY, ...keys.map((key) => key.pay)];
-  expect(records.some((pay) => holdsPay(income, { gross: pay.gross, frequency: pay.frequency })), 'gross and frequency from one record').toBe(true);
-  const shares = records.flatMap((pay) => (pay.net === undefined ? [] : [pay.net / pay.gross]));
+  // I2: gross and frequency are one record's pair, or an annual income
+  // written for the frequency some record holds; the take-home pay is a
+  // record's own (the seeded profile's included) or a record's share of
+  // gross pay applied to this gross (to the cent).
+  const records: Pay[] = [seedPay(before), ...keys.flatMap((key) => ('annual' in key.pay ? [] : [key.pay]))];
+  const annuals = keys.flatMap((key) => ('annual' in key.pay ? [key.pay.annual] : []));
+  const fromRecord = records.some((pay) => holdsPay(income, { gross: pay.gross, frequency: pay.frequency }));
+  const fromAnnual =
+    records.some((pay) => pay.frequency === income.frequency) &&
+    annuals.some((annual) => Math.abs(annual / perYear(income.frequency) - income.grossPerPaycheck) <= CENT);
+  expect(fromRecord || fromAnnual, 'gross and frequency from one record or an annual income').toBe(true);
   const netFromRecord = records.some((pay) => pay.net !== undefined && holdsPay(income, pay));
-  const netAnswered = c.answeredNet !== undefined && same(income.netPerPaycheck, c.answeredNet) && income.frequency === DEFAULT_PAY.frequency;
-  const netAtShare = shares.some((share) => Math.abs(share * income.grossPerPaycheck - income.netPerPaycheck) <= CENT);
+  // An answered take-home pay stays as answered, under the frequency it was answered for.
+  const netAnswered = before.provided.includes(NET) && holdsPay(income, { ...seedPay(before), gross: income.grossPerPaycheck });
+  const netAtShare = records.some((pay) => pay.net !== undefined && Math.abs(shareOf(pay) * income.grossPerPaycheck - income.netPerPaycheck) <= CENT);
   expect(netFromRecord || netAnswered || netAtShare, `take-home ${income.netPerPaycheck} explained`).toBe(true);
   // A 401(k) total never appears without the split it was saved with.
   const elections = [DEFAULT_ELECTION, ...keys.flatMap((key) => (key.election ? [key.election] : []))];
@@ -290,33 +354,31 @@ function expectInvariants(c: Case, before: FinancialProfile, after: FinancialPro
       expect(key.touched.every((path) => path === GROSS || path === NET || path === FREQUENCY || provided.has(path))).toBe(true);
     }
     if (!key.payChanged) continue;
-    const payPaths = key.pay.net === undefined ? [GROSS, FREQUENCY] : [GROSS, NET, FREQUENCY];
-    if (holdsPay(income, key.pay) && payPaths.every((path) => provided.has(path))) continue;
-    // The same annual income kept in the other key's finer per-paycheck record.
-    if (Math.abs(annual(key.pay) - annual({ gross: income.grossPerPaycheck, frequency: income.frequency })) <= 0.01 * 52) {
-      expect(provided.has(GROSS) && provided.has(FREQUENCY)).toBe(true);
+    const pay = key.pay;
+    if (!payAnsweredSince(pay, steps[i])) {
+      if ('annual' in pay) {
+        // The same annual income, in the frequency the profile holds.
+        expect(Math.abs(income.grossPerPaycheck * perYear(income.frequency) - pay.annual), `${key.label}: own income`).toBeLessThanOrEqual(
+          CENT * perYear(income.frequency)
+        );
+        expect(provided.has(GROSS)).toBe(true);
+      } else {
+        expect(holdsPay(income, pay), `${key.label}: own pay`).toBe(true);
+        expect(key.touched.filter((path) => path !== TYPE && path !== PERCENT && path !== ROTH).every((path) => provided.has(path))).toBe(true);
+      }
       continue;
     }
-    // A take-home pay answered before the import holds the pay record.
-    if (c.answeredNet !== undefined) {
-      expect(income.netPerPaycheck).toBe(c.answeredNet);
-      continue;
-    }
-    // The other key, imported earlier, answered the pay first.
-    const earlier = keys.slice(0, i).find((other) => other.payChanged);
-    expect(earlier, `${key.label}: pay lost without a newer answer`).toBeDefined();
-    expect(holdsPay(income, { gross: earlier!.pay.gross, frequency: earlier!.pay.frequency })).toBe(true);
-    expect(provided.has(GROSS) && provided.has(FREQUENCY)).toBe(true);
-    if (key.pay.net !== undefined) {
-      // The documented exception: the take-home pay keeps its share of gross pay.
-      expect(Math.abs((key.pay.net / key.pay.gross) * income.grossPerPaycheck - income.netPerPaycheck)).toBeLessThanOrEqual(CENT);
-      expect(provided.has(NET)).toBe(false);
-    }
+    if ('annual' in pay || pay.net === undefined || steps[i].provided.includes(NET)) continue;
+    // The documented exception: the take-home pay keeps its share of the
+    // gross pay that stays (checked when no later key moved that pay).
+    expect(provided.has(NET)).toBe(false);
+    const movedLater = !holdsPay(steps[i].income, { gross: income.grossPerPaycheck, frequency: income.frequency });
+    if (!movedLater) expect(Math.abs(shareOf(pay) * income.grossPerPaycheck - income.netPerPaycheck)).toBeLessThanOrEqual(CENT);
   }
 
   // I4: an untouched old key alone reproduces the old calculator's run.
   const [only] = keys;
-  if (keys.length === 1 && c.answeredNet === undefined && !only.payChanged && !only.electionChanged) {
+  if (keys.length === 1 && c.seed.patch.income === undefined && !only.payChanged && !only.electionChanged) {
     if (only.id === 'retirement') expectSameRun(RETIREMENT_CALCULATOR);
     else expectSameRun(PAYCHECK_CALCULATOR);
   }
@@ -352,14 +414,15 @@ beforeEach(() => {
 const CASES = buildCases();
 
 describe('importLegacyCalculatorStorage: invariants over the old payload grid', () => {
-  it('covers every combination in both import orders, with and without an answered take-home pay', () => {
-    // (9 x 7 two-key pairs x 2 orders + 9 + 7 one-key + 1 empty) x 2 profiles.
-    expect(CASES).toHaveLength((9 * 7 * 2 + 9 + 7 + 1) * 2);
+  it('covers every combination in both import orders, for every seeded profile', () => {
+    // (9 x 7 two-key pairs x 2 orders + 9 + 7 one-key + 1 empty) x 5 profiles.
+    expect(CASES).toHaveLength((9 * 7 * 2 + 9 + 7 + 1) * 5);
   });
 
   it.each(CASES.map((c) => [c.name, c] as const))('%s', (_, c) => {
-    const { before, after } = runCase(c);
-    expectInvariants(c, before, after);
+    const run = runCase(c);
+    expectInvariants(c, run);
+    const { after } = run;
 
     // I6: a second import changes nothing.
     const setValues = vi.spyOn(useProfileStore.getState(), 'setValues');

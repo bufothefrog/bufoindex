@@ -14,6 +14,7 @@ import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
 import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
 import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
 import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
+import { makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
 import { toPaycheckProfile } from '@/lib/profile/mappers';
@@ -316,7 +317,7 @@ describe('the reverse direction (legacy import)', () => {
   const writesFor = (edit: (engine: PaycheckProfile) => void) => {
     const engine = PAYCHECK_LEGACY.storageDefaults();
     edit(engine);
-    return fromEngineInputs(PAYCHECK_BINDINGS, engine);
+    return fromEngineInputs(PAYCHECK_BINDINGS, engine, makeGet(getDefaultFinancialProfile()));
   };
   const valueAt = (writes: Write[], path: string) => writes.filter((write) => write.path === path).map((write) => write.value);
 

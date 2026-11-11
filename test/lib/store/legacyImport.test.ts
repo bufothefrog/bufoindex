@@ -273,8 +273,7 @@ describe('legacyDefaultGaps', () => {
     expect(legacyDefaultGaps(RETIREMENT_CALCULATOR)).toEqual([
       'person.age', // old 25, profile 30
       'investing.investedBalance', // old 10,000, profile 25,000
-      'income.grossPerPaycheck', // old 100,000 a year (8,333.33 a month), profile 3,500 bi-weekly
-      'income.frequency', // old yearly (monthly in the profile), profile bi-weekly
+      'income.grossPerPaycheck', // old 100,000 a year (3,846.15 in the profile's bi-weekly pay), profile 3,500
       'investing.monthlyContribution', // old 2,000, profile 1,500
       'spending.necessaryMonthly', // old 4,000, profile 3,000
     ]);
@@ -308,17 +307,17 @@ describe('importLegacyCalculatorStorage: an untouched old store keeps its inputs
     }
   }
 
-  it('runs the retirement calculator on the old defaults (the yearly salary as a monthly paycheck)', () => {
+  it("runs the retirement calculator on the old defaults (the yearly salary in the profile's frequency)", () => {
     window.localStorage.setItem(
       RETIREMENT_LEGACY.storageKey,
       JSON.stringify({ state: { inputs: RETIREMENT_LEGACY.storageDefaults() }, version: 3 })
     );
     expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
     expect(profile().provided).toEqual([]);
-    // The profile holds pay per paycheck: 100,000 a year is 8,333.33 a month.
+    // The profile holds pay per paycheck: 100,000 a year is 3,846.15 bi-weekly.
     expectSameRun(RETIREMENT_CALCULATOR, ['currentIncome', 'incomeAmount', 'incomePeriod']);
     const income = engineInputsFor(RETIREMENT_CALCULATOR, profile());
-    expect(income).toMatchObject({ incomeAmount: 8333.33, incomePeriod: 'monthly' });
+    expect(income).toMatchObject({ incomeAmount: 3846.15, incomePeriod: 'biweekly' });
     expect(income.currentIncome).toBeCloseTo(100000, 0);
   });
 
