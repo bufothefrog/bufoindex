@@ -182,6 +182,28 @@ function finerIncomeRecord(group: readonly Write[], answered: readonly boolean[]
 }
 
 /**
+ * The take-home pay that goes with a group that moves the pay frequency but
+ * writes no take-home pay of its own (the retirement income group writes
+ * only gross and frequency): the profile's take-home pay converted to the
+ * new frequency, so its annual amount stays the same and it never sits under
+ * another frequency's unit. Undefined when the group leaves the frequency
+ * alone or writes the take-home pay itself; null when the take-home pay was
+ * answered (the group is then skipped, since an answer given since wins and
+ * cannot be converted without changing what the visitor typed).
+ */
+function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, provided: ReadonlySet<string>): Write | null | undefined {
+  const frequency = group.find((write) => write.path === FREQUENCY_PATH);
+  if (!frequency || group.some((write) => write.path === NET_PATH)) return undefined;
+  if (stableKey(frequency.value) === stableKey(profile.income.frequency)) return undefined;
+  if (provided.has(NET_PATH)) return null;
+  const ownPerYear = paychecksPerYear(frequency.value);
+  const heldPerYear = paychecksPerYear(profile.income.frequency);
+  if (ownPerYear === null || heldPerYear === null) return null;
+  const value = Math.round(((profile.income.netPerPaycheck * heldPerYear) / ownPerYear) * 100) / 100;
+  return { path: NET_PATH, value };
+}
+
+/**
  * Imports `def.legacy.storageKey` into the profile, then removes the key.
  *
  * The writes are taken per group of coupled paths (writeGroups), and a
@@ -204,6 +226,10 @@ function finerIncomeRecord(group: readonly Write[], answered: readonly boolean[]
  *   group's own per-paycheck record and its take-home pay is unanswered
  *   (finerIncomeRecord), the group's gross, take-home and frequency are all
  *   written, so the take-home pay keeps the pay it was saved with.
+ * - A group that moves the pay frequency without a take-home pay of its own
+ *   (the retirement income group) also writes the profile's take-home pay,
+ *   unprovided, converted to the new frequency at the same annual amount; it
+ *   is skipped when the take-home pay was answered (takeHomeAlongside).
  *
  * setValues refuses any value that is not a valid profile value. A saved
  * future-dollars display mode is carried into the shared preference once,
@@ -248,6 +274,9 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
         // from the other old calculator), or describes the same income.
         const agrees = group.every((write, j) => !answered[j] || replaces(write) || holds(write));
         if (!agrees) continue;
+        const takeHome = takeHomeAlongside(group, profile, provided);
+        if (takeHome === null) continue;
+        if (takeHome) untouched.push(takeHome);
         group.forEach((write, j) => {
           if (providedPaths[j] !== null && (!answered[j] || replaces(write))) (changed ? answers : untouched).push(write);
         });
