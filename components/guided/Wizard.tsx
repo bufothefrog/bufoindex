@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import { AlertTriangle, ArrowRight, ChevronLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
-import { ALL_RENDERERS, INTAKE_PREWARM, RENDERERS } from '@/components/calculators/renderers';
+import { ALL_RENDERERS, INTAKE_DESTINATION, INTAKE_PREWARM, RENDERERS } from '@/components/calculators/renderers';
 import { FieldInput } from '@/components/fields/FieldInput';
+import { ScreenNotes } from '@/components/fields/ScreenNotes';
 import type { CustomRenderers } from '@/components/fields/types';
 import { PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
 import {
@@ -27,9 +27,8 @@ import {
   type IntakeMode,
 } from '@/lib/constants/intake';
 import { applyWrites, getAt, makeGet } from '@/lib/fields/paths';
-import { relationErrors, screenPaths, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
-import type { FieldErrors, FieldOption, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
-import { leverageLink, paycheckLink, portfolioLink, retirementLink } from '@/lib/profile/links';
+import { fieldWrites, relationErrors, screenPaths, visibleScreenFields } from '@/lib/fields/runtime';
+import type { FieldErrors, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
@@ -85,16 +84,9 @@ export function isCoreReady(profile: FinancialProfile): boolean {
   return stamp !== null && profile.updatedAt >= stamp;
 }
 
-const CALCULATOR_LINKS: Record<Exclude<IntakeIntent, 'profile'>, (profile: FinancialProfile) => string> = {
-  paycheck: paycheckLink,
-  retirement: retirementLink,
-  portfolio: portfolioLink,
-  leverage: leverageLink,
-};
-
 /** Where an intent's intake leads: the seeded calculator, or the overview for 'profile'. */
 export function intentDestination(intent: IntakeIntent, profile: FinancialProfile): string {
-  return intent === 'profile' ? '/overview' : CALCULATOR_LINKS[intent](profile);
+  return intent === 'profile' ? '/overview' : INTAKE_DESTINATION[intent](profile);
 }
 
 function destinationFor(flow: IntakeFlow, profile: FinancialProfile, next?: string): string {
@@ -124,10 +116,40 @@ function whenIdle(task: () => void): () => void {
   return () => window.clearTimeout(handle);
 }
 
-/** The writes for choosing `value` on a choice field: its own, then its coupled ones. */
-function choiceWrites(spec: FieldSpec, value: FieldOption['value'], get: Get): Write[] {
-  const after: Get = (path) => (path === spec.path ? value : get(path));
-  return [{ path: spec.path, value }, ...(spec.onChange?.(value, after) ?? [])];
+/**
+ * The spec with the option its field held on arrival kept on offer. A
+ * choice the intake offers only in part (offeredWithSaved) adds the saved
+ * value's option from the working answers; once the visitor clicks another
+ * option, that option would vanish, so the one chosen on arrival is
+ * resolved against the arrival profile and kept.
+ */
+function keepArrivalOption(spec: FieldSpec, arrival: Get): FieldSpec {
+  const options = spec.options;
+  if (typeof options !== 'function') return spec;
+  return {
+    ...spec,
+    options: (get) => {
+      const now = options(get);
+      const saved = arrival(spec.path);
+      if (now.some((option) => option.value === saved)) return now;
+      const kept = options(arrival).find((option) => option.value === saved);
+      return kept ? [...now, kept] : now;
+    },
+  };
+}
+
+/** True when `path` is one of `paths` or lies under one (a list row under its list). */
+function isUnder(path: string, paths: readonly string[]): boolean {
+  return paths.some((answered) => path === answered || path.startsWith(`${answered}.`));
+}
+
+/**
+ * The paths among `writes` that are not the screen's own: a field's coupled
+ * writes (onChange) to paths on no field of this screen. They are answers
+ * too, so the screen saves and marks them as the calculator page would.
+ */
+function coupledPaths(writes: readonly Write[], own: readonly string[]): string[] {
+  return writes.map((w) => w.path).filter((path) => !isUnder(path, own));
 }
 
 /**
@@ -215,6 +237,8 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
   const [seed] = useState<FinancialProfile>(initialProfile);
   const [answers, setAnswers] = useState<FinancialProfile>(seed);
   const [provided, setProvided] = useState<string[]>([]);
+  // Coupled-write paths each screen touched, by screen id (see coupledPaths).
+  const [coupled, setCoupled] = useState<Readonly<Record<string, readonly string[]>>>({});
   const [index, setIndex] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [alert, setAlert] = useState<string[]>([]);
@@ -233,6 +257,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     getIntakeScreens(flow, makeGet(values), { mode, provided: initiallyProvided });
 
   const get = useMemo(() => makeGet(answers), [answers]);
+  const arrival = useMemo(() => makeGet(seed), [seed]);
   const screens = useMemo(
     () => getIntakeScreens(flow, get, { mode, provided: initiallyProvided }),
     [flow, mode, initiallyProvided, get]
@@ -307,7 +332,9 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
       return;
     }
 
-    const nextProvided = Array.from(new Set([...provided, ...screenPaths(form, current, nextGet)]));
+    const own = screenPaths(form, current, nextGet);
+    const touched = [...(coupled[current.id] ?? []), ...coupledPaths(writes ?? [], own)];
+    const nextProvided = Array.from(new Set([...provided, ...own, ...touched]));
     if (writes) setAnswers(nextAnswers);
     setProvided(nextProvided);
     clearErrors();
@@ -318,7 +345,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
 
   /** Restores the given screens' answers to their starting values and unmarks them. */
   const revert = (skipped: readonly ScreenSpec[]) => {
-    const skippedPaths = skipped.flatMap((s) => screenPaths(form, s, get));
+    const skippedPaths = skipped.flatMap((s) => [...screenPaths(form, s, get), ...(coupled[s.id] ?? [])]);
     const reverted = applyWrites(
       answers,
       skippedPaths.map((path) => ({ path, value: getAt(seed, path) }))
@@ -326,6 +353,11 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     const remaining = provided.filter((path) => !skippedPaths.includes(path));
     setAnswers(reverted);
     setProvided(remaining);
+    setCoupled((prev) => {
+      const next = { ...prev };
+      for (const s of skipped) delete next[s.id];
+      return next;
+    });
     clearErrors();
     return { reverted, remaining };
   };
@@ -364,6 +396,10 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
 
   const write = (writes: Write[]) => {
     setAnswers((prev) => applyWrites(prev, writes));
+    const extra = coupledPaths(writes, paths);
+    if (extra.length > 0) {
+      setCoupled((prev) => ({ ...prev, [screen.id]: Array.from(new Set([...(prev[screen.id] ?? []), ...extra])) }));
+    }
     clearErrors();
   };
 
@@ -381,7 +417,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     }
   };
 
-  const fields = visibleScreenFields(form, screen, get);
+  const fields = visibleScreenFields(form, screen, get).map((spec) => keepArrivalOption(spec, arrival));
   const singleQuestion = fields.length === 1;
   const showSectionSkip =
     section !== undefined &&
@@ -452,17 +488,13 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
             size="lg"
             hideLabel={singleQuestion}
             renderers={renderers}
-            onChooseAndAdvance={(value) => advance(choiceWrites(spec, value, get))}
+            onChooseAndAdvance={(value) => advance(fieldWrites(spec, value, get))}
             idPrefix="intake"
           />
         ))}
       </div>
 
-      {visibleScreenNotes(screen, get).map((note) => (
-        <StatusAlert key={note.text} tone={note.tone} appearance="tinted">
-          {note.text}
-        </StatusAlert>
-      ))}
+      <ScreenNotes screen={screen} get={get} />
 
       {alert.length > 0 && (
         // Dark mode's --destructive is a deep red (about 1.8:1 on the page

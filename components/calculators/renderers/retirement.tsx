@@ -5,6 +5,8 @@
  */
 
 import type { CustomRenderers } from '@/components/fields/types';
+import { retirementLink } from '@/lib/profile/links';
+import type { FinancialProfile } from '@/lib/profile/types';
 
 export const RETIREMENT_RENDERERS: CustomRenderers = {};
 
@@ -15,3 +17,11 @@ export const RETIREMENT_RENDERERS: CustomRenderers = {};
  * runner's prewarm(); while it is undefined the intake does nothing.
  */
 export const RETIREMENT_INTAKE_PREWARM: (() => void) | undefined = undefined;
+
+/**
+ * Where the retirement intake leads once finished, from the saved profile. Slice
+ * c1 switches it to calculatorHref('retirement', { fromProfile: true }) when
+ * the calculator reads the profile; the wizard reads it through
+ * INTAKE_DESTINATION in ./index.ts.
+ */
+export const RETIREMENT_INTAKE_DESTINATION: (profile: FinancialProfile) => string = retirementLink;

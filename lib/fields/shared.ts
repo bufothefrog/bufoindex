@@ -78,6 +78,9 @@ export const STATE: FieldSpec = {
   path: 'person.state',
   kind: 'state',
   label: 'State you live in',
+  // The combobox can be emptied (a typed term that matches no state); an
+  // empty answer is an error, never a skipped one saved as the old state.
+  required: true,
   tier: 'core',
 };
 

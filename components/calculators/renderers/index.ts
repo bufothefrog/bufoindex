@@ -7,10 +7,11 @@
 
 import type { CustomRenderers } from '@/components/fields/types';
 import type { CalculatorId } from '@/lib/calculators/types';
-import { LEVERAGE_RENDERERS } from './leverage';
-import { PAYCHECK_RENDERERS } from './paycheck';
-import { PORTFOLIO_RENDERERS } from './portfolio';
-import { RETIREMENT_INTAKE_PREWARM, RETIREMENT_RENDERERS } from './retirement';
+import type { FinancialProfile } from '@/lib/profile/types';
+import { LEVERAGE_INTAKE_DESTINATION, LEVERAGE_RENDERERS } from './leverage';
+import { PAYCHECK_INTAKE_DESTINATION, PAYCHECK_RENDERERS } from './paycheck';
+import { PORTFOLIO_INTAKE_DESTINATION, PORTFOLIO_RENDERERS } from './portfolio';
+import { RETIREMENT_INTAKE_DESTINATION, RETIREMENT_INTAKE_PREWARM, RETIREMENT_RENDERERS } from './retirement';
 
 export const RENDERERS: Readonly<Record<CalculatorId, CustomRenderers>> = {
   paycheck: PAYCHECK_RENDERERS,
@@ -32,4 +33,15 @@ export const ALL_RENDERERS: CustomRenderers = Object.values(RENDERERS).reduce<Cu
  */
 export const INTAKE_PREWARM: Readonly<Partial<Record<CalculatorId, () => void>>> = {
   retirement: RETIREMENT_INTAKE_PREWARM,
+};
+
+/**
+ * Where each calculator intent's intake leads once finished, from the saved
+ * profile. Each calculator slice changes only its own entry, in its own file.
+ */
+export const INTAKE_DESTINATION: Readonly<Record<CalculatorId, (profile: FinancialProfile) => string>> = {
+  paycheck: PAYCHECK_INTAKE_DESTINATION,
+  retirement: RETIREMENT_INTAKE_DESTINATION,
+  portfolio: PORTFOLIO_INTAKE_DESTINATION,
+  leverage: LEVERAGE_INTAKE_DESTINATION,
 };

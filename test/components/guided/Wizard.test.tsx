@@ -404,6 +404,35 @@ describe('Wizard, every intent finishes on its calculator', () => {
     expect(replace).toHaveBeenCalledWith('/overview');
   });
 
+  it('keeps the saved status on offer after another is chosen, so it can be chosen again', async () => {
+    useProfileStore.getState().setValues([{ path: 'person.filingStatus', value: 'headOfHousehold' }]);
+    const user = userEvent.setup();
+    render(<Wizard flow="core" />);
+
+    await user.click(screen.getByRole('radio', { name: 'Single' }));
+    expect(screen.getByRole('radio', { name: 'Single' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    await user.click(screen.getByRole('radio', { name: 'Head of household' }));
+    expect(screen.getByRole('radio', { name: 'Head of household' })).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
+  });
+
+  it('does not accept an emptied state, so a blank answer is never saved as the old state', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="core" />);
+    const state = screen.getByRole('combobox', { name: 'State you live in' });
+    await user.click(state);
+    await user.type(state, 'zz');
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(screen.getByText('State you live in is required.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'What does a typical paycheck look like?' })).not.toBeInTheDocument();
+    expect(useProfileStore.getState().profile.provided).not.toContain('person.state');
+  });
+
   it('offers no "Skip the rest" in the core flow', () => {
     render(<Wizard flow="core" />);
     expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
@@ -521,6 +550,68 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(screen.getAllByText('Stop after now.')).toHaveLength(1);
     expect(screen.getByRole('alert')).toHaveTextContent('Stop after now.');
     expect(screen.getByLabelText('Stop age')).not.toHaveAccessibleDescription(/Stop after now/);
+  });
+
+  it('saves and marks a coupled write to a path that is on no field of the screen', async () => {
+    injected.form = {
+      id: 'coupled',
+      fields: [
+        {
+          path: 'workplace.has401k',
+          kind: 'boolean',
+          label: 'Has a 401(k)',
+          tier: 'details',
+          onChange: (value) => (value === false ? [{ path: 'workplace.contributionPercent', value: 0 }] : []),
+        },
+      ],
+      screens: [{ id: 'k', title: 'Fixture 401k?', tier: 'details', fields: ['workplace.has401k'] }],
+    };
+    useProfileStore.getState().setValues([
+      { path: 'workplace.has401k', value: true },
+      { path: 'workplace.contributionPercent', value: 0.06 },
+    ]);
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    await user.click(screen.getByRole('radio', { name: 'No' }));
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    const { profile } = useProfileStore.getState();
+    expect(profile.workplace.has401k).toBe(false);
+    expect(profile.workplace.contributionPercent).toBe(0);
+    expect(profile.provided).toEqual(expect.arrayContaining(['workplace.has401k', 'workplace.contributionPercent']));
+  });
+
+  it('drops a coupled write when its screen is skipped', async () => {
+    injected.form = {
+      id: 'coupled',
+      fields: [
+        {
+          path: 'workplace.has401k',
+          kind: 'boolean',
+          label: 'Has a 401(k)',
+          tier: 'details',
+          onChange: (value) => (value === false ? [{ path: 'workplace.contributionPercent', value: 0 }] : []),
+        },
+        { path: 'person.age', kind: 'number', label: 'Age now', min: 16, max: 100, step: 1, tier: 'details' },
+      ],
+      screens: [
+        { id: 'k', title: 'Fixture 401k?', tier: 'details', fields: ['workplace.has401k'] },
+        { id: 'age', title: 'Fixture age?', tier: 'details', fields: ['person.age'] },
+      ],
+    };
+    useProfileStore
+      .getState()
+      .setValues([{ path: 'workplace.contributionPercent', value: 0.06 }], { unprovide: ['workplace.contributionPercent'] });
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    await user.click(screen.getByRole('radio', { name: 'No' }));
+    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Fixture age?' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    const { profile } = useProfileStore.getState();
+    expect(profile.workplace.contributionPercent).toBe(0.06);
+    expect(profile.provided).not.toContain('workplace.contributionPercent');
   });
 
   it('renders the screen notes', async () => {
