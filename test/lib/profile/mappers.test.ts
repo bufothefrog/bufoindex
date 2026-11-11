@@ -8,6 +8,11 @@
  * invested, $1,500/mo total contributions ($500 taxable), 80/20 mix, $1,000
  * new cash; cashflow-investor preset at 2x.
  *
+ * Goldens: the full outputs pinned below (the default and CUSTOM_V1) were
+ * captured from the v1 mappers before the profile moved to v2. v1-shaped data
+ * must map to exactly the same calculator inputs, so the numbers users see do
+ * not move.
+ *
  * Hand-computed anchors:
  *   annual gross   = 3,500 x 26           = 91,000
  *   monthly gross  = 3,500 x 26 / 12      = 7,583.33
@@ -19,25 +24,20 @@ import { describe, expect, it } from 'vitest';
 import {
   annualGrossIncome,
   getDefaultFinancialProfile,
-  getProfileValue,
-  isValidProfileValue,
+  migrateProfile,
   monthlyGrossIncome,
+  newCashDepositWrites,
   monthlyNetIncome,
-  normalizeProfile,
   PAYCHECKS_PER_YEAR,
-  PRESET_EMERGENCY_MONTHS,
   PROFILE_FIELDS,
-  PROFILE_SECTION_LABELS,
-  PROFILE_SECTIONS,
   profileCompleteness,
-  splitProfilePath,
-  TARGET_MIX_WEIGHTS,
   toPaycheckProfile,
   toRebalanceInputs,
   toRetirementInputs,
 } from '@/lib/profile';
-import type { FinancialProfile, PayFrequency, TargetMixPreset } from '@/lib/profile';
+import type { FinancialProfile, PayFrequency, ProfilePatch, TargetMixPreset } from '@/lib/profile';
 import { calculateOptimalAllocation } from '@/lib/calculations/core';
+import { applyWrites } from '@/lib/fields/paths';
 import {
   rebalancePortfolioV2,
   validateRebalanceInputsV2,
@@ -45,168 +45,43 @@ import {
 import { useRetirementStore } from '@/lib/store/retirementStore';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 
-/** Default profile with per-section overrides. */
-function makeProfile(overrides: {
-  [K in keyof FinancialProfile]?: FinancialProfile[K] extends object
-    ? Partial<FinancialProfile[K]>
-    : FinancialProfile[K];
-} = {}): FinancialProfile {
-  const base = getDefaultFinancialProfile();
-  return {
-    ...base,
-    ...overrides,
-    person: { ...base.person, ...overrides.person },
-    income: { ...base.income, ...overrides.income },
-    spending: { ...base.spending, ...overrides.spending },
-    cash: { ...base.cash, ...overrides.cash },
-    workplace: { ...base.workplace, ...overrides.workplace },
-    investing: { ...base.investing, ...overrides.investing },
-    strategy: { ...base.strategy, ...overrides.strategy },
-    provided: (overrides.provided as string[] | undefined) ?? base.provided,
-  } as FinancialProfile;
+/**
+ * A v1-shaped profile: the given v1 sections over the v1 defaults, loaded
+ * the way a saved v1 profile is (migrateProfile from version 1).
+ */
+function makeProfile(overrides: ProfilePatch = {}): FinancialProfile {
+  return migrateProfile(overrides, 1);
 }
 
-describe('getDefaultFinancialProfile', () => {
-  it('returns the documented placeholder values', () => {
-    const p = getDefaultFinancialProfile();
-    expect(p).toEqual({
-      version: 1,
-      updatedAt: 0,
-      person: { age: 30, state: 'TX', filingStatus: 'single', retirementAge: 60 },
-      income: { grossPerPaycheck: 3500, netPerPaycheck: 2600, frequency: 'bi-weekly' },
-      spending: { necessaryMonthly: 3000, funMoneyMin: 300, funMoneyMax: 600, targetRetirementIncome: 80000 },
-      cash: { emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 3 },
-      workplace: { has401k: true, matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
-      investing: {
-        investedBalance: 25000,
-        monthlyContribution: 1500,
-        taxableMonthlyContribution: 500,
-        targetMix: '80-20',
-        newCashThisMonth: 1000,
-      },
-      strategy: { preset: 'cashflow-investor', leverageRatio: 2 },
-      provided: [],
-    });
-  });
+/** A v2 profile with v2-only answers on top of the defaults. */
+function withV2(edit: (profile: FinancialProfile) => void): FinancialProfile {
+  const profile = getDefaultFinancialProfile();
+  edit(profile);
+  return profile;
+}
 
-  it('returns a fresh object each call', () => {
-    const a = getDefaultFinancialProfile();
-    a.person.age = 99;
-    a.provided.push('person.age');
-    const b = getDefaultFinancialProfile();
-    expect(b.person.age).toBe(30);
-    expect(b.provided).toEqual([]);
-  });
-});
+/** The custom v1 profile used by the link tests: every section differs from the defaults. */
+const CUSTOM_V1: ProfilePatch = {
+  updatedAt: 1760000000000,
+  person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
+  income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
+  spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
+  cash: { emergencyFundBalance: 12000, emergencyFundApy: 0.045, targetMonths: 1 },
+  workplace: { has401k: true, matchPercent: 1, matchLimit: 0.04, contributionPercent: 0.1 },
+  investing: {
+    investedBalance: 140000,
+    monthlyContribution: 2200,
+    taxableMonthlyContribution: 900,
+    targetMix: '60-40',
+    newCashThisMonth: 3000,
+  },
+  strategy: { preset: 'standard', leverageRatio: 1.5 },
+  provided: ['person.age'],
+};
 
-describe('PROFILE_FIELDS and preset constants', () => {
-  it('lists every leaf field exactly once, with a label and a known section', () => {
-    const defaults = getDefaultFinancialProfile();
-    const leafPaths = PROFILE_SECTIONS.flatMap((section) =>
-      Object.keys(defaults[section]).map((key) => `${section}.${key}`)
-    );
-    expect(PROFILE_FIELDS).toHaveLength(25);
-    expect(PROFILE_FIELDS.map((f) => f.path).sort()).toEqual([...leafPaths].sort());
-    for (const field of PROFILE_FIELDS) {
-      expect(field.label.length).toBeGreaterThan(0);
-      expect(field.path.startsWith(`${field.section}.`)).toBe(true);
-      expect(PROFILE_SECTION_LABELS[field.section as keyof typeof PROFILE_SECTION_LABELS]).toBeTruthy();
-    }
-  });
-
-  it('excludes version, updatedAt and provided', () => {
-    const paths = PROFILE_FIELDS.map((f) => f.path);
-    expect(paths).not.toContain('version');
-    expect(paths).not.toContain('updatedAt');
-    expect(paths).not.toContain('provided');
-  });
-
-  it('maps each strategy preset to its starting emergency-fund months', () => {
-    expect(PRESET_EMERGENCY_MONTHS).toEqual({ standard: 3, 'cashflow-investor': 1 });
-  });
-
+describe('PAYCHECKS_PER_YEAR', () => {
   it('derives paychecks per year from the frequency multipliers', () => {
     expect(PAYCHECKS_PER_YEAR).toEqual({ weekly: 52, 'bi-weekly': 26, 'semi-monthly': 24, monthly: 12 });
-  });
-
-  it('has target-mix weights that each sum to 1', () => {
-    for (const mix of Object.keys(TARGET_MIX_WEIGHTS) as TargetMixPreset[]) {
-      const w = TARGET_MIX_WEIGHTS[mix];
-      expect(w['us-stock'] + w['intl-stock'] + w.bonds + w.cash).toBeCloseTo(1, 12);
-    }
-  });
-});
-
-describe('path helpers and validation', () => {
-  it('splits and reads known leaf paths', () => {
-    const p = getDefaultFinancialProfile();
-    expect(splitProfilePath('person.age')).toEqual({ section: 'person', key: 'age' });
-    expect(splitProfilePath('person.nickname')).toBeNull();
-    expect(splitProfilePath('provided')).toBeNull();
-    expect(getProfileValue(p, 'income.grossPerPaycheck')).toBe(3500);
-    expect(getProfileValue(p, 'workplace.has401k')).toBe(true);
-    expect(getProfileValue(p, 'nope.nothing')).toBeUndefined();
-  });
-
-  it('accepts only finite numbers, booleans, listed enum members and non-empty strings', () => {
-    expect(isValidProfileValue('person.age', 41)).toBe(true);
-    expect(isValidProfileValue('person.age', '41')).toBe(false);
-    expect(isValidProfileValue('person.age', Number.NaN)).toBe(false);
-    expect(isValidProfileValue('person.age', Infinity)).toBe(false);
-    expect(isValidProfileValue('workplace.has401k', false)).toBe(true);
-    expect(isValidProfileValue('workplace.has401k', 'false')).toBe(false);
-    expect(isValidProfileValue('income.frequency', 'semi-monthly')).toBe(true);
-    expect(isValidProfileValue('income.frequency', 'daily')).toBe(false);
-    expect(isValidProfileValue('person.filingStatus', 'marriedJoint')).toBe(true);
-    expect(isValidProfileValue('person.filingStatus', 'headOfHousehold')).toBe(false);
-    expect(isValidProfileValue('investing.targetMix', '60-40')).toBe(true);
-    expect(isValidProfileValue('strategy.preset', 'standard')).toBe(true);
-    expect(isValidProfileValue('strategy.preset', 3)).toBe(false);
-    expect(isValidProfileValue('person.state', 'CA')).toBe(true);
-    expect(isValidProfileValue('person.state', '  ')).toBe(false);
-    expect(isValidProfileValue('person.nickname', 'x')).toBe(false);
-  });
-});
-
-describe('normalizeProfile', () => {
-  it('returns the defaults for non-object input', () => {
-    expect(normalizeProfile(null)).toEqual(getDefaultFinancialProfile());
-    expect(normalizeProfile('garbage')).toEqual(getDefaultFinancialProfile());
-    expect(normalizeProfile([1, 2])).toEqual(getDefaultFinancialProfile());
-  });
-
-  it('fills missing sections and keys, and drops invalid leaves', () => {
-    const p = normalizeProfile({
-      updatedAt: 1234,
-      person: { age: 45, state: 'NY', filingStatus: 'bogus' },
-      income: 'not-an-object',
-      cash: { emergencyFundBalance: Number.NaN, targetMonths: 6 },
-      strategy: { preset: 'standard', leverageRatio: 3, extra: 'ignored' },
-      provided: ['person.age', 'person.age', 7, 'cash.targetMonths'],
-    });
-    expect(p.version).toBe(1);
-    expect(p.updatedAt).toBe(1234);
-    expect(p.person).toEqual({ age: 45, state: 'NY', filingStatus: 'single', retirementAge: 60 });
-    expect(p.income).toEqual(getDefaultFinancialProfile().income);
-    expect(p.cash).toEqual({ emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 6 });
-    expect(p.strategy).toEqual({ preset: 'standard', leverageRatio: 3 });
-    expect(p.provided).toEqual(['person.age', 'cash.targetMonths']);
-  });
-
-  it('falls back to a supplied base profile rather than the defaults', () => {
-    const base = makeProfile({ person: { age: 52 }, updatedAt: 99 });
-    const p = normalizeProfile({ person: { age: 'x' }, updatedAt: Number.NaN }, base);
-    expect(p.person.age).toBe(52);
-    expect(p.updatedAt).toBe(99);
-  });
-
-  it('does not share nested objects with the base', () => {
-    const base = getDefaultFinancialProfile();
-    const p = normalizeProfile({}, base);
-    p.person.age = 70;
-    p.provided.push('person.age');
-    expect(base.person.age).toBe(30);
-    expect(base.provided).toEqual([]);
   });
 });
 
@@ -280,7 +155,7 @@ describe('toRetirementInputs', () => {
     expect(inputs.currentIncome).toBe(annual);
   });
 
-  it('uses the retirement store defaults for every field the profile does not carry', () => {
+  it('defaults the fields v1 did not carry to the retirement store defaults', () => {
     const storeDefaults = useRetirementStore.getInitialState().inputs;
     const inputs = toRetirementInputs(getDefaultFinancialProfile());
     for (const key of [
@@ -416,7 +291,10 @@ describe('toRebalanceInputs', () => {
 
   it('clamps negative or non-finite new cash to a zero deposit', () => {
     expect(toRebalanceInputs(makeProfile({ investing: { newCashThisMonth: -50 } })).accounts[1].deposit).toBe(0);
-    expect(toRebalanceInputs(makeProfile({ investing: { newCashThisMonth: Number.NaN } })).accounts[1].deposit).toBe(0);
+    // NaN cannot be saved (JSON stores null); in memory it reaches the
+    // deposit only through newCashDepositWrites, which clamps it.
+    const p = getDefaultFinancialProfile();
+    expect(toRebalanceInputs(applyWrites(p, newCashDepositWrites(p, Number.NaN))).accounts[1].deposit).toBe(0);
   });
 
   it('reconstructs the rebalancer store worked example (holdings, securities, flags)', () => {
@@ -443,6 +321,280 @@ describe('toRebalanceInputs', () => {
   });
 });
 
+describe('goldens: v1-shaped data maps exactly as before v2', () => {
+  const custom = makeProfile(CUSTOM_V1);
+
+  it('toRetirementInputs, custom profile', () => {
+    expect(toRetirementInputs(custom)).toEqual({
+      startingAge: 38,
+      retirementAge: 58,
+      lifeExpectancy: 85,
+      targetIncome: 110000,
+      startingBalance: 140000,
+      currentIncome: 109200,
+      incomeAmount: 109200,
+      incomePeriod: 'yearly',
+      monthlySavings: 2200,
+      necessaryMonthlyExpenses: 4200,
+      accumulationReturn: 0.08,
+      retirementReturn: 0.06,
+      inflationRate: 0.03,
+      socialSecurityAge: 67,
+      socialSecurityBenefit: 30000,
+      healthcareCostMultiplier: 1,
+      volatility: 0.15,
+      filingStatus: 'marriedJoint',
+      state: 'CA',
+      riskProfile: 'tdf',
+      effectiveTaxRate: null,
+      estimatedAnnualHealthcareCost: null,
+    });
+  });
+
+  it.each([
+    ['default', getDefaultFinancialProfile(), {
+      gross: 3500, net: 2600, frequency: 'bi-weekly', monthlyGross: 7583.333333333333, monthlyNet: 5633.333333333333,
+      state: 'TX', filingStatus: 'single', match: 0.5, limit: 0.06, contribution: 0.06,
+      months: 3, fund: 5000, apy: 0.04, necessary: 3000, min: 300, max: 600, current: 450, age: 30, taxable: 500, lastUpdated: 0,
+    }],
+    ['custom', custom, {
+      gross: 2100, net: 1550, frequency: 'weekly', monthlyGross: 9100, monthlyNet: 6716.666666666666,
+      state: 'CA', filingStatus: 'marriedJoint', match: 1, limit: 0.04, contribution: 0.1,
+      months: 1, fund: 12000, apy: 0.045, necessary: 4200, min: 250, max: 900, current: 575, age: 38, taxable: 900,
+      lastUpdated: 1760000000000,
+    }],
+  ] as const)('toPaycheckProfile, %s profile', (_name, profile, g) => {
+    expect(toPaycheckProfile(profile)).toEqual({
+      income: {
+        grossPaycheck: g.gross,
+        netPaycheck: g.net,
+        frequency: g.frequency,
+        regularBonus: false,
+        bonusAmount: 0,
+        bonusFrequency: 'annual',
+        monthlyGross: g.monthlyGross,
+        monthlyNet: g.monthlyNet,
+        gross: g.monthlyGross,
+        net: g.monthlyNet,
+        bonusExpected: 0,
+      },
+      taxes: {
+        federalBracket: 0.22,
+        state: g.state,
+        filingStatus: g.filingStatus,
+        currentWithholding: { federal: 800, state: 200, fica: 382 },
+      },
+      benefits: {
+        employer401k: {
+          available: true,
+          matchPercent: g.match,
+          matchLimit: g.limit,
+          currentContribution: g.contribution,
+          contributionType: 'traditional',
+          traditionalContribution: g.contribution,
+          rothContribution: 0,
+          afterTaxAvailable: false,
+          currentYTD: 0,
+        },
+        hsa: {
+          eligible: false,
+          employerContribution: 0,
+          currentContribution: 0,
+          currentYTD: 0,
+          coverageType: 'individual',
+          investmentStrategy: false,
+        },
+        ira: {
+          hasIRA: false,
+          accountTypes: { traditional: false, roth: false },
+          currentContributions: { traditional: 0, roth: 0 },
+          currentBalances: { traditional: 0, roth: 0 },
+        },
+        other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+      },
+      debts: [],
+      preferences: {
+        emergencyFundMonths: g.months,
+        currentEmergencyFund: g.fund,
+        emergencyFundAPY: g.apy,
+        necessaryExpenses: g.necessary,
+        funMoney: { min: g.min, max: g.max, current: g.current },
+        age: g.age,
+        hasTaxableAccount: true,
+        taxableAccountContribution: g.taxable,
+        isPeakEarnings: false,
+        expectedRetirementBracket: 0.12,
+        riskTolerance: 'moderate',
+        optimizationGoal: 'balanced',
+      },
+      version: '1.0',
+      lastUpdated: g.lastUpdated,
+      source: 'imported',
+    });
+  });
+
+  it('toRebalanceInputs, default profile', () => {
+    expect(toRebalanceInputs(getDefaultFinancialProfile())).toEqual({
+      setupMode: 'multi-shared',
+      securities: [
+        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
+        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
+        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+      ],
+      accounts: [
+        { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
+        { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 1000 },
+      ],
+      holdings: [
+        { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
+        { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
+        { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
+        { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+      ],
+      classTargets: [
+        { accountId: null, assetClass: 'us-stock', target: 0.6 },
+        { accountId: null, assetClass: 'intl-stock', target: 0.2 },
+        { accountId: null, assetClass: 'bonds', target: 0.2 },
+        { accountId: null, assetClass: 'cash', target: 0 },
+      ],
+      customAssetClasses: [],
+      allowTaxableSelling: false,
+      showPlacementAdvice: true,
+      mode: 'whole',
+    });
+  });
+});
+
+describe('v2 sources', () => {
+  it('toRetirementInputs reads life expectancy, Social Security, healthcare and the assumptions', () => {
+    const inputs = toRetirementInputs(
+      withV2((p) => {
+        p.person.lifeExpectancy = 92;
+        p.retirementIncome = { socialSecurityBenefit: 24000, socialSecurityAge: 70, annualHealthcareCost: 9000 };
+        p.assumptions.retirement = {
+          riskProfile: 'custom',
+          accumulationReturn: 0.07,
+          retirementReturn: 0.05,
+          inflationRate: 0.025,
+          volatility: 0.12,
+          effectiveTaxRate: 0.18,
+          healthcareCostMultiplier: 1.2,
+        };
+      })
+    );
+    expect(inputs).toMatchObject({
+      lifeExpectancy: 92,
+      socialSecurityBenefit: 24000,
+      socialSecurityAge: 70,
+      estimatedAnnualHealthcareCost: 9000,
+      riskProfile: 'custom',
+      accumulationReturn: 0.07,
+      retirementReturn: 0.05,
+      inflationRate: 0.025,
+      volatility: 0.12,
+      effectiveTaxRate: 0.18,
+      healthcareCostMultiplier: 1.2,
+    });
+  });
+
+  it.each([
+    ['single', 'single'],
+    ['marriedJoint', 'marriedJoint'],
+    ['marriedSeparate', 'single'],
+    ['headOfHousehold', 'single'],
+  ] as const)('toRetirementInputs maps filing status %s to %s (O10)', (status, expected) => {
+    expect(toRetirementInputs(withV2((p) => { p.person.filingStatus = status; })).filingStatus).toBe(expected);
+    expect(toPaycheckProfile(withV2((p) => { p.person.filingStatus = status; })).taxes.filingStatus).toBe(status);
+  });
+
+  it.each([
+    // type, total, roth share asked, expected traditional, expected roth
+    ['traditional', 0.1, 0.04, 0.1, 0],
+    ['roth', 0.1, 0.04, 0, 0.1],
+    ['split', 0.1, 0.04, 0.06, 0.04],
+    ['split', 0.05, 0.08, 0, 0.05],
+  ] as const)('toPaycheckProfile splits a %s 401(k) election of %d (Roth %d) into %d / %d', (type, total, rothPct, trad, roth) => {
+    const mapped = toPaycheckProfile(
+      withV2((p) => {
+        p.workplace.contributionType = type;
+        p.workplace.contributionPercent = total;
+        p.workplace.rothContributionPercent = rothPct;
+      })
+    );
+    expect(mapped.benefits.employer401k.contributionType).toBe(type);
+    expect(mapped.benefits.employer401k.currentContribution).toBe(total);
+    expect(mapped.benefits.employer401k.traditionalContribution).toBeCloseTo(trad, 12);
+    expect(mapped.benefits.employer401k.rothContribution).toBeCloseTo(roth, 12);
+  });
+
+  it('toPaycheckProfile reads the bonus, HSA, IRAs, debts and the allocator assumptions', () => {
+    const debt = { id: 'd1', name: 'Card', balance: 4000, interestRate: 0.24, minimumPayment: 120, extraPayment: 0, taxDeductible: false };
+    const profile = withV2((p) => {
+      p.income = { ...p.income, hasBonus: true, bonusAmount: 6000, bonusFrequency: 'annual' };
+      p.workplace.afterTaxAvailable = true;
+      p.hsa = { eligible: true, coverage: 'family', monthlyContribution: 300, employerAnnualContribution: 1000, investing: true };
+      p.ira = { traditional: false, roth: true, traditionalMonthly: 0, rothMonthly: 500, traditionalBalance: 0, rothBalance: 12000 };
+      p.debts = [debt];
+      p.assumptions.paycheck = { riskTolerance: 'optimizer', optimizationGoal: 'tax_minimization', expectedRetirementBracket: 0.22 };
+    });
+    const mapped = toPaycheckProfile(profile);
+    // Bonus: 6,000 a year = 500 a month.
+    expect(mapped.income).toMatchObject({ regularBonus: true, bonusAmount: 6000, bonusFrequency: 'annual', bonusExpected: 500 });
+    expect(mapped.benefits.employer401k.afterTaxAvailable).toBe(true);
+    expect(mapped.benefits.hsa).toEqual({
+      eligible: true,
+      employerContribution: 1000,
+      currentContribution: 300,
+      currentYTD: 0,
+      coverageType: 'family',
+      investmentStrategy: true,
+    });
+    expect(mapped.benefits.ira).toEqual({
+      hasIRA: true,
+      accountTypes: { traditional: false, roth: true },
+      currentContributions: { traditional: 0, roth: 500 },
+      currentBalances: { traditional: 0, roth: 12000 },
+    });
+    expect(mapped.debts).toEqual([debt]);
+    expect(mapped.debts[0]).not.toBe(profile.debts[0]);
+    expect(mapped.preferences).toMatchObject({
+      riskTolerance: 'optimizer',
+      optimizationGoal: 'tax_minimization',
+      expectedRetirementBracket: 0.22,
+    });
+  });
+
+  it("toRebalanceInputs uses the profile's class targets for a 'custom' mix, and its lists and settings", () => {
+    const profile = withV2((p) => {
+      p.investing.targetMix = 'custom';
+      p.portfolio.classTargets = [
+        { accountId: null, assetClass: 'us-stock', target: 0.5 },
+        { accountId: null, assetClass: 'cac-gold', target: 0.1 },
+        { accountId: null, assetClass: 'bonds', target: 0.4 },
+      ];
+      p.portfolio.customAssetClasses = [{ id: 'cac-gold', label: 'Gold' }];
+      p.portfolio.accounts[0].deposit = 250;
+      p.assumptions.portfolio = { mode: 'fractional', allowTaxableSelling: true, showPlacementAdvice: false };
+    });
+    const inputs = toRebalanceInputs(profile);
+    expect(inputs.classTargets).toEqual(profile.portfolio.classTargets);
+    expect(inputs.classTargets).not.toBe(profile.portfolio.classTargets);
+    expect(inputs.customAssetClasses).toEqual([{ id: 'cac-gold', label: 'Gold' }]);
+    expect(inputs.accounts.map((a) => a.deposit)).toEqual([250, 1000]);
+    expect(inputs).toMatchObject({ mode: 'fractional', allowTaxableSelling: true, showPlacementAdvice: false });
+    expect(validateRebalanceInputsV2(inputs)).toEqual([]);
+  });
+
+  it('toRebalanceInputs copies the rows, so editing the result never edits the profile', () => {
+    const profile = getDefaultFinancialProfile();
+    const inputs = toRebalanceInputs(profile);
+    inputs.accounts[1].deposit = 1;
+    inputs.holdings[0].shares = 99;
+    expect(profile.portfolio.accounts[1].deposit).toBe(1000);
+    expect(profile.portfolio.holdings[0].shares).toBe(10);
+  });
+});
+
 describe('profileCompleteness', () => {
   it('reports nothing provided for a fresh profile', () => {
     const c = profileCompleteness(getDefaultFinancialProfile());
@@ -453,9 +605,10 @@ describe('profileCompleteness', () => {
   });
 
   it('counts known provided paths and ignores unknown ones', () => {
-    const c = profileCompleteness(
-      makeProfile({ provided: ['person.age', 'income.frequency', 'cash.targetMonths', 'not.a.field'] })
-    );
+    const c = profileCompleteness({
+      ...getDefaultFinancialProfile(),
+      provided: ['person.age', 'income.frequency', 'cash.targetMonths', 'not.a.field', 'hsa.eligible', 'debts'],
+    });
     expect(c.provided).toBe(3);
     expect(c.total).toBe(25);
     expect(c.missing).toHaveLength(22);
@@ -464,6 +617,14 @@ describe('profileCompleteness', () => {
   });
 
   it('reports complete when every field is provided', () => {
+    const c = profileCompleteness(makeProfile({ provided: PROFILE_FIELDS.map((f) => f.path) }));
+    expect(c).toEqual({ provided: 25, total: 25, missing: [] });
+    // The new v2 leaves do not count toward the v1 completeness.
+    const c2 = profileCompleteness({ ...getDefaultFinancialProfile(), provided: ['hsa.eligible', 'debts'] });
+    expect(c2.provided).toBe(0);
+  });
+
+  it('keeps the same result for the same v1 answers after migration', () => {
     const c = profileCompleteness(makeProfile({ provided: PROFILE_FIELDS.map((f) => f.path) }));
     expect(c).toEqual({ provided: 25, total: 25, missing: [] });
   });

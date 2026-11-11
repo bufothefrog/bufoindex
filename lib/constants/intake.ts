@@ -651,6 +651,8 @@ export function buildIntakeSubmission(
 const FILING_SUMMARY: Record<ProfileFilingStatus, string> = {
   single: 'single',
   marriedJoint: 'married filing jointly',
+  marriedSeparate: 'married filing separately',
+  headOfHousehold: 'head of household',
 };
 
 const FREQUENCY_SUMMARY: Record<PayFrequency, string> = {

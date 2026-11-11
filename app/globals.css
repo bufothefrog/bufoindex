@@ -40,6 +40,9 @@
   --color-sage-800: #334729;
   --color-sage-900: #2d3d24;
 
+  /* Mono stack for font-mono and the chart theme (lib/chart-theme.ts). */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));

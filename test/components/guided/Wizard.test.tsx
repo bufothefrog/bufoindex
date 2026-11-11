@@ -57,7 +57,7 @@ describe('Wizard, every question of an intent (mode all)', () => {
 
     // Age 28 to the default retirement age 60 = 32 years; the skipped taxable
     // contribution keeps its typical 500.
-    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?c=500&y=32&b=40000&l=2');
+    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?c=500&y=32&b=40000&l=2&from=profile');
     expect(push).not.toHaveBeenCalled();
 
     const { profile, hasProfile } = useProfileStore.getState();
@@ -106,7 +106,7 @@ describe('Wizard, every question of an intent (mode all)', () => {
 
     await user.keyboard('{Enter}');
     expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/paycheck-allocator#/);
+    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/paycheck-allocator\?from=profile#/);
     expect(useProfileStore.getState().profile.workplace.has401k).toBe(false);
   });
 });
@@ -209,7 +209,7 @@ describe('Wizard, remaining questions of an intent', () => {
     ]);
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith(retirementLink(profile));
-    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/retirement-calculator#/);
+    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/retirement-calculator\?from=profile#/);
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -232,7 +232,7 @@ describe('Wizard, remaining questions of an intent', () => {
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith(portfolioLink(useProfileStore.getState().profile));
-    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/portfolio-rebalancing-calculator#/);
+    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/portfolio-rebalancing-calculator\?from=profile#/);
   });
 
   it('goes straight to the calculator when nothing is left to ask', () => {

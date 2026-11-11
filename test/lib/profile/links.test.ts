@@ -1,15 +1,27 @@
 /**
  * Profile deep-link tests. Each hash link must decode, through the
  * destination calculator's own codec, back to exactly the mapped inputs, so
- * navigating to the link seeds the calculator with the profile.
+ * navigating to the link seeds the calculator with the profile. Every link
+ * carries ?from=profile.
+ *
+ * Goldens: the hashes and leverage queries below were captured from the v1
+ * link builders before the profile moved to v2; for v1-shaped data the v2
+ * links are the same hash (or query) behind ?from=profile.
  */
 
 import { describe, expect, it } from 'vitest';
 import {
   getDefaultFinancialProfile,
+  LEVERAGE_PATH,
   leverageLink,
+  migrateProfile,
+  PAYCHECK_PATH,
   paycheckLink,
+  PORTFOLIO_PATH,
   portfolioLink,
+  PROFILE_HANDOFF_PARAM,
+  PROFILE_HANDOFF_VALUE,
+  RETIREMENT_PATH,
   retirementLink,
   toPaycheckProfile,
   toRebalanceInputs,
@@ -22,27 +34,51 @@ import { decodeRebalancingFromUrlHash } from '@/lib/utils/portfolioRebalancingSt
 import type { PaycheckProfile } from '@/lib/types';
 import { calculateOptimalAllocation } from '@/lib/calculations/core';
 
-/** A profile that differs from the defaults in every section. */
+/** A saved v1 profile that differs from the defaults in every section, loaded through the v1 migration. */
 function customProfile(): FinancialProfile {
-  const p = getDefaultFinancialProfile();
-  return {
-    ...p,
-    updatedAt: 1760000000000,
-    person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
-    income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
-    spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
-    cash: { emergencyFundBalance: 12000, emergencyFundApy: 0.045, targetMonths: 1 },
-    workplace: { has401k: true, matchPercent: 1, matchLimit: 0.04, contributionPercent: 0.1 },
-    investing: {
-      investedBalance: 140000,
-      monthlyContribution: 2200,
-      taxableMonthlyContribution: 900,
-      targetMix: '60-40',
-      newCashThisMonth: 3000,
+  return migrateProfile(
+    {
+      version: 1,
+      updatedAt: 1760000000000,
+      person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
+      income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
+      spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
+      cash: { emergencyFundBalance: 12000, emergencyFundApy: 0.045, targetMonths: 1 },
+      workplace: { has401k: true, matchPercent: 1, matchLimit: 0.04, contributionPercent: 0.1 },
+      investing: {
+        investedBalance: 140000,
+        monthlyContribution: 2200,
+        taxableMonthlyContribution: 900,
+        targetMix: '60-40',
+        newCashThisMonth: 3000,
+      },
+      strategy: { preset: 'standard', leverageRatio: 1.5 },
+      provided: ['person.age'],
     },
-    strategy: { preset: 'standard', leverageRatio: 1.5 },
-    provided: ['person.age'],
-  };
+    1
+  );
+}
+
+/** Hashes the v1 builders produced, per profile: [retirement, paycheck, portfolio]. */
+const GOLDEN_HASHES: Record<'default' | 'custom', readonly [string, string, string]> = {
+  default: [
+    'eyJ2IjoyLCJzYSI6MzAsInNiIjoyNTAwMCwiY2kiOjkxMDAwLCJpYSI6MzUwMCwiaXAiOiJiaXdlZWtseSIsIm1zIjoxNTAwLCJubWUiOjMwMDB9',
+    'eyJ2IjoyLCJwIjp7ImlnIjo3NTgzLjMzMzMzMzMzMzMzMywiaW4iOjU2MzMuMzMzMzMzMzMzMzMzLCJpZiI6ImJpLXdlZWtseSIsImlwZyI6MzUwMCwiaXBuIjoyNjAwLCJ0cyI6IlRYIiwiYjQwMSI6eyJhIjp0cnVlLCJtcCI6MC41LCJtbCI6MC4wNiwiY2MiOjAuMDYsInRjIjowLjA2fSwicHIiOnsibmUiOjMwMDAsImVmbSI6MywiZWYiOjUwMDAsImZtbiI6MzAwLCJmbXgiOjYwMCwiYWdlIjozMCwiaHRhIjp0cnVlLCJ0YWMiOjUwMH19fQ',
+    'eyJ2IjozLCJzbSI6Im11bHRpLXNoYXJlZCIsInNlIjpbeyJpIjoic2VjLXZ0aSIsInQiOiJWVEkiLCJwIjoyNTAsImsiOiJ1cy1zdG9jayIsIm4iOiJWYW5ndWFyZCBUb3RhbCBVUyBTdG9jayJ9LHsiaSI6InNlYy12eHVzIiwidCI6IlZYVVMiLCJwIjo2MCwiayI6ImludGwtc3RvY2siLCJuIjoiVmFuZ3VhcmQgVG90YWwgSW50bCBTdG9jayJ9LHsiaSI6InNlYy1ibmQiLCJ0IjoiQk5EIiwicCI6NzUsImsiOiJib25kcyIsIm4iOiJWYW5ndWFyZCBUb3RhbCBCb25kIn1dLCJhYyI6W3siaSI6ImFjYy1yb3RoIiwibiI6IlJvdGggSVJBIiwiYyI6InRheC1mcmVlIiwiZCI6MH0seyJpIjoiYWNjLWJyb2siLCJuIjoiQnJva2VyYWdlIiwiYyI6InRheGFibGUiLCJkIjoxMDAwfV0sImhvIjpbeyJpIjoiaGxkLXJvdGgtdnRpIiwiYSI6ImFjYy1yb3RoIiwicyI6InNlYy12dGkiLCJoIjoxMH0seyJpIjoiaGxkLXJvdGgtYm5kIiwiYSI6ImFjYy1yb3RoIiwicyI6InNlYy1ibmQiLCJoIjo1fSx7ImkiOiJobGQtYnJvay12dGkiLCJhIjoiYWNjLWJyb2siLCJzIjoic2VjLXZ0aSIsImgiOjIwfSx7ImkiOiJobGQtYnJvay12eHVzIiwiYSI6ImFjYy1icm9rIiwicyI6InNlYy12eHVzIiwiaCI6MTV9XSwiY3QiOlt7ImEiOm51bGwsImsiOiJ1cy1zdG9jayIsInQiOjAuNn0seyJhIjpudWxsLCJrIjoiaW50bC1zdG9jayIsInQiOjAuMn0seyJhIjpudWxsLCJrIjoiYm9uZHMiLCJ0IjowLjJ9LHsiYSI6bnVsbCwiayI6ImNhc2giLCJ0IjowfV0sInAiOnRydWV9',
+  ],
+  custom: [
+    'eyJ2IjoyLCJzYSI6MzgsInJhIjo1OCwidGkiOjExMDAwMCwic2IiOjE0MDAwMCwiY2kiOjEwOTIwMCwiaWEiOjEwOTIwMCwibXMiOjIyMDAsImZzIjoibWFycmllZEpvaW50Iiwic3QiOiJDQSIsIm5tZSI6NDIwMH0',
+    'eyJ2IjoyLCJwIjp7ImlnIjo5MTAwLCJpbiI6NjcxNi42NjY2NjY2NjY2NjYsImlmIjoid2Vla2x5IiwiaXBnIjoyMTAwLCJpcG4iOjE1NTAsInRzIjoiQ0EiLCJ0ZiI6Im1hcnJpZWRKb2ludCIsImI0MDEiOnsiYSI6dHJ1ZSwibXAiOjEsIm1sIjowLjA0LCJjYyI6MC4xLCJ0YyI6MC4xfSwicHIiOnsibmUiOjQyMDAsImVmbSI6MSwiZWYiOjEyMDAwLCJhcHkiOjAuMDQ1LCJmbW4iOjI1MCwiZm14Ijo5MDAsImFnZSI6MzgsImh0YSI6dHJ1ZSwidGFjIjo5MDB9fX0',
+    'eyJ2IjozLCJzbSI6Im11bHRpLXNoYXJlZCIsInNlIjpbeyJpIjoic2VjLXZ0aSIsInQiOiJWVEkiLCJwIjoyNTAsImsiOiJ1cy1zdG9jayIsIm4iOiJWYW5ndWFyZCBUb3RhbCBVUyBTdG9jayJ9LHsiaSI6InNlYy12eHVzIiwidCI6IlZYVVMiLCJwIjo2MCwiayI6ImludGwtc3RvY2siLCJuIjoiVmFuZ3VhcmQgVG90YWwgSW50bCBTdG9jayJ9LHsiaSI6InNlYy1ibmQiLCJ0IjoiQk5EIiwicCI6NzUsImsiOiJib25kcyIsIm4iOiJWYW5ndWFyZCBUb3RhbCBCb25kIn1dLCJhYyI6W3siaSI6ImFjYy1yb3RoIiwibiI6IlJvdGggSVJBIiwiYyI6InRheC1mcmVlIiwiZCI6MH0seyJpIjoiYWNjLWJyb2siLCJuIjoiQnJva2VyYWdlIiwiYyI6InRheGFibGUiLCJkIjozMDAwfV0sImhvIjpbeyJpIjoiaGxkLXJvdGgtdnRpIiwiYSI6ImFjYy1yb3RoIiwicyI6InNlYy12dGkiLCJoIjoxMH0seyJpIjoiaGxkLXJvdGgtYm5kIiwiYSI6ImFjYy1yb3RoIiwicyI6InNlYy1ibmQiLCJoIjo1fSx7ImkiOiJobGQtYnJvay12dGkiLCJhIjoiYWNjLWJyb2siLCJzIjoic2VjLXZ0aSIsImgiOjIwfSx7ImkiOiJobGQtYnJvay12eHVzIiwiYSI6ImFjYy1icm9rIiwicyI6InNlYy12eHVzIiwiaCI6MTV9XSwiY3QiOlt7ImEiOm51bGwsImsiOiJ1cy1zdG9jayIsInQiOjAuNDV9LHsiYSI6bnVsbCwiayI6ImludGwtc3RvY2siLCJ0IjowLjE1fSx7ImEiOm51bGwsImsiOiJib25kcyIsInQiOjAuNH0seyJhIjpudWxsLCJrIjoiY2FzaCIsInQiOjB9XSwicCI6dHJ1ZX0',
+  ],
+};
+
+const PROFILES = { default: getDefaultFinancialProfile, custom: customProfile };
+
+/** The `from` query value of a link, or null. */
+function handoffOf(link: string): string | null {
+  const query = link.split('#')[0].split('?')[1] ?? '';
+  return new URLSearchParams(query).get(PROFILE_HANDOFF_PARAM);
 }
 
 function hashOf(link: string): string {
@@ -51,10 +87,29 @@ function hashOf(link: string): string {
   return link.slice(idx + 1);
 }
 
+describe('profile handoff', () => {
+  it('marks every link with ?from=profile', () => {
+    expect(PROFILE_HANDOFF_PARAM).toBe('from');
+    expect(PROFILE_HANDOFF_VALUE).toBe('profile');
+    for (const build of [retirementLink, paycheckLink, portfolioLink, leverageLink]) {
+      expect(handoffOf(build(getDefaultFinancialProfile()))).toBe('profile');
+      expect(handoffOf(build(customProfile()))).toBe('profile');
+    }
+  });
+
+  it.each(['default', 'custom'] as const)('keeps the v1 hashes behind ?from=profile for the %s profile', (name) => {
+    const profile = PROFILES[name]();
+    const [retirement, paycheck, portfolio] = GOLDEN_HASHES[name];
+    expect(retirementLink(profile)).toBe(`${RETIREMENT_PATH}?from=profile#${retirement}`);
+    expect(paycheckLink(profile)).toBe(`${PAYCHECK_PATH}?from=profile#${paycheck}`);
+    expect(portfolioLink(profile)).toBe(`${PORTFOLIO_PATH}?from=profile#${portfolio}`);
+  });
+});
+
 describe('retirementLink', () => {
   it('targets the retirement calculator with a URL-safe hash', () => {
     const link = retirementLink(getDefaultFinancialProfile());
-    expect(link.startsWith('/tools/retirement-calculator#')).toBe(true);
+    expect(link.startsWith('/tools/retirement-calculator?from=profile#')).toBe(true);
     expect(hashOf(link)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -85,7 +140,7 @@ describe('paycheckLink', () => {
 
   it('targets the paycheck allocator with a URL-safe hash', () => {
     const link = paycheckLink(getDefaultFinancialProfile());
-    expect(link.startsWith('/tools/paycheck-allocator#')).toBe(true);
+    expect(link.startsWith('/tools/paycheck-allocator?from=profile#')).toBe(true);
     expect(hashOf(link)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -171,7 +226,7 @@ describe('paycheckLink', () => {
 describe('portfolioLink', () => {
   it('targets the rebalancer with a URL-safe hash', () => {
     const link = portfolioLink(getDefaultFinancialProfile());
-    expect(link.startsWith('/tools/portfolio-rebalancing-calculator#')).toBe(true);
+    expect(link.startsWith('/tools/portfolio-rebalancing-calculator?from=profile#')).toBe(true);
     expect(hashOf(link)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -202,15 +257,15 @@ describe('portfolioLink', () => {
 describe('leverageLink', () => {
   it('uses the taxable contribution, years to retirement, balance and ratio', () => {
     expect(leverageLink(getDefaultFinancialProfile())).toBe(
-      '/tools/leverage-comparison?c=500&y=30&b=25000&l=2'
+      '/tools/leverage-comparison?c=500&y=30&b=25000&l=2&from=profile'
     );
-    expect(leverageLink(customProfile())).toBe('/tools/leverage-comparison?c=900&y=20&b=140000&l=1.5');
+    expect(leverageLink(customProfile())).toBe('/tools/leverage-comparison?c=900&y=20&b=140000&l=1.5&from=profile');
   });
 
   it('falls back to the total monthly contribution when there is no taxable contribution', () => {
     const base = getDefaultFinancialProfile();
     const profile = { ...base, investing: { ...base.investing, taxableMonthlyContribution: 0 } };
-    expect(leverageLink(profile)).toBe('/tools/leverage-comparison?c=1500&y=30&b=25000&l=2');
+    expect(leverageLink(profile)).toBe('/tools/leverage-comparison?c=1500&y=30&b=25000&l=2&from=profile');
   });
 
   it('clamps years to 1..60', () => {
@@ -229,6 +284,14 @@ describe('leverageLink', () => {
       investing: { ...base.investing, taxableMonthlyContribution: Number.NaN, monthlyContribution: Number.NaN, investedBalance: Number.NaN },
       strategy: { ...base.strategy, leverageRatio: Number.NaN },
     };
-    expect(leverageLink(broken)).toBe('/tools/leverage-comparison?c=0&y=1&b=0&l=2');
+    expect(leverageLink(broken)).toBe('/tools/leverage-comparison?c=0&y=1&b=0&l=2&from=profile');
+  });
+
+  it('uses the leverage overrides when they are set', () => {
+    const base = getDefaultFinancialProfile();
+    const overridden = { ...base, leverage: { monthlyContribution: 750, years: 12, startingBalance: 0 } };
+    expect(leverageLink(overridden)).toBe(`${LEVERAGE_PATH}?c=750&y=12&b=0&l=2&from=profile`);
+    const tooLong = { ...base, leverage: { ...base.leverage, years: 75 } };
+    expect(new URLSearchParams(leverageLink(tooLong).split('?')[1]).get('y')).toBe('60');
   });
 });

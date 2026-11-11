@@ -16,7 +16,16 @@ export interface ChartTheme {
   background: string;
   muted: string;
   accent: string;
+  /** Monospace font stack for axis ticks, labels and legends (--font-mono). */
+  fontMono: string;
 }
+
+/**
+ * Fallback for the --font-mono token in app/globals.css (Tailwind's default
+ * mono stack): used on the server and wherever the variable is not emitted.
+ */
+export const CHART_FONT_MONO_FALLBACK =
+  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 
 /**
  * Sage color variants for consistent theming
@@ -55,7 +64,8 @@ export const getChartTheme = (): ChartTheme => {
       grid: '#e2e8f0',
       background: '#ffffff',
       muted: '#64748b',
-      accent: sage.sage400
+      accent: sage.sage400,
+      fontMono: CHART_FONT_MONO_FALLBACK
     };
   }
 
@@ -73,7 +83,8 @@ export const getChartTheme = (): ChartTheme => {
     grid: `hsl(${style.getPropertyValue('--border').trim()})`,
     background: `hsl(${style.getPropertyValue('--background').trim()})`,
     muted: `hsl(${style.getPropertyValue('--muted-foreground').trim()})`,
-    accent: sage.sage400 // main brand color
+    accent: sage.sage400, // main brand color
+    fontMono: style.getPropertyValue('--font-mono').trim() || CHART_FONT_MONO_FALLBACK
   };
 };
 
@@ -101,3 +112,59 @@ export const subscribeToThemeChanges = (callback: () => void) => {
 
   return () => observer.disconnect();
 };
+
+/** Axis font size in px, shared by every chart. */
+const AXIS_FONT_SIZE = 12;
+
+/**
+ * Props for every XAxis and YAxis: muted stroke and ticks in the mono font.
+ * Charts spread these and add dataKey, ticks, formatters and labels.
+ */
+export const chartAxisProps = (theme: ChartTheme) => ({
+  stroke: theme.muted,
+  fontSize: AXIS_FONT_SIZE,
+  fontFamily: theme.fontMono,
+  tick: { fill: theme.muted }
+});
+
+/** Props for CartesianGrid: dashed lines in the border color. */
+export const chartGridProps = (theme: ChartTheme) => ({
+  strokeDasharray: '3 3',
+  stroke: theme.grid,
+  opacity: 0.3
+});
+
+/**
+ * Chart margins. `labeled` leaves room for rotated axis titles and a legend
+ * under the plot (the retirement charts); `compact` is for charts without
+ * axis titles (the leverage path chart).
+ */
+export const CHART_MARGINS = {
+  labeled: { top: 20, right: 30, left: 20, bottom: 60 },
+  compact: { top: 8, right: 8, left: 0, bottom: 0 }
+} as const;
+
+/**
+ * Spread on every Area, Line and Bar. Recharts' default tween restarts on
+ * each data change and dominates the cost of a results update
+ * (docs/production-audit.md H2).
+ */
+export const CHART_SERIES_DEFAULTS = { isAnimationActive: false } as const;
+
+/**
+ * Downsamples `points` to at most `max` entries at an even index step,
+ * always keeping the first and the last point. Arrays that already fit come
+ * back as a copy. `max` must be an integer of at least 2.
+ */
+export function thinPoints<T>(points: readonly T[], max: number): T[] {
+  if (!Number.isInteger(max) || max < 2) {
+    throw new RangeError(`thinPoints: max must be an integer >= 2, got ${max}`);
+  }
+  if (points.length <= max) return points.slice();
+  const lastIndex = points.length - 1;
+  const step = Math.ceil(lastIndex / (max - 1));
+  const thinned: T[] = [];
+  for (let i = 0; i < lastIndex; i += step) thinned.push(points[i]);
+  thinned.push(points[lastIndex]);
+  return thinned;
+}
