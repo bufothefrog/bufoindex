@@ -64,7 +64,7 @@ Review fixes landed after these as one `fix(rebuild): <slice>: ...` commit per s
 
 ## Tests and coverage
 
-- 86 files, 1808 tests passing after the second review round (1789 after the first, 1755 before it). Global statements 91.1%.
+- 86 files, 1811 tests passing after the second review round (1789 after the first, 1755 before it). Global statements 91.1%.
 - lib/calculations 97.30% statements / 89.70% branches (unchanged). lib/calculators 100%; lib/fields 100% statements; lib/store/createCalculatorStore.ts, legacyImport.ts and preferencesStore.ts 100%; lib/workers/createWorkerRunner.ts 100% statements; lib/constants/intake.ts 100% statements / 93% branches.
 
 ## Deviations from the plan

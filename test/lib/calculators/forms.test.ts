@@ -117,6 +117,19 @@ describe('PROFILE_FORM', () => {
     expect(expected.length).toBeLessThan(PROFILE_PARTS.flatMap(({ form }) => profileEligible(form)).length);
   });
 
+  it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {
+    expect(PROFILE_FORM_ORDER).toEqual(['retirement', 'paycheck', 'portfolio', 'leverage']);
+  });
+
+  it('walks the profile sections in order: the basics, each calculator, then cash and strategy', () => {
+    const walked = screensFor(PROFILE_FORM, makeGet(getDefaultFinancialProfile()), { mode: 'all', surface: 'intake' }).map(
+      (screen) => profileFormSection(screen.id)
+    );
+    // Consecutive screens of one section collapse to one entry, so the forms can grow without changing this list.
+    const sections = walked.filter((section, i) => i === 0 || section !== walked[i - 1]);
+    expect(sections).toEqual(['core', 'retirement', 'paycheck', 'portfolio', 'cash']);
+  });
+
   it('labels every screen with its section', () => {
     const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - PROFILE_EXTRA_SCREENS.length);
     const labelOf = (id: string) =>

@@ -82,6 +82,16 @@ describe('paycheck intake: validation', () => {
     });
   });
 
+  it('flags take-home pay above gross pay on the take-home path', () => {
+    const get = fromDefaults({ 'income.grossPerPaycheck': 2000, 'income.netPerPaycheck': 2600 });
+    expect(validateIntakeScreen('paycheck', screen('pay'), get)).toEqual({
+      'income.netPerPaycheck':
+        'Take-home pay is above gross pay. Take-home is what is left after taxes and deductions, so it is usually lower.',
+    });
+    const below = fromDefaults({ 'income.grossPerPaycheck': 2000, 'income.netPerPaycheck': 1500 });
+    expect(validateIntakeScreen('paycheck', screen('pay'), below)).toEqual({});
+  });
+
   it('checks the match rate against its bounds', () => {
     const get = fromDefaults({ 'workplace.matchPercent': 2.5 });
     expect(validateIntakeScreen('paycheck', screen('match'), get)).toEqual({
