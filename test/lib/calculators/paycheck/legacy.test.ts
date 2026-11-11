@@ -467,10 +467,11 @@ describe('importLegacyCalculatorStorage: the retirement key imported first', () 
 
   // The retirement import writes an old yearly or hourly salary as gross
   // pay in the frequency the profile holds (bi-weekly here), and marks only
-  // the gross pay provided. That answer pins its frequency.
-  it('keeps the gross pay the retirement key set first, and the saved take-home pay at its share', () => {
-    // 100,800 a year is 3,876.92 bi-weekly; the allocator's 4,200
-    // semi-monthly is the same income, but an answered gross pay wins whole.
+  // the gross pay provided. With the frequency unanswered, that gross pay is
+  // an annual amount: a record of the same annual income keeps its own
+  // frequency and take-home pay.
+  it('imports the paycheck record whole when the retirement key set the same annual income first', () => {
+    // 100,800 a year is 3,876.92 bi-weekly and 4,200 semi-monthly.
     storeRetirement({ incomeAmount: 100800, incomePeriod: 'yearly' });
     storePaycheck((profile) => {
       profile.income.grossPaycheck = 4200;
@@ -479,10 +480,47 @@ describe('importLegacyCalculatorStorage: the retirement key imported first', () 
     });
 
     expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['income.grossPerPaycheck']);
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR).sort()).toEqual([
+      'income.frequency',
+      'income.grossPerPaycheck',
+      'income.netPerPaycheck',
+    ]);
+    const { profile } = useProfileStore.getState();
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 4200, netPerPaycheck: 3050, frequency: 'semi-monthly' });
+    expect([...profile.provided].sort()).toEqual(['income.frequency', 'income.grossPerPaycheck', 'income.netPerPaycheck']);
+  });
+
+  it.each([
+    ['yearly 120,000', { incomeAmount: 120000, incomePeriod: 'yearly' }, { gross: 10000, net: 7000, frequency: 'monthly' }],
+    ['yearly 104,000', { incomeAmount: 104000, incomePeriod: 'yearly' }, { gross: 2000, net: 1500, frequency: 'weekly' }],
+    ['hourly 50', { incomeAmount: 50, incomePeriod: 'hourly' }, { gross: 2000, net: 1500, frequency: 'weekly' }],
+  ] as const)('keeps the paycheck frequency and take-home pay after a retirement %s salary of the same income', (_, inputs, pay) => {
+    storeRetirement(inputs);
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = pay.gross;
+      profile.income.netPaycheck = pay.net;
+      profile.income.frequency = pay.frequency;
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: pay.gross, netPerPaycheck: pay.net, frequency: pay.frequency });
+  });
+
+  it('keeps the gross pay the retirement key set first when the paycheck record is another income', () => {
+    // 90,000 a year is 3,461.54 bi-weekly; 4,200 semi-monthly is 100,800.
+    storeRetirement({ incomeAmount: 90000, incomePeriod: 'yearly' });
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
     expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
     const { profile } = useProfileStore.getState();
-    // 3,050 of 4,200 applied to 3,876.92.
-    expect(profile.income).toMatchObject({ grossPerPaycheck: 3876.92, netPerPaycheck: 2815.38, frequency: 'bi-weekly' });
+    // 3,050 of 4,200 applied to 3,461.54.
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 3461.54, netPerPaycheck: 2513.74, frequency: 'bi-weekly' });
     expect(profile.provided).toEqual(['income.grossPerPaycheck']);
   });
 
@@ -747,12 +785,32 @@ describe('importLegacyCalculatorStorage: the take-home pay keeps its share of gr
     expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 8400, netPerPaycheck: 2600, frequency: 'monthly' });
   });
 
-  it('never moves the frequency under a take-home pay answered since', () => {
+  it('carries a monthly salary to the held frequency under a take-home pay answered since', () => {
+    // The frequency is unanswered, so the 2,800 take-home pay keeps it, and
+    // 96,000 a year is written as 3,692.31 bi-weekly (as yearly 96,000 is).
     resetProfileStore({ profile: { income: { netPerPaycheck: 2800 } } });
-    storeRetirement({ incomeAmount: 10000, incomePeriod: 'monthly' });
+    storeRetirement({ incomeAmount: 8000, incomePeriod: 'monthly' });
+
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['income.grossPerPaycheck']);
+    expect(paycheckIncome()).toMatchObject({ grossPaycheck: 3692.31, netPaycheck: 2800, frequency: 'bi-weekly' });
+    expect([...useProfileStore.getState().profile.provided].sort()).toEqual(['income.grossPerPaycheck', 'income.netPerPaycheck']);
+  });
+
+  it('still keeps the salary out when it carries to a gross pay below the answered take-home pay', () => {
+    resetProfileStore({ profile: { income: { netPerPaycheck: 2800 } } });
+    // 3,000 a month is 1,384.62 bi-weekly.
+    storeRetirement({ incomeAmount: 3000, incomePeriod: 'monthly' });
 
     expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
     expect(paycheckIncome()).toMatchObject({ grossPaycheck: 3500, netPaycheck: 2800, frequency: 'bi-weekly' });
+  });
+
+  it('never moves a frequency answered since', () => {
+    resetProfileStore({ profile: { income: { frequency: 'weekly' } } });
+    storeRetirement({ incomeAmount: 8000, incomePeriod: 'monthly' });
+
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
+    expect(paycheckIncome()).toMatchObject({ frequency: 'weekly' });
   });
 
   it('never puts the gross pay below a take-home pay answered since', () => {

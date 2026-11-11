@@ -10,10 +10,14 @@
  *    rule, and a 401(k) total keeps the split it was saved with;
  * I3 the visitor's own values survive (where the case changed any), unless
  *    a newer answer for the same pay existed (payAnsweredSince); an old
- *    yearly or hourly income has no frequency of its own and survives as the
- *    same annual income in the frequency the profile holds;
+ *    yearly or hourly income has no frequency of its own, and a pay that
+ *    would move an unanswered frequency under an answered amount of another
+ *    annual value is carried to the held frequency: both survive as the same
+ *    annual income in the frequency the profile holds (carriedPay);
  * I4 an untouched old key alone reproduces the old calculator's run;
- * I5 nothing unanswered becomes provided, nothing provided is overwritten;
+ * I5 nothing unanswered becomes provided, nothing provided is overwritten
+ *    (an amount answered without its frequency is an annual amount, so it is
+ *    compared by annual value);
  * I6 a second import is a no-op; a corrupt payload changes nothing.
  */
 
@@ -111,6 +115,9 @@ const SEEDS: readonly Seed[] = [
   { label: 'frequency semi-monthly answered', patch: { income: { frequency: 'semi-monthly' } } },
   // 100,800 a year again, as 8,400 monthly; the take-home pay stays unanswered.
   { label: 'gross 8,400 monthly answered', patch: { income: { grossPerPaycheck: 8400, frequency: 'monthly' } } },
+  // 100,800 a year once more, as the bi-weekly gross the retirement key's
+  // yearly 100,800 writes; the frequency stays unanswered, so it is an annual amount.
+  { label: 'gross 3,876.92 answered (frequency unanswered)', patch: { income: { grossPerPaycheck: 3876.92 } } },
 ];
 
 /** Imports the old key of calculator `id`. */
@@ -186,6 +193,10 @@ const RETIREMENT_KEYS: readonly (OldKey | undefined)[] = [
   retirementKey('yearly 100,800', { incomeAmount: 100800, incomePeriod: 'yearly' }),
   retirementKey('yearly 250,000', { incomeAmount: 250000, incomePeriod: 'yearly' }),
   retirementKey('hourly 25', { incomeAmount: 25, incomePeriod: 'hourly' }),
+  // 104,000 a year is the paycheck grid's 2,000 weekly in another form.
+  retirementKey('hourly 50', { incomeAmount: 50, incomePeriod: 'hourly' }),
+  // 96,000 a year, entered per month: kept at that annual income when only an amount is answered.
+  retirementKey('monthly 8,000', { incomeAmount: 8000, incomePeriod: 'monthly' }),
   // Below both the profile default take-home pay and the answered one.
   retirementKey('bi-weekly 2,400', { incomeAmount: 2400, incomePeriod: 'biweekly' }),
   retirementKey('semi-monthly 4,200', { incomeAmount: 4200, incomePeriod: 'semimonthly' }),
@@ -286,25 +297,64 @@ const seedPay = (seeded: FinancialProfile): Pay => ({
   frequency: seeded.income.frequency,
 });
 
+/** The annual value of `amount` per paycheck of `frequency`. */
+const annualOf = (amount: number, frequency: PayFrequency) => amount * perYear(frequency);
+
+/**
+ * True when `amount` (per paycheck of `frequency`) is the answered amount at
+ * `path` in `held` by annual value, within a cent per held paycheck.
+ */
+function sameAnnual(amount: number | undefined, frequency: PayFrequency, held: FinancialProfile, path: string): boolean {
+  const answer = getAt(held, path) as number;
+  const heldYear = perYear(held.income.frequency);
+  return amount !== undefined && Math.abs(annualOf(amount, frequency) - answer * heldYear) <= CENT * heldYear;
+}
+
+/**
+ * The pay a key's pay becomes in `held` (the profile just before its
+ * import), computed here from the documented rule: an annual income is
+ * gross pay in the held frequency; a record that would move an unanswered
+ * frequency under an answered gross or take-home pay keeps its frequency
+ * only when it holds every such answer at the same annual value, and is
+ * otherwise carried to the held frequency at the same annual value (its
+ * frequency dropped). `carried` marks a pay that is no longer the record's own.
+ */
+function carriedPay(pay: OldPay, held: FinancialProfile): { pay: Pay; carried: boolean } {
+  const { income } = held;
+  const answered = new Set(held.provided);
+  const toCents = (value: number) => Math.round(value * 100) / 100;
+  if ('annual' in pay) return { pay: { gross: toCents(pay.annual / perYear(income.frequency)), frequency: income.frequency }, carried: true };
+  const amounts = [GROSS, NET].filter((path) => answered.has(path));
+  if (pay.frequency === income.frequency || answered.has(FREQUENCY) || amounts.length === 0) return { pay, carried: false };
+  const own = (path: string) => (path === GROSS ? pay.gross : pay.net);
+  if (amounts.every((path) => sameAnnual(own(path), pay.frequency, held, path))) return { pay, carried: false };
+  const carry = (amount: number) => toCents(annualOf(amount, pay.frequency) / perYear(income.frequency));
+  return {
+    pay: { gross: carry(pay.gross), net: pay.net === undefined ? undefined : carry(pay.net), frequency: income.frequency },
+    carried: true,
+  };
+}
+
 /**
  * True when an answer in `held` (the profile just before the key's import)
- * is a newer answer for the pay the key stands for: an answered gross pay or
- * frequency that differs from what the key would write, an answered amount
- * (gross or take-home pay, per paycheck of the held frequency) the key would
- * put under another frequency, or an answered take-home pay the key would
- * change or leave above its gross pay. An annual income has no frequency of
- * its own: it stands for gross pay in the frequency the profile holds.
+ * is a newer answer for the pay the key stands for, once that pay is carried
+ * by the rule (carriedPay): an answered frequency it would move, an answered
+ * gross pay of another annual value, or an answered take-home pay it would
+ * change or leave above its gross pay. A pay that moves an unanswered
+ * frequency while holding every answered amount at the same annual value
+ * is the same pay, not a newer answer.
  */
-function payAnsweredSince(pay: OldPay, held: FinancialProfile): boolean {
+function payAnsweredSince(oldPay: OldPay, held: FinancialProfile): boolean {
   const answered = new Set(held.provided);
   const { income } = held;
-  const gross = 'annual' in pay ? pay.annual / perYear(income.frequency) : pay.gross;
-  const movesFrequency = !('annual' in pay) && pay.frequency !== income.frequency;
-  if (answered.has(GROSS) && (movesFrequency || Math.abs(income.grossPerPaycheck - gross) > CENT)) return true;
+  const { pay } = carriedPay(oldPay, held);
+  const movesFrequency = pay.frequency !== income.frequency;
   if (answered.has(FREQUENCY) && movesFrequency) return true;
+  if (movesFrequency) return false;
+  if (answered.has(GROSS) && Math.abs(income.grossPerPaycheck - pay.gross) > CENT) return true;
   if (!answered.has(NET)) return false;
-  const net = 'annual' in pay || pay.net === undefined ? income.netPerPaycheck : pay.net;
-  return movesFrequency || !same(net, income.netPerPaycheck) || gross < net;
+  const net = pay.net ?? income.netPerPaycheck;
+  return !same(net, income.netPerPaycheck) || pay.gross < net;
 }
 
 function expectInvariants(c: Case, { before, steps, after }: Run): void {
@@ -322,7 +372,8 @@ function expectInvariants(c: Case, { before, steps, after }: Run): void {
   // record's own (the seeded profile's included) or a record's share of
   // gross pay applied to this gross (to the cent).
   const records: Pay[] = [seedPay(before), ...keys.flatMap((key) => ('annual' in key.pay ? [] : [key.pay]))];
-  const annuals = keys.flatMap((key) => ('annual' in key.pay ? [key.pay.annual] : []));
+  // Any key's pay may be carried to the held frequency at its annual value.
+  const annuals = keys.map((key) => ('annual' in key.pay ? key.pay.annual : annualOf(key.pay.gross, key.pay.frequency)));
   const fromRecord = records.some((pay) => holdsPay(income, { gross: pay.gross, frequency: pay.frequency }));
   const fromAnnual =
     records.some((pay) => pay.frequency === income.frequency) &&
@@ -342,9 +393,15 @@ function expectInvariants(c: Case, { before, steps, after }: Run): void {
   for (const path of after.provided) {
     if (!before.provided.includes(path)) expect([path, touched.has(path)]).toEqual([path, true]);
   }
+  const annualAmount = !before.provided.includes(FREQUENCY);
   for (const path of before.provided) {
     expect(after.provided).toContain(path);
-    expect([path, stableKey(getAt(after, path))]).toEqual([path, stableKey(getAt(before, path))]);
+    if (annualAmount && (path === GROSS || path === NET)) {
+      // An amount answered without its frequency keeps its annual value.
+      expect(sameAnnual(getAt(after, path) as number, income.frequency, before, path), `${path} keeps its annual value`).toBe(true);
+    } else {
+      expect([path, stableKey(getAt(after, path))]).toEqual([path, stableKey(getAt(before, path))]);
+    }
   }
 
   // I3: the visitor's own values survive, unless a newer answer for the same fact existed.
@@ -356,14 +413,17 @@ function expectInvariants(c: Case, { before, steps, after }: Run): void {
     if (!key.payChanged) continue;
     const pay = key.pay;
     if (!payAnsweredSince(pay, steps[i])) {
-      if ('annual' in pay) {
+      const kept = carriedPay(pay, steps[i]);
+      if (kept.carried) {
         // The same annual income, in the frequency the profile holds.
-        expect(Math.abs(income.grossPerPaycheck * perYear(income.frequency) - pay.annual), `${key.label}: own income`).toBeLessThanOrEqual(
+        const annual = 'annual' in pay ? pay.annual : annualOf(pay.gross, pay.frequency);
+        expect(Math.abs(annualOf(income.grossPerPaycheck, income.frequency) - annual), `${key.label}: own income`).toBeLessThanOrEqual(
           CENT * perYear(income.frequency)
         );
         expect(provided.has(GROSS)).toBe(true);
       } else {
-        expect(holdsPay(income, pay), `${key.label}: own pay`).toBe(true);
+        // Not carried: the key's own record, with its own frequency.
+        expect(holdsPay(income, kept.pay), `${key.label}: own pay`).toBe(true);
         expect(key.touched.filter((path) => path !== TYPE && path !== PERCENT && path !== ROTH).every((path) => provided.has(path))).toBe(true);
       }
       continue;
@@ -415,8 +475,8 @@ const CASES = buildCases();
 
 describe('importLegacyCalculatorStorage: invariants over the old payload grid', () => {
   it('covers every combination in both import orders, for every seeded profile', () => {
-    // (9 x 7 two-key pairs x 2 orders + 9 + 7 one-key + 1 empty) x 5 profiles.
-    expect(CASES).toHaveLength((9 * 7 * 2 + 9 + 7 + 1) * 5);
+    // (11 x 7 two-key pairs x 2 orders + 11 + 7 one-key + 1 empty) x 6 profiles.
+    expect(CASES).toHaveLength((11 * 7 * 2 + 11 + 7 + 1) * 6);
   });
 
   it.each(CASES.map((c) => [c.name, c] as const))('%s', (_, c) => {
