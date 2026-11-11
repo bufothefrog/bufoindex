@@ -1,10 +1,5 @@
 @import 'tailwindcss';
 
-/* Planning docs and tests quote class names (including the "wrong" examples in
-   the style guide); keep Tailwind from generating CSS for them. */
-@source not "../docs";
-@source not "../test";
-
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
@@ -45,10 +40,6 @@
   --color-sage-800: #334729;
   --color-sage-900: #2d3d24;
 
-  /* Monospace stack for figures and chart ticks (read by lib/chart-theme.ts).
-     System fonts only: nothing extra to download. */
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -57,9 +48,6 @@
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-  /* `text-primary` reads its own token so dark mode can use a lighter sage for
-     text while `bg-primary` keeps the brand fill under white text. */
-  --text-color-primary: hsl(var(--primary-text));
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
@@ -87,14 +75,6 @@
 
   --color-info: hsl(var(--info));
   --color-info-foreground: hsl(var(--info-foreground));
-
-  /* Status text reads its own token (like --primary-text) so text-success,
-     text-warning, text-destructive and text-info meet 4.5:1 on background,
-     card and muted, while bg-* and border-* keep the fill colors. */
-  --text-color-success: hsl(var(--success-text));
-  --text-color-warning: hsl(var(--warning-text));
-  --text-color-destructive: hsl(var(--destructive-text));
-  --text-color-info: hsl(var(--info-text));
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -133,11 +113,10 @@
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 106 29% 32%; /* sage-600 #4a6d3c */
     --primary-foreground: 210 40% 98%;
-    --primary-text: 106 29% 32%; /* same as --primary: 6.28:1 on white, 5.72:1 on muted */
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 43%; /* 5.47:1 on white, 4.98:1 on muted (46.9% was 4.33:1) */
+    --muted-foreground: 215.4 16.3% 46.9%;
     --accent: 106 29% 32%; /* sage-600 accent */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84.2% 60.2%;
@@ -152,11 +131,6 @@
     --warning-foreground: 0 0% 10%; /* dark ink: white on amber is ~2.2:1, below WCAG AA */
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
-    /* Status text: on white / muted. The fills above are 2.1 to 3.8:1 as text. */
-    --success-text: 142 72% 27%; /* 5.68:1 / 5.18:1 */
-    --warning-text: 32 95% 30%; /* 6.05:1 / 5.51:1 */
-    --destructive-text: 0 72% 42%; /* 6.47:1 / 5.89:1 */
-    --info-text: 217 80% 42%; /* 6.63:1 / 6.04:1 */
   }
 
   .dark {
@@ -169,9 +143,6 @@
     --popover-foreground: 0 0% 98%;
     --primary: 106 29% 32%; /* sage-600 #4a6d3c */
     --primary-foreground: 0 0% 98%;
-    /* Lighter sage for text: 7.05:1 on background, 6.72:1 on card, 5.79:1 on
-       muted. sage-600 text on these surfaces was 2.4 to 2.9:1. */
-    --primary-text: 106 29% 55%;
     --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 15%;
@@ -189,11 +160,6 @@
     --warning-foreground: 0 0% 8%;
     --info: 217 91% 70%;
     --info-foreground: 0 0% 8%;
-    /* Status text: on background / card / muted. The destructive fill was 1.8:1 as text. */
-    --success-text: 142 69% 58%; /* 10.52:1 / 10.02:1 / 8.64:1 */
-    --warning-text: 45 93% 58%; /* 11.42:1 / 10.88:1 / 9.39:1 */
-    --destructive-text: 0 85% 68%; /* 6.11:1 / 5.82:1 / 5.02:1 */
-    --info-text: 217 91% 70%; /* 7.16:1 / 6.82:1 / 5.88:1 */
   }
 }
  

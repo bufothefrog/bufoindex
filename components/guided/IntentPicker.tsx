@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Route } from 'next';
-import { INTENT_OPTIONS, intentStartLink } from '@/lib/constants/intake';
+import { INTENT_OPTIONS, coreStartLink } from '@/lib/constants/intake';
 import { cn } from '@/lib/utils';
 import { OptionCard } from './OptionCard';
 
@@ -32,7 +32,7 @@ export function IntentPicker({ leading, className }: IntentPickerProps) {
             className={cn('flex', oddCount && index === lastIndex && 'md:col-span-2')}
           >
             <OptionCard
-              href={intentStartLink(option.id) as Route}
+              href={coreStartLink(option.id) as Route}
               title={option.title}
               description={option.description}
               icon={option.icon}

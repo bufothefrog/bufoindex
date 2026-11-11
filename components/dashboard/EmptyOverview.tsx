@@ -4,17 +4,16 @@ import type { Route } from 'next';
 import { ArrowRight, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { buttonVariants } from '@/components/ui/button';
-import { CORE_START_PATH, coreStartLink, intentStartLink } from '@/lib/constants/intake';
+import { CORE_START_PATH, coreStartLink } from '@/lib/constants/intake';
 import { cn } from '@/lib/utils';
 import { DASHBOARD_CARD_LAYOUT } from './cardLayout';
 
-// The paycheck, retirement and leverage paths start with the shared basics;
-// `next` picks the calculator the intake continues to once they are answered.
-// The rebalancer reads none of the basics, so its intake starts directly (O5).
+// Every path starts with the shared basics; `next` picks the calculator the
+// intake continues to once they are answered.
 const INTAKES: ReadonlyArray<{ href: Route; label: string; description: string }> = [
   { href: coreStartLink('paycheck') as Route, label: 'Then a paycheck', description: 'Where the next paycheck goes' },
   { href: coreStartLink('retirement') as Route, label: 'Then retirement', description: 'Simulated odds for a retirement age' },
-  { href: intentStartLink('portfolio') as Route, label: 'Or go straight to a portfolio', description: 'What to buy to reach a target mix' },
+  { href: coreStartLink('portfolio') as Route, label: 'Then a portfolio', description: 'What to buy to reach a target mix' },
   { href: coreStartLink('leverage') as Route, label: 'Then the leverage comparison', description: 'A 2x fund next to a plain index fund' },
 ];
 

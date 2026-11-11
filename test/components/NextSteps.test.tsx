@@ -2,8 +2,8 @@ import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NextSteps } from '@/components/guided/NextSteps';
-import { PROFILE_FORM, profileCompleteness } from '@/lib/calculators/forms';
-import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
+import { intakePaths } from '@/lib/constants/intake';
+import { PROFILE_FIELDS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 beforeEach(() => {
@@ -40,23 +40,10 @@ describe('NextSteps', () => {
     expect(linkNamed(/Answer a few quick questions/)).toHaveAttribute('href', '/start?next=leverage');
   });
 
-  it('sends the rebalancer straight to its own intake, skipping the core basics (O5)', () => {
-    render(<NextSteps intent="portfolio" />);
-    const link = linkNamed(/Answer a few quick questions/);
-    expect(link).toHaveAttribute('href', '/start/portfolio');
-    expect(link).toHaveTextContent(/accounts, holdings, and target mix/);
-    expect(link).not.toHaveTextContent(/filing status/);
-  });
-
   it('offers to finish the profile and try another calculator when a partial profile exists', () => {
-    useProfileStore.getState().setValues(
-      [
-        { path: 'person.age', value: 41 },
-        { path: 'person.state', value: 'CA' },
-      ],
-      { provide: ['person.age', 'person.state', 'spending.necessaryMonthly'] }
-    );
-    const { total } = profileCompleteness(useProfileStore.getState().profile);
+    useProfileStore
+      .getState()
+      .setFields({ person: { age: 41, state: 'CA' } }, ['person.age', 'person.state']);
 
     render(<NextSteps intent="paycheck" />);
 
@@ -64,8 +51,7 @@ describe('NextSteps', () => {
 
     const finish = linkNamed(/Finish your profile/);
     expect(finish).toHaveAttribute('href', '/start/profile');
-    // Counted by topic: only the must-pay screen is fully answered.
-    expect(finish).toHaveTextContent(`1 of ${total} topics answered.`);
+    expect(finish).toHaveTextContent(`2 of ${PROFILE_FIELDS.length} details answered.`);
     expect(finish).toHaveTextContent('Answer the rest once; every calculator and your overview use it.');
 
     expect(linkNamed(/Try another calculator/)).toHaveAttribute('href', '/start/choose');
@@ -74,12 +60,12 @@ describe('NextSteps', () => {
     expect(screen.queryByRole('link', { name: /Answer a few quick questions/ })).not.toBeInTheDocument();
   });
 
-  it('offers the overview once the profile questions run out, even with skipped basics', () => {
-    const asked = intakePaths('profile').filter((path) => !CORE_PATHS.includes(path));
-    useProfileStore.getState().setValues([], { provide: asked });
-    // Skipped basics are not asked by /start/profile, which would only
+  it('offers the overview once the profile questions run out, even with never-asked fields missing', () => {
+    const asked = intakePaths('profile');
+    useProfileStore.getState().setFields({}, asked);
+    // The intake never asks a few fields, so /start/profile would only
     // redirect to the overview; link it directly instead.
-    expect(profileCompleteness(useProfileStore.getState().profile).missing.length).toBeGreaterThan(0);
+    expect(asked.length).toBeLessThan(PROFILE_FIELDS.length);
 
     render(<NextSteps intent="retirement" />);
 
@@ -88,8 +74,11 @@ describe('NextSteps', () => {
     expect(screen.queryByRole('link', { name: /Finish your profile/ })).not.toBeInTheDocument();
   });
 
-  it('swaps "Finish your profile" for the overview once every topic is answered', () => {
-    useProfileStore.getState().setValues([], { provide: PROFILE_FORM.screens.flatMap((s) => s.fields) });
+  it('swaps "Finish your profile" for the overview once every field is answered', () => {
+    useProfileStore.getState().setFields(
+      {},
+      PROFILE_FIELDS.map((field) => field.path)
+    );
 
     render(<NextSteps intent="portfolio" />);
 

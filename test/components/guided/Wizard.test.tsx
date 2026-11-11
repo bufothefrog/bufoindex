@@ -2,34 +2,28 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { nextNavigationFactory, resetRouterMock, routerMock } from '@/test/utils/navigation';
-import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
-import { Wizard, WizardPlaceholder, isCoreReady } from '@/components/guided/Wizard';
-import { INTAKE_DESTINATIONS, PROFILE_FORM } from '@/lib/calculators/forms';
+import { Wizard, isCoreReady } from '@/components/guided/Wizard';
 import { CORE_PATHS, intakePaths, isCoreComplete } from '@/lib/constants/intake';
-import { CORE_SCREENS } from '@/lib/fields/shared';
-import { LEVERAGE_PATH, PAYCHECK_PATH, PORTFOLIO_PATH, RETIREMENT_PATH } from '@/lib/profile/links';
+import { portfolioLink, retirementLink } from '@/lib/profile/links';
 import { useProfileStore } from '@/lib/store/profileStore';
 
-vi.mock('next/navigation', () => nextNavigationFactory());
-
-// Calculator-specific flows (which screens each intent asks, the seeded
-// links) are pinned in each calculator slice's Wizard<Calc>.test.tsx. This
-// file covers the shared core and what every intent has in common; the
-// mechanics on a fixture form live in WizardMechanics.test.tsx.
-
-const { push, replace } = routerMock;
+const push = vi.fn();
+const replace = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, back: vi.fn(), replace, prefetch: vi.fn() }),
+}));
 
 beforeEach(() => {
-  resetRouterMock();
-  clearBrowserState();
+  push.mockReset();
+  replace.mockReset();
+  localStorage.clear();
+  sessionStorage.clear();
   useProfileStore.getState().reset();
-  resetProfileStore({ hydrated: true });
 });
 
 /** Saves the default values for `paths` as answered, like a finished intake. */
 function answer(paths: readonly string[]) {
-  useProfileStore.getState().setValues([], { provide: [...paths] });
+  useProfileStore.getState().setFields({}, [...paths]);
 }
 
 async function typeInto(label: string, text: string) {
@@ -40,12 +34,82 @@ async function typeInto(label: string, text: string) {
   return user;
 }
 
-const CALCULATOR_PATHS = {
-  paycheck: PAYCHECK_PATH,
-  retirement: RETIREMENT_PATH,
-  portfolio: PORTFOLIO_PATH,
-  leverage: LEVERAGE_PATH,
-} as const;
+describe('Wizard, every question of an intent (mode all)', () => {
+  it('walks the leverage intake, skips one screen, and opens the seeded comparison', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+
+    expect(screen.getByRole('heading', { name: 'What is your time horizon?' })).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+
+    await typeInto('Your age', '28');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(
+      screen.getByRole('heading', { name: 'How much goes into a taxable brokerage account each month?' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+
+    expect(screen.getByRole('heading', { name: 'Roughly how much do you have invested?' })).toBeInTheDocument();
+    expect(screen.getByText('Good enough to start. You can refine the details on the calculator.')).toBeInTheDocument();
+    await typeInto('Starting balance', '40000');
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    // Age 28 to the default retirement age 60 = 32 years; the skipped taxable
+    // contribution keeps its typical 500.
+    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?c=500&y=32&b=40000&l=2');
+    expect(push).not.toHaveBeenCalled();
+
+    const { profile, hasProfile } = useProfileStore.getState();
+    expect(hasProfile).toBe(true);
+    expect(profile.person.age).toBe(28);
+    expect(profile.investing.investedBalance).toBe(40000);
+    expect(profile.provided).toEqual(['person.age', 'person.retirementAge', 'investing.investedBalance']);
+    expect(profile.provided).not.toContain('investing.taxableMonthlyContribution');
+    // The intake never asked for a cash target, so it follows the active
+    // cashflow-investor preset (1 month) instead of the 3-month placeholder.
+    expect(profile.strategy.preset).toBe('cashflow-investor');
+    expect(profile.cash.targetMonths).toBe(1);
+    expect(profile.provided).not.toContain('cash.targetMonths');
+  });
+
+  it('blocks Next when the retirement age is not above the current age', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+
+    await typeInto('Your age', '65');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The retirement age needs to be above your current age.');
+    expect(screen.getByRole('heading', { name: 'What is your time horizon?' })).toBeInTheDocument();
+  });
+
+  it('hides the employer-match screen once "No" is chosen, using Enter to choose and advance', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="paycheck" mode="all" />);
+
+    // about, pay, must-pay, fun-money: accept the pre-filled values.
+    for (let i = 0; i < 4; i += 1) {
+      await user.click(screen.getByRole('button', { name: /Next/ }));
+    }
+    expect(screen.getByText('Step 5 of 6')).toBeInTheDocument();
+    const group = screen.getByRole('radiogroup');
+    expect(screen.getByRole('radio', { name: /^Yes/ })).toHaveAttribute('aria-checked', 'true');
+
+    // Arrow down moves the selection to "No"; the match screen disappears and
+    // this becomes the last screen.
+    screen.getByRole('radio', { name: /^Yes/ }).focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('radio', { name: 'No' })).toHaveAttribute('aria-checked', 'true');
+    expect(group).toBeInTheDocument();
+    expect(screen.getByText('Step 5 of 5')).toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/paycheck-allocator#/);
+    expect(useProfileStore.getState().profile.workplace.has401k).toBe(false);
+  });
+});
 
 describe('Wizard, shared core flow', () => {
   it('asks only the basics and continues to the chooser', async () => {
@@ -56,13 +120,10 @@ describe('Wizard, shared core flow', () => {
     expect(screen.getByText('Every calculator shares these answers, so you only give them once.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'A little about you' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
-    // The core is not an intent: no "Skip the rest".
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
 
     await typeInto('Your age', '34');
-    await user.click(screen.getByRole('radio', { name: 'Head of household' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
-    expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Next/ }));
     expect(screen.getByRole('heading', { name: 'What do you have to pay each month?' })).toBeInTheDocument();
     expect(screen.getByText('Good enough to start. You can edit the basics later.')).toBeInTheDocument();
@@ -73,25 +134,8 @@ describe('Wizard, shared core flow', () => {
     expect(replace).not.toHaveBeenCalled();
     const { profile } = useProfileStore.getState();
     expect(profile.person.age).toBe(34);
-    expect(profile.person.filingStatus).toBe('headOfHousehold');
     expect(profile.provided).toEqual([...CORE_PATHS]);
     expect(isCoreComplete(profile)).toBe(true);
-    // The intake never asked for a cash target, so it follows the active
-    // cashflow-investor preset (1 month), unmarked.
-    expect(profile.cash.targetMonths).toBe(1);
-    expect(profile.provided).not.toContain('cash.targetMonths');
-  });
-
-  it('shows a take-home-above-gross answer as one screen-level alert', async () => {
-    const user = userEvent.setup();
-    render(<Wizard flow="core" />);
-    await user.click(screen.getByRole('button', { name: /Next/ }));
-    await typeInto('Take-home pay per paycheck', '9000');
-    await user.click(screen.getByRole('button', { name: /Next/ }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Take-home pay is above gross pay.');
-    expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
-    expect(push).not.toHaveBeenCalled();
   });
 
   it('continues to the intent named by next', async () => {
@@ -99,7 +143,7 @@ describe('Wizard, shared core flow', () => {
     render(<Wizard flow="core" next="retirement" />);
 
     expect(screen.getByText('After this: See if I am on track to retire.')).toBeInTheDocument();
-    for (let i = 0; i < CORE_SCREENS.length; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       await user.click(screen.getByRole('button', { name: /Next|Finish/ }));
     }
     expect(push).toHaveBeenCalledWith('/start/retirement');
@@ -109,14 +153,14 @@ describe('Wizard, shared core flow', () => {
     const user = userEvent.setup();
     render(<Wizard flow="core" next="choose" />);
 
-    for (let i = 0; i < CORE_SCREENS.length; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       await user.click(screen.getByRole('button', { name: /Next|Finish/ }));
     }
     expect(push).toHaveBeenCalledWith('/start/choose');
   });
 
   it('prefills saved basics and offers to keep them as they are', () => {
-    useProfileStore.getState().setValues([{ path: 'person.age', value: 52 }], { provide: [...CORE_PATHS] });
+    useProfileStore.getState().setFields({ person: { age: 52 } }, [...CORE_PATHS]);
     const { unmount } = render(<Wizard flow="core" next="portfolio" />);
 
     expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
@@ -133,50 +177,70 @@ describe('Wizard, shared core flow', () => {
     render(<Wizard flow="core" />);
     expect(screen.queryByRole('link', { name: 'Keep them and continue' })).not.toBeInTheDocument();
   });
-
-  it('renders the header and a skeleton until the profile store hydrates', () => {
-    resetProfileStore({ hydrated: false });
-    render(<Wizard flow="core" next="leverage" />);
-    expect(screen.getByRole('heading', { level: 1, name: 'A few basics' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Loading questions')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Next/ })).not.toBeInTheDocument();
-  });
-});
-
-describe('WizardPlaceholder', () => {
-  it('sizes the skeleton to the first screen: one block per field', () => {
-    const { container } = render(<WizardPlaceholder flow="core" />);
-    const fields = container.querySelector('[aria-label="Loading questions"] > .space-y-5');
-    expect(fields?.children).toHaveLength(CORE_SCREENS[0].fields.length);
-  });
 });
 
 describe('Wizard, remaining questions of an intent', () => {
-  it.each(['paycheck', 'retirement', 'leverage'] as const)(
-    '%s: skips the rest and opens its calculator, replacing the intake entry',
-    async (intent) => {
-      const user = userEvent.setup();
-      answer(CORE_PATHS);
-      render(<Wizard flow={intent} />);
+  it('asks only what retirement still needs and opens the seeded calculator', async () => {
+    const user = userEvent.setup();
+    answer([...CORE_PATHS, 'investing.investedBalance']);
+    render(<Wizard flow="retirement" />);
 
-      expect(screen.getByText('Just the questions this calculator still needs, a few related ones per screen.')).toBeInTheDocument();
-      const skipRest = screen.queryByRole('button', { name: 'Skip the rest' });
-      await user.click(skipRest ?? screen.getByRole('button', { name: /Finish/ }));
+    expect(screen.getByRole('heading', { level: 1, name: 'See if I am on track to retire' })).toBeInTheDocument();
+    expect(screen.getByText('Just the questions this calculator still needs.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'When would you like to retire?' })).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
 
-      expect(push).not.toHaveBeenCalled();
-      expect(replace).toHaveBeenCalledTimes(1);
-      const href = replace.mock.calls[0][0];
-      expect(href.startsWith(CALCULATOR_PATHS[intent])).toBe(true);
-      expect(href).toBe(INTAKE_DESTINATIONS[intent](useProfileStore.getState().profile));
-    }
-  );
+    await typeInto('Target retirement age', '62');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    // The invested-balance screen is skipped: it is already answered.
+    expect(screen.getByRole('heading', { name: 'How much do you invest each month?' })).toBeInTheDocument();
+    await typeInto('Monthly investing contribution', '900');
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    const { profile } = useProfileStore.getState();
+    expect(profile.person.retirementAge).toBe(62);
+    expect(profile.investing.monthlyContribution).toBe(900);
+    expect(profile.provided).toEqual([
+      ...CORE_PATHS,
+      'investing.investedBalance',
+      'person.retirementAge',
+      'investing.monthlyContribution',
+    ]);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith(retirementLink(profile));
+    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/retirement-calculator#/);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('replaces its own history entry on finish, so Back from the result does not bounce forward', async () => {
+    // /start -> /start/choose -> /start/portfolio -> Finish. Pushing the
+    // calculator would leave /start/portfolio behind it in history; Back would
+    // remount it with nothing left to ask and the gate would replace forward
+    // to the calculator again. Replacing on finish lets Back reach the chooser.
+    const user = userEvent.setup();
+    answer(CORE_PATHS);
+    render(<Wizard flow="portfolio" />);
+
+    // With the basics saved, portfolio asks only new cash and the target mix.
+    expect(screen.getByRole('heading', { name: 'How much new cash are you investing this month?' })).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByRole('heading', { name: 'Which stock and bond mix are you aiming for?' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith(portfolioLink(useProfileStore.getState().profile));
+    expect(replace.mock.calls[0][0]).toMatch(/^\/tools\/portfolio-rebalancing-calculator#/);
+  });
 
   it('goes straight to the calculator when nothing is left to ask', () => {
     answer([...CORE_PATHS, ...intakePaths('retirement')]);
     render(<Wizard flow="retirement" mode="remaining" />);
 
     expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith(INTAKE_DESTINATIONS.retirement(useProfileStore.getState().profile));
+    expect(replace).toHaveBeenCalledWith(retirementLink(useProfileStore.getState().profile));
     expect(screen.getByLabelText('Loading questions')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Next|Finish/ })).not.toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
@@ -215,12 +279,6 @@ describe('Wizard, remaining questions of an intent', () => {
     expect(screen.queryByRole('button', { name: /Next|Finish/ })).not.toBeInTheDocument();
   });
 
-  it('lets the portfolio intake start without the basics (O5)', () => {
-    render(<Wizard flow="portfolio" />);
-    expect(replace).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /Next|Finish/ })).toBeInTheDocument();
-  });
-
   it('lets a visitor who skipped core questions continue, until the profile is reset', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<Wizard flow="core" next="leverage" />);
@@ -236,8 +294,10 @@ describe('Wizard, remaining questions of an intent', () => {
 
     const second = render(<Wizard flow="leverage" />);
     expect(replace).not.toHaveBeenCalled();
-    // Core fields are never asked again by an intent, even on a shared screen.
+    expect(screen.getByRole('heading', { name: 'What is your time horizon?' })).toBeInTheDocument();
+    // Age is a core question, so the horizon screen asks only the end age.
     expect(screen.queryByLabelText('Your age')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Age you plan to stop contributing')).toBeInTheDocument();
     second.unmount();
 
     useProfileStore.getState().reset();
@@ -246,22 +306,22 @@ describe('Wizard, remaining questions of an intent', () => {
     expect(replace).toHaveBeenCalledWith('/start?next=leverage');
   });
 
-  it('labels profile screens with their section and skips a section at once', async () => {
+  it('labels profile screens with their section and finishes at the overview', async () => {
     const user = userEvent.setup();
-    // Leave only the profile extras (cash buffer, strategy) unanswered.
-    const extras = PROFILE_FORM.screens.slice(-2).flatMap((s) => s.fields);
-    answer(intakePaths('profile').filter((path) => !extras.includes(path)));
+    answer([...CORE_PATHS, ...intakePaths('retirement'), ...intakePaths('paycheck'), ...intakePaths('portfolio')]);
     render(<Wizard flow="profile" />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Finish your profile' })).toBeInTheDocument();
-    expect(screen.getByText('Just the questions your profile still needs, a few related ones per screen.')).toBeInTheDocument();
-    expect(screen.getByText('Cash and strategy · Step 1 of 2')).toBeInTheDocument();
-    // The whole rest is one section, so only the section skip shows.
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
+    expect(screen.getByText('Just the questions your profile still needs.')).toBeInTheDocument();
+    // Left: the taxable contribution, then the two cash screens.
+    expect(screen.getByText('Portfolio · Step 1 of 3')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByText('Cash and strategy · Step 2 of 3')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Skip the rest of this section' }));
 
     expect(replace).toHaveBeenCalledWith('/overview');
     expect(push).not.toHaveBeenCalled();
+    expect(useProfileStore.getState().profile.provided).toContain('investing.taxableMonthlyContribution');
     expect(useProfileStore.getState().profile.provided).not.toContain('cash.emergencyFundBalance');
   });
 });

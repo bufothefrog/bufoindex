@@ -6,45 +6,12 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-export type LayoutMaxWidth = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
-export type GridSpan = 1 | 2 | 3;
-
-const MAX_WIDTH_CLASSES: Record<LayoutMaxWidth, string> = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-  '7xl': 'max-w-7xl',
-  full: 'max-w-full',
-};
-
-const SPAN_CLASSES: Record<GridSpan, string> = {
-  1: 'lg:col-span-1',
-  2: 'lg:col-span-2',
-  3: 'lg:col-span-3',
-};
-
-const GAP_CLASSES = {
-  sm: 'gap-4',
-  md: 'gap-6',
-  lg: 'gap-8',
-  xl: 'gap-12',
-} as const;
-
-const PADDING_CLASSES = {
-  sm: 'p-4',
-  md: 'p-6',
-  lg: 'p-8',
-  xl: 'p-12',
-} as const;
-
 export interface ResponsiveGridProps {
   children: React.ReactNode;
   hasResults?: boolean;
   className?: string;
-  maxWidth?: LayoutMaxWidth;
-  gap?: keyof typeof GAP_CLASSES;
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
+  gap?: 'sm' | 'md' | 'lg' | 'xl';
   testId?: string;
 }
 
@@ -54,19 +21,39 @@ export function ResponsiveGrid({
   className,
   maxWidth = '7xl',
   gap = 'md',
-  testId,
+  testId
 }: ResponsiveGridProps) {
+  const maxWidthClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md', 
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '7xl': 'max-w-7xl',
+    full: 'max-w-full'
+  };
+  
+  const gapClasses = {
+    sm: 'gap-4',
+    md: 'gap-6',
+    lg: 'gap-8',
+    xl: 'gap-12'
+  };
+  
+  // Dynamic grid based on content state
+  const gridClasses = cn(
+    "grid transition-all duration-500",
+    gapClasses[gap],
+    hasResults 
+      ? "grid-cols-1 lg:grid-cols-2" // Results present: 2-column layout
+      : "grid-cols-1 lg:grid-cols-3", // No results: 3-column with empty state
+    maxWidthClasses[maxWidth],
+    "mx-auto"
+  );
+  
   return (
-    <div
-      className={cn(
-        'grid transition-all duration-500',
-        GAP_CLASSES[gap],
-        // Results present: two columns; otherwise three, with the empty state in the last.
-        hasResults ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-3',
-        MAX_WIDTH_CLASSES[maxWidth],
-        'mx-auto',
-        className
-      )}
+    <div 
+      className={cn(gridClasses, className)}
       data-testid={testId}
     >
       {children}
@@ -80,18 +67,44 @@ export function ResponsiveGrid({
 export interface GridSectionProps {
   children: React.ReactNode;
   className?: string;
-  span?: GridSpan;
+  span?: 1 | 2 | 3;
 }
 
-/** One column of the calculator grid (inputs or results). */
-export function GridSection({ children, className, span }: GridSectionProps) {
-  return <div className={cn('space-y-6', span && SPAN_CLASSES[span], className)}>{children}</div>;
+export function InputSection({ children, className, span }: GridSectionProps) {
+  const spanClasses = {
+    1: 'lg:col-span-1',
+    2: 'lg:col-span-2', 
+    3: 'lg:col-span-3'
+  };
+  
+  return (
+    <div className={cn(
+      "space-y-6",
+      span && spanClasses[span],
+      className
+    )}>
+      {children}
+    </div>
+  );
 }
 
-/** The inputs column. */
-export const InputSection = GridSection;
-/** The results column. */
-export const ResultSection = GridSection;
+export function ResultSection({ children, className, span }: GridSectionProps) {
+  const spanClasses = {
+    1: 'lg:col-span-1',
+    2: 'lg:col-span-2',
+    3: 'lg:col-span-3'
+  };
+  
+  return (
+    <div className={cn(
+      "space-y-6",
+      span && spanClasses[span],
+      className
+    )}>
+      {children}
+    </div>
+  );
+}
 
 /**
  * Empty State Section
@@ -103,7 +116,7 @@ const featureDotClasses: Record<FeatureDotColor, string> = {
   info: 'bg-info',
   warning: 'bg-warning',
   destructive: 'bg-destructive',
-  primary: 'bg-primary',
+  primary: 'bg-primary'
 };
 
 export interface EmptyStateSectionProps {
@@ -120,14 +133,14 @@ export interface EmptyStateSectionProps {
 
 export function EmptyStateSection({
   title,
-  description,
+  description, 
   icon: Icon,
   features = [],
   className,
-  id,
+  id
 }: EmptyStateSectionProps) {
   return (
-    <div id={id} className={cn('lg:col-span-1', className)}>
+    <div id={id} className={cn("lg:col-span-1", className)}>
       <div className="h-full bg-card border border-border rounded-lg shadow-xs">
         {/* Shorter on phones so the empty state never reads as dead space */}
         <div className="p-6 sm:p-8 flex flex-col items-center justify-center text-center h-full min-h-[240px] lg:min-h-[400px]">
@@ -136,16 +149,22 @@ export function EmptyStateSection({
               <Icon className="w-8 h-8 sm:w-10 sm:h-10 text-sage-400 dark:text-sage-300" />
             </div>
           )}
-
-          <h3 className="text-xl font-semibold text-foreground mb-2 sm:mb-4">{title}</h3>
-
-          <p className="text-muted-foreground mb-4 sm:mb-6 max-w-sm">{description}</p>
-
+          
+          <h3 className="text-xl font-semibold text-foreground mb-2 sm:mb-4">
+            {title}
+          </h3>
+          
+          <p className="text-muted-foreground mb-4 sm:mb-6 max-w-sm">
+            {description}
+          </p>
+          
           {features.length > 0 && (
             <div className="text-sm text-muted-foreground space-y-2">
               {features.map((feature, index) => (
                 <div key={index} className="flex items-center justify-center space-x-2">
-                  <div className={cn('w-2 h-2 rounded-full', featureDotClasses[feature.color])} />
+                  <div
+                    className={cn("w-2 h-2 rounded-full", featureDotClasses[feature.color])}
+                  />
                   <span>{feature.text}</span>
                 </div>
               ))}
@@ -162,14 +181,41 @@ export function EmptyStateSection({
  */
 export interface ContainerProps {
   children: React.ReactNode;
-  maxWidth?: LayoutMaxWidth;
-  padding?: keyof typeof PADDING_CLASSES;
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
+  padding?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
 
-export function Container({ children, maxWidth = '7xl', padding = 'md', className }: ContainerProps) {
+export function Container({
+  children,
+  maxWidth = '7xl',
+  padding = 'md',
+  className
+}: ContainerProps) {
+  const maxWidthClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg', 
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '7xl': 'max-w-7xl',
+    full: 'max-w-full'
+  };
+  
+  const paddingClasses = {
+    sm: 'p-4',
+    md: 'p-6',
+    lg: 'p-8',
+    xl: 'p-12'
+  };
+  
   return (
-    <div className={cn(MAX_WIDTH_CLASSES[maxWidth], PADDING_CLASSES[padding], 'mx-auto', className)}>
+    <div className={cn(
+      maxWidthClasses[maxWidth],
+      paddingClasses[padding],
+      'mx-auto',
+      className
+    )}>
       {children}
     </div>
   );

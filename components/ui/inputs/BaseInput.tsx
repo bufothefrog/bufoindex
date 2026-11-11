@@ -7,17 +7,9 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { BaseInputProps, ComponentState, AccessibilityProps } from '@/lib/design-system/types';
 
-/**
- * Field sizes shared by the input primitives. 'xl' is the guided-intake size
- * (56px controls, large text); 'lg' is the roomy calculator size.
- */
-export type InputSize = 'sm' | 'md' | 'lg' | 'xl';
-
 export interface BaseInputConfig extends BaseInputProps, AccessibilityProps {
   children: React.ReactNode;
   state?: ComponentState;
-  /** Only 'xl' changes the chrome (a larger label); the control sizes itself. */
-  size?: InputSize;
 }
 
 export function BaseInput({
@@ -31,7 +23,6 @@ export function BaseInput({
   testId,
   children,
   state,
-  size = 'md',
   ...ariaProps
 }: BaseInputConfig) {
   const inputId = `input-${name}`;
@@ -47,8 +38,7 @@ export function BaseInput({
       <label 
         htmlFor={inputId}
         className={cn(
-          "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-          size === 'xl' ? "text-base" : "text-sm",
+          "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
           hasError && "text-destructive"
         )}
       >

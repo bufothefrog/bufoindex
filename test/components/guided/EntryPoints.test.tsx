@@ -6,7 +6,6 @@ import sitemap from '@/app/sitemap';
 import { EmptyOverview } from '@/components/dashboard/EmptyOverview';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
-import { profileCompleteness } from '@/lib/calculators/forms';
 import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
 import { PROFILE_FIELDS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -30,7 +29,7 @@ describe('landing page', () => {
     expect(started[0]).toHaveAttribute('href', '/start');
   });
 
-  it('previews each calculator, routing all but the rebalancer through the core first', () => {
+  it('previews each calculator and routes it through the core first', () => {
     render(<HomePage />);
     const section = screen.getByRole('region', { name: 'What you can learn' });
     const hrefs = within(section)
@@ -39,7 +38,7 @@ describe('landing page', () => {
     expect(hrefs).toEqual([
       '/start?next=paycheck',
       '/start?next=retirement',
-      '/start/portfolio',
+      '/start?next=portfolio',
       '/start?next=leverage',
       '/tools',
     ]);
@@ -87,9 +86,7 @@ describe('ContinueProfileCard', () => {
     expect(link).toHaveAttribute('href', '/start/choose');
     // Default core values, all marked as answered (take-home is not summarized).
     expect(link).toHaveTextContent(
-      `30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. 3 of ${
-        profileCompleteness(useProfileStore.getState().profile).total
-      } topics saved in this browser.`
+      `30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. ${CORE_PATHS.length} of ${PROFILE_FIELDS.length} details saved in this browser.`
     );
   });
 
@@ -97,24 +94,18 @@ describe('ContinueProfileCard', () => {
     useProfileStore.getState().setFields({}, ['investing.investedBalance']);
     render(<ContinueProfileCard />);
     const link = screen.getByRole('link', { name: /Continue with my profile/ });
-    // Counted by topic: the invested-balance screen is fully answered.
-    const { provided, total } = profileCompleteness(useProfileStore.getState().profile);
-    expect(provided).toBe(1);
-    expect(link).toHaveTextContent(`1 of ${total} topics saved in this browser.`);
+    expect(link).toHaveTextContent(`1 of ${PROFILE_FIELDS.length} details saved in this browser.`);
     expect(link).not.toHaveTextContent('must-pay');
   });
 });
 
 describe('EmptyOverview', () => {
-  it('starts with the basics, then offers each calculator (the rebalancer without the core)', () => {
+  it('starts with the basics, then offers each calculator through the core', () => {
     render(<EmptyOverview />);
     expect(screen.getByRole('link', { name: /Start with the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.getByRole('link', { name: /Then a paycheck/ })).toHaveAttribute('href', '/start?next=paycheck');
     expect(screen.getByRole('link', { name: /Then retirement/ })).toHaveAttribute('href', '/start?next=retirement');
-    expect(screen.getByRole('link', { name: /Or go straight to a portfolio/ })).toHaveAttribute(
-      'href',
-      '/start/portfolio'
-    );
+    expect(screen.getByRole('link', { name: /Then a portfolio/ })).toHaveAttribute('href', '/start?next=portfolio');
     expect(screen.getByRole('link', { name: /Then the leverage comparison/ })).toHaveAttribute(
       'href',
       '/start?next=leverage'

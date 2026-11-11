@@ -1,52 +1,64 @@
 import React from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toneFromLegacy, type Tone } from '@/lib/design-system/tone';
-import { KeyValueRow } from '@/components/ui/results/KeyValueList';
 
-/** Deprecated spelling of `tone`; kept until every caller moves (x2 removes it). */
-export type BreakdownRowVariant = 'default' | 'success' | 'warning' | 'danger' | 'info';
+type RowVariant = 'default' | 'success' | 'warning' | 'danger' | 'info';
 
-export interface BreakdownRowProps {
+interface BreakdownRowProps {
   icon?: LucideIcon;
   label: string;
   subtitle?: string;
   value: string | number;
   prefix?: '+' | '-' | '';
-  /** Colors the value. Default neutral. Wins over `variant`. */
-  tone?: Tone;
-  /** @deprecated Use `tone` (default -> neutral, success -> positive, warning -> caution, danger -> negative). */
-  variant?: BreakdownRowVariant;
+  variant?: RowVariant;
   className?: string;
 }
 
-/**
- * A single boxed label/value row: KeyValueList's row in a one-row dl, so it
- * stays valid markup wherever it is placed. Prefer KeyValueList for a run of rows.
- */
+const variantText: Record<RowVariant, string> = {
+  default: 'text-foreground',
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-destructive',
+  info: 'text-info',
+};
+
 export function BreakdownRow({
-  icon,
+  icon: Icon,
   label,
   subtitle,
   value,
   prefix = '',
-  tone,
-  variant,
+  variant = 'default',
   className,
 }: BreakdownRowProps) {
   return (
-    <dl className={cn('m-0', className)}>
-      <KeyValueRow
-        appearance="boxed"
-        icon={icon}
-        label={label}
-        subtitle={subtitle}
-        value={value}
-        prefix={prefix}
-        tone={tone ?? toneFromLegacy(variant)}
-      />
-    </dl>
+    <div
+      className={cn(
+        'flex items-center justify-between p-2 rounded-lg border border-border',
+        className
+      )}
+    >
+      <div className="flex items-center space-x-2 min-w-0">
+        {Icon && (
+          <div className="w-5 h-5 bg-muted rounded-full flex items-center justify-center shrink-0">
+            <Icon className="w-3 h-3 text-muted-foreground" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <div className="text-sm font-medium">{label}</div>
+          {subtitle && (
+            <div className="text-xs text-muted-foreground">{subtitle}</div>
+          )}
+        </div>
+      </div>
+      <div
+        className={cn(
+          'text-base font-semibold font-mono tabular-nums shrink-0',
+          variantText[variant]
+        )}
+      >
+        {prefix}{value}
+      </div>
+    </div>
   );
 }
-
-export default BreakdownRow;

@@ -1,18 +1,8 @@
 /**
  * Chart Theme Utility for BufoIndex
- *
- * Theme-aware colors and shared Recharts props. Colors come from the CSS
- * custom properties in app/globals.css, so charts follow light/dark mode.
- * Components normally reach this through `useChartTheme()` from
- * `@/components/ui/charts`, which calls getChartTheme() underneath.
+ * Provides theme-aware colors for Recharts components
+ * Uses CSS custom properties for automatic dark mode switching
  */
-
-import { Global } from 'recharts';
-
-// Recharts 3 connects every chart to the Redux DevTools extension unless this
-// is off, including in production. Every chart imports this module (directly
-// or through useChartTheme), so the switch is set before any chart mounts.
-Global.devToolsEnabled = false;
 
 export interface ChartTheme {
   primary: string;
@@ -26,13 +16,7 @@ export interface ChartTheme {
   background: string;
   muted: string;
   accent: string;
-  /** Monospace font stack for axis ticks and legends (the --font-mono token). */
-  fontMono: string;
 }
-
-/** Same stack as the --font-mono token in app/globals.css. */
-export const FONT_MONO_FALLBACK =
-  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
 
 /**
  * Sage color variants for consistent theming
@@ -71,8 +55,7 @@ export const getChartTheme = (): ChartTheme => {
       grid: '#e2e8f0',
       background: '#ffffff',
       muted: '#64748b',
-      accent: sage.sage400,
-      fontMono: FONT_MONO_FALLBACK
+      accent: sage.sage400
     };
   }
 
@@ -90,133 +73,31 @@ export const getChartTheme = (): ChartTheme => {
     grid: `hsl(${style.getPropertyValue('--border').trim()})`,
     background: `hsl(${style.getPropertyValue('--background').trim()})`,
     muted: `hsl(${style.getPropertyValue('--muted-foreground').trim()})`,
-    accent: sage.sage400, // main brand color
-    fontMono: style.getPropertyValue('--font-mono').trim() || FONT_MONO_FALLBACK
+    accent: sage.sage400 // main brand color
   };
 };
 
-// ---------------------------------------------------------------------------
-// Theme-change subscription (one MutationObserver shared by every chart)
-// ---------------------------------------------------------------------------
-
-export type ChartThemeMode = 'light' | 'dark';
-
-const themeListeners = new Set<() => void>();
-let themeObserver: MutationObserver | null = null;
-
 /**
- * Calls `callback` after the `class` attribute of <html> changes. Charts read
- * computed CSS variables, so they must re-read after ThemeProvider's effect
- * has swapped the class (a render-time context read would see the old values).
+ * Listen for theme changes and update charts
  */
-export const subscribeToThemeChanges = (callback: () => void): (() => void) => {
-  if (typeof window === 'undefined' || typeof MutationObserver === 'undefined') {
-    return () => {};
-  }
+export const subscribeToThemeChanges = (callback: () => void) => {
+  if (typeof window === 'undefined') return () => {};
 
-  themeListeners.add(callback);
-  if (!themeObserver) {
-    themeObserver = new MutationObserver(() => {
-      themeListeners.forEach((listener) => listener());
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        const target = mutation.target as HTMLElement;
+        if (target === document.documentElement) {
+          callback();
+        }
+      }
     });
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-  }
+  });
 
-  return () => {
-    themeListeners.delete(callback);
-    if (themeListeners.size === 0 && themeObserver) {
-      themeObserver.disconnect();
-      themeObserver = null;
-    }
-  };
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class']
+  });
+
+  return () => observer.disconnect();
 };
-
-/** Snapshot for useSyncExternalStore: the theme class currently on <html>. */
-export const getThemeModeSnapshot = (): ChartThemeMode =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light';
-
-let cachedTheme: { mode: ChartThemeMode; theme: ChartTheme } | null = null;
-
-/**
- * getChartTheme() cached per theme mode, so every chart on the page shares one
- * object (stable for React.memo) and getComputedStyle runs once per switch.
- * Never caches the server fallback.
- */
-export const getChartThemeForMode = (mode: ChartThemeMode): ChartTheme => {
-  if (typeof window === 'undefined') return getChartTheme();
-  if (cachedTheme?.mode !== mode) {
-    cachedTheme = { mode, theme: getChartTheme() };
-  }
-  return cachedTheme.theme;
-};
-
-/** Server snapshot: the server always renders the light fallback. */
-export const getServerThemeModeSnapshot = (): ChartThemeMode => 'light';
-
-// ---------------------------------------------------------------------------
-// Shared Recharts props
-// ---------------------------------------------------------------------------
-
-/** Chart margins. `compact` fits tick labels only; `labeled` leaves room for axis titles. */
-export const CHART_MARGINS = {
-  compact: { top: 8, right: 8, left: 0, bottom: 0 },
-  labeled: { top: 20, right: 30, left: 20, bottom: 60 }
-} as const;
-
-export type ChartMarginKey = keyof typeof CHART_MARGINS;
-
-/** Axis tick font size, in px. */
-export const CHART_TICK_FONT_SIZE = 12;
-
-/**
- * Spread into every Area/Line/Bar: animation is off by default. Recharts'
- * default JS animation replays on each data change (about 1.5 s), which made
- * every keystroke re-animate the retirement charts.
- */
-export const CHART_SERIES_DEFAULTS = { isAnimationActive: false } as const;
-
-/** Spread into XAxis / YAxis. Pass a series color to tint a secondary axis. */
-export const chartAxisProps = (theme: ChartTheme, color: string = theme.muted) => ({
-  stroke: color,
-  tick: { fill: color, fontSize: CHART_TICK_FONT_SIZE, fontFamily: theme.fontMono }
-});
-
-/** Spread into CartesianGrid. */
-export const chartGridProps = (theme: ChartTheme) => ({
-  strokeDasharray: '3 3',
-  stroke: theme.grid,
-  opacity: 0.4
-});
-
-/** Legend wrapper style in the theme's text color and mono font. */
-export const chartLegendStyle = (theme: ChartTheme) => ({
-  fontSize: CHART_TICK_FONT_SIZE,
-  fontFamily: theme.fontMono,
-  color: theme.text
-});
-
-/** Default upper bound on plotted points per series (keeps phones responsive). */
-export const MAX_CHART_POINTS = 120;
-
-/**
- * Thins a series to at most `max` points on a regular stride, always keeping
- * the first and last point. Returns the input array unchanged when it is
- * already short enough. `max` below 2 is treated as 2.
- */
-export function thinPoints<T>(points: readonly T[], max: number = MAX_CHART_POINTS): T[] {
-  const limit = Math.max(2, Math.floor(max));
-  if (points.length <= limit) return points as T[];
-
-  const lastIndex = points.length - 1;
-  // Smallest stride s with ceil(lastIndex / s) + 1 <= limit.
-  const step = Math.ceil(lastIndex / (limit - 1));
-  const out: T[] = [];
-  for (let i = 0; i < lastIndex; i += step) out.push(points[i]);
-  out.push(points[lastIndex]);
-  return out;
-}

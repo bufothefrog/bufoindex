@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
-import { BaseInput, type InputSize } from './BaseInput';
+import { BaseInput } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 
 interface PercentInputProps extends BaseInputProps {
@@ -16,7 +16,7 @@ interface PercentInputProps extends BaseInputProps {
   min?: number; // In decimal format (e.g., 0 for 0%)
   max?: number; // In decimal format (e.g., 1 for 100%)
   precision?: number; // Decimal places to show (default: 1)
-  size?: InputSize;
+  size?: 'sm' | 'md' | 'lg';
   step?: number; // Step size in decimal format
   showSlider?: boolean; // Render a range slider below the input
   /**
@@ -190,15 +190,13 @@ export function PercentInput({
   const sizeClasses = {
     sm: 'h-8 text-sm pl-3 pr-7',
     md: 'h-10 text-sm pl-3 pr-8',
-    lg: 'h-12 text-base pl-3 pr-9',
-    xl: 'h-14 text-2xl pl-3 pr-10'
+    lg: 'h-12 text-base pl-3 pr-9'
   };
   
   const suffixPositions = {
     sm: 'right-2.5',
     md: 'right-3',
-    lg: 'right-3.5',
-    xl: 'right-4'
+    lg: 'right-3.5'
   };
 
   const inputField = (
@@ -212,7 +210,6 @@ export function PercentInput({
       className={showSlider ? undefined : className}
       testId={showSlider ? undefined : testId}
       aria-label={ariaLabel}
-      size={size}
     >
       <div className="relative w-full">
         <input

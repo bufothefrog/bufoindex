@@ -3,11 +3,9 @@ import Link from 'next/link'
 import { ArrowRight, ClipboardList, LockKeyhole, MonitorSmartphone, Sigma } from 'lucide-react'
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard'
 import { buttonVariants } from '@/components/ui/button'
-import { calculatorMeta } from '@/lib/calculators/registry'
-import { composeDisclaimer } from '@/lib/constants/disclaimers'
 import {
   CORE_START_PATH,
-  intentStartLink,
+  coreStartLink,
   getIntentOption,
   type IntakeIntent,
 } from '@/lib/constants/intake'
@@ -18,13 +16,6 @@ export const metadata: Metadata = {
   description:
     'Personal-finance calculators that start from a few quick answers and show the math behind every number. Paycheck allocation, retirement modeling, rebalancing, and a leveraged versus plain index comparison.',
 }
-
-/** Site-wide disclaimer: the shared "not advice" fragment, worded for every calculator at once. */
-const SITE_DISCLAIMER = composeDisclaimer(
-  'Educational tools only.',
-  'Results depend on the assumptions you enter and are not predictions.',
-  'notAdvice'
-)
 
 const HOW_IT_WORKS = [
   {
@@ -50,39 +41,43 @@ const HOW_IT_WORKS = [
 ]
 
 /**
- * Calculator previews (names from lib/calculators/registry). Each card links to the shared core intake with
+ * Calculator previews. Each card links to the shared core intake with
  * `next` set, so every path answers the basics first and then continues to
  * that calculator's remaining questions. The icon and the "what it shows"
  * line come from INTENT_OPTIONS so the landing page and the chooser agree.
  */
 const PREVIEWS: ReadonlyArray<{
   intent: Exclude<IntakeIntent, 'profile'>
+  name: string
   question: string
 }> = [
   {
     intent: 'paycheck',
+    name: 'Paycheck Allocator',
     question: 'Where should each paycheck go?',
   },
   {
     intent: 'retirement',
+    name: 'Retirement Calculator',
     question: 'Am I on track to retire when I want to?',
   },
   {
     intent: 'portfolio',
+    name: 'Portfolio Rebalancer',
     question: 'What should I buy with new cash to reach my target mix?',
   },
   {
     intent: 'leverage',
+    name: 'Leverage Comparison',
     question: 'How do a leveraged fund and a plain index fund compare when I invest monthly?',
   },
 ]
 
-function CalculatorPreviewCard({ intent, question }: (typeof PREVIEWS)[number]) {
+function CalculatorPreviewCard({ intent, name, question }: (typeof PREVIEWS)[number]) {
   const { icon: Icon, description } = getIntentOption(intent)
-  const name = calculatorMeta(intent).shortTitle
   return (
     <Link
-      href={intentStartLink(intent) as Route}
+      href={coreStartLink(intent) as Route}
       className={cn(
         'group flex h-full w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-card-foreground transition-colors md:p-5',
         'hover:border-sage-400 dark:hover:border-sage-500',
@@ -211,7 +206,10 @@ export default function HomePage() {
         </p>
       </section>
 
-      <p className="text-xs text-muted-foreground">{SITE_DISCLAIMER}</p>
+      <p className="text-xs text-muted-foreground">
+        Educational tools only. Results depend on the assumptions you enter and
+        are not predictions. Not tax or investment advice.
+      </p>
     </div>
   )
 }

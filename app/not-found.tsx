@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import type { Route } from 'next';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { CALCULATOR_LIST } from '@/lib/calculators/registry';
 
 export default function NotFound() {
   return (
@@ -15,22 +13,36 @@ export default function NotFound() {
         </CardHeader>
         <CardContent>
           <nav aria-label="Site pages">
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/" className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline">
+                <Link href="/" className="text-primary underline-offset-4 hover:underline">
                   Home
                 </Link>
               </li>
-              {CALCULATOR_LIST.map((calculator) => (
-                <li key={calculator.id}>
-                  <Link
-                    href={calculator.path as Route}
-                    className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline"
-                  >
-                    {calculator.shortTitle}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link
+                  href="/tools/paycheck-allocator"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Paycheck Allocator
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/tools/retirement-calculator"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Retirement Calculator
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/tools/portfolio-rebalancing-calculator"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Portfolio Rebalancer
+                </Link>
+              </li>
             </ul>
           </nav>
         </CardContent>

@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { cn, formatCurrency, formatNumberWithCommas } from '@/lib/utils';
-import { BaseInput, type InputSize } from './BaseInput';
+import { BaseInput } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 import { DollarSign } from 'lucide-react';
 
@@ -17,7 +17,7 @@ interface EnhancedMoneyInputProps extends BaseInputProps {
   currency?: string;
   min?: number;
   max?: number;
-  size?: InputSize;
+  size?: 'sm' | 'md' | 'lg';
   /**
    * Accessible name for the input when no visible label text is rendered
    * (e.g. label="" in a composite row that draws its own label). Never pass
@@ -173,15 +173,13 @@ export function EnhancedMoneyInput({
   const sizeClasses = {
     sm: 'h-8 text-sm pl-7 pr-3',
     md: 'h-10 text-sm pl-8 pr-3',
-    lg: 'h-12 text-base pl-9 pr-3',
-    xl: 'h-14 text-2xl pl-10 pr-3'
+    lg: 'h-12 text-base pl-9 pr-3'
   };
   
   const iconSizes = {
     sm: 'w-3 h-3 left-2.5',
     md: 'w-4 h-4 left-3',
-    lg: 'w-5 h-5 left-3.5',
-    xl: 'w-5 h-5 left-4'
+    lg: 'w-5 h-5 left-3.5'
   };
   
   return (
@@ -195,7 +193,6 @@ export function EnhancedMoneyInput({
       className={className}
       testId={testId}
       aria-label={ariaLabel}
-      size={size}
     >
       <div className="relative w-full">
         <span className={cn(

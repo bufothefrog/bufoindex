@@ -7,7 +7,7 @@ import { RetirementConstants } from '@/lib/constants/retirement';
 import { ScenarioAnalysis, analyzeRetirementScenarios, determineRetirementStatus } from './scenarioAnalysis';
 import { CoastFireAnalysis, calculateCoastFireAnalysis } from './coastFire';
 import { InflationAnalysis, analyzeInflationImpact } from './inflationAdjustment';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency } from '@/lib/utils';
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random';
 // Import to register retirement formulas
 import '@/lib/formulas/retirement-formulas';

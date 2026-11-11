@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { LayoutDashboard } from 'lucide-react';
-import { profileCompleteness } from '@/lib/calculators/forms';
 import {
   CORE_START_PATH,
   LEARN_OPTIONS,
@@ -13,6 +12,7 @@ import {
   remainingIntakeScreens,
   type IntentOption,
 } from '@/lib/constants/intake';
+import { profileCompleteness } from '@/lib/profile/mappers';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
@@ -33,21 +33,22 @@ interface ChooserEntry {
   tone: 'default' | 'emphasis';
 }
 
-/** Counts topic screens: each asks one question or a few related ones. */
+/** Counts screens: each poses one question, a few with two related fields. */
 function remainingHint(count: number): string {
   if (count === 0) return 'Nothing more to ask; opens with your answers.';
-  return count === 1 ? '1 more screen.' : `${count} more screens.`;
+  return count === 1 ? '1 more question.' : `${count} more questions.`;
 }
 
-/** What the overview card says once nothing is left to finish. */
-function overviewDescription(profile: FinancialProfile): string {
-  return isProfileComplete(profile)
-    ? 'Every topic is answered. The overview runs each calculator from your profile.'
-    : 'No questions left to ask. The overview runs each calculator from your profile; skipped basics keep a typical value until you edit them.';
-}
-
-function isProfileComplete(profile: FinancialProfile): boolean {
-  return profileCompleteness(profile).missing.length === 0;
+/**
+ * What the overview card says once nothing is left to finish. The intake
+ * does not ask a few profile fields (and skipped basics are edited through
+ * "Edit the basics"), so running out of questions can still leave some
+ * fields on typical values; the overview lists them.
+ */
+function overviewDescription(missingCount: number): string {
+  if (missingCount === 0) return 'Every detail is saved. The overview runs each calculator from your profile.';
+  const onDefaults = missingCount === 1 ? '1 detail that still uses' : `${missingCount} details that still use`;
+  return `No questions left to ask. The overview runs each calculator from your profile and lists the ${onDefaults} a typical value.`;
 }
 
 function buildEntries(profile: FinancialProfile): ChooserEntry[] {
@@ -57,7 +58,7 @@ function buildEntries(profile: FinancialProfile): ChooserEntry[] {
         id: 'overview',
         href: '/overview',
         title: 'See your overview',
-        description: overviewDescription(profile),
+        description: overviewDescription(profileCompleteness(profile).missing.length),
         icon: LayoutDashboard,
         tone: 'emphasis',
       };

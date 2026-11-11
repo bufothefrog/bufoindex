@@ -1,5 +1,4 @@
 import type { MetadataRoute } from 'next';
-import { CALCULATOR_LIST, CALCULATOR_SUBPAGES } from '@/lib/calculators/registry';
 
 const BASE_URL = 'https://bufoindex.com';
 
@@ -12,7 +11,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     '/',
     '/tools',
-    ...CALCULATOR_LIST.flatMap((calculator) => [calculator.path, ...(CALCULATOR_SUBPAGES[calculator.id] ?? [])]),
+    '/tools/paycheck-allocator',
+    '/tools/retirement-calculator',
+    '/tools/retirement-calculator/methodology',
+    '/tools/portfolio-rebalancing-calculator',
+    '/tools/leverage-comparison',
   ];
 
   // `lastModified` is omitted rather than hardcoded: a frozen date goes stale

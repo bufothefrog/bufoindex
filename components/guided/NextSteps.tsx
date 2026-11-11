@@ -4,14 +4,13 @@ import React from 'react';
 import type { Route } from 'next';
 import { ClipboardList, Compass, LayoutDashboard, Signpost, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
-import { profileCompleteness } from '@/lib/calculators/forms';
 import {
   LEARN_CHOOSER_PATH,
-  intentRequiresCore,
-  intentStartLink,
+  coreStartLink,
   isProfileFinished,
   type IntakeIntent,
 } from '@/lib/constants/intake';
+import { profileCompleteness } from '@/lib/profile/mappers';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { OptionCard } from './OptionCard';
 
@@ -54,27 +53,23 @@ export function NextSteps({ intent, className }: NextStepsProps) {
             Answer once and the answers carry across every calculator.
           </p>
           <OptionCard
-            href={intentStartLink(intent) as Route}
+            href={coreStartLink(intent) as Route}
             tone="emphasis"
             icon={ClipboardList}
             title="Answer a few quick questions"
-            description={
-              intentRequiresCore(intent)
-                ? 'A few questions on age, state, filing status, pay, and must-pay costs. Saved only in this browser.'
-                : 'A few questions on your accounts, holdings, and target mix. Saved only in this browser.'
-            }
+            description="A few questions on age, state, filing status, pay, and must-pay costs. Saved only in this browser."
           />
         </div>
       </BaseCard>
     );
   }
 
-  // Offer the overview once nothing is left to finish: every profile topic
-  // answered, or no profile questions left (/start/profile would only
-  // redirect to the overview).
+  // Offer the overview once nothing is left to finish: every field answered,
+  // or no profile questions left (a few fields are not asked by any intake,
+  // so /start/profile would only redirect to the overview).
   const finished = isProfileFinished(profile);
   const { provided, total } = profileCompleteness(profile);
-  const finishDescription = `${provided} of ${total} topics answered. Answer the rest once; every calculator and your overview use it.`;
+  const finishDescription = `${provided} of ${total} details answered. Answer the rest once; every calculator and your overview use it.`;
 
   return (
     <BaseCard {...cardProps}>
