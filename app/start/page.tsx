@@ -1,10 +1,7 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { Wizard } from '@/components/guided/Wizard';
-import { isIntakeIntent } from '@/lib/constants/intake';
-
-interface CoreStartPageProps {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
+import { CoreStartWizard } from '@/components/guided/CoreStartWizard';
+import { WizardPlaceholder } from '@/components/guided/Wizard';
 
 export const metadata: Metadata = {
   title: 'A few basics',
@@ -15,18 +12,18 @@ export const metadata: Metadata = {
 };
 
 /**
- * The shared core intake. `?next=<intent>` continues to that intent's
- * remaining questions afterwards; without it (or with an unknown value) the
- * flow continues to the /start/choose chooser.
+ * The shared core intake, prerendered as a static page. `?next=<intent>`
+ * continues to that intent's remaining questions afterwards; without it (or
+ * with an unknown value) the flow continues to the /start/choose chooser.
+ * The query is read on the client inside the Suspense boundary, so the
+ * prerendered HTML is the header and the first screen's skeleton.
  */
-export default async function CoreStartPage({ searchParams }: CoreStartPageProps) {
-  const { next } = await searchParams;
-  const raw = Array.isArray(next) ? next[0] : next;
-  const nextIntent = raw && isIntakeIntent(raw) ? raw : undefined;
-
+export default function CoreStartPage() {
   return (
     <div className="mx-auto max-w-xl pt-2 md:pt-8">
-      <Wizard flow="core" next={nextIntent} />
+      <Suspense fallback={<WizardPlaceholder flow="core" />}>
+        <CoreStartWizard />
+      </Suspense>
     </div>
   );
 }

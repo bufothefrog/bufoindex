@@ -6,6 +6,7 @@ import sitemap from '@/app/sitemap';
 import { EmptyOverview } from '@/components/dashboard/EmptyOverview';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
+import { profileCompleteness } from '@/lib/calculators/forms';
 import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
 import { PROFILE_FIELDS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -86,7 +87,9 @@ describe('ContinueProfileCard', () => {
     expect(link).toHaveAttribute('href', '/start/choose');
     // Default core values, all marked as answered (take-home is not summarized).
     expect(link).toHaveTextContent(
-      `30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. ${CORE_PATHS.length} of ${PROFILE_FIELDS.length} details saved in this browser.`
+      `30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. 3 of ${
+        profileCompleteness(useProfileStore.getState().profile).total
+      } topics saved in this browser.`
     );
   });
 
@@ -94,7 +97,10 @@ describe('ContinueProfileCard', () => {
     useProfileStore.getState().setFields({}, ['investing.investedBalance']);
     render(<ContinueProfileCard />);
     const link = screen.getByRole('link', { name: /Continue with my profile/ });
-    expect(link).toHaveTextContent(`1 of ${PROFILE_FIELDS.length} details saved in this browser.`);
+    // Counted by topic: the invested-balance screen is fully answered.
+    const { provided, total } = profileCompleteness(useProfileStore.getState().profile);
+    expect(provided).toBe(1);
+    expect(link).toHaveTextContent(`1 of ${total} topics saved in this browser.`);
     expect(link).not.toHaveTextContent('must-pay');
   });
 });

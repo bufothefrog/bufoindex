@@ -3,8 +3,8 @@
 import React from 'react';
 import type { Route } from 'next';
 import { UserRound } from 'lucide-react';
+import { profileCompleteness } from '@/lib/calculators/forms';
 import { LEARN_CHOOSER_PATH, coreSummary } from '@/lib/constants/intake';
-import { profileCompleteness } from '@/lib/profile/mappers';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { OptionCard } from './OptionCard';
 
@@ -29,7 +29,7 @@ export function ContinueProfileCard({ className }: ContinueProfileCardProps) {
   if (!hasHydrated || !hasProfile) return null;
 
   const { provided, total } = profileCompleteness(profile);
-  const saved = `${provided} of ${total} details saved in this browser.`;
+  const saved = `${provided} of ${total} topics saved in this browser.`;
   const summary = coreSummary(profile);
 
   return (

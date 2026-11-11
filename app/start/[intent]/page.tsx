@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: StartPageProps): Promise<Meta
   const option = getLearnOption(intent);
   return {
     title: option.title,
-    description: `${option.description} Only the questions not answered yet, then ${
+    description: `${option.description} Only the questions not answered yet, a few related ones per screen, then ${
       intent === 'profile' ? 'your overview' : 'the calculator'
     } opens with your answers. Runs in your browser.`,
     // Intake screens are a step in a flow, not a landing page worth indexing.
@@ -30,10 +30,10 @@ export async function generateMetadata({ params }: StartPageProps): Promise<Meta
 }
 
 /**
- * One intent's remaining questions: the non-core questions the saved profile
- * does not answer yet. The wizard sends visitors without the basics to
- * /start?next=<intent> first, and goes straight to the result when nothing
- * is left to ask.
+ * One intent's remaining questions: the non-core topic screens the saved
+ * profile does not fully answer yet. The wizard sends visitors without the
+ * basics to /start?next=<intent> first (except portfolio, which reads none
+ * of them), and goes straight to the result when nothing is left to ask.
  */
 export default async function StartPage({ params }: StartPageProps) {
   const { intent } = await params;

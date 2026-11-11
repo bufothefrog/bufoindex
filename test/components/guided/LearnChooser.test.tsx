@@ -4,8 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LearnChooser } from '@/components/guided/LearnChooser';
 import { Wizard } from '@/components/guided/Wizard';
-import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
-import { PROFILE_FIELDS } from '@/lib/profile/defaults';
+import { CORE_PATHS, intakePaths, remainingIntakeScreens } from '@/lib/constants/intake';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 const push = vi.fn();
@@ -24,6 +23,13 @@ beforeEach(() => {
 
 function answer(paths: readonly string[]) {
   useProfileStore.getState().setFields({}, [...paths]);
+}
+
+/** The chooser's hint for an intent's remaining screens, from the saved profile. */
+function remainingText(intent: Parameters<typeof remainingIntakeScreens>[0]): string {
+  const count = remainingIntakeScreens(intent, useProfileStore.getState().profile).length;
+  if (count === 0) return 'Nothing more to ask; opens with your answers.';
+  return count === 1 ? '1 more screen.' : `${count} more screens.`;
 }
 
 function optionLinks() {
@@ -45,9 +51,12 @@ describe('LearnChooser', () => {
       '/start/leverage',
     ]);
     expect(links[0]).toHaveTextContent('Finish your profile');
-    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 11 more questions.');
+    expect(links[0]).toHaveTextContent(
+      `Answer the rest once; every calculator and your overview use it. ${remainingText('profile')}`
+    );
+    expect(links[0]).toHaveTextContent(/\d+ more screens\./);
     expect(links[2]).toHaveTextContent('See if I am on track to retire');
-    expect(links[2]).toHaveTextContent('3 more questions.');
+    expect(links[2]).toHaveTextContent(remainingText('retirement'));
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -60,39 +69,41 @@ describe('LearnChooser', () => {
   });
 
   it('counts what each calculator still needs from the saved answers', () => {
-    answer([...CORE_PATHS, ...intakePaths('retirement'), 'investing.newCashThisMonth']);
+    answer([...CORE_PATHS, ...intakePaths('retirement')]);
     render(<LearnChooser />);
 
     const links = optionLinks();
     expect(links[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
-    expect(links[3]).toHaveTextContent('1 more question.');
-    // Retirement covered the leverage horizon and balance; the taxable contribution is left.
-    expect(links[4]).toHaveTextContent('1 more question.');
+    expect(links[1]).toHaveTextContent(remainingText('paycheck'));
+    expect(links[3]).toHaveTextContent(remainingText('portfolio'));
+    expect(links[4]).toHaveTextContent(remainingText('leverage'));
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
-    // The intake never asks four profile fields, so profileCompleteness still
-    // lists them; /start/profile would only redirect, so link the overview.
-    answer(intakePaths('profile'));
+    // Skipped basics are not asked again by the profile intake, so
+    // /start/profile would only redirect; link the overview.
+    answer(intakePaths('profile').filter((path) => path !== 'spending.necessaryMonthly'));
+    // The basics were finished in this tab with the must-pay screen skipped.
+    sessionStorage.setItem('bufo-core-finished', '1');
     render(<LearnChooser />);
 
     const first = optionLinks()[0];
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
     expect(first).toHaveTextContent(
-      'No questions left to ask. The overview runs each calculator from your profile and lists the 4 details that still use a typical value.'
+      'No questions left to ask. The overview runs each calculator from your profile; skipped basics keep a typical value until you edit them.'
     );
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
   });
 
-  it('swaps option one for the overview when every profile detail is saved', () => {
-    answer(PROFILE_FIELDS.map((field) => field.path));
+  it('swaps option one for the overview when every profile topic is answered', () => {
+    answer(intakePaths('profile'));
     render(<LearnChooser />);
 
     const first = optionLinks()[0];
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
-    expect(first).toHaveTextContent('Every detail is saved. The overview runs each calculator from your profile.');
+    expect(first).toHaveTextContent('Every topic is answered. The overview runs each calculator from your profile.');
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
     expect(optionLinks()).toHaveLength(5);
   });

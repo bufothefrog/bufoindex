@@ -76,6 +76,8 @@ interface StateSelectorProps {
   required?: boolean;
   help?: string;
   error?: string;
+  /** 'xl' is the guided-intake size (56px control, larger text). */
+  size?: 'md' | 'xl';
 }
 
 export function StateSelector({ 
@@ -87,8 +89,11 @@ export function StateSelector({
   placeholder = "Select state...",
   required = false,
   help,
-  error
+  error,
+  size = 'md'
 }: StateSelectorProps) {
+  const helpId = help && !error ? `${name}-help` : undefined;
+  const errorId = error ? `${name}-error` : undefined;
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -231,7 +236,7 @@ export function StateSelector({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <label htmlFor={name} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+        <label htmlFor={name} className={cn(size === 'xl' ? "text-base" : "text-sm", "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70")}>
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
         </label>
@@ -260,7 +265,8 @@ export function StateSelector({
           onBlur={handleBlur}
           placeholder={placeholder}
           className={cn(
-            "w-full h-10 pl-10 pr-10 py-2 border border-input bg-background rounded-md text-sm",
+            "w-full pl-10 pr-10 py-2 border border-input bg-background rounded-md",
+            size === 'xl' ? "h-14 text-lg" : "h-10 text-sm",
             "focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-ring",
             "hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
             error && "border-destructive focus-visible:ring-destructive"
@@ -276,6 +282,7 @@ export function StateSelector({
               : undefined
           }
           aria-invalid={!!error}
+          aria-describedby={[helpId, errorId].filter(Boolean).join(' ') || undefined}
         />
         <ChevronDown className={cn(
           "absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform",
@@ -330,13 +337,13 @@ export function StateSelector({
       )}
       
       {help && !error && (
-        <p className="text-xs text-muted-foreground">
+        <p id={helpId} className="text-xs text-muted-foreground">
           {help}
         </p>
       )}
       
       {error && (
-        <p className="text-xs text-destructive" role="alert">
+        <p id={errorId} className="text-xs text-destructive" role="alert">
           {error}
         </p>
       )}
