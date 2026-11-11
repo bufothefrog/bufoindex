@@ -1,5 +1,11 @@
+import type { Route } from 'next';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { CALCULATORS } from '@/lib/calculators/registry';
+import type { CalculatorId } from '@/lib/calculators/types';
+
+/** The calculators this page links to. */
+const NOT_FOUND_CALCULATORS: readonly CalculatorId[] = ['paycheck', 'retirement', 'portfolio'];
 
 export default function NotFound() {
   return (
@@ -19,30 +25,16 @@ export default function NotFound() {
                   Home
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/tools/paycheck-allocator"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Paycheck Allocator
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/tools/retirement-calculator"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Retirement Calculator
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/tools/portfolio-rebalancing-calculator"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Portfolio Rebalancer
-                </Link>
-              </li>
+              {NOT_FOUND_CALCULATORS.map((id) => (
+                <li key={id}>
+                  <Link
+                    href={CALCULATORS[id].path as Route}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {CALCULATORS[id].shortTitle}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </nav>
         </CardContent>

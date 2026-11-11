@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     default: 'BufoIndex',
   },
   description:
-    'Interactive personal-finance calculators: paycheck allocation, Monte Carlo retirement modeling, and portfolio rebalancing. Client-side, shareable by URL.',
+    'Interactive personal-finance calculators: paycheck allocation, Monte Carlo retirement modeling, and portfolio rebalancing. Client-side.',
   openGraph: {
     siteName: 'BufoIndex',
     type: 'website',

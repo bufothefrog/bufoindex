@@ -6,11 +6,23 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+export type MaxWidth = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
+
+const MAX_WIDTH_CLASSES: Record<MaxWidth, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '7xl': 'max-w-7xl',
+  full: 'max-w-full'
+};
+
 export interface ResponsiveGridProps {
   children: React.ReactNode;
   hasResults?: boolean;
   className?: string;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
+  maxWidth?: MaxWidth;
   gap?: 'sm' | 'md' | 'lg' | 'xl';
   testId?: string;
 }
@@ -23,16 +35,6 @@ export function ResponsiveGrid({
   gap = 'md',
   testId
 }: ResponsiveGridProps) {
-  const maxWidthClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md', 
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '7xl': 'max-w-7xl',
-    full: 'max-w-full'
-  };
-  
   const gapClasses = {
     sm: 'gap-4',
     md: 'gap-6',
@@ -47,7 +49,7 @@ export function ResponsiveGrid({
     hasResults 
       ? "grid-cols-1 lg:grid-cols-2" // Results present: 2-column layout
       : "grid-cols-1 lg:grid-cols-3", // No results: 3-column with empty state
-    maxWidthClasses[maxWidth],
+    MAX_WIDTH_CLASSES[maxWidth],
     "mx-auto"
   );
   
@@ -70,17 +72,18 @@ export interface GridSectionProps {
   span?: 1 | 2 | 3;
 }
 
-export function InputSection({ children, className, span }: GridSectionProps) {
-  const spanClasses = {
-    1: 'lg:col-span-1',
-    2: 'lg:col-span-2', 
-    3: 'lg:col-span-3'
-  };
-  
+const SPAN_CLASSES: Record<NonNullable<GridSectionProps['span']>, string> = {
+  1: 'lg:col-span-1',
+  2: 'lg:col-span-2',
+  3: 'lg:col-span-3'
+};
+
+/** One column of the grid; InputSection and ResultSection are the same element. */
+function GridSection({ children, className, span }: GridSectionProps) {
   return (
     <div className={cn(
       "space-y-6",
-      span && spanClasses[span],
+      span && SPAN_CLASSES[span],
       className
     )}>
       {children}
@@ -88,23 +91,8 @@ export function InputSection({ children, className, span }: GridSectionProps) {
   );
 }
 
-export function ResultSection({ children, className, span }: GridSectionProps) {
-  const spanClasses = {
-    1: 'lg:col-span-1',
-    2: 'lg:col-span-2',
-    3: 'lg:col-span-3'
-  };
-  
-  return (
-    <div className={cn(
-      "space-y-6",
-      span && spanClasses[span],
-      className
-    )}>
-      {children}
-    </div>
-  );
-}
+export const InputSection = GridSection;
+export const ResultSection = GridSection;
 
 /**
  * Empty State Section
@@ -181,7 +169,7 @@ export function EmptyStateSection({
  */
 export interface ContainerProps {
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
+  maxWidth?: MaxWidth;
   padding?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
@@ -192,16 +180,6 @@ export function Container({
   padding = 'md',
   className
 }: ContainerProps) {
-  const maxWidthClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg', 
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '7xl': 'max-w-7xl',
-    full: 'max-w-full'
-  };
-  
   const paddingClasses = {
     sm: 'p-4',
     md: 'p-6',
@@ -211,7 +189,7 @@ export function Container({
   
   return (
     <div className={cn(
-      maxWidthClasses[maxWidth],
+      MAX_WIDTH_CLASSES[maxWidth],
       paddingClasses[padding],
       'mx-auto',
       className

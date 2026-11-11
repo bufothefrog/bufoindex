@@ -1,7 +1,8 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CalculatorLayout, SimpleCalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import userEvent from '@testing-library/user-event';
+import { CalculatorLayout, DisclaimerFooter, SimpleCalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 
 const baseProps = {
   title: 'Test calculator',
@@ -52,5 +53,109 @@ describe('CalculatorLayout resultFooter', () => {
       <SimpleCalculatorLayout {...baseProps} resultFooter={<div data-testid="footer">What next?</div>} />
     );
     expect(screen.queryByTestId('footer')).not.toBeInTheDocument();
+  });
+});
+
+describe('CalculatorLayout share UI', () => {
+  it('ignores the deprecated onShare: no Share button and no link copy', () => {
+    const onShare = vi.fn();
+    render(<CalculatorLayout {...baseProps} onShare={onShare} resultSection={<div>Results here</div>} />);
+    expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Shareable link' })).not.toBeInTheDocument();
+    expect(onShare).not.toHaveBeenCalled();
+  });
+});
+
+describe('CalculatorLayout with a Calculate button', () => {
+  it('keeps the Calculate card and the mobile Calculate action', () => {
+    render(<CalculatorLayout {...baseProps} calculateButtonText="Rebalance" />);
+    // The desktop card button and the mobile bar button (full and compact labels).
+    expect(screen.getAllByRole('button', { name: /Rebalance/ })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /See results/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the Calculate empty state', () => {
+    render(<CalculatorLayout {...baseProps} />);
+    expect(screen.getByRole('heading', { name: 'Ready to Calculate?' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Fill in your information and click Calculate to see your personalized results.')
+    ).toBeInTheDocument();
+  });
+
+  it('switches the mobile view to Results when a run settles', () => {
+    const { rerender } = render(
+      <CalculatorLayout {...baseProps} isCalculating resultSection={<div>Results here</div>} />
+    );
+    expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-selected', 'true');
+    rerender(<CalculatorLayout {...baseProps} isCalculating={false} resultSection={<div>Results here</div>} />);
+    expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+describe('CalculatorLayout liveResults', () => {
+  const liveProps = {
+    title: 'Live calculator',
+    description: 'Results follow the inputs.',
+    inputSections: <div>Inputs here</div>,
+    liveResults: true,
+  };
+
+  it('has no Calculate button; the mobile bar offers See results, then Edit inputs', async () => {
+    const user = userEvent.setup();
+    render(<CalculatorLayout {...liveProps} resultSection={<div>Results here</div>} />);
+    expect(screen.queryByRole('button', { name: /Calculate/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /See results/ }));
+    expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: /Edit inputs/ }));
+    expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('offers See results even before there are results', () => {
+    render(<CalculatorLayout {...liveProps} />);
+    expect(screen.getByRole('button', { name: /See results/ })).toBeInTheDocument();
+  });
+
+  it('shows the live empty state, and emptyStateConfig still overrides it field by field', () => {
+    const { rerender } = render(<CalculatorLayout {...liveProps} />);
+    expect(screen.getByRole('heading', { name: 'No results yet' })).toBeInTheDocument();
+    expect(screen.getByText('Results appear here as soon as every field holds a valid value.')).toBeInTheDocument();
+
+    rerender(<CalculatorLayout {...liveProps} emptyStateConfig={{ title: 'Nothing to show' }} />);
+    expect(screen.getByRole('heading', { name: 'Nothing to show' })).toBeInTheDocument();
+    expect(screen.getByText('Results appear here as soon as every field holds a valid value.')).toBeInTheDocument();
+  });
+
+  it('stays on Inputs when a run settles, and switches on showResultsKey', () => {
+    const results = <div>Results here</div>;
+    const { rerender } = render(<CalculatorLayout {...liveProps} isCalculating resultSection={results} />);
+    rerender(<CalculatorLayout {...liveProps} isCalculating={false} resultSection={results} />);
+    expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-selected', 'true');
+
+    rerender(<CalculatorLayout {...liveProps} resultSection={results} showResultsKey="profile" />);
+    expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('names the results panel as a region, the one the Results tab controls', () => {
+    render(
+      <CalculatorLayout {...liveProps} resultsLabel="Fake results" resultSection={<div>Results here</div>} />
+    );
+    const region = screen.getByRole('region', { name: 'Fake results' });
+    expect(region).toHaveTextContent('Results here');
+    expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-controls', region.id);
+  });
+
+  it('counts the fields that need attention in the mobile bar', () => {
+    render(<CalculatorLayout {...liveProps} errors={{ 'person.age': 'Age must be at least 18.' }} />);
+    expect(screen.getByText('1 field needs attention before the results update.')).toBeInTheDocument();
+  });
+});
+
+describe('DisclaimerFooter', () => {
+  it('renders the shared disclaimer line', () => {
+    render(<DisclaimerFooter text="Not advice." />);
+    expect(screen.getByText('Not advice.')).toBeInTheDocument();
+    expect(screen.getByText('Disclaimer:')).toBeInTheDocument();
   });
 });
