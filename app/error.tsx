@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
@@ -8,7 +9,13 @@ export type ErrorPageProps = {
   reset: () => void;
 };
 
-export default function ErrorPage({ reset }: ErrorPageProps) {
+export default function ErrorPage({ error, reset }: ErrorPageProps) {
+  // Keep render failures diagnosable in production: next.config.js keeps
+  // console.error through removeConsole for exactly this purpose.
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
   return (
     <div className="mx-auto max-w-lg py-16">
       <Card>

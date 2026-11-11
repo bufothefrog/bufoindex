@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   getDefaultFinancialProfile,
   leverageLink,
+  PROFILE_HANDOFF_PARAM,
+  PROFILE_HANDOFF_VALUE,
   paycheckLink,
   portfolioLink,
   retirementLink,
@@ -28,11 +30,11 @@ function customProfile(): FinancialProfile {
   return {
     ...p,
     updatedAt: 1760000000000,
-    person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
-    income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
+    person: { ...p.person, age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
+    income: { ...p.income, grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
     spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
     cash: { emergencyFundBalance: 12000, emergencyFundApy: 0.045, targetMonths: 1 },
-    workplace: { has401k: true, matchPercent: 1, matchLimit: 0.04, contributionPercent: 0.1 },
+    workplace: { ...p.workplace, has401k: true, matchPercent: 1, matchLimit: 0.04, contributionPercent: 0.1 },
     investing: {
       investedBalance: 140000,
       monthlyContribution: 2200,
@@ -40,9 +42,19 @@ function customProfile(): FinancialProfile {
       targetMix: '60-40',
       newCashThisMonth: 3000,
     },
+    portfolio: {
+      ...p.portfolio,
+      accounts: p.portfolio.accounts.map((a) => (a.id === 'acc-brok' ? { ...a, deposit: 3000 } : a)),
+    },
     strategy: { preset: 'standard', leverageRatio: 1.5 },
     provided: ['person.age'],
   };
+}
+
+function queryOf(link: string): URLSearchParams {
+  const start = link.indexOf('?');
+  const end = link.indexOf('#');
+  return new URLSearchParams(link.slice(start + 1, end < 0 ? undefined : end));
 }
 
 function hashOf(link: string): string {
@@ -54,7 +66,7 @@ function hashOf(link: string): string {
 describe('retirementLink', () => {
   it('targets the retirement calculator with a URL-safe hash', () => {
     const link = retirementLink(getDefaultFinancialProfile());
-    expect(link.startsWith('/tools/retirement-calculator#')).toBe(true);
+    expect(link.startsWith('/tools/retirement-calculator?from=profile#')).toBe(true);
     expect(hashOf(link)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -85,7 +97,7 @@ describe('paycheckLink', () => {
 
   it('targets the paycheck allocator with a URL-safe hash', () => {
     const link = paycheckLink(getDefaultFinancialProfile());
-    expect(link.startsWith('/tools/paycheck-allocator#')).toBe(true);
+    expect(link.startsWith('/tools/paycheck-allocator?from=profile#')).toBe(true);
     expect(hashOf(link)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -171,7 +183,7 @@ describe('paycheckLink', () => {
 describe('portfolioLink', () => {
   it('targets the rebalancer with a URL-safe hash', () => {
     const link = portfolioLink(getDefaultFinancialProfile());
-    expect(link.startsWith('/tools/portfolio-rebalancing-calculator#')).toBe(true);
+    expect(link.startsWith('/tools/portfolio-rebalancing-calculator?from=profile#')).toBe(true);
     expect(hashOf(link)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
@@ -202,15 +214,15 @@ describe('portfolioLink', () => {
 describe('leverageLink', () => {
   it('uses the taxable contribution, years to retirement, balance and ratio', () => {
     expect(leverageLink(getDefaultFinancialProfile())).toBe(
-      '/tools/leverage-comparison?c=500&y=30&b=25000&l=2'
+      '/tools/leverage-comparison?c=500&y=30&b=25000&l=2&from=profile'
     );
-    expect(leverageLink(customProfile())).toBe('/tools/leverage-comparison?c=900&y=20&b=140000&l=1.5');
+    expect(leverageLink(customProfile())).toBe('/tools/leverage-comparison?c=900&y=20&b=140000&l=1.5&from=profile');
   });
 
   it('falls back to the total monthly contribution when there is no taxable contribution', () => {
     const base = getDefaultFinancialProfile();
     const profile = { ...base, investing: { ...base.investing, taxableMonthlyContribution: 0 } };
-    expect(leverageLink(profile)).toBe('/tools/leverage-comparison?c=1500&y=30&b=25000&l=2');
+    expect(leverageLink(profile)).toBe('/tools/leverage-comparison?c=1500&y=30&b=25000&l=2&from=profile');
   });
 
   it('clamps years to 1..60', () => {
@@ -229,6 +241,30 @@ describe('leverageLink', () => {
       investing: { ...base.investing, taxableMonthlyContribution: Number.NaN, monthlyContribution: Number.NaN, investedBalance: Number.NaN },
       strategy: { ...base.strategy, leverageRatio: Number.NaN },
     };
-    expect(leverageLink(broken)).toBe('/tools/leverage-comparison?c=0&y=1&b=0&l=2');
+    expect(leverageLink(broken)).toBe('/tools/leverage-comparison?c=0&y=1&b=0&l=2&from=profile');
+  });
+});
+
+describe('profile hand-off marker', () => {
+  it('exports the from=profile marker', () => {
+    expect(PROFILE_HANDOFF_PARAM).toBe('from');
+    expect(PROFILE_HANDOFF_VALUE).toBe('profile');
+  });
+
+  it.each([
+    ['retirement', retirementLink],
+    ['paycheck', paycheckLink],
+    ['portfolio', portfolioLink],
+    ['leverage', leverageLink],
+  ] as const)('the %s link carries from=profile in its query', (_name, build) => {
+    for (const profile of [getDefaultFinancialProfile(), customProfile()]) {
+      expect(queryOf(build(profile)).get(PROFILE_HANDOFF_PARAM)).toBe(PROFILE_HANDOFF_VALUE);
+    }
+  });
+
+  it('the leverage link uses the leverage overrides when set', () => {
+    const base = getDefaultFinancialProfile();
+    const profile = { ...base, leverage: { monthlyContribution: 250, years: 15, startingBalance: 0 } };
+    expect(leverageLink(profile)).toBe('/tools/leverage-comparison?c=250&y=15&b=0&l=2&from=profile');
   });
 });

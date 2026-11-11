@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { STATE_TAX_RATES } from '../constants/states-2026'
 import { FREQUENCY_MULTIPLIERS } from '../constants/frequency'
+import { formatCurrency as formatCurrencyCached, formatPercent as formatPercentCached } from '../format'
 import {
   SS_WAGE_BASE_2026,
   FICA_RATE,
@@ -19,26 +20,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format currency for display
+ * Format currency for display (delegates to the cached lib/format formatter)
  */
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return formatCurrencyCached(amount)
 }
 
 /**
- * Format percentage for display
+ * Format percentage for display (delegates to the cached lib/format formatter)
  */
 export function formatPercent(decimal: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'percent',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  }).format(decimal)
+  return formatPercentCached(decimal)
 }
 
 /**

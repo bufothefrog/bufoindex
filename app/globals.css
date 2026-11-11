@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Planning docs and tests quote class names (including the "wrong" examples in
+   the style guide); keep Tailwind from generating CSS for them. */
+@source not "../docs";
+@source not "../test";
+
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
@@ -40,6 +45,10 @@
   --color-sage-800: #334729;
   --color-sage-900: #2d3d24;
 
+  /* Monospace stack for figures and chart ticks (read by lib/chart-theme.ts).
+     System fonts only: nothing extra to download. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -48,6 +57,9 @@
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  /* `text-primary` reads its own token so dark mode can use a lighter sage for
+     text while `bg-primary` keeps the brand fill under white text. */
+  --text-color-primary: hsl(var(--primary-text));
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
@@ -113,10 +125,11 @@
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 106 29% 32%; /* sage-600 #4a6d3c */
     --primary-foreground: 210 40% 98%;
+    --primary-text: 106 29% 32%; /* same as --primary: 6.28:1 on white, 5.72:1 on muted */
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215.4 16.3% 43%; /* 5.47:1 on white, 4.98:1 on muted (46.9% was 4.33:1) */
     --accent: 106 29% 32%; /* sage-600 accent */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84.2% 60.2%;
@@ -143,6 +156,9 @@
     --popover-foreground: 0 0% 98%;
     --primary: 106 29% 32%; /* sage-600 #4a6d3c */
     --primary-foreground: 0 0% 98%;
+    /* Lighter sage for text: 7.05:1 on background, 6.72:1 on card, 5.79:1 on
+       muted. sage-600 text on these surfaces was 2.4 to 2.9:1. */
+    --primary-text: 106 29% 55%;
     --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 15%;
