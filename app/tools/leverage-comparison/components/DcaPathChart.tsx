@@ -1,26 +1,22 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { Area, CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis } from 'recharts';
 import {
-  Area,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
+  CHART_MARGINS,
+  CHART_SERIES_DEFAULTS,
+  ChartTooltipCard,
+  chartAxisProps,
+  chartGridProps,
+  thinPoints,
+  useChartTheme,
+} from '@/components/ui/charts';
 import type { MedianPathPoint } from '@/lib/calculations/leverageComparison';
-import { formatCurrency } from '@/lib/utils';
-import { formatCompactCurrency, formatLeverage } from './format';
+import { formatCurrency, formatMultiple } from '@/lib/format';
 
 export interface DcaPathChartProps {
-  points: MedianPathPoint[];
+  points: readonly MedianPathPoint[];
   leverageRatio: number;
-  paths: number;
 }
 
 interface ChartRow {
@@ -31,18 +27,10 @@ interface ChartRow {
   leveragedMedian: number;
 }
 
-/** Keep the chart light on phones: at most ~120 plotted points. */
-const MAX_POINTS = 120;
+/** Keep the chart light on phones: about 120 steps plus the last point. */
+const MAX_POINTS = 121;
 
-function toRows(points: MedianPathPoint[]): ChartRow[] {
-  if (points.length === 0) return [];
-  const lastIndex = points.length - 1;
-  const step = Math.max(1, Math.ceil(lastIndex / MAX_POINTS));
-  const rows: ChartRow[] = [];
-  for (let i = 0; i <= lastIndex; i += step) rows.push(toRow(points[i]));
-  if (lastIndex % step !== 0) rows.push(toRow(points[lastIndex]));
-  return rows;
-}
+const COMPACT = { compact: true } as const;
 
 function toRow(p: MedianPathPoint): ChartRow {
   return {
@@ -62,134 +50,113 @@ function yearTicks(maxYears: number): number[] {
   return ticks;
 }
 
-interface ChartTooltipProps {
+function band([low, high]: [number, number]): string {
+  return `${formatCurrency(low, COMPACT)} to ${formatCurrency(high, COMPACT)}`;
+}
+
+interface PathTooltipProps {
   active?: boolean;
-  payload?: Array<{ payload: ChartRow }>;
+  payload?: ReadonlyArray<{ payload: ChartRow }>;
   leverageLabel: string;
   indexColor: string;
   leveragedColor: string;
 }
 
-function ChartTooltip({ active, payload, leverageLabel, indexColor, leveragedColor }: ChartTooltipProps) {
+function PathTooltip({ active, payload, leverageLabel, indexColor, leveragedColor }: PathTooltipProps) {
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   const month = Math.round(row.years * 12);
-  const label = month % 12 === 0 ? `Year ${month / 12}` : `Year ${Math.floor(month / 12)}, month ${month % 12}`;
+  const title = month % 12 === 0 ? `Year ${month / 12}` : `Year ${Math.floor(month / 12)}, month ${month % 12}`;
   return (
-    <div className="rounded-lg border border-border bg-background p-3 text-xs text-foreground shadow-lg">
-      <p className="mb-2 font-mono text-sm">{label}</p>
-      <p className="tabular-nums">
-        <span style={{ color: indexColor }}>Index fund median:</span> {formatCurrency(row.indexMedian)}
-      </p>
-      <p className="mb-1 text-muted-foreground tabular-nums">
-        10th to 90th: {formatCompactCurrency(row.indexBand[0])} to {formatCompactCurrency(row.indexBand[1])}
-      </p>
-      <p className="tabular-nums">
-        <span style={{ color: leveragedColor }}>{leverageLabel} fund median:</span>{' '}
-        {formatCurrency(row.leveragedMedian)}
-      </p>
-      <p className="text-muted-foreground tabular-nums">
-        10th to 90th: {formatCompactCurrency(row.leveragedBand[0])} to{' '}
-        {formatCompactCurrency(row.leveragedBand[1])}
-      </p>
-    </div>
+    <ChartTooltipCard
+      title={title}
+      rows={[
+        { label: 'Index fund median', value: formatCurrency(row.indexMedian), color: indexColor },
+        { label: '10th to 90th', value: band(row.indexBand), muted: true },
+        { label: `${leverageLabel} fund median`, value: formatCurrency(row.leveragedMedian), color: leveragedColor },
+        { label: '10th to 90th', value: band(row.leveragedBand), muted: true },
+      ]}
+    />
   );
 }
 
-export function DcaPathChart({ points, leverageRatio, paths }: DcaPathChartProps) {
-  const [theme, setTheme] = useState(() => getChartTheme());
-
-  useEffect(() => subscribeToThemeChanges(() => setTheme(getChartTheme())), []);
-
-  const rows = useMemo(() => toRows(points), [points]);
+/**
+ * Median balance paths with 10th to 90th percentile bands for the index fund
+ * and the leveraged fund. Rendered inside a ChartFrame, which sizes it.
+ */
+function DcaPathChart({ points, leverageRatio }: DcaPathChartProps) {
+  const theme = useChartTheme();
+  const rows = useMemo(() => thinPoints(points, MAX_POINTS).map(toRow), [points]);
   const maxYears = rows.length > 0 ? rows[rows.length - 1].years : 1;
   const ticks = useMemo(() => yearTicks(maxYears), [maxYears]);
-  const leverageLabel = formatLeverage(leverageRatio);
+  const leverageLabel = formatMultiple(leverageRatio);
 
   const indexColor = theme.primary;
   const leveragedColor = theme.warning;
+  const axis = chartAxisProps(theme);
 
   return (
-    <figure className="space-y-2">
-      <div className="h-72 md:h-96">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} opacity={0.4} />
-            <XAxis
-              dataKey="years"
-              type="number"
-              domain={[0, ticks[ticks.length - 1] ?? maxYears]}
-              ticks={ticks}
-              tickFormatter={(value: number) => `${value}y`}
-              stroke={theme.muted}
-              tick={{ fill: theme.muted, fontSize: 12 }}
-            />
-            <YAxis
-              width={56}
-              tickFormatter={(value: number) => formatCompactCurrency(value)}
-              stroke={theme.muted}
-              tick={{ fill: theme.muted, fontSize: 12 }}
-            />
-            <Tooltip
-              content={
-                <ChartTooltip
-                  leverageLabel={leverageLabel}
-                  indexColor={indexColor}
-                  leveragedColor={leveragedColor}
-                />
-              }
-            />
-            <Legend
-              verticalAlign="bottom"
-              iconType="plainline"
-              wrapperStyle={{ fontSize: 12, color: theme.text, paddingTop: 8 }}
-            />
-            <Area
-              dataKey="leveragedBand"
-              stroke="none"
-              fill={leveragedColor}
-              fillOpacity={0.2}
-              legendType="none"
-              isAnimationActive={false}
-              activeDot={false}
-              name={`${leverageLabel} fund 10th to 90th`}
-            />
-            <Area
-              dataKey="indexBand"
-              stroke="none"
-              fill={indexColor}
-              fillOpacity={0.2}
-              legendType="none"
-              isAnimationActive={false}
-              activeDot={false}
-              name="Index fund 10th to 90th"
-            />
-            <Line
-              dataKey="indexMedian"
-              stroke={indexColor}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-              name="Index fund (median)"
-            />
-            <Line
-              dataKey="leveragedMedian"
-              stroke={leveragedColor}
-              strokeWidth={2.5}
-              strokeDasharray="6 3"
-              dot={false}
-              isAnimationActive={false}
-              name={`${leverageLabel} fund (median)`}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-      <figcaption className="text-xs text-muted-foreground">
-        Lines are the median balance across {paths} simulated paths; shaded bands span the 10th to
-        90th percentile. Both funds receive the same contributions on the same dates.
-      </figcaption>
-    </figure>
+    <ComposedChart data={rows} margin={CHART_MARGINS.compact}>
+      <CartesianGrid {...chartGridProps(theme)} />
+      <XAxis
+        {...axis}
+        dataKey="years"
+        type="number"
+        domain={[0, ticks[ticks.length - 1] ?? maxYears]}
+        ticks={ticks}
+        tickFormatter={(value: number) => `${value}y`}
+      />
+      <YAxis {...axis} width={56} tickFormatter={(value: number) => formatCurrency(value, COMPACT)} />
+      <Tooltip
+        content={
+          <PathTooltip leverageLabel={leverageLabel} indexColor={indexColor} leveragedColor={leveragedColor} />
+        }
+      />
+      <Legend
+        verticalAlign="bottom"
+        iconType="plainline"
+        wrapperStyle={{ fontSize: 12, color: theme.text, paddingTop: 8 }}
+      />
+      <Area
+        {...CHART_SERIES_DEFAULTS}
+        dataKey="leveragedBand"
+        stroke="none"
+        fill={leveragedColor}
+        fillOpacity={0.2}
+        legendType="none"
+        activeDot={false}
+        name={`${leverageLabel} fund 10th to 90th`}
+      />
+      <Area
+        {...CHART_SERIES_DEFAULTS}
+        dataKey="indexBand"
+        stroke="none"
+        fill={indexColor}
+        fillOpacity={0.2}
+        legendType="none"
+        activeDot={false}
+        name="Index fund 10th to 90th"
+      />
+      <Line
+        {...CHART_SERIES_DEFAULTS}
+        dataKey="indexMedian"
+        stroke={indexColor}
+        strokeWidth={2}
+        dot={false}
+        name="Index fund (median)"
+      />
+      <Line
+        {...CHART_SERIES_DEFAULTS}
+        dataKey="leveragedMedian"
+        stroke={leveragedColor}
+        strokeWidth={2.5}
+        strokeDasharray="6 3"
+        dot={false}
+        name={`${leverageLabel} fund (median)`}
+      />
+    </ComposedChart>
   );
 }
 
-export default DcaPathChart;
+/** Memoized: the chart re-renders only when its points or the ratio change (audit H3). */
+export default React.memo(DcaPathChart);

@@ -202,7 +202,7 @@ describe('intake screens', () => {
 
   it('counts each intent from its form', () => {
     for (const intent of CALCULATOR_INTENTS) {
-      expect(screenIds(intent)).toEqual(FORMS[intent].screens.map((s) => s.id));
+      expect(screenIds(intent)).toEqual(FORMS[intent].screens.filter((s) => s.surface !== 'calculator').map((s) => s.id));
     }
     expect(screenIds('profile')).toEqual(PROFILE_FORM.screens.map((s) => s.id));
     expect(screenIds('core')).toEqual(formForFlow('core').screens.map((s) => s.id));
@@ -534,7 +534,7 @@ describe('isProfileFinished', () => {
     const asked = intakePaths('profile');
     const neverAsked = PROFILE_FIELDS.map((field) => field.path).filter((path) => !asked.includes(path));
     // The derived emergency-month target is never asked; with the provisional
-    // forms neither are the contribution rate and the ratio.
+    // forms neither is the contribution rate.
     expect(neverAsked).toContain('cash.targetMonths');
     expect(isProfileFinished(profileWith(asked))).toBe(true);
     expect(isProfileFinished(profileWith(asked.filter((path) => path !== asked[asked.length - 1])))).toBe(false);

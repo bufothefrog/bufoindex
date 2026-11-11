@@ -66,12 +66,13 @@ describe('LearnChooser', () => {
     const links = optionLinks();
     expect(links[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
     expect(links[3]).toHaveTextContent('1 more question.');
-    // Retirement covered the leverage horizon and balance; the taxable contribution is left.
-    expect(links[4]).toHaveTextContent('1 more question.');
+    // Retirement covered the leverage horizon and balance; the taxable contribution and the
+    // ratio are left, then the market assumptions.
+    expect(links[4]).toHaveTextContent('2 more questions.');
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
-    // The intake never asks three profile fields, so profileCompleteness still
+    // The intake never asks two profile fields, so profileCompleteness still
     // lists them; /start/profile would only redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
@@ -80,7 +81,7 @@ describe('LearnChooser', () => {
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
     expect(first).toHaveTextContent(
-      'No questions left to ask. The overview runs each calculator from your profile and lists the 3 details that still use a typical value.'
+      'No questions left to ask. The overview runs each calculator from your profile and lists the 2 details that still use a typical value.'
     );
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
   });

@@ -124,8 +124,8 @@ describe('ProfileCompletenessCard (overview)', () => {
 
   it('edits the basics once no profile question is left, instead of bouncing back to the overview', () => {
     const { unmount } = render(<ProfileCompletenessCard profile={withProvided(intakePaths('profile'))} />);
-    // Three fields are never asked by the intake, so they stay listed.
-    expect(screen.getByText('22 of 25')).toBeInTheDocument();
+    // Two fields are never asked by the intake, so they stay listed.
+    expect(screen.getByText('23 of 25')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Edit the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: /Fill in the rest/ })).not.toBeInTheDocument();
     unmount();

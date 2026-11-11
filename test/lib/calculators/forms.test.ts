@@ -113,8 +113,12 @@ describe('PROFILE_FORM', () => {
     }
     const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - PROFILE_EXTRA_SCREENS.length);
     expect(middle.map((screen) => [screen.id, screen.fields])).toEqual(expected);
-    // Some calculator screen is covered by earlier ones (leverage's horizon and balance, with the provisional forms).
-    expect(expected.length).toBeLessThan(PROFILE_PARTS.flatMap(({ form }) => profileEligible(form)).length);
+    // Leverage's facts screen keeps only what no earlier screen asks (the age, the retirement age and the
+    // invested balance were asked before it).
+    expect(PROFILE_FORM.screens.find((screen) => screen.id === 'facts')?.fields).toEqual([
+      'investing.taxableMonthlyContribution',
+      'strategy.leverageRatio',
+    ]);
   });
 
   it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {

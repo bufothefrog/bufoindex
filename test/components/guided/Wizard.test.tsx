@@ -8,7 +8,6 @@ import { PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculato
 import { CORE_PATHS, intakePaths, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
 import type { FormSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { leverageLink } from '@/lib/profile/links';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -178,7 +177,7 @@ describe('Wizard, remaining questions of an intent', () => {
     const user = userEvent.setup();
     answer([...CORE_PATHS, ...intakePaths('retirement'), ...intakePaths('paycheck'), ...intakePaths('portfolio')]);
     // What is left: the screens of the sections after those three (the
-    // taxable contribution, then the two cash screens, with the provisional forms).
+    // leverage facts screen, then the two cash screens, with the provisional paycheck form).
     const left = remainingIntakeScreens('profile', useProfileStore.getState().profile);
     const cashAt = left.findIndex((s) => profileFormSection(s.id) === 'cash');
     expect(cashAt).toBeGreaterThan(0);
@@ -529,7 +528,7 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(profile.cash.targetMonths).toBe(7);
     expect(profile.provided).toEqual(['person.age', 'person.retirementAge']);
     expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith(leverageLink(profile));
+    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?from=profile');
   });
 });
 

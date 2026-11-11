@@ -16,12 +16,12 @@
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
 import {
   dcaEffectSentence,
-  LeverageResults,
   lumpSumScaleSentence,
   relativeGapNoisePoints,
-} from '@/app/tools/leverage-comparison/components/LeverageResults';
+} from '@/lib/calculators/leverage/narrative';
 import {
   DEFAULT_DCA_COMPARISON_INPUTS,
   simulateDcaComparison,
