@@ -14,7 +14,7 @@
 
 import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { fromEngineInputs, stableKey } from '@/lib/fields/binding';
-import { isRecord } from '@/lib/fields/paths';
+import { getAt, isRecord } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
 import { providedPathFor } from '@/lib/profile/defaults';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
@@ -70,18 +70,53 @@ function readEngine<E>(legacy: LegacyStorage<E>, payload: unknown): E | null {
 }
 
 /**
- * Both old stores persisted the visitor's dollar display mode next to their
- * inputs (`state.displayMode`). A saved future-dollars choice ('nominal')
- * becomes the shared preference (O15) while that preference is still at its
- * default; a future-dollars preference already set stays. The preference
- * store writes its key as soon as it hydrates, so the key's presence does
- * not tell whether a mode was ever chosen; the old key, read here once, is
- * the older record.
+ * The old keys whose envelope kept the dollar display mode
+ * (`state.displayMode`): the retirement and paycheck stores' storageKey
+ * (test/lib/store/legacyImport.test.ts pins the two in step).
  */
-function importDisplayMode(payload: unknown): void {
-  if (!isRecord(payload) || !isRecord(payload.state) || payload.state.displayMode !== 'nominal') return;
+export const LEGACY_DISPLAY_MODE_KEYS: readonly string[] = ['retirement-calculator', 'paycheck-allocator-storage'];
+
+/** The parsed JSON under `key`; null when it is missing or not JSON. */
+function readJson(storage: Storage, key: string): unknown {
+  const raw = storage.getItem(key);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** The old envelope's state record, when `payload` holds one with a display mode. */
+function stateWithMode(payload: unknown): Record<string, unknown> | null {
+  return isRecord(payload) && isRecord(payload.state) && 'displayMode' in payload.state ? payload.state : null;
+}
+
+/**
+ * Both old stores persisted the visitor's dollar display mode next to their
+ * inputs. The first import that meets one settles the shared preference
+ * (O15) once, from every old key still present: a saved future-dollars
+ * choice ('nominal') in any of them becomes the preference while it is
+ * still at its default. The mode is then removed from the other keys still
+ * waiting for their own calculator, so a later import of those inputs
+ * cannot undo a choice the visitor made in between. The preference store
+ * writes its key as soon as it hydrates, so the key's presence does not
+ * tell whether a mode was ever chosen; the old keys are the older record.
+ */
+function importDisplayMode(storage: Storage, ownKey: string, ownPayload: unknown): void {
+  const others = LEGACY_DISPLAY_MODE_KEYS.filter((key) => key !== ownKey).map((key) => ({ key, payload: readJson(storage, key) }));
+  const states = [ownPayload, ...others.map((other) => other.payload)].map(stateWithMode);
+  if (states.every((state) => state === null)) return;
   const preferences = usePreferencesStore.getState();
-  if (preferences.displayMode === DEFAULT_DOLLAR_DISPLAY_MODE) preferences.setDisplayMode('nominal');
+  if (states.some((state) => state?.displayMode === 'nominal') && preferences.displayMode === DEFAULT_DOLLAR_DISPLAY_MODE) {
+    preferences.setDisplayMode('nominal');
+  }
+  others.forEach(({ key, payload }, i) => {
+    const state = states[i + 1];
+    if (state === null) return;
+    delete state.displayMode;
+    storage.setItem(key, JSON.stringify(payload));
+  });
 }
 
 /**
@@ -90,12 +125,13 @@ function importDisplayMode(payload: unknown): void {
  * The writes are taken per group of coupled paths (writeGroups). A group is
  * imported only when its writes differ from what the same bindings write
  * for def.legacy.storageDefaults() (an untouched old default says nothing
- * about the visitor), and only when none of its paths is already marked
- * provided (an answer given since always wins). A group is kept or skipped
- * as a whole, so coupled paths (an amount and its unit) never split.
+ * about the visitor). A path already marked provided is never written (an
+ * answer given since always wins); its group's other paths are imported
+ * only when every such provided path already holds the value the group
+ * would write, so coupled paths (an amount and its unit) never split.
  * Written values are marked provided; setValues refuses any that are not
  * valid profile values. A saved future-dollars display mode is carried into
- * the shared preference (importDisplayMode). The key is removed even when
+ * the shared preference once, from every old key (importDisplayMode). The key is removed even when
  * its payload is corrupt or foreign, since nothing else will ever read it.
  *
  * Idempotent: once the key is gone a call does nothing, and a repeat import
@@ -111,29 +147,30 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
 
   try {
     const storage = window.localStorage;
-    const raw = storage.getItem(legacy.storageKey);
-    if (raw === null) return [];
+    if (storage.getItem(legacy.storageKey) === null) return [];
 
-    let payload: unknown = null;
-    try {
-      payload = JSON.parse(raw) as unknown;
-    } catch {
-      payload = null;
-    }
+    const payload = readJson(storage, legacy.storageKey);
     const engine = payload === null ? null : readEngine(legacy, payload);
     const writes: Write[] = [];
     if (engine !== null) {
-      const provided = new Set(profileStore.profile.provided);
+      const { profile } = profileStore;
+      const provided = new Set(profile.provided);
       for (const [group, defaults] of writeGroups(def, engine, legacy.storageDefaults())) {
         if (group.length === 0 || groupKey(group) === groupKey(defaults)) continue;
         const providedPaths = group.map((write) => providedPathFor(write.path));
-        if (providedPaths.some((path) => path !== null && provided.has(path))) continue;
+        const answered = providedPaths.map((path) => path !== null && provided.has(path));
+        // An answer given since wins, and the group stays whole: its other
+        // paths come along only when every answered path already holds what
+        // the group would write (e.g. the same pay and frequency imported
+        // from the other old calculator).
+        const agrees = group.every((write, j) => !answered[j] || stableKey(getAt(profile, write.path)) === stableKey(write.value));
+        if (!agrees) continue;
         group.forEach((write, j) => {
-          if (providedPaths[j] !== null) writes.push(write);
+          if (providedPaths[j] !== null && !answered[j]) writes.push(write);
         });
       }
     }
-    importDisplayMode(payload);
+    importDisplayMode(storage, legacy.storageKey, payload);
     if (writes.length > 0) profileStore.setValues(writes);
     storage.removeItem(legacy.storageKey);
     return [...new Set(writes.map((write) => write.path))];

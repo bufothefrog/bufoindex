@@ -8,6 +8,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_LEGACY, readPaycheckStorage } from '@/lib/calculators/paycheck/legacy';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
@@ -384,5 +386,73 @@ describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR): the dollar display
     store(withMode('sideways'));
     importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
     expect(usePreferencesStore.getState().displayMode).toBe('today');
+  });
+});
+
+describe('importLegacyCalculatorStorage: the retirement key imported first', () => {
+  const RETIREMENT_KEY = RETIREMENT_LEGACY.storageKey;
+  const storeRetirement = (inputs: Record<string, unknown>, displayMode: unknown = 'today') =>
+    localStorage.setItem(
+      RETIREMENT_KEY,
+      JSON.stringify({ state: { inputs: { ...RETIREMENT_LEGACY.storageDefaults(), ...inputs }, displayMode }, version: 3 })
+    );
+  const storePaycheck = (edit: (profile: PaycheckProfile) => void, displayMode: unknown = 'today') =>
+    store({ ...envelope(oldProfile(edit)), state: { ...envelope(oldProfile(edit)).state, displayMode } });
+
+  beforeEach(() => {
+    usePreferencesStore.setState({ displayMode: 'today' });
+  });
+
+  it('still imports the saved take-home pay when the pay and frequency already came from the retirement key', () => {
+    storeRetirement({ incomeAmount: 4200, incomePeriod: 'semimonthly' });
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR).sort()).toEqual(['income.frequency', 'income.grossPerPaycheck']);
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual(['income.netPerPaycheck']);
+    const { profile } = useProfileStore.getState();
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 4200, netPerPaycheck: 3050, frequency: 'semi-monthly' });
+    expect(profile.provided).toContain('income.netPerPaycheck');
+  });
+
+  it('keeps the whole pay group out when the retirement key set a different pay', () => {
+    storeRetirement({ incomeAmount: 5000, incomePeriod: 'monthly' });
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
+    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 5000, frequency: 'monthly' });
+    expect(useProfileStore.getState().profile.provided).not.toContain('income.netPerPaycheck');
+  });
+
+  it("settles the display mode once, so a switch to today's dollars between the two imports stays", () => {
+    storeRetirement({}, 'nominal');
+    storePaycheck(() => {}, 'nominal');
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('nominal');
+    usePreferencesStore.getState().setDisplayMode('today');
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('today');
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('carries a future-dollars mode saved only in the key imported second', () => {
+    storeRetirement({ monthlySavings: 3100 }, 'today');
+    storePaycheck((profile) => {
+      profile.preferences.necessaryExpenses = 3300;
+    }, 'nominal');
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('nominal');
+    // The other key keeps its inputs for its own import.
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual(['spending.necessaryMonthly']);
   });
 });

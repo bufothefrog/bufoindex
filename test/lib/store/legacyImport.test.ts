@@ -6,7 +6,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { getDefaultFinancialProfile } from '@/lib/profile';
-import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
+import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
+import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
+import { importLegacyCalculatorStorage, LEGACY_DISPLAY_MODE_KEYS } from '@/lib/store/legacyImport';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 
@@ -168,6 +170,13 @@ describe('importLegacyCalculatorStorage', () => {
       expect(profile().income.grossPerPaycheck).toBe(getDefaultFinancialProfile().income.grossPerPaycheck);
       expect(profile().income.frequency).toBe('weekly');
     });
+
+    it('imports the rest of the binding when its provided paths already hold what it would write', () => {
+      resetProfileStore({ profile: { income: { frequency: 'monthly' } } });
+      storeIncome({ incomeAmount: 120000 });
+      expect(importLegacyCalculatorStorage(INCOME)).toEqual(['income.grossPerPaycheck']);
+      expect(profile().income).toMatchObject({ grossPerPaycheck: 10000, frequency: 'monthly' });
+    });
   });
 
   it('does nothing without a stored key', () => {
@@ -222,5 +231,11 @@ describe('importLegacyCalculatorStorage', () => {
     });
     expect(importLegacyCalculatorStorage(DEFINITION)).toEqual([]);
     vi.restoreAllMocks();
+  });
+});
+
+describe('LEGACY_DISPLAY_MODE_KEYS', () => {
+  it('names the old retirement and paycheck keys', () => {
+    expect([...LEGACY_DISPLAY_MODE_KEYS].sort()).toEqual([RETIREMENT_LEGACY.storageKey, PAYCHECK_LEGACY.storageKey].sort());
   });
 });
