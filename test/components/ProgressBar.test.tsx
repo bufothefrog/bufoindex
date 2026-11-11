@@ -48,6 +48,22 @@ describe('ProgressBar', () => {
     expect(fill.style.width).toBe('38%');
   });
 
+  it.each([NaN, Infinity, -Infinity])('shows %d as the start of the range', (value) => {
+    render(<ProgressBar label="Steps" value={value} max={8} />);
+    const bar = screen.getByRole('progressbar', { name: 'Steps' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+    expect((bar.firstElementChild as HTMLElement).style.width).toBe('0%');
+  });
+
+  it('treats an inverted range as empty, with consistent aria values', () => {
+    render(<ProgressBar label="Steps" value={5} min={10} max={0} />);
+    const bar = screen.getByRole('progressbar', { name: 'Steps' });
+    expect(bar).toHaveAttribute('aria-valuemin', '10');
+    expect(bar).toHaveAttribute('aria-valuemax', '10');
+    expect(bar).toHaveAttribute('aria-valuenow', '10');
+    expect((bar.firstElementChild as HTMLElement).style.width).toBe('0%');
+  });
+
   it('shows an empty bar for an empty range', () => {
     render(<ProgressBar label="Steps" value={0} max={0} />);
     const fill = screen.getByRole('progressbar', { name: 'Steps' }).firstElementChild as HTMLElement;

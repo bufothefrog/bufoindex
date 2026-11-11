@@ -3,9 +3,10 @@ import { cn } from '@/lib/utils';
 import { TONE_FILL, type Tone } from '@/lib/design-system/tone';
 
 export interface ProgressBarProps {
-  /** Clamped to [min, max]. */
+  /** Clamped to [min, max]; a non-finite value shows as min. */
   value: number;
   min?: number;
+  /** A max at or below min gives an empty bar, with aria-valuemax = min. */
   max?: number;
   /** The accessible name, e.g. "Profile fields answered". */
   label: string;
@@ -25,15 +26,17 @@ export function ProgressBar({
   tone = 'brand',
   className,
 }: ProgressBarProps) {
-  const clamped = Math.min(max, Math.max(min, value));
-  const share = max > min ? (clamped - min) / (max - min) : 0;
+  // A range with max <= min is empty; a non-finite value counts as min.
+  const top = Math.max(min, max);
+  const clamped = Number.isFinite(value) ? Math.min(top, Math.max(min, value)) : min;
+  const share = top > min ? (clamped - min) / (top - min) : 0;
 
   return (
     <div
       role="progressbar"
       aria-label={label}
       aria-valuemin={min}
-      aria-valuemax={max}
+      aria-valuemax={top}
       aria-valuenow={clamped}
       aria-valuetext={valueText}
       className={cn('h-2 w-full rounded-full bg-muted', className)}
