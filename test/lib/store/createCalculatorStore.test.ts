@@ -331,6 +331,16 @@ describe('failed runs', () => {
     });
   });
 
+  it('a runner that throws synchronously reports under calculation instead of escaping submit', async () => {
+    const runner = vi.fn((): Promise<Results> => {
+      throw new Error('sync boom');
+    });
+    const store = createCalculatorStore({ definition: definition(0), runner });
+    expect(() => store.getState().submit(profileWith())).not.toThrow();
+    await store.getState().flush();
+    expect(store.getState()).toMatchObject({ errors: { calculation: 'sync boom' }, stale: true, isCalculating: false });
+  });
+
   it('a non-Error rejection gets a generic message', async () => {
     const runner = vi.fn(() => Promise.reject('broken'));
     const store = createCalculatorStore({ definition: definition(0), runner });

@@ -7,8 +7,10 @@
  * - Where there is no Worker (the server, jsdom) or construction throws, runs
  *   go straight to `fallback` in-thread, wrapped in a promise, so callers
  *   share one async path.
- * - If the worker breaks (onerror, e.g. its script failed to load), it is
+ * - If the worker breaks (onerror, e.g. its script failed to load; a
+ *   messageerror; or a message that is not a CalculationResponse), it is
  *   retired for good and the runs it still owed are retried in-thread.
+ * - A failure response without a message rejects with 'Calculation failed'.
  * - If posting a request throws (e.g. inputs that cannot be cloned), that run
  *   goes in-thread and the worker is no longer used.
  *
@@ -42,6 +44,16 @@ interface Pending<E, R> {
   inputs: E;
   resolve: (results: R) => void;
   reject: (error: unknown) => void;
+}
+
+/** The message a failed run reports when the worker sent none. */
+const FAILED = 'Calculation failed';
+
+/** A response in the shape exposeCalculation posts (id a number, ok a boolean). */
+function isResponse(data: unknown): data is { id: number; ok: boolean; results?: unknown; message?: unknown } {
+  if (typeof data !== 'object' || data === null) return false;
+  const record = data as Record<string, unknown>;
+  return typeof record.id === 'number' && typeof record.ok === 'boolean';
 }
 
 export function createWorkerRunner<E, R>({ create, fallback }: WorkerRunnerOptions<E, R>): WorkerRunner<E, R> {
@@ -78,18 +90,25 @@ export function createWorkerRunner<E, R>({ create, fallback }: WorkerRunnerOptio
       unavailable = true;
       return null;
     }
-    created.onmessage = (event: MessageEvent<CalculationResponse<R>>) => {
-      const response = event.data;
-      const request = pending.get(response.id);
-      if (!request) return;
-      pending.delete(response.id);
-      if (response.ok) request.resolve(response.results);
-      else request.reject(new Error(response.message));
-    };
-    created.onerror = () => {
+    const broken = (): void => {
       unavailable = true;
       retire(created);
     };
+    created.onmessage = (event: MessageEvent<CalculationResponse<R>>) => {
+      const response: unknown = event.data;
+      if (!isResponse(response)) {
+        // Not this protocol: the worker cannot be trusted to answer what it owes.
+        broken();
+        return;
+      }
+      const request = pending.get(response.id);
+      if (!request) return;
+      pending.delete(response.id);
+      if (response.ok) request.resolve(response.results as R);
+      else request.reject(new Error(typeof response.message === 'string' && response.message ? response.message : FAILED));
+    };
+    created.onmessageerror = broken;
+    created.onerror = broken;
     worker = created;
     return created;
   };

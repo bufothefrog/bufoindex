@@ -28,6 +28,7 @@ class FakeWorker {
   static instances: FakeWorker[] = [];
   onmessage: ((event: MessageEvent<CalculationResponse<number>>) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
+  onmessageerror: ((event: MessageEvent) => void) | null = null;
   terminated = false;
   failPost = false;
   readonly inbox: CalculationRequest<Inputs>[] = [];
@@ -183,6 +184,41 @@ describe('with a worker', () => {
     worker.onmessage?.({ data: { id: 99, ok: true, results: 0 } } as MessageEvent<CalculationResponse<number>>);
     worker.deliver();
     await expect(result).resolves.toBe(2);
+  });
+
+  it.each([
+    ['null', null],
+    ['a message without an id', { ok: true, results: 0 }],
+    ['a message without ok', { id: 1, results: 0 }],
+  ])('retires the worker on %s and retries what it owed in-thread', async (_, data) => {
+    stubWorker();
+    const { run, fallback } = runnerWith();
+    const owed = run({ n: 1 });
+    const worker = FakeWorker.instances[0];
+    expect(() => worker.onmessage?.({ data } as MessageEvent<CalculationResponse<number>>)).not.toThrow();
+    await expect(owed).resolves.toBe(2);
+    expect(worker.terminated).toBe(true);
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('retires the worker on a messageerror and retries what it owed in-thread', async () => {
+    stubWorker();
+    const { run } = runnerWith();
+    const owed = run({ n: 3 });
+    const worker = FakeWorker.instances[0];
+    expect(worker.onmessageerror).not.toBeNull();
+    worker.onmessageerror?.(new MessageEvent('messageerror'));
+    await expect(owed).resolves.toBe(6);
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("rejects with 'Calculation failed' when a failure carries no message", async () => {
+    stubWorker();
+    const { run } = runnerWith();
+    const result = run({ n: 1 });
+    const worker = FakeWorker.instances[0];
+    worker.onmessage?.({ data: { id: 1, ok: false } } as unknown as MessageEvent<CalculationResponse<number>>);
+    await expect(result).rejects.toThrow('Calculation failed');
   });
 
   it('dispose terminates the worker, finishes its runs in-thread and lets the next run start fresh', async () => {

@@ -147,7 +147,14 @@ export function createCalculatorStore<E, R>({
             return;
           }
           set({ isCalculating: true });
-          const done = runner(job.inputs).then(
+          let run: Promise<R>;
+          try {
+            run = runner(job.inputs);
+          } catch (error) {
+            // A runner that throws instead of rejecting still reports under 'calculation'.
+            run = Promise.reject(error);
+          }
+          const done = run.then(
             (results) => {
               if (id !== seq) return;
               inFlight = null;

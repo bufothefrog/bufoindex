@@ -118,6 +118,58 @@ describe('importLegacyCalculatorStorage', () => {
     expect(profile().provided).toEqual(['person.age', 'person.retirementAge']);
   });
 
+  describe('a binding that writes coupled paths', () => {
+    interface IncomeEngine {
+      incomeAmount: number;
+      incomePeriod: 'yearly' | 'monthly';
+    }
+    const INCOME_KEY = 'fake-income-calculator';
+    const INCOME_DEFAULTS: IncomeEngine = { incomeAmount: 100000, incomePeriod: 'yearly' };
+    // Modelled on the retirement income binding: the reverse write is an
+    // amount per paycheck plus its frequency, which only make sense together.
+    const INCOME: CalculatorDefinition<IncomeEngine, number> = {
+      id: 'retirement',
+      form: { id: 'fake-income', fields: [], screens: [] },
+      bindings: [
+        {
+          engine: 'incomeAmount',
+          read: (get) => (get('income.grossPerPaycheck') as number) * 12,
+          write: (value) => [
+            { path: 'income.grossPerPaycheck', value: (value as number) / 12 },
+            { path: 'income.frequency', value: 'monthly' },
+          ],
+        },
+      ],
+      engineBase: () => ({ ...INCOME_DEFAULTS }),
+      validate: () => ({}),
+      calculate: (inputs) => inputs.incomeAmount,
+      debounceMs: 0,
+      legacy: {
+        storageKey: INCOME_KEY,
+        readStorage: (raw) => ({ ...INCOME_DEFAULTS, ...((raw as { state: Partial<IncomeEngine> }).state ?? {}) }),
+        storageDefaults: () => ({ ...INCOME_DEFAULTS }),
+      },
+    };
+    const storeIncome = (state: Partial<IncomeEngine>) =>
+      window.localStorage.setItem(INCOME_KEY, JSON.stringify({ state }));
+
+    it('imports every write of a changed binding, including those equal to the old default', () => {
+      storeIncome({ incomeAmount: 120000, incomePeriod: 'yearly' });
+      expect(importLegacyCalculatorStorage(INCOME)).toEqual(['income.grossPerPaycheck', 'income.frequency']);
+      expect(profile().income.grossPerPaycheck).toBe(10000);
+      expect(profile().income.frequency).toBe('monthly');
+      expect(profile().provided).toEqual(['income.grossPerPaycheck', 'income.frequency']);
+    });
+
+    it('skips the whole binding when one of its paths is already provided', () => {
+      resetProfileStore({ profile: { income: { frequency: 'weekly' } } });
+      storeIncome({ incomeAmount: 120000 });
+      expect(importLegacyCalculatorStorage(INCOME)).toEqual([]);
+      expect(profile().income.grossPerPaycheck).toBe(getDefaultFinancialProfile().income.grossPerPaycheck);
+      expect(profile().income.frequency).toBe('weekly');
+    });
+  });
+
   it('does nothing without a stored key', () => {
     expect(importLegacyCalculatorStorage(DEFINITION)).toEqual([]);
     expect(profile().provided).toEqual([]);

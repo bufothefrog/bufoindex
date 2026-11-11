@@ -18,11 +18,13 @@ import type { Write } from '@/lib/fields/types';
 import { providedPathFor } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
-/** The last write to each path (setValues applies writes in order), with its memo key. */
-function lastWrites(writes: readonly Write[]): Map<string, { value: unknown; key: string }> {
-  const out = new Map<string, { value: unknown; key: string }>();
-  for (const write of writes) out.set(write.path, { value: write.value, key: stableKey(write.value) });
-  return out;
+/**
+ * The writes that reproduce `engine`, one group per binding. A derived
+ * binding may write coupled paths (an amount and its unit), which only make
+ * sense together, so the import keeps or skips each group as a whole.
+ */
+function writeGroups<E, R>(def: CalculatorDefinition<E, R>, engine: E): Write[][] {
+  return def.bindings.map((binding) => fromEngineInputs([binding], engine));
 }
 
 /** The engine inputs stored in `raw`; null when it is not JSON or not this calculator's payload. */
@@ -37,10 +39,12 @@ function readEngine<E>(legacy: LegacyStorage<E>, raw: string): E | null {
 /**
  * Imports `def.legacy.storageKey` into the profile, then removes the key.
  *
- * Only values that differ from def.legacy.storageDefaults() are written (an
- * untouched old default says nothing about the visitor), and only to paths
- * the profile does not already mark as provided (an answer given since
- * always wins). Written values are marked provided; setValues refuses any
+ * The writes are taken per binding. A binding's writes are imported only
+ * when they differ from what the same binding writes for
+ * def.legacy.storageDefaults() (an untouched old default says nothing about
+ * the visitor), and only when none of its paths is already marked provided
+ * (an answer given since always wins). A binding's writes are kept or
+ * skipped together, so coupled paths (an amount and its unit) never split. Written values are marked provided; setValues refuses any
  * that are not valid profile values. The key is removed even when its
  * payload is corrupt or foreign, since nothing else will ever read it.
  *
@@ -63,18 +67,20 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
     const engine = readEngine(legacy, raw);
     const writes: Write[] = [];
     if (engine !== null) {
-      const defaults = lastWrites(fromEngineInputs(def.bindings, legacy.storageDefaults()));
+      const defaults = writeGroups(def, legacy.storageDefaults());
       const provided = new Set(profileStore.profile.provided);
-      for (const [path, { value, key }] of lastWrites(fromEngineInputs(def.bindings, engine))) {
-        if (defaults.get(path)?.key === key) continue;
-        const providedPath = providedPathFor(path);
-        if (providedPath === null || provided.has(providedPath)) continue;
-        writes.push({ path, value });
-      }
+      writeGroups(def, engine).forEach((group, i) => {
+        if (group.length === 0 || stableKey(group) === stableKey(defaults[i])) return;
+        const providedPaths = group.map((write) => providedPathFor(write.path));
+        if (providedPaths.some((path) => path !== null && provided.has(path))) return;
+        group.forEach((write, j) => {
+          if (providedPaths[j] !== null) writes.push(write);
+        });
+      });
     }
     if (writes.length > 0) profileStore.setValues(writes);
     storage.removeItem(legacy.storageKey);
-    return writes.map((write) => write.path);
+    return [...new Set(writes.map((write) => write.path))];
   } catch {
     // Storage is blocked (e.g. a privacy mode): leave everything as it is.
     return [];

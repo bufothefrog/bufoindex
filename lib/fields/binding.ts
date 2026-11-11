@@ -83,8 +83,12 @@ function startsWithSegments(path: readonly string[], prefix: readonly string[]):
  * with the longest engine path equal to it or containing it; of equally long
  * ones, the last. With `get` (the profile the inputs were built from), a
  * binding that reads undefined is passed over, because toEngineInputs skips
- * it, so the error lands on the binding whose value the engine actually got.
- * Without `get`, every binding is assumed to have supplied a value.
+ * it. Without `get`, every binding is assumed to have supplied a value.
+ * The rule matches toEngineInputs for equally long engine paths and for
+ * bindings that read undefined. It does not detect a later binding with a
+ * shorter engine path that overwrites a longer one ('a' after 'a.b'): the
+ * error still goes to the longer binding, so bindings should not overlap
+ * that way.
  *
  * - 1:1 binding: the profile path plus the rest of the key, so a row error
  *   ('debts.0.balance' under a 'debts' binding) lands on the same row.
