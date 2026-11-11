@@ -355,10 +355,30 @@ describe('fieldError', () => {
 
   it('checks list row counts', () => {
     expect(fieldError(DEBTS, [{}, {}, {}], get)).toBe('Debts allows at most 2 entries.');
-    expect(fieldError({ ...DEBTS, minRows: 1 }, [], get)).toBeUndefined();
+    // minRows > 0 rejects an empty list even when the field is not required.
+    expect(fieldError({ ...DEBTS, minRows: 1 }, [], get)).toBe('Debts needs at least 1 entry.');
+    expect(fieldError({ ...DEBTS, minRows: 0 }, [], get)).toBeUndefined();
+    expect(fieldError(DEBTS, [], get)).toBeUndefined();
     expect(fieldError({ ...DEBTS, minRows: 2 }, [{}], get)).toBe('Debts needs at least 2 entries.');
     expect(fieldError({ ...DEBTS, minRows: 1, maxRows: 1 }, [{}, {}], get)).toBe('Debts allows at most 1 entry.');
     expect(fieldError({ ...DEBTS, required: true }, [], get)).toBe('Debts is required.');
+  });
+});
+
+describe('fieldError with non-finite numbers', () => {
+  const get = getWith();
+
+  it('rejects Infinity and -Infinity whatever bounds are set', () => {
+    expect(fieldError(GROSS, Number.POSITIVE_INFINITY, get)).toBe('Gross pay must be a number.');
+    expect(fieldError(GROSS, Number.NEGATIVE_INFINITY, get)).toBe('Gross pay must be a number.');
+    const unbounded: FieldSpec = { path: 'n', kind: 'number', label: 'Count', tier: 'details' };
+    expect(fieldError(unbounded, Number.NEGATIVE_INFINITY, get)).toBe('Count must be a number.');
+    expect(fieldError(unbounded, 3, get)).toBeUndefined();
+  });
+
+  it('reports an empty minRows list through validateFields', () => {
+    const form: FormSpec = { id: 'f', fields: [{ ...DEBTS, minRows: 1 }], screens: [] };
+    expect(validateFields(form, getWith(['debts', []]))).toEqual({ debts: 'Debts needs at least 1 entry.' });
   });
 });
 

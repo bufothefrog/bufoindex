@@ -18,7 +18,8 @@
  * - Nullable. null is a valid answer ("derive"), so a nullable field holding
  *   null passes every check. undefined is still empty.
  * - Empty values are undefined, null, NaN, a blank string and an empty list.
- *   An empty optional field passes every check.
+ *   An empty optional field passes every check, except that an empty list
+ *   fails a minRows above 0. Infinity and -Infinity are not numbers here.
  * - List rows. Row specs use paths relative to the row. Their callbacks
  *   (visibleWhen, options, help, ...) receive rowGet(get, listPath, index),
  *   which resolves paths inside that row only. Row errors are keyed by the
@@ -194,9 +195,17 @@ function entries(count: number): string {
  */
 export function fieldError(spec: FieldSpec, value: unknown, get: Get): string | undefined {
   if (spec.nullable && value === null) return undefined;
-  if (isEmptyValue(value)) return spec.required ? `${spec.label} is required.` : undefined;
+  if (isEmptyValue(value)) {
+    if (spec.required) return `${spec.label} is required.`;
+    // minRows > 0 means the list must not be empty, required or not.
+    if (Array.isArray(value) && spec.minRows !== undefined && spec.minRows > 0) {
+      return `${spec.label} needs at least ${entries(spec.minRows)}.`;
+    }
+    return undefined;
+  }
 
   if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return `${spec.label} must be a number.`;
     const { min, max } = spec;
     const below = min !== undefined && value < min;
     const above = max !== undefined && value > max;
@@ -237,7 +246,7 @@ function collectErrors(spec: FieldSpec, path: string, get: Get, scope: Get, out:
   const error = fieldError(spec, value, scope);
   if (error) out[path] = error;
   if (spec.kind !== 'list' || !spec.row) return;
-  // An empty list has no rows, so the minRows check above covers it.
+  // An empty list has no rows; fieldError has already checked minRows on it.
   listRows(value).forEach((_, index) => {
     const rowScope = rowGet(get, path, index);
     for (const rowSpec of spec.row ?? []) {

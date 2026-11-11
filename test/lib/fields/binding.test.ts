@@ -205,6 +205,15 @@ describe('engineErrorsToFields', () => {
     });
   });
 
+  it('sends an error to the binding whose value toEngineInputs keeps when two share an engine path', () => {
+    const bindings: Binding<Engine>[] = [
+      { profile: 'person.age', engine: 'age' },
+      { engine: 'age', read: () => 99, errorPath: 'override.age' },
+    ];
+    expect(toEngineInputs(bindings, engineBase(), makeGet(profile)).age).toBe(99);
+    expect(engineErrorsToFields(bindings, { age: 'bad' })).toEqual({ 'override.age': 'bad' });
+  });
+
   it('keeps an error whose target path shares a name with an Object member', () => {
     const bindings: Binding<Engine>[] = [{ profile: 'toString', engine: 'age' }];
     expect(engineErrorsToFields(bindings, { age: 'Too young.' })).toEqual({ toString: 'Too young.' });
@@ -235,6 +244,12 @@ describe('stableKey', () => {
     expect(stableKey({ a: Number.NaN })).toBe('{"a":NaN}');
     expect(stableKey([Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])).toBe('[Infinity,-Infinity]');
     expect(stableKey({ a: Number.NaN })).not.toBe(stableKey({ a: null }));
+  });
+
+  it('keeps -0 apart from 0, as setAt does, and writes holes as null', () => {
+    expect(stableKey(-0)).toBe('-0');
+    expect(stableKey({ a: -0 })).not.toBe(stableKey({ a: 0 }));
+    expect(stableKey([, 1])).toBe('[null,1]');
   });
 
   it('serializes primitives', () => {

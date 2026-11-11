@@ -75,7 +75,8 @@ function startsWithSegments(path: readonly string[], prefix: readonly string[]):
 /**
  * Engine validation errors moved onto profile paths. Keys in bracket form
  * ('accounts[0].deposit') are read as dot paths. Each key goes to the binding
- * with the longest engine path equal to it or containing it:
+ * with the longest engine path equal to it or containing it (of equally long
+ * ones, the last, which is the one whose value toEngineInputs keeps):
  *
  * - 1:1 binding: the profile path plus the rest of the key, so a row error
  *   ('debts.0.balance' under a 'debts' binding) lands on the same row.
@@ -91,7 +92,8 @@ export function engineErrorsToFields<E>(bindings: readonly Binding<E>[], errors:
     const segments = splitPath(toDotPath(key));
     let best = -1;
     enginePaths.forEach((enginePath, i) => {
-      const longer = best < 0 || enginePath.length > enginePaths[best].length;
+      // '>=' so the last of equally long bindings wins, as in toEngineInputs.
+      const longer = best < 0 || enginePath.length >= enginePaths[best].length;
       if (longer && startsWithSegments(segments, enginePath)) best = i;
     });
     let target = 'calculation';
@@ -116,6 +118,8 @@ function serialize(value: unknown): string | undefined {
       return String(value);
     case 'number':
       // NaN and the infinities stay distinct from null (JSON would merge them).
+      // -0 stays distinct from 0, as setAt (Object.is) treats them.
+      if (Object.is(value, -0)) return '-0';
       return Number.isFinite(value) ? JSON.stringify(value) : String(value);
     case 'bigint':
       return `${value}n`;
@@ -126,7 +130,8 @@ function serialize(value: unknown): string | undefined {
   }
   if (value === null) return 'null';
   if (Array.isArray(value)) {
-    return `[${value.map((item) => serialize(item) ?? 'null').join(',')}]`;
+    // Array.from visits holes too, so a sparse slot becomes null as in JSON.
+    return `[${Array.from(value, (item) => serialize(item) ?? 'null').join(',')}]`;
   }
   const record = value as Record<string, unknown>;
   const parts: string[] = [];
@@ -140,8 +145,9 @@ function serialize(value: unknown): string | undefined {
 /**
  * A memoization key: JSON-like, with object keys sorted at every depth, so
  * two values that differ only in key order get the same key. Like JSON,
- * undefined and function members are left out (and become null in lists);
- * unlike JSON, NaN and the infinities keep their own spelling. Values must
+ * undefined and function members are left out (and become null in lists,
+ * as do holes); unlike JSON, NaN, the infinities and -0 keep their own
+ * spelling. Values must
  * be plain, acyclic data (no Dates, Maps or class instances).
  */
 export function stableKey(value: unknown): string {
