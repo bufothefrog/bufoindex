@@ -15,11 +15,9 @@
  *   (filingStatusNote).
  *
  * The reverse direction (`write`) serves only the one-time import of the old
- * calculator's localStorage (O7), whose pay rule (lib/store/legacyImport.ts
- * carryPay) decides how the writes meet answered pay. The binding only
- * states the old entry: an amount with its frequency, or, for a period with
- * no pay frequency (yearly, hourly), gross pay in the frequency the profile
- * holds at the same annual income, with no frequency.
+ * calculator's localStorage (O7): an amount with its frequency, or, for a
+ * period with no pay frequency (yearly, hourly), gross pay in the frequency
+ * the profile holds at the same annual income, with no frequency.
  */
 
 import { annualizeIncome, type IncomePeriod, type RetirementInputs } from '@/lib/calculations/retirement';
@@ -62,10 +60,10 @@ function incomeEntry(get: Get): IncomeEntry {
 
 /**
  * Profile writes for an old income entry. A period with a pay frequency
- * keeps its amount and writes that frequency (the import may carry it to
- * the held frequency). Hourly and yearly amounts have no frequency of their
- * own: they become gross pay per paycheck of `held` (the frequency the
- * profile holds) at the same annual income, rounded to the cent.
+ * keeps its amount and writes that frequency. Hourly and yearly amounts
+ * have no frequency of their own: they become gross pay per paycheck of
+ * `held` (the frequency the profile holds) at the same annual income,
+ * rounded to the cent.
  */
 function incomeWrites(amount: number, period: IncomePeriod, held: PayFrequency): Write[] {
   const frequency = FREQUENCY_FOR_PERIOD[period];
