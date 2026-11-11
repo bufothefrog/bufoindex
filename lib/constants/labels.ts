@@ -11,14 +11,16 @@ import { formatCurrency, formatMultiple } from '@/lib/format';
 import { CONTRIBUTION_LIMITS_2026 } from './irs-2026';
 import { LEVERAGE_RATIO_OPTIONS } from './leverage';
 import type { AccountType } from '@/lib/calculations/portfolioRebalancing';
-import type { StrategyPreset, TargetMixPreset } from '@/lib/profile/types';
 import type {
-  EmployerBenefits,
-  HSABenefits,
-  IncomeData,
-  TaxData,
-  UserPreferences,
-} from '@/lib/types';
+  BonusFrequency,
+  ContributionType,
+  FilingStatus,
+  HsaCoverage,
+  OptimizationGoal,
+  RiskTolerance,
+  StrategyPreset,
+  TargetMixPreset,
+} from '@/lib/profile/types';
 
 /** One entry of a select or choice group. */
 export interface LabelOption<V extends string | number> {
@@ -39,8 +41,6 @@ function optionsFrom<V extends string>(
 // Filing status
 // ---------------------------------------------------------------------------
 
-type FilingStatusValue = TaxData['filingStatus'];
-
 export interface FilingStatusMeta {
   /** Select-option and heading text. */
   label: string;
@@ -48,22 +48,20 @@ export interface FilingStatusMeta {
   phrase: string;
 }
 
-export const FILING_STATUS_META: Readonly<Record<FilingStatusValue, FilingStatusMeta>> = {
+export const FILING_STATUS_META: Readonly<Record<FilingStatus, FilingStatusMeta>> = {
   single: { label: 'Single', phrase: 'single' },
   marriedJoint: { label: 'Married Filing Jointly', phrase: 'married filing jointly' },
   marriedSeparate: { label: 'Married Filing Separately', phrase: 'married filing separately' },
   headOfHousehold: { label: 'Head of Household', phrase: 'head of household' },
 };
 
-export const FILING_STATUS_OPTIONS: readonly LabelOption<FilingStatusValue>[] = (
+export const FILING_STATUS_OPTIONS: readonly LabelOption<FilingStatus>[] = (
   ['single', 'marriedJoint', 'marriedSeparate', 'headOfHousehold'] as const
 ).map((value) => ({ value, label: FILING_STATUS_META[value].label }));
 
 // ---------------------------------------------------------------------------
 // Bonus frequency
 // ---------------------------------------------------------------------------
-
-type BonusFrequency = IncomeData['bonusFrequency'];
 
 export const BONUS_FREQUENCY_LABELS: Readonly<Record<BonusFrequency, string>> = {
   quarterly: 'Quarterly',
@@ -119,17 +117,14 @@ export const STRATEGY_PRESET_OPTIONS: readonly LabelOption<StrategyPreset>[] = [
 // Target mix
 // ---------------------------------------------------------------------------
 
-/** The presets plus 'custom' (per-class targets), which the v2 profile adds. */
-type TargetMix = TargetMixPreset | 'custom';
-
-export const TARGET_MIX_LABELS: Readonly<Record<TargetMix, string>> = {
+export const TARGET_MIX_LABELS: Readonly<Record<TargetMixPreset, string>> = {
   '100-0': '100% stocks',
   '80-20': '80% stocks, 20% bonds',
   '60-40': '60% stocks, 40% bonds',
   custom: 'Custom',
 };
 
-export const TARGET_MIX_OPTIONS: readonly LabelOption<TargetMix>[] = [
+export const TARGET_MIX_OPTIONS: readonly LabelOption<TargetMixPreset>[] = [
   { value: '100-0', label: TARGET_MIX_LABELS['100-0'], description: 'The highest expected growth and the deepest drawdowns.' },
   { value: '80-20', label: TARGET_MIX_LABELS['80-20'], description: 'Mostly stocks, with a bond cushion.' },
   { value: '60-40', label: TARGET_MIX_LABELS['60-40'], description: 'Smaller swings and lower expected growth.' },
@@ -139,9 +134,6 @@ export const TARGET_MIX_OPTIONS: readonly LabelOption<TargetMix>[] = [
 // ---------------------------------------------------------------------------
 // Paycheck allocator assumptions
 // ---------------------------------------------------------------------------
-
-type RiskTolerance = UserPreferences['riskTolerance'];
-type OptimizationGoal = UserPreferences['optimizationGoal'];
 
 export const RISK_TOLERANCE_LABELS: Readonly<Record<RiskTolerance, string>> = {
   conservative: 'Conservative',
@@ -170,9 +162,6 @@ export const OPTIMIZATION_GOAL_OPTIONS = optionsFrom<OptimizationGoal>(
 // ---------------------------------------------------------------------------
 // HSA coverage and 401(k) contribution type
 // ---------------------------------------------------------------------------
-
-type HsaCoverage = HSABenefits['coverageType'];
-type ContributionType = EmployerBenefits['contributionType'];
 
 export const HSA_COVERAGE_LABELS: Readonly<Record<HsaCoverage, string>> = {
   individual: 'Individual',

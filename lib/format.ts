@@ -10,6 +10,20 @@
  * formatCurrency / formatPercent in lib/utils and lib/calculations/core, and
  * the leverage comparison's components/format.ts. Signed and compact output
  * uses the U+2212 minus sign, as the leverage results always have.
+ *
+ * Intentional deviations from legacy output (no option reproduces them):
+ * - A percent that rounds to zero never prints a minus: leverage
+ *   formatPct(-0.0049, 0) gave "-0%" and PercentInput gave "-0.0%".
+ * - Signed NaN prints "NaN%" (leverage formatSignedPct gave a minus first).
+ * - formatMultiple prints "-" for NaN and the infinities (formatLeverage
+ *   gave "NaNx", "Infinityx", "-Infinityx").
+ * - Negative axis ticks print like "-$5k" with a U+2212 minus; the
+ *   retirement MonteCarloChart formatAxisCurrency gave "$-5000". Non-finite
+ *   compact values are not guarded (-Infinity prints with an "M" suffix);
+ *   callers pass finite numbers.
+ * - percent-signed without digits follows formatPercent (0 to 1 decimals,
+ *   grouped); the leverage formatSignedPct always had one decimal, so its
+ *   callers pass { digits: 1, signed: true }.
  */
 
 /** A value kind a results tile or table cell can be formatted as. */
@@ -47,7 +61,10 @@ export interface PercentFormatOptions {
    * 0.07 -> "7%"). A value that rounds to zero never prints a minus sign.
    */
   digits?: number;
-  /** +9.5% / -10.0% with a U+2212 minus; anything that rounds to zero prints unsigned. */
+  /**
+   * +9.5% / -10% with a U+2212 minus (-10.0% with digits: 1); anything that
+   * rounds to zero prints unsigned.
+   */
   signed?: boolean;
 }
 

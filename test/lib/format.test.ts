@@ -89,6 +89,7 @@ describe('formatCurrency', () => {
     [500_000, { compact: 'axis' }, '$500k'],
     [1_250_000, { compact: 'axis' }, '$1.3M'],
     [12_400_000, { compact: 'axis' }, '$12.4M'],
+    // New behaviour, an intentional deviation: MonteCarloChart printed '$-5000'.
     [-5000, { compact: 'axis' }, `${MINUS}$5k`],
     // Signed, not compact
     [1234, { signed: true }, '+$1,234'],
