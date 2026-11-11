@@ -6,6 +6,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { BaseInput, type InputSize } from './BaseInput';
+import { fieldMessageIds } from '@/components/ui/FieldMessages';
 import { BaseInputProps } from '@/lib/design-system/types';
 
 interface NumberInputProps extends BaseInputProps {
@@ -190,8 +191,17 @@ export function NumberInput({
   
   // Calculate padding based on prefix/suffix
   const large = size === 'lg' || size === 'xl';
+  // A word unit (" years", " months") is wider than the fixed right padding,
+  // so it sits beside the box instead of on top of the value, and joins the
+  // field's accessible description. Symbols ("x", "%") stay inside the box.
+  const wordUnit = suffix && /[a-z]{2,}/i.test(suffix) ? suffix.trim() : undefined;
+  const inlineSuffix = wordUnit ? undefined : suffix;
+  const unitId = `input-${name}-unit`;
+  const describedBy = wordUnit
+    ? [unitId, fieldMessageIds(`input-${name}`, help, error).describedBy].filter(Boolean).join(' ')
+    : undefined;
   const paddingLeft = prefix ? (large ? 'pl-9' : size === 'sm' ? 'pl-7' : 'pl-8') : 'pl-3';
-  const paddingRight = suffix ? (large ? 'pr-9' : size === 'sm' ? 'pr-7' : 'pr-8') : 'pr-3';
+  const paddingRight = inlineSuffix ? (large ? 'pr-9' : size === 'sm' ? 'pr-7' : 'pr-8') : 'pr-3';
   
   return (
     <BaseInput
@@ -204,8 +214,9 @@ export function NumberInput({
       className={className}
       testId={testId}
       size={size}
+      {...(describedBy ? { 'aria-describedby': describedBy } : {})}
     >
-      <div className="relative w-full">
+      <div className={cn('relative w-full', wordUnit && 'flex items-center gap-2')}>
         {prefix && (
           <span className={cn(
             "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
@@ -233,17 +244,30 @@ export function NumberInput({
             textAlignClasses[textAlign],
             paddingLeft,
             paddingRight,
+            wordUnit && "min-w-0 flex-1",
             "font-mono",
             "focus:outline-hidden" // BaseInput handles focus styles
           )}
         />
 
-        {suffix && (
+        {inlineSuffix && (
           <span className={cn(
             "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
             large ? 'right-3 text-base' : size === 'sm' ? 'right-2.5 text-xs' : 'right-3 text-sm'
           )}>
-            {suffix}
+            {inlineSuffix}
+          </span>
+        )}
+
+        {wordUnit && (
+          <span
+            id={unitId}
+            className={cn(
+              "shrink-0 text-muted-foreground",
+              large ? 'text-base' : size === 'sm' ? 'text-xs' : 'text-sm'
+            )}
+          >
+            {wordUnit}
           </span>
         )}
       </div>

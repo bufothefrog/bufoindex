@@ -43,7 +43,7 @@ export function SectionToggle({
       aria-expanded={expanded}
       aria-controls={controls}
       aria-label={`${expanded ? collapseLabel : expandLabel} ${sectionName}`}
-      className="min-h-11 shrink-0 px-3 text-sage-700 hover:bg-sage-100 dark:text-sage-200 dark:hover:bg-sage-800"
+      className="min-h-11 shrink-0 px-3 text-sage-700 hover:bg-sage-100 hover:text-sage-800 dark:text-sage-200 dark:hover:bg-sage-800 dark:hover:text-sage-100"
     >
       {expanded ? (
         <ChevronUp className="mr-1.5 h-4 w-4" aria-hidden="true" />
