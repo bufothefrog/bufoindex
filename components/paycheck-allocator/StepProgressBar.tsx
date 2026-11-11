@@ -1,8 +1,11 @@
 import React, { useMemo } from 'react';
 import { AlertTriangle, Target } from 'lucide-react';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { StepStatus } from '@/lib/constants/financialSteps';
+import { TONE_TEXT } from '@/lib/design-system/tone';
+import { cn } from '@/lib/utils';
 
-interface StepProgressBarProps {
+export interface StepProgressBarProps {
   steps: StepStatus[];
 }
 
@@ -22,24 +25,24 @@ export const StepProgressBar = React.memo(function StepProgressBar({ steps }: St
         <span className="font-medium text-foreground">
           Optimization Progress: {completedSteps} of {totalApplicableSteps} steps
         </span>
-        <span className="text-info font-semibold">{progressPercentage}% Complete</span>
+        <span className={cn('font-semibold', TONE_TEXT.info)}>{progressPercentage}% Complete</span>
       </div>
-      <div className="w-full bg-muted rounded-full h-2">
-        <div
-          className="bg-info h-2 rounded-full transition-all duration-300"
-          style={{ width: `${progressPercentage}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={progressPercentage}
+        label="Optimization progress"
+        valueText={`${completedSteps} of ${totalApplicableSteps} steps`}
+        tone="info"
+      />
       {(criticalIssues > 0 || importantItems > 0) && (
         <div className="flex items-center space-x-4 text-sm">
           {criticalIssues > 0 && (
-            <div className="flex items-center space-x-1 text-destructive">
+            <div className={cn('flex items-center space-x-1', TONE_TEXT.negative)}>
               <AlertTriangle className="w-4 h-4" aria-hidden="true" />
               <span>{criticalIssues} Critical Issue{criticalIssues !== 1 ? 's' : ''}</span>
             </div>
           )}
           {importantItems > 0 && (
-            <div className="flex items-center space-x-1 text-warning">
+            <div className={cn('flex items-center space-x-1', TONE_TEXT.caution)}>
               <Target className="w-4 h-4" aria-hidden="true" />
               <span>{importantItems} Optimization{importantItems !== 1 ? 's' : ''}</span>
             </div>
@@ -49,3 +52,5 @@ export const StepProgressBar = React.memo(function StepProgressBar({ steps }: St
     </div>
   );
 });
+
+export default StepProgressBar;
