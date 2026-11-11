@@ -3,12 +3,12 @@
 import React, { useState } from 'react';
 import { ListChecks } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
-import { formatCurrency, formatPercent } from '@/lib/calculations/core';
+import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
+import { buildChecklistRows } from '@/lib/dashboard/derive';
+import { formatCurrency, formatPercent } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { AllocationResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { DASHBOARD_CARD_LAYOUT } from './cardLayout';
-import { buildChecklistRows } from './derive';
 
 export interface AutomationChecklistCardProps {
   profile: FinancialProfile;
@@ -27,7 +27,7 @@ export function AutomationChecklistCard({ profile, allocation }: AutomationCheck
   const toggle = (id: string) => setDone((current) => ({ ...current, [id]: !current[id] }));
 
   return (
-    <BaseCard title="Automation checklist" icon={ListChecks} {...DASHBOARD_CARD_LAYOUT} testId="overview-automation">
+    <BaseCard title="Automation checklist" icon={ListChecks} className="h-full" {...DENSE_CARD_CLASSES} testId="overview-automation">
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
           Recurring transfers that would carry out this paycheck&apos;s plan without a monthly decision.

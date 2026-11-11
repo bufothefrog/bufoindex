@@ -163,9 +163,13 @@ export const CORE_START_PATH = '/start';
 /** The "What do you want to learn?" chooser shown after the core. */
 export const LEARN_CHOOSER_PATH = '/start/choose';
 
-/** The core intake, continuing to `intent`'s remaining questions afterwards. */
+/**
+ * Where an entry link for `intent` starts: the core intake, continuing to
+ * `intent`'s remaining questions afterwards, or `intent`'s own intake when it
+ * needs no core field (O5: /start/portfolio skips the basics).
+ */
 export function coreStartLink(intent: IntakeIntent): string {
-  return `${CORE_START_PATH}?next=${intent}`;
+  return intentNeedsCore(intent) ? `${CORE_START_PATH}?next=${intent}` : `/start/${intent}`;
 }
 
 /**

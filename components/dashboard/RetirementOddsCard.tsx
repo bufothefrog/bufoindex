@@ -1,70 +1,80 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import type { Route } from 'next';
 import { TrendingUp } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
-import { formatCurrency, formatPercent } from '@/lib/calculations/core';
-import type { RetirementInputs } from '@/lib/calculations/retirement';
-import { retirementLink } from '@/lib/profile/links';
-import { toRetirementInputs } from '@/lib/profile/mappers';
+import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
+import { StatGrid } from '@/components/ui/results';
+import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
+import { calculatorHref } from '@/lib/calculators/registry';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { retirementHeadline } from '@/lib/calculators/retirement/headline';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { RetirementConstants } from '@/lib/constants/retirement';
+import { summarizeRetirement, type RetirementLever } from '@/lib/dashboard/derive';
+import { formatStatValue, type StatSpec } from '@/lib/design-system/stat';
+import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { CardLinkButton } from './CardLinkButton';
-import { DASHBOARD_CARD_LAYOUT } from './cardLayout';
-import { StatTile } from './StatTile';
-import { summarizeRetirement, type RetirementOutcome } from './derive';
+import { SimulationRegion } from './SimulationRegion';
+import { useDeferredResult } from './useDeferredResult';
 
 export interface RetirementOddsCardProps {
   profile: FinancialProfile;
 }
 
-interface ComputedOutcome {
-  key: string;
-  outcome: RetirementOutcome;
+const RUNS = RetirementConstants.DEFAULT_MONTE_CARLO_RUNS;
+
+/** The card's own labels for the headline figures it shows, in display order. */
+const CARD_LABELS: Readonly<Record<string, string>> = {
+  success: 'Simulated success rate',
+  projected: 'Projected at retirement',
+  required: 'Balance the 4% guideline implies',
+};
+
+function successHint(inputs: RetirementInputs): string {
+  return `Share of ${formatCount(RUNS)} seeded paths with money left at age ${inputs.lifeExpectancy}, retiring at ${inputs.retirementAge}`;
+}
+
+/** The headline's success, projected and required figures (today's dollars), under the card's labels. */
+function oddsStats(results: RetirementResults, inputs: RetirementInputs): StatSpec[] {
+  return retirementHeadline(results, inputs)
+    .filter((stat) => stat.id in CARD_LABELS)
+    .map((stat) => ({
+      ...stat,
+      label: CARD_LABELS[stat.id],
+      hint: stat.id === 'success' ? successHint(inputs) : stat.hint,
+    }));
+}
+
+/** Label-only tiles that hold the figures' place while the simulation runs. */
+function placeholderStats(inputs: RetirementInputs): StatSpec[] {
+  return Object.entries(CARD_LABELS).map(([id, label]) => ({
+    id,
+    label,
+    value: null,
+    format: 'currency',
+    hint: id === 'success' ? successHint(inputs) : undefined,
+  }));
 }
 
 /**
- * The retirement analysis runs several 1,000-path Monte Carlo simulations,
- * so it is deferred until after the browser has painted the loading state
- * (requestAnimationFrame, then a macrotask). The inputs are keyed by their
- * serialized form so edits elsewhere in the profile (strategy preset, cash
- * target) do not re-run it.
+ * The retirement calculator's analysis runs several 1,000-path Monte Carlo
+ * simulations, so it is deferred until after the browser has painted the
+ * loading state. The engine inputs come from the calculator's own bindings.
  */
 export function RetirementOddsCard({ profile }: RetirementOddsCardProps) {
-  const inputsKey = useMemo(() => JSON.stringify(toRetirementInputs(profile)), [profile]);
-  const [computed, setComputed] = useState<ComputedOutcome | null>(null);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const frame = requestAnimationFrame(() => {
-      timer = setTimeout(() => {
-        const inputs = JSON.parse(inputsKey) as RetirementInputs;
-        setComputed({ key: inputsKey, outcome: summarizeRetirement(inputs) });
-      }, 0);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [inputsKey]);
-
-  const isLoading = computed === null || computed.key !== inputsKey;
-  const outcome = isLoading ? null : computed.outcome;
+  const inputs = useMemo(() => engineInputsFor(RETIREMENT_CALCULATOR, profile), [profile]);
+  const outcome = useDeferredResult(inputs, summarizeRetirement);
 
   return (
-    <BaseCard title="Retirement odds" icon={TrendingUp} {...DASHBOARD_CARD_LAYOUT} testId="overview-retirement">
-      <div aria-live="polite" aria-busy={isLoading}>
-        {isLoading && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Running 1,000 simulated market paths...</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="h-[74px] animate-pulse rounded-lg bg-muted" />
-              <div className="h-[74px] animate-pulse rounded-lg bg-muted" />
-              <div className="col-span-2 h-[74px] animate-pulse rounded-lg bg-muted" />
-            </div>
-          </div>
-        )}
-
+    <BaseCard title="Retirement odds" icon={TrendingUp} className="h-full" {...DENSE_CARD_CLASSES} testId="overview-retirement">
+      <SimulationRegion
+        pending={outcome === null}
+        paths={RUNS}
+        placeholder={<StatGrid stats={placeholderStats(inputs)} fullWidth={['success']} loading />}
+      >
         {outcome?.status === 'invalid' && (
           <div className="space-y-2 text-sm">
             <p className="text-foreground">The retirement inputs from the profile need attention:</p>
@@ -77,47 +87,44 @@ export function RetirementOddsCard({ profile }: RetirementOddsCardProps) {
         )}
 
         {outcome?.status === 'ok' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <StatTile
-                className="col-span-2"
-                label="Simulated success rate"
-                value={formatPercent(outcome.summary.successProbability)}
-                hint={`Share of ${outcome.summary.runs.toLocaleString('en-US')} seeded paths with money left at age ${outcome.summary.lifeExpectancy}, retiring at ${outcome.summary.retirementAge}`}
-              />
-              <StatTile
-                label="Projected at retirement"
-                value={formatCurrency(outcome.summary.projectedBalanceToday)}
-                hint="Today's dollars"
-              />
-              <StatTile
-                label="Balance the 4% guideline implies"
-                value={formatCurrency(outcome.summary.requiredBalanceToday)}
-                hint="Today's dollars"
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Saving{' '}
-              <span className="font-medium tabular-nums text-foreground">
-                {formatCurrency(outcome.summary.lever.extraMonthly)}
-              </span>{' '}
-              more per month moves the simulated success rate from{' '}
-              <span className="tabular-nums">{formatPercent(outcome.summary.successProbability)}</span> to{' '}
-              <span className="font-medium tabular-nums text-foreground">
-                {formatPercent(outcome.summary.lever.successProbability)}
-              </span>{' '}
-              and the projected balance to{' '}
-              <span className="tabular-nums">{formatCurrency(outcome.summary.lever.projectedBalanceToday)}</span>{' '}
-              (same simulated markets).
-            </p>
-          </div>
+          <OddsFigures results={outcome.results} inputs={inputs} lever={outcome.lever} />
         )}
-      </div>
+      </SimulationRegion>
 
       <div className="mt-4">
-        <CardLinkButton href={retirementLink(profile) as Route}>Open the retirement calculator</CardLinkButton>
+        <CardLinkButton href={calculatorHref('retirement', { fromProfile: true }) as Route}>
+          Open the retirement calculator
+        </CardLinkButton>
       </div>
     </BaseCard>
+  );
+}
+
+interface OddsFiguresProps {
+  results: RetirementResults;
+  inputs: RetirementInputs;
+  lever: RetirementLever;
+}
+
+function OddsFigures({ results, inputs, lever }: OddsFiguresProps) {
+  const stats = oddsStats(results, inputs);
+  const success = stats.find((stat) => stat.id === 'success');
+  const successText = formatStatValue(success?.value ?? null, 'percent');
+
+  return (
+    <div className="space-y-4">
+      <StatGrid stats={stats} fullWidth={['success']} />
+      <p className="text-sm text-muted-foreground">
+        Saving{' '}
+        <span className="font-medium tabular-nums text-foreground">{formatCurrency(lever.extraMonthly)}</span>{' '}
+        more per month moves the simulated success rate from <span className="tabular-nums">{successText}</span> to{' '}
+        <span className="font-medium tabular-nums text-foreground">
+          {formatPercent(lever.successProbability)}
+        </span>{' '}
+        and the projected balance to{' '}
+        <span className="tabular-nums">{formatCurrency(lever.projectedBalanceToday)}</span> (same simulated markets).
+      </p>
+    </div>
   );
 }
 

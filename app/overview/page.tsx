@@ -4,7 +4,7 @@ import OverviewDashboard from '@/components/dashboard/OverviewDashboard';
 export const metadata: Metadata = {
   title: 'Your overview',
   description:
-    'One screen computed from your saved profile: this paycheck’s allocation, simulated retirement odds, the cash buffer under two strategy presets, and a leverage comparison for monthly contributions.',
+    'One screen computed from your saved profile: this paycheck\u2019s allocation, simulated retirement odds, the cash buffer under two strategy presets, and a leverage comparison for monthly contributions.',
   robots: { index: false },
 };
 
