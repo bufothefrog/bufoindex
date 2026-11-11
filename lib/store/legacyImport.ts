@@ -1,23 +1,60 @@
 /**
- * One-time import of a calculator's old localStorage inputs into the profile
- * (O7). The hand-written retirement and paycheck stores persisted their own
- * inputs ('retirement-calculator' v3, 'paycheck-allocator-storage'); the
- * profile is now the only record, so whatever the visitor changed there is
- * carried over once and the old key is removed.
+ * One-time import of the old calculators' localStorage inputs into the
+ * profile (O7). The hand-written retirement and paycheck stores persisted
+ * their own inputs ('retirement-calculator' v3, 'paycheck-allocator-storage');
+ * the profile is now the only record, so whatever the visitor changed there
+ * is carried over once and each old key is removed.
  *
- * Sequencing: call it on the client after the profile store has hydrated
- * (useProfileStore.getState().hasHydrated) and before the calculator's first
- * submit, so the first run already sees the imported values. On the server
- * and before hydration it does nothing and leaves the key in place, so the
- * caller can simply call it again once hydration is done.
+ * importLegacyStorage(LEGACY_IMPORTS) handles every old key in one call, in
+ * the list's order (lib/calculators/legacyImports.ts: paycheck, then
+ * retirement), each against the profile as the previous key left it, so the
+ * result does not depend on which page runs it. Call it on the client after
+ * the profile store has hydrated and before a calculator's first submit; on
+ * the server and before hydration it does nothing and leaves the keys in
+ * place.
+ *
+ * The rule, the same for every group of coupled paths: a key's writes are
+ * taken per group (writeGroups) and a group is imported or skipped whole. A
+ * group that differs from what the bindings write for the frozen old
+ * defaults is the visitor's own: imported, its paths marked provided. A
+ * group equal to the old defaults is imported unprovided, and only when an
+ * old default differs from the shared profile's default (legacyDefaultGaps).
+ * A provided path is never written, and a group is skipped when one of its
+ * provided paths holds another value than the group would write, or when it
+ * would leave an answered take-home pay above the gross pay. After each key,
+ * an unanswered take-home pay keeps the share of gross pay it had in its
+ * record (the key's own pay record when it has one, else the profile's
+ * before that key), written unprovided and never above gross pay
+ * (takeHomeAtShare).
+ *
+ * What follows, and is accepted:
+ * - Both old keys hold the visitor's own pay: the paycheck record (gross,
+ *   take-home, frequency) stays; the retirement salary is dropped unless it
+ *   writes the same values.
+ * - Only the retirement salary is the visitor's own: it is imported, and the
+ *   take-home pay keeps its share of gross pay.
+ * - Pay answered in the new site before the import (the intake does not run
+ *   it): an old pay group that conflicts with any answered pay path is
+ *   skipped whole, not merged (only take-home pay answered: the paycheck
+ *   record is not imported; only the frequency: a monthly salary in another
+ *   frequency is not; only gross pay: a paycheck record with another gross
+ *   is not).
+ * - Both keys untouched on pay: the later key's old default may replace the
+ *   earlier one's (both unprovided).
+ * - Only take-home pay answered: a retirement salary with a frequency of its
+ *   own (monthly, semi-monthly, bi-weekly) meets no answered path, so it
+ *   moves the unanswered frequency and the answered amount stays as it is.
+ *
+ * A saved future-dollars display mode in any old key becomes the shared
+ * preference once (importDisplayMode). Never throws; a corrupt or foreign
+ * payload is removed unread and does not stop the other key.
  */
 
-import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
-import { fromEngineInputs, stableKey } from '@/lib/fields/binding';
+import type { LegacyImport, LegacyStorage } from '@/lib/calculators/types';
+import { fromEngineInputs, stableKey, type Binding } from '@/lib/fields/binding';
 import { getAt, isRecord } from '@/lib/fields/paths';
 import type { Get, Write } from '@/lib/fields/types';
 import { GROSS_PAY, NET_PAY, PAY_FREQUENCY } from '@/lib/fields/shared';
-import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import { getDefaultFinancialProfile, providedPathFor } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
@@ -27,14 +64,13 @@ import { useProfileStore } from '@/lib/store/profileStore';
 /**
  * The writes that reproduce `engine` and `defaults` in the profile `get`
  * reads, side by side, one pair per group of coupled paths. Each binding
- * starts a group; groups that write
- * a common path (the 1:1 binding of an amount and the derived binding that
- * writes the amount with its unit) are merged, so coupled paths are always
- * compared, kept or skipped together. Within a group the first write to a
- * path wins.
+ * starts a group; groups that write a common path (the 1:1 binding of an
+ * amount and the derived binding that writes the amount with its unit) are
+ * merged, so coupled paths are always compared, kept or skipped together.
+ * Within a group the first write to a path wins.
  */
-function writeGroups<E, R>(def: CalculatorDefinition<E, R>, engine: E, defaults: E, get: Get): [Write[], Write[]][] {
-  const pairs = def.bindings.map((binding) => [fromEngineInputs([binding], engine, get), fromEngineInputs([binding], defaults, get)]);
+function writeGroups<E>(bindings: readonly Binding<E>[], engine: E, defaults: E, get: Get): [Write[], Write[]][] {
+  const pairs = bindings.map((binding) => [fromEngineInputs([binding], engine, get), fromEngineInputs([binding], defaults, get)]);
   let groups: { paths: Set<string>; members: number[] }[] = [];
   pairs.forEach(([fromEngine, fromDefaults], i) => {
     const merged = { paths: new Set([...fromEngine, ...fromDefaults].map((write) => write.path)), members: [i] };
@@ -73,17 +109,8 @@ function readEngine<E>(legacy: LegacyStorage<E>, payload: unknown): E | null {
   }
 }
 
-/**
- * The old keys whose envelope kept the dollar display mode
- * (`state.displayMode`): the retirement and paycheck stores' storageKey
- * (test/lib/store/legacyImport.test.ts pins the two in step).
- */
-export const LEGACY_DISPLAY_MODE_KEYS: readonly string[] = ['retirement-calculator', 'paycheck-allocator-storage'];
-
-/** The parsed JSON under `key`; null when it is missing or not JSON. */
-function readJson(storage: Storage, key: string): unknown {
-  const raw = storage.getItem(key);
-  if (raw === null) return null;
+/** The parsed JSON in `raw`; null when it is not JSON. */
+function parseJson(raw: string): unknown {
   try {
     return JSON.parse(raw) as unknown;
   } catch {
@@ -91,36 +118,18 @@ function readJson(storage: Storage, key: string): unknown {
   }
 }
 
-/** The old envelope's state record, when `payload` holds one with a display mode. */
-function stateWithMode(payload: unknown): Record<string, unknown> | null {
-  return isRecord(payload) && isRecord(payload.state) && 'displayMode' in payload.state ? payload.state : null;
-}
-
 /**
  * Both old stores persisted the visitor's dollar display mode next to their
- * inputs. The first import that meets one settles the shared preference
- * (O15) once, from every old key still present: a saved future-dollars
- * choice ('nominal') in any of them becomes the preference while it is
- * still at its default. The mode is then removed from the other keys still
- * waiting for their own calculator, so a later import of those inputs
- * cannot undo a choice the visitor made in between. The preference store
- * writes its key as soon as it hydrates, so the key's presence does not
- * tell whether a mode was ever chosen; the old keys are the older record.
+ * inputs (`state.displayMode`). A saved future-dollars choice ('nominal') in
+ * any of `payloads` becomes the shared preference (O15) while it is still at
+ * its default. The preference store writes its key as soon as it hydrates,
+ * so the key's presence does not tell whether a mode was ever chosen; the
+ * old keys are the older record.
  */
-function importDisplayMode(storage: Storage, ownKey: string, ownPayload: unknown): void {
-  const others = LEGACY_DISPLAY_MODE_KEYS.filter((key) => key !== ownKey).map((key) => ({ key, payload: readJson(storage, key) }));
-  const states = [ownPayload, ...others.map((other) => other.payload)].map(stateWithMode);
-  if (states.every((state) => state === null)) return;
+function importDisplayMode(payloads: readonly unknown[]): void {
+  const nominal = payloads.some((payload) => isRecord(payload) && isRecord(payload.state) && payload.state.displayMode === 'nominal');
   const preferences = usePreferencesStore.getState();
-  if (states.some((state) => state?.displayMode === 'nominal') && preferences.displayMode === DEFAULT_DOLLAR_DISPLAY_MODE) {
-    preferences.setDisplayMode('nominal');
-  }
-  others.forEach(({ key, payload }, i) => {
-    const state = states[i + 1];
-    if (state === null) return;
-    delete state.displayMode;
-    storage.setItem(key, JSON.stringify(payload));
-  });
+  if (nominal && preferences.displayMode === DEFAULT_DOLLAR_DISPLAY_MODE) preferences.setDisplayMode('nominal');
 }
 
 /**
@@ -134,15 +143,13 @@ function profileDefaultGaps(defaults: readonly Write[], profileDefaults: Financi
 /**
  * The profile paths where a calculator's frozen old default and the shared
  * profile's default disagree (in binding order). A visitor who left such a
- * value untouched saw the old default, so the import carries it over
- * (importLegacyCalculatorStorage); test/lib/store/legacyImport.test.ts
- * pins the list for each legacy calculator.
+ * value untouched saw the old default, so the import carries it over;
+ * test/lib/store/legacyImport.test.ts pins the list for each legacy calculator.
  */
-export function legacyDefaultGaps<E, R>(def: CalculatorDefinition<E, R>): string[] {
-  if (!def.legacy) return [];
-  const defaults = def.legacy.storageDefaults();
+export function legacyDefaultGaps<E>({ legacy, bindings }: LegacyImport<E>): string[] {
+  const defaults = legacy.storageDefaults();
   const profileDefaults = getDefaultFinancialProfile();
-  return writeGroups(def, defaults, defaults, (path) => getAt(profileDefaults, path)).flatMap(([, writes]) =>
+  return writeGroups(bindings, defaults, defaults, (path) => getAt(profileDefaults, path)).flatMap(([, writes]) =>
     profileDefaultGaps(writes, profileDefaults).map((write) => write.path)
   );
 }
@@ -158,59 +165,9 @@ interface PayRecord {
   frequency: unknown;
 }
 
-/** The pay record `profile` holds. */
-const payRecord = (profile: FinancialProfile): PayRecord => ({
-  gross: profile.income.grossPerPaycheck,
-  net: profile.income.netPerPaycheck,
-  frequency: profile.income.frequency,
-});
-
 /** The value `group` writes at `path`; undefined when it does not write it. */
 function valueAt(group: readonly Write[], path: string): unknown {
   return group.find((write) => write.path === path)?.value;
-}
-
-/** Paychecks per year of `frequency`; undefined when it is not a pay frequency. */
-const perYear = (frequency: unknown): number | undefined =>
-  typeof frequency === 'string' && frequency in PAY_FREQUENCY_META ? PAY_FREQUENCY_META[frequency as PayFrequency].perYear : undefined;
-
-const toCents = (value: number) => Math.round(value * 100) / 100;
-
-/**
- * The pay rule, for a group that would move the frequency: an answered
- * frequency pins the per-paycheck amounts (the group then fails the
- * answered-path check and is skipped), while an amount answered without its
- * frequency is an annual amount (amount x paychecks per year of the
- * frequency the profile holds). When every such answered amount is written
- * by the group at the same annual value (within a cent per held paycheck,
- * the rounding of an amount carried into that frequency), the group is the
- * same pay in a frequency of its own: it is imported whole, those answered
- * amounts with it (`rewrite`). Otherwise the group's amounts are carried to
- * the held frequency at the same annual value, rounded to the cent, and its
- * frequency is dropped. A group that keeps the frequency, or meets no
- * answered amount, is returned as it is.
- */
-function carryPay(group: readonly Write[], profile: FinancialProfile, provided: ReadonlySet<string>): { group: readonly Write[]; rewrite: string[] } {
-  const held = profile.income.frequency;
-  const to = valueAt(group, FREQUENCY_PATH);
-  const unchanged = { group, rewrite: [] };
-  if (to === undefined || stableKey(to) === stableKey(held) || provided.has(FREQUENCY_PATH)) return unchanged;
-  const amounts = [GROSS_PATH, NET_PATH].filter((path) => provided.has(path));
-  const [toYear, heldYear] = [perYear(to), perYear(held)];
-  if (amounts.length === 0 || toYear === undefined || heldYear === undefined) return unchanged;
-  const sameAnnual = (path: string) => {
-    const [value, answer] = [valueAt(group, path), getAt(profile, path)];
-    return typeof value === 'number' && typeof answer === 'number' && Math.abs(value * toYear - answer * heldYear) <= 0.005 * heldYear + 1e-9;
-  };
-  if (amounts.every(sameAnnual)) return { group, rewrite: amounts };
-  const carried = group
-    .filter((write) => write.path !== FREQUENCY_PATH)
-    .map((write) =>
-      (write.path === GROSS_PATH || write.path === NET_PATH) && typeof write.value === 'number'
-        ? { path: write.path, value: toCents((write.value * toYear) / heldYear) }
-        : write
-    );
-  return { group: carried, rewrite: [] };
 }
 
 /** False when `group` would leave an answered take-home pay above the gross pay. */
@@ -237,105 +194,74 @@ function takeHomeAtShare(record: PayRecord, profile: FinancialProfile): Write | 
 }
 
 /**
- * Imports `def.legacy.storageKey` into the profile, then removes the key.
- *
- * The writes are taken per group of coupled paths (writeGroups), each in
- * the profile as it is before the import, and a group is imported or
- * skipped whole:
- *
- * - A group whose writes differ from what the same bindings write for
- *   def.legacy.storageDefaults() holds the visitor's own values: it is
- *   imported and its paths are marked provided.
- * - A group equal to the old defaults is imported only when one of those
- *   old defaults is not the shared profile's default (legacyDefaultGaps),
- *   so the visitor keeps seeing what the old calculator showed them. These
- *   values were never answered, so they are written unprovided: the intake
- *   still asks for them, and a later import of the other old key (which
- *   may hold the visitor's own answer) can still write them.
- * - A path already marked provided is never written (an answer given since
- *   always wins), and a group is skipped when one of its provided paths
- *   holds another value than the group would write, so coupled paths (an
- *   amount and its unit) never split. An answered take-home pay must also
- *   stay at most the gross pay (keepsTakeHomeUnderGross).
- *
- * Pay is gross and take-home pay per paycheck of a frequency, and it has
- * one rule (carryPay): an answered frequency pins the per-paycheck amounts;
- * an amount answered without its frequency is compared and carried by
- * annual value. So a group that would move an unanswered frequency under an
- * answered amount is imported whole, with its own frequency, when it holds
- * every answered amount at the same annual value, and is otherwise carried
- * to the held frequency at the same annual income (its frequency dropped)
- * before the checks above. An old amount with no frequency of its own (the
- * retirement calculator's yearly or hourly income) is always in the held
- * frequency: its binding writes it there at the same annual income.
- *
- * Take-home pay: after the groups, an unanswered take-home pay is carried
- * to the gross pay and frequency the profile ends up with at the share of
- * gross pay it had in its record (takeHomeAtShare), written unprovided. Its
- * record is the old key's own pay record when the key has one (the paycheck
- * income group, imported or skipped), else the profile's before the import.
- * That is the one exception to keeping the visitor's numbers: when the old
- * key's pay lost to a pay of another annual income answered before it (by
- * the visitor, or by the other old key imported first), its take-home pay
- * is kept as the same share of the gross pay that stays.
- *
- * setValues refuses any value that is not a valid profile value. A saved
- * future-dollars display mode is carried into the shared preference once,
- * from every old key (importDisplayMode). The key is removed even when its
- * payload is corrupt or foreign, since nothing else will ever read it.
- *
- * Idempotent: once the key is gone a call does nothing. Never throws.
- * Returns the profile paths it passed to setValues as the visitor's answers
- * (a refused value among them stays unprovided); the unprovided writes of
- * untouched old defaults and of the take-home pay's share are not listed.
+ * Imports one old key's `payload` into the profile as it is now, by the rule
+ * in the module docblock, then removes the key. setValues refuses any value
+ * that is not a valid profile value. Returns the paths it passed to
+ * setValues as the visitor's answers.
  */
-export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E, R>): string[] {
-  const legacy = def.legacy;
-  if (!legacy || typeof window === 'undefined') return [];
+function importKey<E>({ legacy, bindings }: LegacyImport<E>, payload: unknown, storage: Storage): string[] {
   const profileStore = useProfileStore.getState();
-  if (!profileStore.hasHydrated) return [];
+  const { profile } = profileStore;
+  const engine = payload === null ? null : readEngine(legacy, payload);
+  const answers: Write[] = [];
+  const untouched: Write[] = [];
+  let record: PayRecord = { gross: profile.income.grossPerPaycheck, net: profile.income.netPerPaycheck, frequency: profile.income.frequency };
+  if (engine !== null) {
+    const provided = new Set(profile.provided);
+    const profileDefaults = getDefaultFinancialProfile();
+    const get = (path: string) => getAt(profile, path);
+    for (const [group, defaults] of writeGroups(bindings, engine, legacy.storageDefaults(), get)) {
+      if (group.length === 0) continue;
+      const changed = groupKey(group) !== groupKey(defaults);
+      if (!changed && profileDefaultGaps(defaults, profileDefaults).length === 0) continue;
+      if (group.some((write) => write.path === NET_PATH)) {
+        record = { gross: valueAt(group, GROSS_PATH), net: valueAt(group, NET_PATH), frequency: valueAt(group, FREQUENCY_PATH) };
+      }
+      const providedPaths = group.map((write) => providedPathFor(write.path));
+      const answered = providedPaths.map((path) => path !== null && provided.has(path));
+      const holds = (write: Write) => stableKey(getAt(profile, write.path)) === stableKey(write.value);
+      if (!group.every((write, j) => !answered[j] || holds(write))) continue;
+      if (!keepsTakeHomeUnderGross(group, profile, provided)) continue;
+      group.forEach((write, j) => {
+        if (providedPaths[j] !== null && !answered[j]) (changed ? answers : untouched).push(write);
+      });
+    }
+  }
+  // Already provided paths stay provided; untouched old defaults add none.
+  if (untouched.length > 0) profileStore.setValues(untouched, { provide: [] });
+  if (answers.length > 0) profileStore.setValues(answers);
+  const imported = useProfileStore.getState().profile;
+  const share = imported.provided.includes(NET_PATH) ? null : takeHomeAtShare(record, imported);
+  if (share) profileStore.setValues([share], { provide: [] });
+  storage.removeItem(legacy.storageKey);
+  return answers.map((write) => write.path);
+}
 
+/**
+ * Imports every old key of `imports` still in localStorage, in order, then
+ * removes each (see the module docblock). Idempotent: once the keys are gone
+ * a call does nothing. Never throws; when storage is blocked nothing
+ * changes. Returns the profile paths passed to setValues as the visitor's
+ * answers (a refused value among them stays unprovided); the unprovided
+ * writes of old defaults and of the take-home pay's share are not listed.
+ */
+export function importLegacyStorage<T extends readonly unknown[]>(imports: { readonly [K in keyof T]: LegacyImport<T[K]> }): string[] {
+  if (typeof window === 'undefined' || !useProfileStore.getState().hasHydrated) return [];
   try {
     const storage = window.localStorage;
-    if (storage.getItem(legacy.storageKey) === null) return [];
-
-    const payload = readJson(storage, legacy.storageKey);
-    const engine = payload === null ? null : readEngine(legacy, payload);
-    const answers: Write[] = [];
-    const untouched: Write[] = [];
-    const { profile } = profileStore;
-    let takeHome = payRecord(profile);
-    if (engine !== null) {
-      const provided = new Set(profile.provided);
-      const profileDefaults = getDefaultFinancialProfile();
-      const get = (path: string) => getAt(profile, path);
-      for (const [saved, defaults] of writeGroups(def, engine, legacy.storageDefaults(), get)) {
-        if (saved.length === 0) continue;
-        const changed = groupKey(saved) !== groupKey(defaults);
-        if (!changed && profileDefaultGaps(defaults, profileDefaults).length === 0) continue;
-        if (saved.some((write) => write.path === NET_PATH)) {
-          takeHome = { gross: valueAt(saved, GROSS_PATH), net: valueAt(saved, NET_PATH), frequency: valueAt(saved, FREQUENCY_PATH) };
-        }
-        const { group, rewrite } = carryPay(saved, profile, provided);
-        const providedPaths = group.map((write) => providedPathFor(write.path));
-        const answered = providedPaths.map((path) => path !== null && provided.has(path) && !rewrite.includes(path));
-        const holds = (write: Write) => stableKey(getAt(profile, write.path)) === stableKey(write.value);
-        if (!group.every((write, j) => !answered[j] || holds(write))) continue;
-        if (!keepsTakeHomeUnderGross(group, profile, provided)) continue;
-        group.forEach((write, j) => {
-          if (providedPaths[j] !== null && !answered[j]) (changed ? answers : untouched).push(write);
-        });
+    const present = imports.flatMap((item) => {
+      const raw = storage.getItem(item.legacy.storageKey);
+      return raw === null ? [] : [{ item, payload: parseJson(raw) }];
+    });
+    importDisplayMode(present.map(({ payload }) => payload));
+    const answered = present.flatMap(({ item, payload }) => {
+      try {
+        return importKey(item, payload, storage);
+      } catch {
+        return [];
       }
-    }
-    importDisplayMode(storage, legacy.storageKey, payload);
-    // Already provided paths stay provided; untouched old defaults add none.
-    if (untouched.length > 0) profileStore.setValues(untouched, { provide: [] });
-    if (answers.length > 0) profileStore.setValues(answers);
-    const imported = useProfileStore.getState().profile;
-    const share = imported.provided.includes(NET_PATH) ? null : takeHomeAtShare(takeHome, imported);
-    if (share) profileStore.setValues([share], { provide: [] });
-    storage.removeItem(legacy.storageKey);
-    return [...new Set(answers.map((write) => write.path))];
+    });
+    return [...new Set(answered)];
   } catch {
     // Storage is blocked (e.g. a privacy mode): leave everything as it is.
     return [];

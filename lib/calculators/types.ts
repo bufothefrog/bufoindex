@@ -42,6 +42,12 @@ export interface LegacyStorage<E> {
   storageDefaults(): E;
 }
 
+/** What the one-time import reads of a calculator: its old storage and its bindings. */
+export interface LegacyImport<E> {
+  legacy: LegacyStorage<E>;
+  bindings: readonly Binding<E>[];
+}
+
 export interface CalculatorDefinition<E, R> {
   id: CalculatorId;
   form: FormSpec;
