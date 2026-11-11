@@ -71,3 +71,53 @@ in retirement.ts.
 - s3: Disclaimer can back DisclaimerFooter (`text` is required); the bootstrap strips `?from=profile` (PROFILE_HANDOFF_PARAM / VALUE).
 - w1: intake still writes `investing.newCashThisMonth` (mirrored into the deposit). Decide whether a provided new cash should mark `portfolio.accounts`. Wizard tests now expect the `?from=profile` links.
 - Later owners: c5 derives portfolioRebalancingStore defaults from the profile; d1 must label a 'custom' target mix in OverviewDashboard; c4 decides tabs vs radios for the PayrollSetupGuide tier picker; d1 moving StrategyToggle to SegmentedControl changes it to radios; c7 picks grid opacity 0.4 vs 0.3; x2 drops the `variant` aliases and adds the new primitives to /demo.
+
+## Review notes for later phases
+
+Collected from the phase 1 reviews. Each is a fact about the foundations that a later slice has to design around.
+
+Open follow-ups (small, owned by phase 2):
+
+- lib/fields/binding.ts: the engineErrorsToFields doc says the last of equally long bindings is the one whose value toEngineInputs keeps. That is not true when the later binding reads undefined: toEngineInputs skips undefined and keeps the earlier value, but the error still goes to the later binding. Correct the comment or the tie-break (s1).
+- lib/fields/runtime.ts formats bounds in validation messages with a private Intl.NumberFormat (BOUND_FORMAT), because no lib/format option reproduces those messages (unit prefix and suffix, up to 2 decimals). Move it onto lib/format only if the messages stay byte-identical; otherwise record why it stays (s2).
+
+lib/fields:
+
+- rowGet scopes a row field's callbacks (visibleWhen, options, help, summary) to that row. A row field cannot read top-level profile paths, so a row whose options depend on another list (a holding's account) has to be a custom renderer (c5).
+- validateFields has no surface filter. Without a screen it validates every visible field of the form, intake-only screens included. A calculator page that should validate only what it shows loops screensFor(form, get, { mode: 'all', surface: 'calculator' }) and validates per screen (s1, s3).
+- validateFields merges relation errors into the field map under checkOn. The wizard shows relations as a screen-level alert, so it subtracts relationErrors(...) from the inline errors to avoid showing a message twice (w1).
+- A derived binding with errorPath maps every engine error under its engine path to that one path, row errors included: the row index is lost. If a calculator needs per-row errors, bind that list 1:1 (c3, c5).
+- Dynamic options that resolve to an empty list switch off the option-membership check.
+- toEngineInputs does not clone. Engine inputs share arrays and objects with the profile store, so engines must not mutate their inputs.
+- setAt creates an array for a missing container when the next segment is numeric. Writing a numeric-keyed record entry into a missing record throws RangeError, so engine bases pre-create such records.
+- An empty list fails minRows above 0. Infinity and -Infinity fail numeric validation.
+
+lib/profile and the store:
+
+- leverageLink carries profile.leverage overrides but not assumptions.leverage; the leverage page reads those from the query today. c7 reads them from the profile.
+- zustand persist calls migrate for every stored version that differs from the current one, including higher ones. The store never overwrites a payload saved by a newer version: the session works on a normalized copy and does not persist. Keep that in mind for any later version bump.
+- classTargets.accountId accepts an empty string; c5 reducers treat '' as dangling.
+- Unmigrated retirement, paycheck and portfolio pages keep ?from=profile in the address bar after a handoff. The s3 bootstrap strip removes it once each calculator moves onto CalculatorPage.
+- PAY_FREQUENCY_META.perYear and mappers.PAYCHECKS_PER_YEAR are two derivations of one table until x1 deletes the mappers. Bindings use PAY_FREQUENCY_META.
+
+lib/format and labels:
+
+- Replacing formatPct or the PercentInput formatPercent with formatPercent({ digits }) turns "-0.0%" into "0.0%" for tiny negatives. Replacing formatLeverage with formatMultiple turns NaN and Infinity into "-".
+- c6: the rebalancer drift column needs formatPercent(d, { digits: 1, signed: d > 0 }); signed: true would print U+2212 where the page prints a hyphen-minus today.
+
+Results and chart primitives:
+
+- SegmentedControl has no disabled-option support. None of the four implementations it replaces needs one; a field renderer that needs a disabled choice adds it there, skipping disabled options in the roving and arrow logic (s2).
+- StatTile's tone colours the border and surface only; the figure is always text-foreground. A calculator that wants a coloured figure gets a tinted tile instead (c2).
+- StatGrid columns=2 is two columns on a phone. Retirement and leverage use one column on a phone and two from md today, so c2 and c7 pass columns=1 with className "md:grid-cols-2", or accept the change.
+- KeyValueList prints the prefix before the missing-value glyph when a numeric item is null; callers omit the prefix for null values.
+- The dashboard CashBufferCard prints "-" for a missing months-on-hand and StatTile prints U+2014; d1 changes that glyph when it migrates.
+- DataTable numeric cells do not add font-mono. The rebalancer tables use font-mono today, so c6 passes it per cell or accepts the change.
+- useChartTheme throws outside ThemeProvider. Chart component tests need ThemeProvider and a matchMedia stub.
+- useChartTheme reads getChartTheme() in its useState initializer. A chart mounted in the same commit as a theme switch could keep the old palette; mount charts after the theme settles (deferUntilVisible helps) (c2, c7).
+- CHART_FONT_MONO_FALLBACK repeats the --font-mono value in app/globals.css for the server render. Change both together.
+
+Test helpers:
+
+- Tests that use nextNavigationFactory either import '@/test/utils/navigation' before any module that loads next/navigation, or use the async form: vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory()).
+- resetProfileStore and renderWithProfile mark every seeded leaf as provided, at any depth.
