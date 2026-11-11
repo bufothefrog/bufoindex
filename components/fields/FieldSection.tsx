@@ -73,11 +73,13 @@ export function FieldSection({
   const canRestore = screen.tier === 'assumption' && onRestoreDefaults !== undefined;
   const sectionName = screen.title.toLowerCase();
 
-  // The controls wrap onto a second line rather than push the header past
-  // the card on a phone; on wider screens they stay on one line.
+  // The controls share one wrapping row (a named group) rather than sit
+  // straight in the card header, so on a phone the toggle moves under
+  // Restore defaults instead of pushing the header past the card; on wider
+  // screens they stay on one line.
   const actions =
     canRestore || onToggle ? (
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div role="group" aria-label={`Controls for ${sectionName}`} className="flex flex-wrap items-center justify-end gap-2">
         {canRestore && (
           <Button
             type="button"
