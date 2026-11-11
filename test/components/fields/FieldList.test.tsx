@@ -343,4 +343,44 @@ describe('FieldList', () => {
     await user.click(screen.getByRole('button', { name: 'Add to debts' }));
     expect(useProfileStore.getState().profile.debts.map((debt) => debt.id)).toEqual(['debts-2', 'debts-3', 'debts-4']);
   });
+
+  it.each([
+    ['portfolio.accounts', true],
+    ['portfolio.securities', true],
+    ['portfolio.customAssetClasses', true],
+    ['portfolio.holdings', false],
+    ['portfolio.classTargets', false],
+  ] as const)('without newRow, %s offers Add only when the store keeps a bare row (%s)', async (path, addable) => {
+    const user = userEvent.setup();
+    resetProfileStore();
+    const spec: FieldSpec = { path, kind: 'list', label: 'Rows', addLabel: 'Add row', tier: 'details', row: [] };
+    function ProfileRows() {
+      const profile = useProfileStore((state) => state.profile);
+      return (
+        <FieldList
+          spec={spec}
+          get={makeGet(profile)}
+          onWrite={(writes) => useProfileStore.getState().setValues(writes)}
+          errors={{}}
+        />
+      );
+    }
+    render(<ProfileRows />);
+    const count = () => (makeGet(useProfileStore.getState().profile)(path) as unknown[]).length;
+    const before = count();
+    if (addable) {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Add row' }));
+      expect(count()).toBe(before + 1);
+    } else {
+      expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(`The list "${path}" needs a newRow`);
+    }
+  });
+
+  it('keeps Add for a list outside the profile without newRow', () => {
+    const spec: FieldSpec = { path: 'fixture.rows', kind: 'list', label: 'Rows', addLabel: 'Add row', tier: 'details', row: [] };
+    render(<FieldList spec={spec} get={() => []} onWrite={() => undefined} errors={{}} />);
+    expect(screen.getByRole('button', { name: 'Add row' })).toBeInTheDocument();
+  });
 });

@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { joinPath } from '@/lib/fields/paths';
 import { isFieldVisible, listRows, resolveText, rowGet } from '@/lib/fields/runtime';
 import type { FieldErrors, FieldSpec, Write } from '@/lib/fields/types';
+import {
+  PROFILE_LIST_PATHS,
+  applyProfileWrites,
+  getDefaultFinancialProfile,
+  getProfileValue,
+} from '@/lib/profile/defaults';
 import { cn } from '@/lib/utils';
+import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { CustomSlot } from './CustomSlot';
 import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import type { FieldInputProps, FieldListProps } from './types';
@@ -53,6 +60,26 @@ function freshRowId(listPath: string, rows: readonly Record<string, unknown>[]):
   return `${base}-${n}`;
 }
 
+const bareRowAccepted = new Map<string, boolean>();
+
+/**
+ * Whether the profile store keeps a row that has only an id at `listPath`.
+ * Rows of debts, accounts, securities and custom asset classes take their
+ * other fields from the row defaults; holdings (accountId, securityId) and
+ * class targets (assetClass) need more, so a bare row would be dropped.
+ * Paths outside the profile's lists are not checked.
+ */
+function acceptsBareRow(listPath: string): boolean {
+  if (!(PROFILE_LIST_PATHS as readonly string[]).includes(listPath)) return true;
+  let accepted = bareRowAccepted.get(listPath);
+  if (accepted === undefined) {
+    const { profile } = applyProfileWrites(getDefaultFinancialProfile(), [{ path: listPath, value: [{ id: 'row-1' }] }]);
+    accepted = (getProfileValue(profile, listPath) as unknown[]).length === 1;
+    bareRowAccepted.set(listPath, accepted);
+  }
+  return accepted;
+}
+
 /**
  * An editable list of rows (debts, portfolio accounts). Use FieldList
  * (exported from FieldInput.tsx and the components/fields index), which
@@ -67,7 +94,10 @@ function freshRowId(listPath: string, rows: readonly Record<string, unknown>[]):
  *   give the row an id no other row has, or the profile store refuses the
  *   write. Without newRow the row is { id: freshRowId(...) }; the profile
  *   store fills the other fields from the list's row defaults (and drops the
- *   id for a list whose rows have none);
+ *   id for a list whose rows have none). A profile list whose rows need more
+ *   than an id (portfolio.holdings, portfolio.classTargets) must have newRow:
+ *   without it the list shows an alert in place of Add, a schema bug made
+ *   visible as CustomSlot does for a missing renderer;
  * - remove: '<list>' = the rows without that one (indices stay canonical),
  *   then spec.removeRow(get, i), whose Get still sees the row being removed
  *   so a cascade can read its id.
@@ -94,6 +124,7 @@ export function FieldListBase({
   const canAdd = spec.maxRows === undefined || rows.length < spec.maxRows;
   const canRemove = rows.length > minRows;
   const large = size === 'lg';
+  const missingNewRow = !spec.newRow && !acceptsBareRow(spec.path);
 
   const add = () => {
     onWrite([{ path: joinPath(spec.path, rows.length), value: spec.newRow?.(get) ?? { id: freshRowId(spec.path, rows) } }]);
@@ -205,17 +236,23 @@ export function FieldListBase({
         />
       )}
 
-      <Button
-        ref={addRef}
-        type="button"
-        variant="outline"
-        onClick={add}
-        disabled={!canAdd}
-        className={cn('gap-2', large && 'h-12 w-full text-base')}
-      >
-        <Plus className="h-4 w-4" aria-hidden="true" />
-        {spec.addLabel ?? `Add to ${spec.label.toLowerCase()}`}
-      </Button>
+      {missingNewRow ? (
+        <StatusAlert tone="negative" appearance="tinted" role="alert" title="Missing newRow">
+          {`The list "${spec.path}" needs a newRow: a row with only an id is not a valid row there.`}
+        </StatusAlert>
+      ) : (
+        <Button
+          ref={addRef}
+          type="button"
+          variant="outline"
+          onClick={add}
+          disabled={!canAdd}
+          className={cn('gap-2', large && 'h-12 w-full text-base')}
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {spec.addLabel ?? `Add to ${spec.label.toLowerCase()}`}
+        </Button>
+      )}
 
       <FieldMessages id={id} help={help} error={error} />
     </div>
