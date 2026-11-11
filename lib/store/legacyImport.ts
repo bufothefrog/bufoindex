@@ -181,48 +181,63 @@ function finerIncomeRecord(group: readonly Write[], answered: readonly boolean[]
   return Math.abs(ownGross * ownPerYear - profile.income.grossPerPaycheck * heldPerYear) <= tolerance;
 }
 
-/**
- * The take-home pay that goes with a group that moves the pay frequency but
- * writes no take-home pay of its own (the retirement income group writes
- * only gross and frequency): the profile's take-home pay converted to the
- * new frequency, so its annual amount stays the same and it never sits under
- * another frequency's unit. Undefined when the group leaves the frequency
- * alone or writes the take-home pay itself; null when the take-home pay was
- * answered (the group is then skipped, since an answer given since wins and
- * cannot be converted without changing what the visitor typed).
- */
-function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, provided: ReadonlySet<string>): Write | null | undefined {
-  const frequency = group.find((write) => write.path === FREQUENCY_PATH);
-  if (!frequency || group.some((write) => write.path === NET_PATH)) return undefined;
-  if (stableKey(frequency.value) === stableKey(profile.income.frequency)) return undefined;
-  if (provided.has(NET_PATH)) return null;
-  const ownPerYear = paychecksPerYear(frequency.value);
-  const heldPerYear = paychecksPerYear(profile.income.frequency);
-  if (ownPerYear === null || heldPerYear === null) return null;
-  const value = Math.round(((profile.income.netPerPaycheck * heldPerYear) / ownPerYear) * 100) / 100;
-  return { path: NET_PATH, value };
+/** The value `group` writes at `path`; undefined when it does not write it. */
+function valueAt(group: readonly Write[], path: string): unknown {
+  return group.find((write) => write.path === path)?.value;
+}
+
+/** Gross and take-home pay per paycheck of `frequency`, as stored (unchecked). */
+interface PayRecord {
+  gross: unknown;
+  net: unknown;
+  frequency: unknown;
 }
 
 /**
- * The take-home pay of a skipped income group, carried over to the pay
- * answered since. When a group writes the whole per-paycheck income record
- * but the answered gross and frequency describe another income (e.g. the
- * retirement key's newer salary), the group is skipped and its take-home pay
- * would be lost with the old key. If the take-home pay itself is still
- * unanswered, it is kept at the share of gross pay the visitor saved
- * (net / gross, the same in any frequency) applied to the answered gross.
- * Undefined when the group is not such a record or the share cannot be
- * formed.
+ * The one rule for a take-home pay that has to follow a pay it was not
+ * saved with: it keeps the share of gross pay it had (net / gross, which is
+ * the same in any frequency), applied to the new gross per paycheck of the
+ * new frequency, rounded to the cent and never above the new gross. When
+ * that share cannot be formed (the held gross is not positive, or the share
+ * is not finite or is above 1), it is the smaller of the take-home pay
+ * converted to the new frequency at the same yearly amount and the new
+ * gross. Undefined when the new gross or the take-home pay is not a finite
+ * number, or the fallback has no frequency to convert between.
  */
-function takeHomeShareOfAnsweredPay(group: readonly Write[], answered: readonly boolean[], profile: FinancialProfile): Write | undefined {
-  const at = (path: string) => group.findIndex((write) => write.path === path);
-  const [gross, net, frequency] = [at(GROSS_PATH), at(NET_PATH), at(FREQUENCY_PATH)];
-  if (gross < 0 || net < 0 || frequency < 0 || answered[net] || !answered[gross] || !answered[frequency]) return undefined;
-  const ownGross = group[gross].value;
-  const ownNet = group[net].value;
-  if (typeof ownGross !== 'number' || typeof ownNet !== 'number' || !(ownGross > 0) || !Number.isFinite(ownNet)) return undefined;
-  const value = Math.round(((ownNet / ownGross) * profile.income.grossPerPaycheck) * 100) / 100;
-  return Number.isFinite(value) ? { path: NET_PATH, value } : undefined;
+function takeHomeAtShare(held: PayRecord, gross: unknown, frequency: unknown): Write | undefined {
+  if (typeof gross !== 'number' || !Number.isFinite(gross)) return undefined;
+  if (typeof held.net !== 'number' || !Number.isFinite(held.net)) return undefined;
+  const cents = (value: number) => Math.min(Math.round(value * 100) / 100, gross);
+  const share = typeof held.gross === 'number' && held.gross > 0 ? held.net / held.gross : Number.NaN;
+  if (Number.isFinite(share) && share <= 1) return { path: NET_PATH, value: cents(share * gross) };
+  const heldPerYear = paychecksPerYear(held.frequency);
+  const newPerYear = paychecksPerYear(frequency);
+  if (heldPerYear === null || newPerYear === null) return undefined;
+  return { path: NET_PATH, value: cents((held.net * heldPerYear) / newPerYear) };
+}
+
+/**
+ * The take-home pay that goes with a group that changes the pay (gross or
+ * frequency) but writes no take-home pay of its own (the retirement income
+ * group): the profile's take-home pay at its share of the profile's gross
+ * (takeHomeAtShare), so it is never above the new gross nor under another
+ * frequency's unit. Undefined when the group leaves the pay alone or writes
+ * the take-home pay itself. Null when the group must be skipped: the
+ * take-home pay was answered and the group would move it to another
+ * frequency or leave it above the new gross (an answer given since wins
+ * and is never changed), or no take-home pay can be formed.
+ */
+function takeHomeAlongside(group: readonly Write[], profile: FinancialProfile, provided: ReadonlySet<string>): Write | null | undefined {
+  if (group.some((write) => write.path === NET_PATH)) return undefined;
+  const held = profile.income;
+  const gross = valueAt(group, GROSS_PATH) ?? held.grossPerPaycheck;
+  const frequency = valueAt(group, FREQUENCY_PATH) ?? held.frequency;
+  const movesFrequency = stableKey(frequency) !== stableKey(held.frequency);
+  if (!movesFrequency && stableKey(gross) === stableKey(held.grossPerPaycheck)) return undefined;
+  if (provided.has(NET_PATH)) {
+    return movesFrequency || !(typeof gross === 'number' && gross >= held.netPerPaycheck) ? null : undefined;
+  }
+  return takeHomeAtShare({ gross: held.grossPerPaycheck, net: held.netPerPaycheck, frequency: held.frequency }, gross, frequency) ?? null;
 }
 
 /**
@@ -247,14 +262,17 @@ function takeHomeShareOfAnsweredPay(group: readonly Write[], answered: readonly 
  *   answered pay and frequency describe the same annual income as the
  *   group's own per-paycheck record and its take-home pay is unanswered
  *   (finerIncomeRecord), the group's gross, take-home and frequency are all
- *   written, so the take-home pay keeps the pay it was saved with. When
- *   they describe another income instead, the group is skipped but its
- *   take-home pay, if unanswered, is written unprovided at the saved share
- *   of gross pay applied to the answered gross (takeHomeShareOfAnsweredPay).
- * - A group that moves the pay frequency without a take-home pay of its own
- *   (the retirement income group) also writes the profile's take-home pay,
- *   unprovided, converted to the new frequency at the same annual amount; it
- *   is skipped when the take-home pay was answered (takeHomeAlongside).
+ *   written, so the take-home pay keeps the pay it was saved with.
+ * - The take-home pay follows one rule whenever the gross pay and frequency
+ *   the profile ends up with are not the ones it was saved with
+ *   (takeHomeAtShare): an unanswered take-home pay is written, unprovided,
+ *   at the share of gross pay it had, applied to the gross pay that stays.
+ *   That covers a group that changes the pay without a take-home pay of its
+ *   own (the retirement income group; the profile's take-home pay follows
+ *   it, takeHomeAlongside) and a skipped paycheck income group whose pay
+ *   lost to an answered one (its own take-home pay follows the answered
+ *   pay). An answered take-home pay is never moved: a group that would put
+ *   it under another frequency or above the gross pay is skipped.
  *
  * setValues refuses any value that is not a valid profile value. A saved
  * future-dollars display mode is carried into the shared preference once,
@@ -299,7 +317,10 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
         // from the other old calculator), or describes the same income.
         const agrees = group.every((write, j) => !answered[j] || replaces(write) || holds(write));
         if (!agrees) {
-          const share = changed ? takeHomeShareOfAnsweredPay(group, answered, profile) : undefined;
+          // The group's own take-home pay (if any) follows the answered pay.
+          const own = { gross: valueAt(group, GROSS_PATH), net: valueAt(group, NET_PATH), frequency: valueAt(group, FREQUENCY_PATH) };
+          const { grossPerPaycheck, frequency } = profile.income;
+          const share = changed && !provided.has(NET_PATH) ? takeHomeAtShare(own, grossPerPaycheck, frequency) : undefined;
           if (share) untouched.push(share);
           continue;
         }
