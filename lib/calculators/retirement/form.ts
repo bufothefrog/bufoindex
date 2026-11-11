@@ -54,11 +54,6 @@ const MUST_PAY = withOverrides(NECESSARY_MONTHLY, {
 });
 
 /**
- * The basics the retirement engine reads: every core fact except take-home
- * pay, which no retirement binding reads (so neither does its relation to
- * gross pay hold results back here).
- */
-/**
  * O10: the filing status says when the saved one runs as single, whatever
  * the results column shows (none yet, out of date, or a failed run): in full
  * as a note on the open card, and in the collapsed card's summary.
@@ -74,6 +69,11 @@ const FILING_STATUS_NOTE: ScreenNote = {
   text: (get) => filingStatusNote(get(FILING_STATUS.path) as FilingStatus) ?? undefined,
 };
 
+/**
+ * The basics the retirement engine reads: every core fact except take-home
+ * pay, which no retirement binding reads (so neither does its relation to
+ * gross pay hold results back here).
+ */
 const BASICS: readonly FieldSpec[] = CORE_FIELDS.filter((spec) => spec !== NET_PAY).map(
   (spec) => [CURRENT_AGE, HOME_STATE, FILING, MUST_PAY].find((own) => own.path === spec.path) ?? spec
 );
