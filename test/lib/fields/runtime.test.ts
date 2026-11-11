@@ -8,8 +8,10 @@
 import { describe, expect, it } from 'vitest';
 import { makeGet, setAt } from '@/lib/fields/paths';
 import {
+  fieldWrites,
   fieldError,
   fieldMap,
+  formatFieldValue,
   isEmptyValue,
   isFieldVisible,
   listRows,
@@ -365,6 +367,29 @@ describe('fieldError', () => {
   });
 });
 
+describe('formatFieldValue', () => {
+  it('prints a percent as 0-100 with up to 2 decimals', () => {
+    expect(formatFieldValue(MATCH, 0.5)).toBe('50%');
+    expect(formatFieldValue(MATCH, 0.12345)).toBe('12.35%');
+    expect(formatFieldValue(MATCH, 12.5)).toBe('1,250%');
+  });
+
+  it('prints money with $ and a hyphen-minus before it', () => {
+    expect(formatFieldValue(GROSS, 100000)).toBe('$100,000');
+    expect(formatFieldValue(GROSS, 1234.567)).toBe('$1,234.57');
+    expect(formatFieldValue(GROSS, -0.5)).toBe('-$0.5');
+  });
+
+  it("uses the spec's unit, which wins over the money default", () => {
+    const months: FieldSpec = { path: 'm', kind: 'number', label: 'Months', tier: 'details', unit: { suffix: ' mo' } };
+    expect(formatFieldValue(months, 2.5)).toBe('2.5 mo');
+    expect(formatFieldValue(AGE, 30)).toBe('30');
+    expect(formatFieldValue({ ...GROSS, unit: { prefix: 'USD ' } }, 1500)).toBe('USD 1,500');
+    const multiplier: FieldSpec = { path: 'x', kind: 'slider', label: 'Multiplier', tier: 'assumption', unit: { suffix: 'x' } };
+    expect(formatFieldValue(multiplier, 1.25)).toBe('1.25x');
+  });
+});
+
 describe('fieldError with non-finite numbers', () => {
   const get = getWith();
 
@@ -550,5 +575,30 @@ describe('screenPaths', () => {
 
   it('adds the covers of a custom field after its own path, deduplicated', () => {
     expect(screenPaths(FORM, SCREENS.holdings, getWith())).toEqual(['portfolio.holdings', 'portfolio.securities']);
+  });
+});
+
+describe('fieldWrites', () => {
+  const HAS_401K: FieldSpec = {
+    path: 'workplace.has401k',
+    kind: 'boolean',
+    label: 'Has a 401(k)',
+    tier: 'core',
+    onChange: (value, get) =>
+      value === false ? [{ path: 'workplace.contributionPercent', value: get('workplace.has401k') === false ? 0 : 1 }] : [],
+  };
+  const get = makeGet({ workplace: { has401k: true, contributionPercent: 0.06 } });
+
+  it('writes the field, then its coupled writes, which see the new value', () => {
+    expect(fieldWrites(HAS_401K, false, get)).toEqual([
+      { path: 'workplace.has401k', value: false },
+      { path: 'workplace.contributionPercent', value: 0 },
+    ]);
+  });
+
+  it('writes only the field when it has no coupled writes', () => {
+    expect(fieldWrites({ ...HAS_401K, onChange: undefined }, false, get)).toEqual([
+      { path: 'workplace.has401k', value: false },
+    ]);
   });
 });

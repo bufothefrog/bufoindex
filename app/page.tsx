@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, ClipboardList, LockKeyhole, MonitorSmartphone, Sigma } from 'lucide-react'
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard'
 import { buttonVariants } from '@/components/ui/button'
+import { CALCULATORS, SITE_DISCLAIMER } from '@/lib/calculators/registry'
 import {
   CORE_START_PATH,
   coreStartLink,
@@ -44,37 +45,34 @@ const HOW_IT_WORKS = [
  * Calculator previews. Each card links to the shared core intake with
  * `next` set, so every path answers the basics first and then continues to
  * that calculator's remaining questions. The icon and the "what it shows"
- * line come from INTENT_OPTIONS so the landing page and the chooser agree.
+ * line come from INTENT_OPTIONS so the landing page and the chooser agree;
+ * the name comes from the calculator registry.
  */
 const PREVIEWS: ReadonlyArray<{
   intent: Exclude<IntakeIntent, 'profile'>
-  name: string
   question: string
 }> = [
   {
     intent: 'paycheck',
-    name: 'Paycheck Allocator',
     question: 'Where should each paycheck go?',
   },
   {
     intent: 'retirement',
-    name: 'Retirement Calculator',
     question: 'Am I on track to retire when I want to?',
   },
   {
     intent: 'portfolio',
-    name: 'Portfolio Rebalancer',
     question: 'What should I buy with new cash to reach my target mix?',
   },
   {
     intent: 'leverage',
-    name: 'Leverage Comparison',
     question: 'How do a leveraged fund and a plain index fund compare when I invest monthly?',
   },
 ]
 
-function CalculatorPreviewCard({ intent, name, question }: (typeof PREVIEWS)[number]) {
+function CalculatorPreviewCard({ intent, question }: (typeof PREVIEWS)[number]) {
   const { icon: Icon, description } = getIntentOption(intent)
+  const name = CALCULATORS[intent].shortTitle
   return (
     <Link
       href={coreStartLink(intent) as Route}
@@ -206,10 +204,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      <p className="text-xs text-muted-foreground">
-        Educational tools only. Results depend on the assumptions you enter and
-        are not predictions. Not tax or investment advice.
-      </p>
+      <p className="text-xs text-muted-foreground">{SITE_DISCLAIMER}</p>
     </div>
   )
 }

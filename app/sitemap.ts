@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { CALCULATOR_IDS, CALCULATORS } from '@/lib/calculators/registry';
 
 const BASE_URL = 'https://bufoindex.com';
 
@@ -8,14 +9,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // The guided-flow steps (/start, /start/choose, /start/<intent>) and
   // /overview are left out too: they set robots noindex, depend on answers
   // saved in the visitor's browser, and the landing page links into them.
+  // The retirement methodology page follows its calculator.
   const routes = [
     '/',
     '/tools',
-    '/tools/paycheck-allocator',
-    '/tools/retirement-calculator',
-    '/tools/retirement-calculator/methodology',
-    '/tools/portfolio-rebalancing-calculator',
-    '/tools/leverage-comparison',
+    ...CALCULATOR_IDS.flatMap((id) => {
+      const { path } = CALCULATORS[id];
+      return id === 'retirement' ? [path, `${path}/methodology`] : [path];
+    }),
   ];
 
   // `lastModified` is omitted rather than hardcoded: a frozen date goes stale

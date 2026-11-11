@@ -79,6 +79,15 @@ export interface MultipleFormatOptions {
   trimZeros?: boolean;
 }
 
+export interface CountFormatOptions {
+  /**
+   * At most this many decimal places, trailing zeros dropped, with grouping
+   * (1234.5 with 2 -> "1,234.5"). Omitted: toLocaleString('en-US'), which
+   * keeps up to 3.
+   */
+  maxDigits?: number;
+}
+
 export interface SharesFormatOptions {
   /** Round to whole shares (1,234). Default: up to 4 decimals (12.3457). */
   whole?: boolean;
@@ -108,6 +117,18 @@ const PERCENT = new Intl.NumberFormat('en-US', {
 
 /** Same output as Number.prototype.toLocaleString('en-US'). */
 const DECIMAL = new Intl.NumberFormat('en-US');
+
+/** Grouped decimals with at most N places, built once per N on first use. */
+const DECIMAL_MAX_DIGITS = new Map<number, Intl.NumberFormat>();
+
+function decimalWithMaxDigits(maxDigits: number): Intl.NumberFormat {
+  let format = DECIMAL_MAX_DIGITS.get(maxDigits);
+  if (!format) {
+    format = new Intl.NumberFormat('en-US', { maximumFractionDigits: maxDigits });
+    DECIMAL_MAX_DIGITS.set(maxDigits, format);
+  }
+  return format;
+}
 
 const FRACTIONAL_SHARES = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
@@ -214,9 +235,13 @@ export function formatShares(shares: number, options: SharesFormatOptions = {}):
   return FRACTIONAL_SHARES.format(shares);
 }
 
-/** 1000 -> "1,000" (same as toLocaleString('en-US')). */
-export function formatCount(value: number): string {
-  return DECIMAL.format(value);
+/**
+ * 1000 -> "1,000" (same as toLocaleString('en-US')); with { maxDigits: 2 },
+ * 0.125 -> "0.13".
+ */
+export function formatCount(value: number, options: CountFormatOptions = {}): string {
+  const { maxDigits } = options;
+  return (maxDigits === undefined ? DECIMAL : decimalWithMaxDigits(maxDigits)).format(value);
 }
 
 /** Formats a number as the given kind, for data-driven tiles and tables. */

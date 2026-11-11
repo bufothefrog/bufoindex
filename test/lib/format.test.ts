@@ -242,6 +242,23 @@ describe('formatCount', () => {
   ])('formatCount(%s) -> %s', (value, expected) => {
     expect(formatCount(value)).toBe(expected);
   });
+
+  it('keeps up to 3 decimals by default, like toLocaleString', () => {
+    expect(formatCount(1234.5678)).toBe('1,234.568');
+    expect(formatCount(1234.5678)).toBe((1234.5678).toLocaleString('en-US'));
+  });
+
+  it.each([
+    [1234.5, 2, '1,234.5'],
+    [0.125, 2, '0.13'],
+    [12.3456, 2, '12.35'],
+    [7.000000000000001, 2, '7'],
+    [-0.5, 2, '-0.5'],
+    [2.6, 0, '3'],
+    [1.23456, 4, '1.2346'],
+  ])('formatCount(%s, { maxDigits: %s }) -> %s', (value, maxDigits, expected) => {
+    expect(formatCount(value, { maxDigits })).toBe(expected);
+  });
 });
 
 describe('formatValue', () => {

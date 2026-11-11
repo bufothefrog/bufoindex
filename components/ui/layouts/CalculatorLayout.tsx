@@ -5,9 +5,14 @@
  * Desktop (lg and up): the original two-column grid, unchanged.
  * Below lg (mobileMode 'tabs', the default): an Inputs | Results tab bar that
  * sticks to the top of the viewport and a sticky bottom action bar holding
- * Calculate, Share and an inputs/results toggle. Panel visibility is driven
- * by CSS classes (hidden / lg:block) so server and client render the same
- * markup and nothing reads window.matchMedia during render.
+ * Calculate and an inputs/results toggle. Panel visibility is driven by CSS
+ * classes (hidden / lg:block) so server and client render the same markup
+ * and nothing reads window.matchMedia during render.
+ *
+ * With liveResults the results follow the inputs on their own (O8): there is
+ * no desktop Calculate card, the mobile bar's one action is "See results" /
+ * "Edit inputs", and the mobile view switches to Results only when asked
+ * (the bar, the tab bar or showResultsKey), never because a run finished.
  */
 
 'use client';
@@ -15,20 +20,21 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Calculator, Loader2, Share2 } from 'lucide-react';
+import { Disclaimer } from '@/components/ui/results';
+import { ArrowLeft, ArrowRight, Calculator, Loader2 } from 'lucide-react';
 import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Container, type FeatureDotColor } from './ResponsiveGrid';
 import { BaseCard } from '../cards/BaseCard';
 
 /**
- * Result of a share handler. Returning `copied` shows a transient inline
- * "Link copied" confirmation; `error` surfaces the URL for manual copying.
- * Handlers may also return nothing (e.g. the native share sheet handled it).
+ * @deprecated Share links are gone; the layout ignores onShare. Kept until
+ * the last shell stops passing a share handler (x2).
  */
 export type ShareResult =
   | { status: 'shared' }
   | { status: 'copied' }
   | { status: 'error'; url: string };
 
+/** @deprecated See ShareResult. */
 export type ShareHandler = () => void | ShareResult | Promise<void | ShareResult>;
 
 /** Which panel the mobile (below lg) view shows. */
@@ -36,6 +42,29 @@ export type CalculatorMobileTab = 'inputs' | 'results';
 
 /** How the layout behaves below lg. Desktop is identical in both modes. */
 export type CalculatorMobileMode = 'tabs' | 'stacked';
+
+export interface CalculatorEmptyState {
+  title?: string;
+  description?: string;
+  features?: Array<{
+    color: FeatureDotColor;
+    text: string;
+  }>;
+}
+
+/** The empty state of a calculator that runs on a Calculate button. */
+export const CALCULATE_EMPTY_STATE: Required<CalculatorEmptyState> = {
+  title: 'Ready to Calculate?',
+  description: 'Fill in your information and click Calculate to see your personalized results.',
+  features: [],
+};
+
+/** The empty state of a live calculator: results are missing only while a field is invalid. */
+export const LIVE_EMPTY_STATE: Required<CalculatorEmptyState> = {
+  title: 'No results yet',
+  description: 'Results appear here as soon as every field holds a valid value.',
+  features: [],
+};
 
 export interface CalculatorLayoutProps {
   title: string;
@@ -50,18 +79,23 @@ export interface CalculatorLayoutProps {
   resultFooter?: React.ReactNode;
   isCalculating?: boolean;
   onCalculate?: () => void;
+  /** @deprecated Ignored: the share UI is gone. Kept so unmigrated shells compile until x2. */
   onShare?: ShareHandler;
   calculateButtonText?: string;
   calculatingText?: string;
   errors?: Record<string, string>;
-  emptyStateConfig?: {
-    title?: string;
-    description?: string;
-    features?: Array<{
-      color: FeatureDotColor;
-      text: string;
-    }>;
-  };
+  /**
+   * Replaces the default empty state (CALCULATE_EMPTY_STATE, or
+   * LIVE_EMPTY_STATE with liveResults); fields left out keep the default.
+   */
+  emptyStateConfig?: CalculatorEmptyState;
+  /**
+   * Results follow the inputs without a Calculate button (O8): no desktop
+   * Calculate card, and the mobile bar's primary action is "See results".
+   */
+  liveResults?: boolean;
+  /** Accessible name of the results panel, which then becomes a region. */
+  resultsLabel?: string;
   disclaimer?: string;
   className?: string;
   testId?: string;
@@ -106,15 +140,12 @@ export function CalculatorLayout({
   resultFooter,
   isCalculating = false,
   onCalculate,
-  onShare,
   calculateButtonText = "Calculate",
   calculatingText,
   errors = {},
-  emptyStateConfig = {
-    title: "Ready to Calculate?",
-    description: "Fill in your information and click Calculate to see your personalized results.",
-    features: []
-  },
+  emptyStateConfig,
+  liveResults = false,
+  resultsLabel,
   disclaimer,
   className,
   testId,
@@ -127,6 +158,7 @@ export function CalculatorLayout({
   const hasResults = !!resultSection;
   const useTabs = mobileMode === 'tabs';
   const loadingText = calculatingText || `${calculateButtonText}...`;
+  const emptyState = { ...(liveResults ? LIVE_EMPTY_STATE : CALCULATE_EMPTY_STATE), ...emptyStateConfig };
 
   const [mobileTab, setMobileTab] = useState<CalculatorMobileTab>(defaultMobileTab);
   // Bumped whenever the mobile view should scroll back to the tab bar.
@@ -139,19 +171,21 @@ export function CalculatorLayout({
 
   // Derive tab switches from prop transitions during render (no effect, no
   // extra paint): https://react.dev/learn/you-might-not-need-an-effect
+  // Live results change while the visitor edits, so only showResultsKey
+  // switches the tab for them.
   let shouldReveal = false;
   if (isCalculating !== prevCalculating) {
     setPrevCalculating(isCalculating);
-    if (prevCalculating && !isCalculating) shouldReveal = true;
+    if (!liveResults && prevCalculating && !isCalculating) shouldReveal = true;
   }
   if (showResultsKey !== prevShowResultsKey) {
     setPrevShowResultsKey(showResultsKey);
     shouldReveal = true;
   }
   if (hasResults !== prevHasResults) {
-    // First results after mount (a share link, or a synchronous calculator).
+    // First results after mount (a handoff link, or a synchronous calculator).
     setPrevHasResults(hasResults);
-    if (hasResults) shouldReveal = true;
+    if (!liveResults && hasResults) shouldReveal = true;
   }
   if (pendingReveal && !isCalculating) {
     // Covers synchronous calculators and memoized (instant) recalculations.
@@ -195,7 +229,7 @@ export function CalculatorLayout({
 
   const showInputsOnMobile = !useTabs || mobileTab === 'inputs';
   const showResultsOnMobile = !useTabs || mobileTab === 'results';
-  const showActionBar = useTabs && (!!onCalculate || !!onShare || hasResults);
+  const showActionBar = useTabs && (liveResults || !!onCalculate || hasResults);
 
   return (
     <div className={cn("calculator-container", className)} data-testid={testId}>
@@ -252,16 +286,17 @@ export function CalculatorLayout({
             </div>
 
             {/* Calculate Button (desktop; also mobile in 'stacked' mode) */}
-            <CalculateButton
-              onClick={onCalculate}
-              isLoading={isCalculating}
-              buttonText={calculateButtonText}
-              loadingText={loadingText}
-              errors={errors}
-              disabled={!onCalculate || hasErrors}
-              onShare={onShare}
-              className={useTabs ? 'hidden lg:block' : undefined}
-            />
+            {!liveResults && (
+              <CalculateButton
+                onClick={onCalculate}
+                isLoading={isCalculating}
+                buttonText={calculateButtonText}
+                loadingText={loadingText}
+                errors={errors}
+                disabled={!onCalculate || hasErrors}
+                className={useTabs ? 'hidden lg:block' : undefined}
+              />
+            )}
           </InputSection>
 
           {/* Results Section */}
@@ -270,7 +305,12 @@ export function CalculatorLayout({
               span={1}
               className={cn(!showResultsOnMobile && 'hidden lg:block')}
             >
-              <div id={resultsPanelId} className="space-y-6">
+              <div
+                id={resultsPanelId}
+                role={resultsLabel ? 'region' : undefined}
+                aria-label={resultsLabel}
+                className="space-y-6"
+              >
                 {resultSection}
                 {resultFooter}
               </div>
@@ -293,22 +333,23 @@ export function CalculatorLayout({
           {!hasResults && !isCalculating && (
             <EmptyStateSection
               id={resultsPanelId}
-              title={emptyStateConfig.title!}
-              description={emptyStateConfig.description!}
+              title={emptyState.title}
+              description={emptyState.description}
               icon={Calculator}
-              features={emptyStateConfig.features}
+              features={emptyState.features}
               className={cn(useTabs && !showResultsOnMobile && 'hidden lg:block')}
             />
           )}
         </ResponsiveGrid>
 
         {/* Footer */}
-        {disclaimer && <DisclaimerFooter text={disclaimer} />}
+        {disclaimer && <Disclaimer text={disclaimer} />}
 
         {/* Mobile sticky action bar (below lg) */}
         {showActionBar && (
           <MobileActionBar
             onCalculate={onCalculate ? handleMobileCalculate : undefined}
+            liveResults={liveResults}
             isLoading={isCalculating}
             buttonText={calculateButtonText}
             compactButtonText={mobileCalculateButtonText ?? firstWord(calculateButtonText)}
@@ -316,7 +357,6 @@ export function CalculatorLayout({
             compactLoadingText={`${firstWord(loadingText)}…`}
             disabled={!onCalculate || hasErrors}
             errorCount={Object.keys(errors).length}
-            onShare={onShare}
             activeTab={mobileTab}
             hasResults={hasResults}
             onToggleTab={() => selectTab(mobileTab === 'inputs' ? 'results' : 'inputs')}
@@ -384,74 +424,6 @@ export function CalculatorHeader({ title, description, className }: CalculatorHe
   );
 }
 
-/**
- * Share handling shared by the desktop card and the mobile bar: runs the
- * handler and keeps the transient "Link copied" / manual-copy feedback.
- */
-function useShareFeedback(onShare?: ShareHandler) {
-  const [shareFeedback, setShareFeedback] = useState<ShareResult | null>(null);
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-    };
-  }, []);
-
-  const share = async () => {
-    if (!onShare) return;
-    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-
-    const result = await onShare();
-
-    if (result && result.status === 'copied') {
-      setShareFeedback(result);
-      clearTimerRef.current = setTimeout(() => setShareFeedback(null), 2500);
-    } else if (result && result.status === 'error') {
-      setShareFeedback(result);
-    } else {
-      setShareFeedback(null);
-    }
-  };
-
-  const dismiss = () => {
-    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-    setShareFeedback(null);
-  };
-
-  return { shareFeedback, share, dismiss };
-}
-
-interface ShareFeedbackMessageProps {
-  feedback: ShareResult | null;
-  className?: string;
-}
-
-function ShareFeedbackMessage({ feedback, className }: ShareFeedbackMessageProps) {
-  if (feedback?.status === 'copied') {
-    return (
-      <p className={cn("text-center text-sm text-muted-foreground", className)}>
-        Link copied to clipboard
-      </p>
-    );
-  }
-  if (feedback?.status === 'error') {
-    return (
-      <div className={cn("text-sm text-muted-foreground", className)}>
-        <p className="mb-1">Couldn&apos;t copy automatically. Copy this link:</p>
-        <input
-          readOnly
-          value={feedback.url}
-          onFocus={(event) => event.currentTarget.select()}
-          aria-label="Shareable link"
-          className="w-full rounded-md border-input bg-background px-2 py-1 text-xs text-foreground"
-        />
-      </div>
-    );
-  }
-  return null;
-}
-
 interface ErrorListProps {
   errors: Record<string, string>;
   className?: string;
@@ -482,7 +454,6 @@ interface CalculateButtonProps {
   loadingText?: string;
   errors?: Record<string, string>;
   disabled?: boolean;
-  onShare?: ShareHandler;
   className?: string;
 }
 
@@ -493,11 +464,9 @@ export function CalculateButton({
   loadingText = "Calculating...",
   errors = {},
   disabled = false,
-  onShare,
   className
 }: CalculateButtonProps) {
   const hasErrors = Object.keys(errors).length > 0;
-  const { shareFeedback, share } = useShareFeedback(onShare);
 
   return (
     <BaseCard className={className}>
@@ -520,24 +489,6 @@ export function CalculateButton({
         )}
       </Button>
 
-      {/* Share Action */}
-      {onShare && (
-        <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={share}
-            className="w-full mt-4"
-          >
-            <Share2 className="w-4 h-4 mr-2" />
-            Share
-          </Button>
-          <div aria-live="polite">
-            <ShareFeedbackMessage feedback={shareFeedback} className="mt-2" />
-          </div>
-        </>
-      )}
-
       {/* Error Display */}
       {hasErrors && <ErrorList errors={errors} className="mt-4" />}
     </BaseCard>
@@ -546,12 +497,15 @@ export function CalculateButton({
 
 /**
  * Mobile Action Bar
- * Sticky bottom bar shown below lg: Calculate, Share, and (once results
- * exist) a See results / Edit inputs toggle. It sits in the page flow at the
- * end of the layout, so scrolling to the bottom never hides the last field.
+ * Sticky bottom bar shown below lg: Calculate and (once results exist) a
+ * See results / Edit inputs toggle; with liveResults the toggle is the one
+ * primary action. It sits in the page flow at the end of the layout, so
+ * scrolling to the bottom never hides the last field.
  */
 export interface MobileActionBarProps {
   onCalculate?: () => void;
+  /** No Calculate button: "See results" / "Edit inputs" is the primary action. */
+  liveResults?: boolean;
   isLoading?: boolean;
   buttonText: string;
   compactButtonText: string;
@@ -559,7 +513,6 @@ export interface MobileActionBarProps {
   compactLoadingText: string;
   disabled?: boolean;
   errorCount?: number;
-  onShare?: ShareHandler;
   activeTab: CalculatorMobileTab;
   hasResults: boolean;
   onToggleTab: () => void;
@@ -568,6 +521,7 @@ export interface MobileActionBarProps {
 
 export function MobileActionBar({
   onCalculate,
+  liveResults = false,
   isLoading = false,
   buttonText,
   compactButtonText,
@@ -575,13 +529,12 @@ export function MobileActionBar({
   compactLoadingText,
   disabled = false,
   errorCount = 0,
-  onShare,
   activeTab,
   hasResults,
   onToggleTab,
   className
 }: MobileActionBarProps) {
-  const { shareFeedback, share, dismiss } = useShareFeedback(onShare);
+  const fieldsNeed = errorCount === 1 ? '1 field needs' : `${errorCount} fields need`;
 
   return (
     <div
@@ -593,30 +546,20 @@ export function MobileActionBar({
       )}
     >
       <div aria-live="polite">
-        {shareFeedback && (
-          <div className="mb-2 flex items-start gap-2">
-            <ShareFeedbackMessage feedback={shareFeedback} className="flex-1" />
-            {shareFeedback.status === 'error' && (
-              <Button variant="ghost" size="sm" onClick={dismiss} className="min-h-11 shrink-0">
-                Done
-              </Button>
-            )}
-          </div>
-        )}
         {errorCount > 0 && (
           <p className="mb-2 text-center text-xs text-destructive dark:text-foreground">
-            {errorCount === 1 ? '1 field needs' : `${errorCount} fields need`} attention before calculating.
+            {fieldsNeed} attention {liveResults ? 'before the results update' : 'before calculating'}.
           </p>
         )}
       </div>
 
       <div className="flex items-center gap-2">
-        {hasResults && (
+        {(liveResults || hasResults) && (
           <Button
             type="button"
-            variant="outline"
+            variant={liveResults ? 'default' : 'outline'}
             onClick={onToggleTab}
-            className="h-11 shrink-0 px-3"
+            className={cn("h-11 px-3", liveResults ? "min-w-0 flex-1" : "shrink-0")}
           >
             {activeTab === 'inputs' ? (
               <>
@@ -632,31 +575,20 @@ export function MobileActionBar({
           </Button>
         )}
 
-        <Button
-          type="button"
-          onClick={onCalculate}
-          disabled={disabled || isLoading || !onCalculate}
-          className="h-11 min-w-0 flex-1 px-3"
-        >
-          {isLoading ? (
-            <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
-          ) : (
-            <Calculator className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
-          )}
-          <span className="truncate sm:hidden">{isLoading ? compactLoadingText : compactButtonText}</span>
-          <span className="hidden truncate sm:inline">{isLoading ? loadingText : buttonText}</span>
-        </Button>
-
-        {onShare && (
+        {!liveResults && (
           <Button
             type="button"
-            variant="outline"
-            onClick={share}
-            aria-label="Share"
-            className="h-11 w-11 shrink-0 p-0 sm:w-auto sm:px-3"
+            onClick={onCalculate}
+            disabled={disabled || isLoading || !onCalculate}
+            className="h-11 min-w-0 flex-1 px-3"
           >
-            <Share2 className="h-4 w-4" aria-hidden="true" />
-            <span className="ml-2 hidden sm:inline">Share</span>
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+            ) : (
+              <Calculator className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+            )}
+            <span className="truncate sm:hidden">{isLoading ? compactLoadingText : compactButtonText}</span>
+            <span className="hidden truncate sm:inline">{isLoading ? loadingText : buttonText}</span>
           </Button>
         )}
       </div>
@@ -665,25 +597,10 @@ export function MobileActionBar({
 }
 
 /**
- * Disclaimer Footer Component
+ * Disclaimer footer: the shared Disclaimer line from the results vocabulary.
+ * @deprecated Import Disclaimer from '@/components/ui/results'.
  */
-interface DisclaimerFooterProps {
-  text?: string;
-  className?: string;
-}
-
-export function DisclaimerFooter({
-  text = "This calculator provides educational information only and should not be considered personalized financial advice. Consider consulting with a qualified financial advisor before making significant financial decisions.",
-  className
-}: DisclaimerFooterProps) {
-  return (
-    <div className={cn("mt-8 text-center lg:mt-12", className)}>
-      <p className="text-sm text-muted-foreground max-w-4xl mx-auto">
-        <strong>Disclaimer:</strong> {text}
-      </p>
-    </div>
-  );
-}
+export { Disclaimer as DisclaimerFooter } from '@/components/ui/results';
 
 /**
  * Pre-configured Calculator Layouts
@@ -691,6 +608,7 @@ export function DisclaimerFooter({
 
 /**
  * Simple Calculator Layout - For basic calculators
+ * @deprecated Use CalculatorLayout (or CalculatorPage); kept for /demo until x2.
  */
 export function SimpleCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emptyStateConfig'>) {
   return (
@@ -711,6 +629,7 @@ export function SimpleCalculatorLayout(props: Omit<CalculatorLayoutProps, 'empty
 
 /**
  * Advanced Calculator Layout - For complex calculators with multiple features
+ * @deprecated Use CalculatorLayout (or CalculatorPage); kept for /demo until x2.
  */
 export function AdvancedCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emptyStateConfig'>) {
   return (
@@ -724,27 +643,6 @@ export function AdvancedCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emp
           { color: 'info', text: 'Tax efficiency analysis' },
           { color: 'warning', text: 'Opportunity analysis' },
           { color: 'destructive', text: 'Risk assessment' }
-        ]
-      }}
-    />
-  );
-}
-
-/**
- * Comparison Calculator Layout - For calculators that compare scenarios
- */
-export function ComparisonCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emptyStateConfig'>) {
-  return (
-    <CalculatorLayout
-      {...props}
-      emptyStateConfig={{
-        title: "Ready to Compare?",
-        description: "Set up your scenarios to compare different strategies and outcomes.",
-        features: [
-          { color: 'success', text: 'Scenario comparison' },
-          { color: 'info', text: 'Monte Carlo analysis' },
-          { color: 'warning', text: 'Probability modeling' },
-          { color: 'primary', text: 'Long-term projections' }
         ]
       }}
     />

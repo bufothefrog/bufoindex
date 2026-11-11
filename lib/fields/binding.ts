@@ -38,11 +38,16 @@ export function isDerivedBinding<E>(binding: Binding<E>): binding is DerivedBind
   return 'read' in binding;
 }
 
+/** The value a binding feeds the engine; undefined means toEngineInputs skips it. */
+function readBinding<E>(binding: Binding<E>, get: Get): unknown {
+  return isDerivedBinding(binding) ? binding.read(get) : get(binding.profile);
+}
+
 /** Engine inputs from the profile: `base` with every binding applied. */
 export function toEngineInputs<E>(bindings: readonly Binding<E>[], base: E, get: Get): E {
   let engine = base;
   for (const binding of bindings) {
-    const value = isDerivedBinding(binding) ? binding.read(get) : get(binding.profile);
+    const value = readBinding(binding, get);
     if (value === undefined) continue;
     engine = setAt(engine, binding.engine, value);
   }
@@ -75,8 +80,15 @@ function startsWithSegments(path: readonly string[], prefix: readonly string[]):
 /**
  * Engine validation errors moved onto profile paths. Keys in bracket form
  * ('accounts[0].deposit') are read as dot paths. Each key goes to the binding
- * with the longest engine path equal to it or containing it (of equally long
- * ones, the last, which is the one whose value toEngineInputs keeps):
+ * with the longest engine path equal to it or containing it; of equally long
+ * ones, the last. With `get` (the profile the inputs were built from), a
+ * binding that reads undefined is passed over, because toEngineInputs skips
+ * it. Without `get`, every binding is assumed to have supplied a value.
+ * The rule matches toEngineInputs for equally long engine paths and for
+ * bindings that read undefined. It does not detect a later binding with a
+ * shorter engine path that overwrites a longer one ('a' after 'a.b'): the
+ * error still goes to the longer binding, so bindings should not overlap
+ * that way.
  *
  * - 1:1 binding: the profile path plus the rest of the key, so a row error
  *   ('debts.0.balance' under a 'debts' binding) lands on the same row.
@@ -85,16 +97,17 @@ function startsWithSegments(path: readonly string[], prefix: readonly string[]):
  *
  * When two errors land on the same key, the first one is kept.
  */
-export function engineErrorsToFields<E>(bindings: readonly Binding<E>[], errors: FieldErrors): FieldErrors {
+export function engineErrorsToFields<E>(bindings: readonly Binding<E>[], errors: FieldErrors, get?: Get): FieldErrors {
   const out: FieldErrors = {};
   const enginePaths = bindings.map((binding) => splitPath(binding.engine));
+  const supplied = bindings.map((binding) => !get || readBinding(binding, get) !== undefined);
   for (const [key, message] of Object.entries(errors)) {
     const segments = splitPath(toDotPath(key));
     let best = -1;
     enginePaths.forEach((enginePath, i) => {
-      // '>=' so the last of equally long bindings wins, as in toEngineInputs.
+      // '>=' so the last of equally long supplying bindings wins, as in toEngineInputs.
       const longer = best < 0 || enginePath.length >= enginePaths[best].length;
-      if (longer && startsWithSegments(segments, enginePath)) best = i;
+      if (longer && supplied[i] && startsWithSegments(segments, enginePath)) best = i;
     });
     let target = 'calculation';
     if (best >= 0) {
