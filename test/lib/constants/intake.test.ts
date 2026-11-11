@@ -29,7 +29,13 @@ import {
   type IntakeScreenOptions,
 } from '@/lib/constants/intake';
 import type { ScreenSpec } from '@/lib/fields/types';
-import { PROFILE_FIELDS, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
+import {
+  PROFILE_FIELDS,
+  PROFILE_LEAF_PATHS,
+  PROFILE_LIST_PATHS,
+  getDefaultFinancialProfile,
+  isProfilePath,
+} from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 import {
   OLD_CORE_FLOW,
@@ -154,11 +160,40 @@ describe('behaviour-preserving: the provisional forms carry the old question set
     expect(askedScreens('core')).toEqual(oldScreens(OLD_CORE_FLOW, OLD_CORE_SCREENS, OLD_CORE_QUESTIONS));
   });
 
-  it('starts every calculator intent that asks the core with the core screens, worded the same', () => {
+  it('starts every calculator form that has basics with the core screens, labelled and bounded the same', () => {
+    // A form's basics show on its calculator page only (an intent's intake
+    // asks the shared core, then the form's own screens), so the page may
+    // keep its old help, hint and placeholder and leave out a core fact its
+    // engine does not read (retirement: take-home pay). Labels, kinds,
+    // options and bounds are the core's, and the order is the core's.
     const core = askedScreens('core');
+    const strip = (question: AskedScreen['questions'][number]) => {
+      const rest: Partial<AskedScreen['questions'][number]> = { ...question };
+      delete rest.help;
+      return rest;
+    };
     for (const intent of CALCULATOR_INTENTS) {
       if (!FORMS[intent].screens.some((s) => s.tier === 'core')) continue;
-      expect(askedScreens(intent).slice(0, core.length), intent).toEqual(core);
+      const basics = askedScreens(intent).slice(0, core.length);
+      expect(basics.map((screen) => screen.id), intent).toEqual(core.map((screen) => screen.id));
+      basics.forEach((screen, i) => {
+        expect({ ...screen, questions: [] }, intent).toEqual({ ...core[i], questions: [] });
+        const coreQuestions = new Map(core[i].questions.map((question) => [question.path, strip(question)]));
+        const paths = screen.questions.map((question) => question.path);
+        expect(paths, intent).toEqual(core[i].questions.map((q) => q.path).filter((path) => paths.includes(path)));
+        for (const question of screen.questions) expect(strip(question), intent).toEqual(coreQuestions.get(question.path));
+      });
+    }
+    expect(intakePaths('retirement')).not.toContain('income.netPerPaycheck');
+    expect(askedScreens('paycheck').slice(0, core.length).flatMap((screen) => screen.questions.map((q) => q.path))).toEqual([
+      ...CORE_PATHS,
+    ]);
+  });
+
+  it('never asks a calculator form\'s own basics in the intent intake: that asks the shared core', () => {
+    for (const intent of CALCULATOR_INTENTS) {
+      const screens = getIntakeScreens(intent, fromDefaults(), { mode: 'remaining', provided: [] });
+      expect(screens.some((screen) => screen.tier === 'core'), intent).toBe(false);
     }
   });
 
@@ -196,7 +231,7 @@ describe('intake screens', () => {
 
   it('counts each intent from its form', () => {
     for (const intent of CALCULATOR_INTENTS) {
-      expect(screenIds(intent)).toEqual(FORMS[intent].screens.map((s) => s.id));
+      expect(screenIds(intent)).toEqual(FORMS[intent].screens.filter((s) => s.surface !== 'calculator').map((s) => s.id));
     }
     expect(screenIds('profile')).toEqual(PROFILE_FORM.screens.map((s) => s.id));
     expect(screenIds('core')).toEqual(formForFlow('core').screens.map((s) => s.id));
@@ -204,15 +239,19 @@ describe('intake screens', () => {
 
   it('asks the shared core in the same order for every intent that has it', () => {
     const withCore = CALCULATOR_INTENTS.filter((intent) => FORMS[intent].screens.some((s) => s.tier === 'core'));
-    for (const intent of [...withCore, 'profile'] as const) {
-      expect(intakePaths(intent).slice(0, CORE_PATHS.length)).toEqual([...CORE_PATHS]);
+    for (const intent of withCore) {
+      // The form's basics: the core facts its engine reads, in core order.
+      const basics = FORMS[intent].screens.filter((s) => s.tier === 'core').flatMap((s) => s.fields);
+      expect(basics, intent).toEqual(CORE_PATHS.filter((path) => basics.includes(path)));
+      expect(intakePaths(intent).slice(0, basics.length), intent).toEqual(basics);
     }
+    expect(intakePaths('profile').slice(0, CORE_PATHS.length)).toEqual([...CORE_PATHS]);
   });
 
   it('offers the typical-value skip, and keeps the defaults on an assumption screen', () => {
     for (const intent of INTAKE_INTENTS) {
       for (const screen of getIntakeScreens(intent, fromDefaults())) {
-        expect(skipLabelFor(screen)).toBe(INTAKE_SKIP_LABEL);
+        expect(skipLabelFor(screen)).toBe(screen.tier === 'assumption' ? KEEP_ASSUMPTIONS_LABEL : INTAKE_SKIP_LABEL);
       }
     }
     const assumptions: ScreenSpec = { id: 'a', title: 'Assumptions', tier: 'assumption', fields: [] };
@@ -242,6 +281,23 @@ describe('validateIntakeScreen', () => {
     // Equal is allowed (no withholding at all is possible).
     const equal = fromDefaults({ 'income.grossPerPaycheck': 2600, 'income.netPerPaycheck': 2600 });
     expect(validateIntakeScreen('core', screen('core', 'pay'), equal)).toEqual({});
+  });
+
+  it('flags custom portfolio targets that do not total 100% on the targets screen, as the engine words it', () => {
+    const targets = (us: number) => [
+      { accountId: null, assetClass: 'us-stock', target: us },
+      { accountId: null, assetClass: 'bonds', target: 0.4 },
+    ];
+    const custom = fromDefaults({ 'investing.targetMix': 'custom', 'portfolio.classTargets': targets(0.9) });
+    const targetsScreen = getIntakeScreens('portfolio', custom)[0];
+    expect(validateIntakeScreen('portfolio', targetsScreen, custom)).toEqual({
+      'portfolio.classTargets': 'Target allocations must sum to 100% (currently 130.00%).',
+    });
+    const whole = fromDefaults({ 'investing.targetMix': 'custom', 'portfolio.classTargets': targets(0.6) });
+    expect(validateIntakeScreen('portfolio', targetsScreen, whole)).toEqual({});
+    // A preset mix never shows the editor, so its stale custom rows are not checked.
+    const preset = fromDefaults({ 'investing.targetMix': '60-40', 'portfolio.classTargets': targets(0.9) });
+    expect(validateIntakeScreen('portfolio', getIntakeScreens('portfolio', preset)[0], preset)).toEqual({});
   });
 
   it('checks each field against its bounds', () => {
@@ -521,14 +577,14 @@ describe('isProfileFinished', () => {
   });
 
   it('is true once every profile field is answered', () => {
-    expect(isProfileFinished(profileWith(PROFILE_FIELDS.map((field) => field.path)))).toBe(true);
+    expect(isProfileFinished(profileWith([...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS]))).toBe(true);
   });
 
   it('is true once the profile intake has nothing left, though a few fields are never asked', () => {
     const asked = intakePaths('profile');
     const neverAsked = PROFILE_FIELDS.map((field) => field.path).filter((path) => !asked.includes(path));
     // The derived emergency-month target is never asked; with the provisional
-    // forms neither are the target income, the contribution rate and the ratio.
+    // forms neither is the contribution rate.
     expect(neverAsked).toContain('cash.targetMonths');
     expect(isProfileFinished(profileWith(asked))).toBe(true);
     expect(isProfileFinished(profileWith(asked.filter((path) => path !== asked[asked.length - 1])))).toBe(false);

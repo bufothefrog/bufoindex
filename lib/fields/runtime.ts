@@ -275,7 +275,8 @@ function hasError(errors: FieldErrors, path: string): boolean {
   return Object.prototype.hasOwnProperty.call(errors, path);
 }
 
-function isFiniteNumber(value: unknown): value is number {
+/** True for a number that is not NaN or an infinity. */
+export function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
@@ -355,10 +356,11 @@ export function screenPaths(form: FormSpec, screen: ScreenSpec, get: Get): strin
 /**
  * The writes for setting `spec` to `value`: its own write, then the spec's
  * coupled writes (onChange). The Get handed to onChange already sees the new
- * value, so a coupled write derives from what the visitor just entered. The
- * calculator's FieldInput and the intake wizard both build writes with this.
+ * value, so a coupled write derives from what the visitor just entered; the
+ * third argument still sees the value before the change. The calculator's
+ * FieldInput and the intake wizard both build writes with this.
  */
 export function fieldWrites(spec: FieldSpec, value: unknown, get: Get): Write[] {
   const after: Get = (path) => (path === spec.path ? value : get(path));
-  return [{ path: spec.path, value }, ...(spec.onChange?.(value, after) ?? [])];
+  return [{ path: spec.path, value }, ...(spec.onChange?.(value, after, get) ?? [])];
 }

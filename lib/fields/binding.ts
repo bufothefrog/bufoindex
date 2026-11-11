@@ -26,8 +26,12 @@ export interface DirectBinding {
 export interface DerivedBinding<E> {
   engine: string;
   read: (get: Get) => unknown;
-  /** Profile writes that reproduce `value` (the engine value at `engine`); omit for one-way bindings. */
-  write?: (value: unknown, engine: E) => Write[];
+  /**
+   * Profile writes that reproduce `value` (the engine value at `engine`) in
+   * the profile `get` reads (the one the writes are for); omit for one-way
+   * bindings.
+   */
+  write?: (value: unknown, engine: E, get: Get) => Write[];
   /** The profile path that engine errors at this binding are shown on; omit to show them as 'calculation'. */
   errorPath?: string;
 }
@@ -55,16 +59,17 @@ export function toEngineInputs<E>(bindings: readonly Binding<E>[], base: E, get:
 }
 
 /**
- * Profile writes that reproduce `engine`, in binding order. Used only for the
- * one-time legacy localStorage import (O7). Engine values that are undefined
- * and derived bindings without `write` produce nothing.
+ * Profile writes that reproduce `engine` in the profile `get` reads, in
+ * binding order. Used only for the one-time legacy localStorage import (O7).
+ * Engine values that are undefined and derived bindings without `write`
+ * produce nothing.
  */
-export function fromEngineInputs<E>(bindings: readonly Binding<E>[], engine: E): Write[] {
+export function fromEngineInputs<E>(bindings: readonly Binding<E>[], engine: E, get: Get): Write[] {
   const writes: Write[] = [];
   for (const binding of bindings) {
     const value = getAt(engine, binding.engine);
     if (isDerivedBinding(binding)) {
-      if (binding.write) writes.push(...binding.write(value, engine));
+      if (binding.write) writes.push(...binding.write(value, engine, get));
     } else if (value !== undefined) {
       writes.push({ path: binding.profile, value });
     }

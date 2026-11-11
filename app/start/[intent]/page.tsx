@@ -32,8 +32,9 @@ export async function generateMetadata({ params }: StartPageProps): Promise<Meta
 /**
  * One intent's remaining questions: the non-core screens of its form that
  * the saved profile does not answer yet. The wizard sends visitors without
- * the basics to /start?next=<intent> first, and goes straight to the result
- * when nothing is left to ask.
+ * the basics to /start?next=<intent> first, except for an intent that needs
+ * no core field (intentNeedsCore; /start/portfolio, O5), and goes straight to
+ * the result when nothing is left to ask.
  */
 export default async function StartPage({ params }: StartPageProps) {
   const { intent } = await params;

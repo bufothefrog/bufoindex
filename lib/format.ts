@@ -34,6 +34,8 @@ export type FormatKind =
   | 'currency-signed'
   | 'currency-compact-signed'
   | 'percent'
+  /** Exactly one decimal place: 0.03 -> "3.0%". */
+  | 'percent-1'
   | 'percent-signed'
   | 'multiple'
   | 'months'
@@ -259,6 +261,8 @@ export function formatValue(value: number, kind: FormatKind): string {
       return formatCurrency(value, { compact: true, signed: true });
     case 'percent':
       return formatPercent(value);
+    case 'percent-1':
+      return formatPercent(value, { digits: 1 });
     case 'percent-signed':
       return formatPercent(value, { signed: true });
     case 'multiple':

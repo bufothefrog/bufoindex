@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { PROFILE_HANDOFF_PARAM, PROFILE_HANDOFF_VALUE } from '@/lib/profile/links';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
-import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
+import { importLegacyStorage } from '@/lib/store/legacyImport';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 export interface CalculatorBootstrap {
@@ -26,8 +27,10 @@ const NOT_READY: CalculatorBootstrap = { ready: false, arrivedFromProfile: false
  *    is reported as arrivedFromProfile; any other query or hash (an old
  *    share link) is dropped unread, so the page always shows the visitor's
  *    own profile and a reload reads the profile too.
- * 2. Import the calculator's old localStorage key once (O7), so the first
- *    run already sees the imported values.
+ * 2. Import every old calculator localStorage key once (O7), on every
+ *    calculator page (those with no old key of their own too), so the
+ *    result does not depend on which page opens first and the first run
+ *    already sees the imported values.
  * 3. Submit the profile to the run store immediately (no debounce).
  * 4. Report ready.
  *
@@ -51,7 +54,7 @@ export function useCalculatorBootstrap<E, R>(
       new URLSearchParams(search).get(PROFILE_HANDOFF_PARAM) === PROFILE_HANDOFF_VALUE;
     if (search !== '' || hash !== '') window.history.replaceState(null, '', pathname);
 
-    if (def.legacy) importLegacyCalculatorStorage(def);
+    importLegacyStorage(LEGACY_IMPORTS);
     store.getState().submit(useProfileStore.getState().profile, { immediate: true });
     setBootstrap({ ready: true, arrivedFromProfile });
   }, [hasHydrated, def, store]);

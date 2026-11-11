@@ -174,6 +174,31 @@ describe('FieldSection', () => {
     expect(screen.queryByRole('button', { name: /Restore defaults/ })).not.toBeInTheDocument();
   });
 
+  it('keeps both header controls, named, in one row of their own beside a long title', () => {
+    // A phone can only fit them by wrapping (checked in a browser; jsdom has
+    // no layout). What jsdom can check is the structure the wrapping relies
+    // on: neither control is dropped, and both sit in one group of their own
+    // that holds nothing else and not the heading, rather than straight in
+    // the card header next to the title.
+    const long: ScreenSpec = {
+      ...SCREENS.assumptions,
+      title: 'Market, inflation, healthcare and tax assumptions for the whole plan',
+    };
+    renderSection(long, {}, true, vi.fn());
+    const region = screen.getByRole('region', { name: long.title });
+    const heading = within(region).getByRole('heading', { name: long.title });
+    const restore = within(region).getByRole('button', { name: `Restore defaults for ${long.title.toLowerCase()}` });
+    const toggle = within(region).getByRole('button', { name: `Show ${long.title.toLowerCase()}` });
+    expect(restore).toHaveTextContent('Restore defaults');
+    expect(toggle).toHaveTextContent('Show');
+
+    const row = within(region).getByRole('group', { name: `Controls for ${long.title.toLowerCase()}` });
+    expect(restore.parentElement).toBe(row);
+    expect(toggle.parentElement).toBe(row);
+    expect([...row.children]).toEqual([restore, toggle]);
+    expect(row).not.toContainElement(heading);
+  });
+
   it('passes field writes through', () => {
     const onWrite = renderSection(SCREENS.about);
     fireEvent.change(screen.getByRole('textbox', { name: 'Gross pay' }), { target: { value: '4000' } });

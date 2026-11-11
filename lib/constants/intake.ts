@@ -19,11 +19,12 @@
 import type { LucideIcon } from 'lucide-react';
 import { Layers, Scale, Sunset, UserRound, Wallet } from 'lucide-react';
 import { formForFlow } from '@/lib/calculators/forms';
+import { CLASS_TARGETS_PATH, classTargetsError } from '@/lib/calculators/portfolio/bindings';
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { FILING_STATUS_META } from '@/lib/constants/labels';
 import { CORE_SCREENS } from '@/lib/fields/shared';
 import { getAt, makeGet } from '@/lib/fields/paths';
-import { screensFor, validateFields } from '@/lib/fields/runtime';
+import { screenPaths, screensFor, validateFields } from '@/lib/fields/runtime';
 import type { FieldErrors, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import { formatCurrency } from '@/lib/format';
 import { isProfilePath } from '@/lib/profile/defaults';
@@ -144,6 +145,18 @@ export function isCoreComplete(profile: FinancialProfile): boolean {
   return CORE_PATHS.every((path) => provided.has(path));
 }
 
+/**
+ * Intents whose calculator reads none of the core fields, so their intake does
+ * not send a visitor without the basics to the core first (O5: the rebalancer
+ * asks its holdings and needs no income, state or spending).
+ */
+const CORE_FREE_INTENTS: ReadonlySet<IntakeIntent> = new Set<IntakeIntent>(['portfolio']);
+
+/** Whether an intent's intake sends a visitor without the basics to the core first. */
+export function intentNeedsCore(intent: IntakeIntent): boolean {
+  return !CORE_FREE_INTENTS.has(intent);
+}
+
 /** The shared core intake. */
 export const CORE_START_PATH = '/start';
 
@@ -256,14 +269,31 @@ export function isProfileFinished(profile: FinancialProfile): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Checks one screen: each visible field's bounds and options, and the
- * flow's cross-field rules checked on that screen (take-home above gross,
+ * Engine rules a custom editor's value must meet before the intake moves on,
+ * by field path: the calculator page reports them from the engine's own
+ * validation, which the intake does not run.
+ */
+const ENGINE_FIELD_CHECKS: Readonly<Record<string, (get: Get) => string | undefined>> = {
+  [CLASS_TARGETS_PATH]: classTargetsError,
+};
+
+/**
+ * Checks one screen: each visible field's bounds and options, the flow's
+ * cross-field rules checked on that screen (take-home above gross,
  * fun-money minimum above maximum, retirement at or before the current
- * age). Keyed by path; empty when the screen is fine. Relation messages are
- * keyed by the rule's checkOn path (relationErrors tells them apart).
+ * age), and the engine rules of ENGINE_FIELD_CHECKS for the fields it shows
+ * (custom portfolio targets that do not total 100%). Keyed by path; empty
+ * when the screen is fine. Relation messages are keyed by the rule's
+ * checkOn path (relationErrors tells them apart).
  */
 export function validateIntakeScreen(flow: IntakeFlow, screen: ScreenSpec, get: Get): FieldErrors {
-  return validateFields(formForFlow(flow), get, { screen });
+  const form = formForFlow(flow);
+  const errors = validateFields(form, get, { screen });
+  for (const path of screenPaths(form, screen, get)) {
+    const message = errors[path] === undefined ? ENGINE_FIELD_CHECKS[path]?.(get) : undefined;
+    if (message) errors[path] = message;
+  }
+  return errors;
 }
 
 export interface IntakeSubmission {

@@ -30,13 +30,6 @@ import {
   formatCurrency as coreFormatCurrency,
   formatPercent as coreFormatPercent,
 } from '@/lib/calculations/core';
-import {
-  formatCompactCurrency,
-  formatLeverage,
-  formatPct,
-  formatSignedCompactCurrency,
-  formatSignedPct,
-} from '@/app/tools/leverage-comparison/components/format';
 import { formatPercent as percentInputFormatPercent } from '@/components/ui/inputs/PercentInput';
 import {
   formatMonths as dashboardFormatMonths,
@@ -44,6 +37,49 @@ import {
 } from '@/components/dashboard/derive';
 
 const MINUS = '\u2212';
+
+// The leverage results' own formatters, frozen here as they were when slice
+// c7 deleted app/tools/leverage-comparison/components/format.ts, so the
+// parity block below keeps comparing against them.
+
+/** $950, $12.3k, $633k, $1.20M, $12.4M */
+function formatCompactCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? MINUS : '';
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    return `${sign}$${m >= 10 ? m.toFixed(1) : m.toFixed(2)}M`;
+  }
+  if (abs >= 1_000) {
+    const k = abs / 1_000;
+    return `${sign}$${k >= 100 ? k.toFixed(0) : k.toFixed(1)}k`;
+  }
+  return `${sign}$${abs.toFixed(0)}`;
+}
+
+/** +$54.8k, or the U+2212 minus for a negative; $0 when it rounds to zero. */
+function formatSignedCompactCurrency(value: number): string {
+  if (Math.abs(value) < 0.5) return '$0';
+  return value > 0 ? `+${formatCompactCurrency(value)}` : formatCompactCurrency(value);
+}
+
+/** 0.434 -> "43%"; 0.0795 with 2 digits -> "7.95%" */
+function formatPct(fraction: number, digits = 0): string {
+  return `${(fraction * 100).toFixed(digits)}%`;
+}
+
+/** 0.095 -> "+9.5%", the U+2212 minus for a negative; rounds to zero -> "0.0%" */
+function formatSignedPct(fraction: number, digits = 1): string {
+  const rounded = Number((fraction * 100).toFixed(digits));
+  const text = `${Math.abs(rounded).toFixed(digits)}%`;
+  if (rounded === 0) return text;
+  return rounded > 0 ? `+${text}` : `${MINUS}${text}`;
+}
+
+/** 2 -> "2x", 1.5 -> "1.5x" */
+function formatLeverage(ratio: number): string {
+  return `${Number(ratio.toFixed(2))}x`;
+}
 
 describe('formatCurrency', () => {
   const cases: Array<[number, CurrencyFormatOptions | undefined, string]> = [
@@ -269,6 +305,7 @@ describe('formatValue', () => {
     [-1234, 'currency-signed', `${MINUS}$1,234`],
     [54_800, 'currency-compact-signed', '+$54.8k'],
     [0.075, 'percent', '7.5%'],
+    [0.03, 'percent-1', '3.0%'],
     [-0.1, 'percent-signed', `${MINUS}10%`],
     [2.25, 'multiple', '2.25x'],
     [2.5, 'months', '2.5 months'],

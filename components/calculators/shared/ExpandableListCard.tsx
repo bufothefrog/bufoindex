@@ -5,7 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TONE_TEXT, toneFromLegacy, type Tone } from '@/lib/design-system/tone';
 
+/** @deprecated The older card vocabulary; use `Tone` through the `tone` prop. */
 export type CardVariant = 'default' | 'success' | 'warning' | 'danger';
 
 interface ExpandableListCardProps {
@@ -14,6 +16,8 @@ interface ExpandableListCardProps {
   subtitle?: string;
   value?: string | number;
   valueSubtext?: string;
+  tone?: Tone;
+  /** @deprecated Use `tone`; it maps through toneFromLegacy (danger is negative). */
   variant?: CardVariant;
   expanded?: boolean;
   onToggle?: () => void;
@@ -22,19 +26,20 @@ interface ExpandableListCardProps {
   className?: string;
 }
 
-const variantBorder: Record<CardVariant, string> = {
-  default: 'border-l-border',
-  success: 'border-l-success',
-  warning: 'border-l-warning',
-  danger: 'border-l-destructive',
+/** The left accent border per tone. */
+const TONE_BORDER_LEFT: Readonly<Record<Tone, string>> = {
+  neutral: 'border-l-border',
+  positive: 'border-l-success',
+  caution: 'border-l-warning',
+  negative: 'border-l-destructive',
+  info: 'border-l-info',
+  brand: 'border-l-sage-500 dark:border-l-sage-400',
 };
 
-const variantIcon: Record<CardVariant, string> = {
-  default: 'text-muted-foreground',
-  success: 'text-success',
-  warning: 'text-warning',
-  danger: 'text-destructive',
-};
+/** The header icon per tone; a neutral icon stays muted. */
+function iconClass(tone: Tone): string {
+  return tone === 'neutral' ? 'text-muted-foreground' : TONE_TEXT[tone];
+}
 
 export function ExpandableListCard({
   icon: Icon,
@@ -42,6 +47,7 @@ export function ExpandableListCard({
   subtitle,
   value,
   valueSubtext,
+  tone,
   variant = 'default',
   expanded,
   onToggle,
@@ -49,6 +55,7 @@ export function ExpandableListCard({
   headerRight,
   className,
 }: ExpandableListCardProps) {
+  const resolved = tone ?? toneFromLegacy(variant);
   const isExpandable = onToggle !== undefined;
   const Chevron = expanded ? ChevronDown : ChevronRight;
 
@@ -56,7 +63,7 @@ export function ExpandableListCard({
     <Card
       className={cn(
         'border-l-4 transition-all duration-200',
-        variantBorder[variant],
+        TONE_BORDER_LEFT[resolved],
         isExpandable && 'hover:shadow-md cursor-pointer',
         className
       )}
@@ -76,7 +83,7 @@ export function ExpandableListCard({
         >
           <div className="flex items-center space-x-3 min-w-0">
             {Icon && (
-              <Icon className={cn('w-5 h-5 shrink-0', variantIcon[variant])} />
+              <Icon className={cn('w-5 h-5 shrink-0', iconClass(resolved))} />
             )}
             <div className="min-w-0">
               <h4 className="font-semibold text-sm">{title}</h4>

@@ -18,6 +18,7 @@ import {
   getIntakeScreens,
   getLearnOption,
   intakeForm,
+  intentNeedsCore,
   isCoreComplete,
   isIntakeIntent,
   skipLabelFor,
@@ -599,7 +600,7 @@ interface WizardGateProps {
 /**
  * Decides once, from the profile as it was on arrival, whether to ask
  * anything. In 'remaining' mode an intent sends a visitor without the basics
- * to the core intake first, and any flow goes straight to its destination
+ * to the core intake first (unless it needs none of them, O5), and any flow goes straight to its destination
  * when nothing is left to ask (so an empty wizard never renders). Frozen at
  * mount so the save on finish does not re-trigger a redirect.
  */
@@ -608,7 +609,7 @@ function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
   const [profileOnArrival] = useState(initialProfile);
   const [redirect] = useState<string | null>(() => {
     if (mode !== 'remaining') return null;
-    if (flow !== 'core' && !isCoreReady(profileOnArrival)) return coreStartLink(flow);
+    if (flow !== 'core' && intentNeedsCore(flow) && !isCoreReady(profileOnArrival)) return coreStartLink(flow);
     const screens = getIntakeScreens(flow, makeGet(profileOnArrival), {
       mode,
       provided: profileOnArrival.provided,

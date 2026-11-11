@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { LearnChooser } from '@/components/guided/LearnChooser';
 import { Wizard } from '@/components/guided/Wizard';
 import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
-import { PROFILE_FIELDS } from '@/lib/profile/defaults';
+import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 const push = vi.fn();
@@ -45,9 +45,9 @@ describe('LearnChooser', () => {
       '/start/leverage',
     ]);
     expect(links[0]).toHaveTextContent('Finish your profile');
-    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 11 more questions.');
+    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 14 more questions.');
     expect(links[2]).toHaveTextContent('See if I am on track to retire');
-    expect(links[2]).toHaveTextContent('3 more questions.');
+    expect(links[2]).toHaveTextContent('4 more questions.');
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -65,14 +65,17 @@ describe('LearnChooser', () => {
 
     const links = optionLinks();
     expect(links[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
-    expect(links[3]).toHaveTextContent('1 more question.');
-    // Retirement covered the leverage horizon and balance; the taxable contribution is left.
-    expect(links[4]).toHaveTextContent('1 more question.');
+    // The deprecated new cash answers no portfolio screen: targets, accounts, holdings and settings are left.
+    expect(links[3]).toHaveTextContent('4 more questions.');
+    // Retirement covered the leverage horizon and balance; the taxable contribution and the
+    // ratio are left, then the market assumptions.
+    expect(links[4]).toHaveTextContent('2 more questions.');
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
-    // The intake never asks four profile fields, so profileCompleteness still
-    // lists them; /start/profile would only redirect, so link the overview.
+    // The intake never asks the emergency-fund target months, so
+    // profileCompleteness still lists it (the answered accounts answer the
+    // new cash); /start/profile would only redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
 
@@ -80,13 +83,13 @@ describe('LearnChooser', () => {
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
     expect(first).toHaveTextContent(
-      'No questions left to ask. The overview runs each calculator from your profile and lists the 4 details that still use a typical value.'
+      'No questions left to ask. The overview runs each calculator from your profile and lists the 1 detail that still uses a typical value.'
     );
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
   });
 
   it('swaps option one for the overview when every profile detail is saved', () => {
-    answer(PROFILE_FIELDS.map((field) => field.path));
+    answer([...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS]);
     render(<LearnChooser />);
 
     const first = optionLinks()[0];

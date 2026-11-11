@@ -1,13 +1,13 @@
 import { AllocationItem, DebtData, PaycheckProfile } from '@/lib/types';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { FinancialStep, StepStatus, UrgencyLevel } from '@/lib/constants/financialSteps';
-import { CONTRIBUTION_LIMITS_2026, TOTAL_415C_BY_AGE } from '@/lib/constants/irs-2026';
-
-/**
- * Rate above which a debt counts as high-interest. Same threshold the allocator
- * applies (lib/calculations/optimization.ts `getHighInterestThreshold`).
- */
-const HIGH_INTEREST_THRESHOLD = 0.07;
+import {
+  HIGH_INTEREST_THRESHOLD,
+  limit401k,
+  limit415c,
+  limitHsa,
+  limitIra,
+} from '@/lib/calculations/contributionLimits';
 
 /**
  * Copy for the emergency-fund steps when necessary expenses are $0: the target
@@ -16,49 +16,11 @@ const HIGH_INTEREST_THRESHOLD = 0.07;
 const NO_EXPENSE_TARGET = 'Necessary monthly expenses not set - emergency fund target unknown';
 
 /**
- * 402(g) elective-deferral limit, including the age-based catch-ups the
- * allocator applies (optimization.ts `calculateAdditional401k`): the regular
- * catch-up at 50+, and the SECURE 2.0 super catch-up for ages 60-63 only.
- * Figures come from lib/constants/irs-2026.ts.
- */
-function elective401kLimit(age: number): number {
-  const catchUp = age >= 60 && age <= 63
-    ? CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k
-    : age >= 50
-      ? CONTRIBUTION_LIMITS_2026.catchUp['401k']
-      : 0;
-  return CONTRIBUTION_LIMITS_2026.traditional401k + catchUp;
-}
-
-/**
- * Combined traditional + Roth IRA contribution limit, with the 50+ catch-up
- * (optimization.ts `calculateRothIRA` uses the same pair of constants).
- */
-function iraLimit(age: number): number {
-  return CONTRIBUTION_LIMITS_2026.ira + (age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
-}
-
-/** HSA limit for the coverage tier, plus the age-55 catch-up. */
-function hsaLimit(coverageType: 'individual' | 'family', age: number): number {
-  const base = coverageType === 'family'
-    ? CONTRIBUTION_LIMITS_2026.hsa.family
-    : CONTRIBUTION_LIMITS_2026.hsa.individual;
-  return base + (age >= 55 ? CONTRIBUTION_LIMITS_2026.catchUp.hsa : 0);
-}
-
-/** Total 415(c) annual-additions limit for the age band. */
-function total415cLimit(age: number): number {
-  if (age >= 60 && age <= 63) return TOTAL_415C_BY_AGE.superCatchUp60to63;
-  if (age >= 50) return TOTAL_415C_BY_AGE.catchUp50;
-  return TOTAL_415C_BY_AGE.standard;
-}
-
-/**
  * The qualifying debt the allocator actually targets: highest rate first, not
  * first in input order (optimization.ts `calculateHighInterestDebt` sorts the
  * filtered list descending by rate).
  */
-function highestRateHighInterestDebt(debts: DebtData[]): DebtData | undefined {
+export function highestRateHighInterestDebt(debts: DebtData[]): DebtData | undefined {
   return debts
     .filter(d => d.interestRate > HIGH_INTEREST_THRESHOLD)
     .reduce<DebtData | undefined>(
@@ -124,7 +86,7 @@ export function calculateStepStatus(
 
       switch (step.id) {
         // A target of $0 means necessary expenses have not been entered yet, not
-        // that the fund is funded — `0 >= 0` must not read as complete.
+        // that the fund is funded: `0 >= 0` must not read as complete.
         case 'emergency-1month':
           return profile.preferences.necessaryExpenses > 0 &&
                  profile.preferences.currentEmergencyFund >= profile.preferences.necessaryExpenses;
@@ -141,18 +103,18 @@ export function calculateStepStatus(
         case 'hsa-max': {
           if (!profile.benefits.hsa.eligible) return false;
           const hsaAnnualContribution = profile.benefits.hsa.currentContribution * 12;
-          const limit = hsaLimit(profile.benefits.hsa.coverageType, profile.preferences.age);
+          const limit = limitHsa(profile.benefits.hsa.coverageType, profile.preferences.age);
           return hsaAnnualContribution >= (limit * 0.98);
         }
         case 'roth-ira': {
           const rothContribution = profile.benefits.ira?.currentContributions?.roth || 0;
           const rothAnnualContribution = rothContribution * 12;
-          return rothAnnualContribution >= (iraLimit(profile.preferences.age) * 0.98);
+          return rothAnnualContribution >= (limitIra(profile.preferences.age) * 0.98);
         }
         case 'additional-401k': {
           if (!profile.benefits.employer401k.available) return false;
           const employee401kContribution = profile.income.gross * profile.benefits.employer401k.currentContribution * 12;
-          return employee401kContribution >= (elective401kLimit(profile.preferences.age) * 0.98);
+          return employee401kContribution >= (limit401k(profile.preferences.age) * 0.98);
         }
         default:
           return false;
@@ -221,7 +183,7 @@ export function calculateStepStatus(
         }
         case 'hsa-max': {
           if (!profile.benefits.hsa.eligible) return { monthly: 0, annual: 0 };
-          const limit = hsaLimit(profile.benefits.hsa.coverageType, profile.preferences.age);
+          const limit = limitHsa(profile.benefits.hsa.coverageType, profile.preferences.age);
           const currentHSA = profile.benefits.hsa.currentContribution * 12;
           // Deduction value at the profile's own federal bracket, not a fixed rate.
           const taxSavings = Math.max(0, limit - currentHSA) * Math.max(0, profile.taxes.federalBracket);
@@ -229,7 +191,7 @@ export function calculateStepStatus(
         }
         case 'roth-ira': {
           const currentRoth = (profile.benefits.ira?.currentContributions?.roth || 0) * 12;
-          const potentialGrowth = Math.max(0, iraLimit(profile.preferences.age) - currentRoth) * 0.07;
+          const potentialGrowth = Math.max(0, limitIra(profile.preferences.age) - currentRoth) * 0.07;
           return { monthly: potentialGrowth / 12, annual: potentialGrowth };
         }
         default:
@@ -265,7 +227,7 @@ export function calculateStepStatus(
             "Set up investment options within HSA"
           ];
         case 'roth-ira': {
-          const monthlyToLimit = iraLimit(profile.preferences.age) / 12;
+          const monthlyToLimit = limitIra(profile.preferences.age) / 12;
           return [
             "Open Roth IRA at low-cost broker (Vanguard, Fidelity)",
             `Set up automatic ${formatCurrency(monthlyToLimit)}/month transfer`,
@@ -284,7 +246,7 @@ export function calculateStepStatus(
         case 'additional-401k': {
           const currentContrib = profile.benefits.employer401k.currentContribution;
           const annualGross = profile.income.gross * 12;
-          const maxLimit = elective401kLimit(profile.preferences.age);
+          const maxLimit = limit401k(profile.preferences.age);
           const neededAnnual = Math.max(0, maxLimit - (annualGross * currentContrib));
           // Without a gross figure there is no percent-of-salary to quote; the
           // dollar amount still stands on its own. "by X% more" was ambiguous
@@ -302,7 +264,7 @@ export function calculateStepStatus(
           return [
             "Confirm after-tax 401k contributions allowed",
             "Set up in-service Roth conversions with provider",
-            `Contribute up to annual limit (${formatCurrency(total415cLimit(profile.preferences.age))} total)`
+            `Contribute up to annual limit (${formatCurrency(limit415c(profile.preferences.age))} total)`
           ];
         case 'taxable-investment':
           return [
@@ -394,7 +356,7 @@ export function calculateStepStatus(
 
         case 'roth-ira': {
           if (isComplete) return `Roth IRA maximized`;
-          const monthlyToLimit = iraLimit(profile.preferences.age) / 12;
+          const monthlyToLimit = limitIra(profile.preferences.age) / 12;
           return allocation
             ? `Contributing to Roth IRA`
             : `Contribute ${formatCurrency(monthlyToLimit)}/month to Roth IRA`;
@@ -405,12 +367,12 @@ export function calculateStepStatus(
 
           const currentEmployee401k = profile.benefits.employer401k.currentContribution;
           const annualGross = profile.income.gross * 12;
-          const maxEmployee401kLimit = elective401kLimit(profile.preferences.age);
+          const maxEmployee401kLimit = limit401k(profile.preferences.age);
           const currentAnnualContribution = annualGross * currentEmployee401k;
           const additionalNeeded = Math.max(0, maxEmployee401kLimit - currentAnnualContribution);
           const additionalNeededMonthly = additionalNeeded / 12;
           // With no gross pay on file the percent-of-salary figure is undefined,
-          // so the copy quotes dollars only. Label the period and the base —
+          // so the copy quotes dollars only. Label the period and the base;
           // "$922 (13.2%)" left the reader to guess both.
           const additionalFigure = annualGross > 0
             ? `${formatCurrency(additionalNeededMonthly)}/month (${formatPercent(additionalNeeded / annualGross)} of salary)`

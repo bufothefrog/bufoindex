@@ -67,25 +67,17 @@ describe('shared field specs', () => {
     }
   });
 
-  it('words filing status from the label table: single and married filing jointly', () => {
+  it('words filing status from the label table: all four statuses, whatever is saved (O10)', () => {
     const offered = [
       { value: 'single', label: 'Single' },
       { value: 'marriedJoint', label: 'Married filing jointly' },
-    ];
-    expect(resolveOptions(FILING_STATUS, getFrom({ 'person.filingStatus': 'single' }))).toEqual(offered);
-    expect(resolveOptions(FILING_STATUS, getFrom({ 'person.filingStatus': 'marriedJoint' }))).toEqual(offered);
-    expect(FILING_STATUS_META.marriedJoint.phrase).toBe('married filing jointly');
-  });
-
-  it('keeps a saved filing status the intake does not offer as a third option', () => {
-    expect(resolveOptions(FILING_STATUS, getFrom({ 'person.filingStatus': 'headOfHousehold' }))).toEqual([
-      { value: 'single', label: 'Single' },
-      { value: 'marriedJoint', label: 'Married filing jointly' },
+      { value: 'marriedSeparate', label: 'Married filing separately' },
       { value: 'headOfHousehold', label: 'Head of household' },
-    ]);
-    expect(
-      resolveOptions(FILING_STATUS, getFrom({ 'person.filingStatus': 'marriedSeparate' })).map((o) => o.label)
-    ).toEqual(['Single', 'Married filing jointly', 'Married filing separately']);
+    ];
+    for (const saved of ['single', 'marriedJoint', 'marriedSeparate', 'headOfHousehold']) {
+      expect(resolveOptions(FILING_STATUS, getFrom({ 'person.filingStatus': saved })), saved).toEqual(offered);
+    }
+    expect(FILING_STATUS_META.marriedJoint.phrase).toBe('married filing jointly');
   });
 
   it('offeredWithSaved adds only a known saved value, and returns the offered list itself otherwise', () => {

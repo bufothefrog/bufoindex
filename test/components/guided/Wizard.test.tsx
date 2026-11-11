@@ -4,11 +4,11 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { INTAKE_DESTINATION } from '@/components/calculators/renderers';
 import { Wizard } from '@/components/guided/Wizard';
-import { PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
+import { FORMS, PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
 import { CORE_PATHS, intakePaths, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
-import type { FormSpec } from '@/lib/fields/types';
+import { offeredWithSaved } from '@/lib/fields/shared';
+import type { FieldOption, FormSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { leverageLink } from '@/lib/profile/links';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe('Wizard, a saved value the intake does not offer', () => {
-  it('keeps a saved filing status the intake does not offer, chosen, and moves on with it', async () => {
+  it('shows a saved head-of-household status chosen among the four statuses, and moves on with it', async () => {
     useProfileStore.getState().setValues([{ path: 'person.filingStatus', value: 'headOfHousehold' }]);
     const user = userEvent.setup();
     render(<Wizard flow="core" />);
@@ -62,6 +62,7 @@ describe('Wizard, a saved value the intake does not offer', () => {
     expect(screen.getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
       'Single',
       'Married filing jointly',
+      'Married filing separately',
       'Head of household',
     ]);
     expect(screen.getByRole('radio', { name: 'Head of household' })).toHaveAttribute('aria-checked', 'true');
@@ -176,11 +177,25 @@ describe('Wizard, remaining questions of an intent', () => {
 
   it('labels profile screens with their section and finishes at the overview', async () => {
     const user = userEvent.setup();
-    answer([...CORE_PATHS, ...intakePaths('retirement'), ...intakePaths('paycheck'), ...intakePaths('portfolio')]);
-    // What is left: the screens of the sections after those three (the
-    // taxable contribution, then the two cash screens, with the provisional forms).
+    // Everything answered but one retirement screen and the last two paycheck
+    // screens. The paycheck form asks the emergency fund, so the cash section
+    // is the strategy screen alone; the paycheck section is the last one with
+    // two screens left.
+    const paycheckLeft = ['ira-taxable', 'debts'];
+    const unanswered = new Set(
+      [
+        ...FORMS.retirement.screens.filter((s) => s.id === 'ss-healthcare'),
+        ...FORMS.paycheck.screens.filter((s) => paycheckLeft.includes(s.id)),
+      ].flatMap((s) => s.fields)
+    );
+    answer(intakePaths('profile').filter((path) => !unanswered.has(path)));
     const left = remainingIntakeScreens('profile', useProfileStore.getState().profile);
-    const cashAt = left.findIndex((s) => profileFormSection(s.id) === 'cash');
+    expect(left.map((s) => [s.id, profileFormSection(s.id)])).toEqual([
+      ['ss-healthcare', 'retirement'],
+      ['ira-taxable', 'paycheck'],
+      ['debts', 'paycheck'],
+    ]);
+    const cashAt = left.findIndex((s) => profileFormSection(s.id) === 'paycheck');
     expect(cashAt).toBeGreaterThan(0);
     render(<Wizard flow="profile" />);
 
@@ -193,14 +208,15 @@ describe('Wizard, remaining questions of an intent', () => {
       await user.click(screen.getByRole('button', { name: /Next/ }));
     }
     expect(screen.getByText(label(cashAt))).toBeInTheDocument();
-    expect(label(cashAt).startsWith('Cash and strategy · ')).toBe(true);
+    expect(label(cashAt).startsWith('Paycheck \u00b7 ')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Skip the rest of this section' }));
 
     expect(replace).toHaveBeenCalledWith('/overview');
     expect(push).not.toHaveBeenCalled();
     const { provided } = useProfileStore.getState().profile;
     for (const screen of left.slice(0, cashAt)) expect(provided).toEqual(expect.arrayContaining([...screen.fields]));
-    expect(provided).not.toContain('cash.emergencyFundBalance');
+    expect(provided).not.toContain('debts');
+    expect(provided).not.toContain('ira.traditional');
   });
 });
 
@@ -239,7 +255,7 @@ describe('Wizard, every intent finishes on its calculator', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Single' }));
     expect(screen.getByRole('radio', { name: 'Single' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getAllByRole('radio')).toHaveLength(4);
     await user.click(screen.getByRole('radio', { name: 'Head of household' }));
     expect(screen.getByRole('radio', { name: 'Head of household' })).toHaveAttribute('aria-checked', 'true');
 
@@ -310,6 +326,59 @@ describe('Wizard mechanics (fixture form)', () => {
   });
 
   const heading = (name: string) => screen.getByRole('heading', { level: 2, name });
+
+  /** FIXTURE with the mix offered in part: a saved 'custom' mix joins the three offered. */
+  const withSavedMix = (): FormSpec => ({
+    ...FIXTURE,
+    fields: FIXTURE.fields.map((spec) =>
+      spec.path === 'investing.targetMix'
+        ? {
+            ...spec,
+            options: offeredWithSaved('investing.targetMix', spec.options as readonly FieldOption[], [
+              ...(spec.options as readonly FieldOption[]),
+              { value: 'custom', label: 'Own mix' },
+            ]),
+          }
+        : spec
+    ),
+    screens: FIXTURE.screens.filter((s) => s.id !== 'ages'),
+  });
+
+  it('keeps a saved value the intake does not offer, chosen, and moves on with it', async () => {
+    injected.form = withSavedMix();
+    useProfileStore.getState().setValues([{ path: 'investing.targetMix', value: 'custom' }]);
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+
+    expect(screen.getByRole('radiogroup', { name: 'Mix' })).not.toHaveAccessibleDescription(/listed options/);
+    expect(screen.getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
+      'All stocks',
+      'Mostly stocks',
+      'Balanced',
+      'Own mix',
+    ]);
+    expect(screen.getByRole('radio', { name: 'Own mix' })).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(heading('Fixture cash?')).toBeInTheDocument();
+    expect(screen.queryByText(/must be one of the listed options/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the saved value on offer after another is chosen, so it can be chosen again', async () => {
+    injected.form = withSavedMix();
+    useProfileStore.getState().setValues([{ path: 'investing.targetMix', value: 'custom' }]);
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+
+    await user.click(screen.getByRole('radio', { name: 'All stocks' }));
+    expect(screen.getByRole('radio', { name: 'All stocks' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getAllByRole('radio')).toHaveLength(4);
+    await user.click(screen.getByRole('radio', { name: 'Own mix' }));
+    expect(screen.getByRole('radio', { name: 'Own mix' })).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(heading('Fixture cash?')).toBeInTheDocument();
+  });
 
   it('advances, moves focus to the new question, and goes Back with the answers kept', async () => {
     render(<Wizard flow="leverage" mode="all" />);
@@ -529,7 +598,7 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(profile.cash.targetMonths).toBe(7);
     expect(profile.provided).toEqual(['person.age', 'person.retirementAge']);
     expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith(leverageLink(profile));
+    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?from=profile');
   });
 });
 

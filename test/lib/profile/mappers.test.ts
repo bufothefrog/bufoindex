@@ -42,8 +42,7 @@ import {
   rebalancePortfolioV2,
   validateRebalanceInputsV2,
 } from '@/lib/calculations/portfolioRebalancing';
-import { useRetirementStore } from '@/lib/store/retirementStore';
-import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
+import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
 
 /**
  * A v1-shaped profile: the given v1 sections over the v1 defaults, loaded
@@ -156,7 +155,7 @@ describe('toRetirementInputs', () => {
   });
 
   it('defaults the fields v1 did not carry to the retirement store defaults', () => {
-    const storeDefaults = useRetirementStore.getInitialState().inputs;
+    const storeDefaults = RETIREMENT_LEGACY.storageDefaults();
     const inputs = toRetirementInputs(getDefaultFinancialProfile());
     for (const key of [
       'lifeExpectancy',
@@ -298,8 +297,30 @@ describe('toRebalanceInputs', () => {
   });
 
   it('reconstructs the rebalancer store worked example (holdings, securities, flags)', () => {
-    usePortfolioRebalancingStore.getState().reset();
-    const storeDefaults = usePortfolioRebalancingStore.getState().inputs;
+    // The old store's seed (defaultInputs in lib/store/portfolioRebalancingStore.ts
+    // before slice c5 made it a run store), captured as a fixture.
+    const storeDefaults = {
+      setupMode: 'multi-shared',
+      securities: [
+        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
+        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
+        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+      ],
+      accounts: [
+        { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 500 },
+        { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 1500 },
+      ],
+      holdings: [
+        { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
+        { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
+        { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
+        { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+      ],
+      customAssetClasses: [],
+      allowTaxableSelling: false,
+      showPlacementAdvice: true,
+      mode: 'whole',
+    } as const;
     const inputs = toRebalanceInputs(getDefaultFinancialProfile());
     expect(inputs.setupMode).toBe(storeDefaults.setupMode);
     expect(inputs.securities).toEqual(storeDefaults.securities);

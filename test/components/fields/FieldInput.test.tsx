@@ -452,3 +452,35 @@ describe('FieldInput: custom renderers', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('No renderer "holdings" for the field "portfolio.holdings"');
   });
 });
+
+describe('FieldInput: word units', () => {
+  const LIFE: FieldSpec = {
+    path: 'person.lifeExpectancy',
+    kind: 'number',
+    label: 'Life expectancy',
+    help: 'Age to plan to',
+    tier: 'details',
+    min: 60,
+    max: 110,
+    unit: { suffix: ' years' },
+  };
+
+  it('shows a word unit as its own text beside the value and announces it with the field', () => {
+    for (const size of [undefined, 'lg'] as const) {
+      renderField(LIFE, { person: { lifeExpectancy: 85 } }, size ? { size } : {});
+      const box = screen.getByRole('textbox', { name: 'Life expectancy' });
+      expect(box).toHaveValue('85');
+      // The unit is readable on its own (not drawn inside the value box)
+      // and is part of what a screen reader hears for the field.
+      expect(screen.getByText('years')).toBeVisible();
+      expect(box).toHaveAccessibleDescription('years Age to plan to');
+      cleanup();
+    }
+  });
+
+  it('keeps a one-character unit inside the box without changing the description', () => {
+    renderField({ ...AGE, unit: { suffix: 'x' } }, { person: { age: 30 } });
+    expect(screen.getByRole('textbox', { name: 'Age' })).toHaveAccessibleDescription('Your age today');
+    expect(screen.getByText('x')).toBeVisible();
+  });
+});

@@ -16,12 +16,12 @@
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
 import {
   dcaEffectSentence,
-  LeverageResults,
   lumpSumScaleSentence,
   relativeGapNoisePoints,
-} from '@/app/tools/leverage-comparison/components/LeverageResults';
+} from '@/lib/calculators/leverage/narrative';
 import {
   DEFAULT_DCA_COMPARISON_INPUTS,
   simulateDcaComparison,
@@ -170,5 +170,18 @@ describe('LeverageResults model and caveats', () => {
     expect(
       screen.getByText(/can still carry sampling error of a few\s+percentage points; a different seed would move them/)
     ).toBeInTheDocument();
+  });
+});
+
+describe('LeverageResults announcements', () => {
+  it('puts the headline figures, and only them, in a polite live region', () => {
+    const { inputs, result } = atReturn(0.1);
+    const { container } = render(<LeverageResults result={result} inputs={inputs} />);
+    const live = container.querySelectorAll('[aria-live]');
+    expect(live).toHaveLength(1);
+    expect(live[0]).toHaveAttribute('aria-live', 'polite');
+    expect(live[0]).toHaveTextContent('Index fund, median ending balance');
+    expect(live[0]).toHaveTextContent('Share of simulated paths where the 2x fund ends behind the index fund');
+    expect(live[0]).not.toHaveTextContent('Cash flow vs lump sum');
   });
 });

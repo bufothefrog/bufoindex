@@ -1,271 +1,217 @@
+'use client';
+
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { AlertTriangle, Info, LineChart, Scale, TrendingDown } from 'lucide-react';
-import { ResultCard, SummaryCard } from '@/components/ui/cards';
-import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
+import { ResultCard } from '@/components/ui/cards';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
+import { ChartFrame } from '@/components/ui/charts';
+import { DataTable, KeyValueList, StatGrid, type DataTableColumn } from '@/components/ui/results';
 import {
   horizonMonths,
   type DcaComparisonInputs,
   type DcaComparisonResult,
 } from '@/lib/calculations/leverageComparison';
-import { cn, formatCurrency } from '@/lib/utils';
-import { ComparisonTable } from './ComparisonTable';
-import { DcaPathChart } from './DcaPathChart';
+import { leverageHeadline } from '@/lib/calculators/leverage/headline';
 import {
-  formatCompactCurrency,
-  formatLeverage,
-  formatPct,
-  formatSignedCompactCurrency,
-  formatSignedPct,
-} from './format';
+  COMPACT,
+  COMPACT_SIGNED,
+  dcaEffectSentence,
+  dragParts,
+  lumpSumScaleSentence,
+  recoveryGain,
+  relativeGap,
+} from '@/lib/calculators/leverage/narrative';
+import { formatCurrency, formatMultiple, formatPercent } from '@/lib/format';
+
+// Recharts loads only on the client and only once the chart frame nears the
+// viewport (audit H1).
+const DcaPathChart = dynamic(() => import('./DcaPathChart'), { ssr: false });
 
 export interface LeverageResultsProps {
   result: DcaComparisonResult;
+  /** The inputs that produced `result`. */
   inputs: DcaComparisonInputs;
-  /** True while a newer set of inputs is still being simulated. */
-  isStale?: boolean;
 }
 
-function relative(gap: number, base: number): number {
-  return base > 0 ? gap / base : 0;
+const SIGNED_ONE_DECIMAL = { digits: 1, signed: true } as const;
+const WHOLE = { digits: 0 } as const;
+const TWO_DECIMALS = { digits: 2 } as const;
+
+interface FramingRow {
+  label: string;
+  sublabel: string;
+  index: number;
+  leveraged: number;
+  gap: number;
 }
 
-function direction(gap: number): string {
-  if (Math.abs(gap) < 0.5) return 'level with';
-  return gap > 0 ? 'above' : 'below';
+interface MeasureRow {
+  label: string;
+  sublabel: string;
+  index: string;
+  leveraged: string;
 }
 
-function GapCell({ gap, base }: { gap: number; base: number }) {
+function RowLabel({ label, sublabel }: { label: string; sublabel: string }) {
   return (
     <>
-      <span className="block">{formatSignedCompactCurrency(gap)}</span>
-      <span className="block text-xs text-muted-foreground">{formatSignedPct(relative(gap, base))}</span>
+      <span className="block">{label}</span>
+      <span className="block text-xs font-normal text-muted-foreground">{sublabel}</span>
     </>
   );
 }
 
-/** Gain needed to get back to the prior peak after a fractional drawdown. */
-function formatRecovery(drawdown: number): string {
-  if (drawdown >= 0.999) return 'more than 100,000%';
-  return formatPct(1 / (1 - drawdown) - 1);
+function rowLabelColumn<T extends { label: string; sublabel: string }>(header: string): DataTableColumn<T> {
+  return { id: 'label', header, rowHeader: true, cell: (row) => <RowLabel label={row.label} sublabel={row.sublabel} /> };
 }
 
-type NoiseInputs = Pick<DcaComparisonInputs, 'leverageRatio' | 'years' | 'paths'>;
-
-/**
- * Rough seed-to-seed noise, in percentage points, in the difference between
- * the two relative gaps. Calibrated by rerunning the engine on 30 to 40 seeds
- * at the default assumptions with 500 paths: the standard deviation was about
- * 2.8 points at 2x over 20 years, 1.4 at 1.5x, 5 at 3x, 1.5 over 5 years and
- * 4.3 over 40 years, and about 0.3 at 1x (fees only, nearly deterministic).
- * This returns roughly 1.5 of those standard deviations: 4 points at 2x over
- * 20 years, scaled by the leverage above 1x, the square root of the horizon,
- * and one over the square root of the path count. It only decides whether the
- * copy calls a difference noise; it is not a confidence interval.
- */
-export function relativeGapNoisePoints(inputs: NoiseInputs): number {
-  const excess = Math.abs(inputs.leverageRatio - 1);
-  const years = Math.max(1, inputs.years);
-  const paths = Math.max(1, inputs.paths);
-  if (!Number.isFinite(excess) || !Number.isFinite(years) || !Number.isFinite(paths)) return 0;
-  return 4 * excess * Math.sqrt(years / 20) * Math.sqrt(500 / paths);
-}
-
-export function dcaEffectSentence(
-  result: DcaComparisonResult,
-  L: string,
-  inputs: NoiseInputs
-): string {
-  const { dcaGap, lumpSumGap } = result.dcaEffect;
-  if (Math.abs(dcaGap) < 0.5 && Math.abs(lumpSumGap) < 0.5) {
-    return `At these settings the ${L} fund and the index fund produce the same balances under both framings.`;
-  }
-  const dcaRel = relative(dcaGap, result.index.dca.p50);
-  const lumpRel = relative(lumpSumGap, result.index.lumpSum.p50);
-  const diffPoints = (dcaRel - lumpRel) * 100;
-  const pointsText = `${Math.abs(diffPoints).toFixed(1)} percentage points`;
-  const noise = relativeGapNoisePoints(inputs);
-  const gaps =
-    `With monthly contributions the ${L} fund's median ends ${direction(dcaGap)} the index fund's ` +
-    `median by ${formatCompactCurrency(Math.abs(dcaGap))} (${formatSignedPct(dcaRel)} of the index median). ` +
-    `Investing the same ${formatCompactCurrency(result.totalContributed)} at month 0 gives a gap of ` +
-    `${formatSignedCompactCurrency(lumpSumGap)} (${formatSignedPct(lumpRel)}).`;
-
-  if (noise > 0 && Math.abs(diffPoints) < noise) {
-    return (
-      `${gaps} The two relative gaps differ by ${pointsText}, which is within the sampling error of ` +
-      `${inputs.paths} simulated paths, so at these settings this run does not separate the two framings.`
-    );
-  }
-  const sign = diffPoints >= 0 ? '+' : '−';
-  const noiseNote =
-    noise > 0
-      ? ` With ${inputs.paths} paths that figure still carries sampling error of a few percentage points.`
-      : '';
-  return (
-    `${gaps} Both framings use the same simulated markets, so the difference between the two relative ` +
-    `gaps (${sign}${pointsText}) comes from how the contribution pattern interacts with the funds' ` +
-    `different growth rates.${noiseNote}`
-  );
-}
-
-/**
- * Compares each fund's lump-sum median with its monthly-contribution median.
- * The direction depends on the inputs: with positive expected returns the lump
- * sum's longer time in the market usually makes it larger, but at low or
- * negative returns (or where volatility drag dominates the leveraged fund) it
- * can be smaller for one fund or both, so the sentence is computed rather
- * than fixed.
- */
-export function lumpSumScaleSentence(result: DcaComparisonResult, L: string): string {
-  const indexDiff = result.index.lumpSum.p50 - result.index.dca.p50;
-  const levDiff = result.leveraged.lumpSum.p50 - result.leveraged.dca.p50;
-  const indexDir = direction(indexDiff);
-  const levDir = direction(levDiff);
-  const tail = 'The relative gap in the table is the like-for-like comparison.';
-  if (indexDir === levDir) {
-    if (indexDir === 'above') {
-      return `The lump sum has more money in the market for longer, and at these settings that makes its median balance larger than the monthly median under both funds. ${tail}`;
-    }
-    if (indexDir === 'below') {
-      return `At these settings the lump sum's median balance is smaller than the monthly median under both funds: when the typical path grows slowly or falls, money that sits in the market longer has more time to lose ground. ${tail}`;
-    }
-    return `At these settings the lump sum and monthly contributions end at about the same median balance under both funds. ${tail}`;
-  }
-  return (
-    `At these settings the lump sum's median ends ${indexDir} the monthly median for the index fund and ` +
-    `${levDir} it for the ${L} fund: the two funds' typical paths grow at different rates, and the lump sum ` +
-    `spends longer exposed to that difference. ${tail}`
-  );
-}
-
-export function LeverageResults({ result, inputs, isStale = false }: LeverageResultsProps) {
-  const L = formatLeverage(inputs.leverageRatio);
+export function LeverageResults({ result, inputs }: LeverageResultsProps) {
+  const L = formatMultiple(inputs.leverageRatio);
   const months = horizonMonths(inputs.years);
-  const years = months / 12;
   const { index, leveraged } = result;
   const sigma = Math.max(0, inputs.indexVolatility);
-  const lev = inputs.leverageRatio;
-  const multiple = Number(lev.toFixed(2));
-  const decay = ((lev * lev - lev) / 2) * sigma * sigma;
-  const financing = (lev - 1) * inputs.financingRate;
+  const multiple = Number(inputs.leverageRatio.toFixed(2));
+  const { volatilityDrag, financing } = dragParts(inputs);
   const mddIndex = result.medianMaxDrawdown.index;
   const mddLeveraged = result.medianMaxDrawdown.leveraged;
   const monthsBehind = Math.round(result.medianMonthsBehind);
 
+  const framingRows: FramingRow[] = [
+    {
+      label: 'Monthly',
+      sublabel: `${formatCurrency(inputs.monthlyContribution, COMPACT)}/mo + ${formatCurrency(inputs.startingBalance, COMPACT)} start`,
+      index: index.dca.p50,
+      leveraged: leveraged.dca.p50,
+      gap: result.dcaEffect.dcaGap,
+    },
+    {
+      label: 'Lump sum',
+      sublabel: `${formatCurrency(result.totalContributed, COMPACT)} at month 0`,
+      index: index.lumpSum.p50,
+      leveraged: leveraged.lumpSum.p50,
+      gap: result.dcaEffect.lumpSumGap,
+    },
+  ];
+  const framingColumns: DataTableColumn<FramingRow>[] = [
+    rowLabelColumn('Framing'),
+    { id: 'index', header: 'Index', numeric: true, value: (row) => row.index, format: 'currency-compact' },
+    { id: 'leveraged', header: L, numeric: true, value: (row) => row.leveraged, format: 'currency-compact' },
+    {
+      id: 'gap',
+      header: 'Gap',
+      numeric: true,
+      cell: (row) => (
+        <>
+          <span className="block">{formatCurrency(row.gap, COMPACT_SIGNED)}</span>
+          <span className="block text-xs text-muted-foreground">
+            {formatPercent(relativeGap(row.gap, row.index), SIGNED_ONE_DECIMAL)}
+          </span>
+        </>
+      ),
+    },
+  ];
+
+  const measureRows: MeasureRow[] = [
+    {
+      label: 'Median max drawdown',
+      sublabel: 'Worst peak-to-trough fall in fund price',
+      index: formatPercent(mddIndex, WHOLE),
+      leveraged: formatPercent(mddLeveraged, WHOLE),
+    },
+    {
+      label: '10th percentile',
+      sublabel: 'Ending balance; 1 in 10 paths end lower',
+      index: formatCurrency(index.dca.p10, COMPACT),
+      leveraged: formatCurrency(leveraged.dca.p10, COMPACT),
+    },
+    {
+      label: '90th percentile',
+      sublabel: 'Ending balance; 1 in 10 paths end higher',
+      index: formatCurrency(index.dca.p90, COMPACT),
+      leveraged: formatCurrency(leveraged.dca.p90, COMPACT),
+    },
+  ];
+  const measureColumns: DataTableColumn<MeasureRow>[] = [
+    rowLabelColumn('Measure'),
+    { id: 'index', header: 'Index', numeric: true, cell: (row) => row.index },
+    { id: 'leveraged', header: L, numeric: true, cell: (row) => row.leveraged },
+  ];
+
   return (
-    <div
-      className={cn('space-y-6 transition-opacity', isStale && 'opacity-60')}
-      aria-busy={isStale}
-      aria-live="polite"
-    >
-      {/* 1. Headline */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <SummaryCard
-          value={formatCurrency(index.dca.p50)}
-          label="Index fund, median ending balance"
-          secondaryValue={`10th to 90th: ${formatCompactCurrency(index.dca.p10)} to ${formatCompactCurrency(index.dca.p90)}`}
-        />
-        <SummaryCard
-          value={formatCurrency(leveraged.dca.p50)}
-          label={`${L} fund, median ending balance`}
-          secondaryValue={`10th to 90th: ${formatCompactCurrency(leveraged.dca.p10)} to ${formatCompactCurrency(leveraged.dca.p90)}`}
-        />
-        <SummaryCard
-          className="md:col-span-2"
-          value={formatPct(result.probLeveragedBehindDca)}
-          label={`of simulated paths where the ${L} fund ends behind the index fund`}
-          secondaryValue={`${formatCurrency(result.totalContributed)} contributed to each over ${years % 1 === 0 ? years : years.toFixed(1)} years, ${inputs.paths} paths`}
+    <div className="space-y-6">
+      {/* Results recalculate on every edit; screen readers hear the headline
+          figures, not the whole comparison. */}
+      <div aria-live="polite" data-testid="leverage-headline">
+        <StatGrid
+          stats={leverageHeadline(result, inputs)}
+          columns={1}
+          fullWidth={['behind']}
+          size="lg"
+          className="gap-4 md:grid-cols-2"
         />
       </div>
 
-      {/* 2. Balance paths */}
       <ResultCard title="Balance over time" icon={LineChart}>
-        <DcaPathChart points={result.medianPath} leverageRatio={inputs.leverageRatio} paths={inputs.paths} />
+        <ChartFrame
+          deferUntilVisible
+          caption={`Lines are the median balance across ${inputs.paths} simulated paths; shaded bands span the 10th to 90th percentile. Both funds receive the same contributions on the same dates.`}
+        >
+          <DcaPathChart points={result.medianPath} leverageRatio={inputs.leverageRatio} />
+        </ChartFrame>
       </ResultCard>
 
-      {/* 3. Cash flow vs lump sum */}
       <ResultCard title="Cash flow vs lump sum" icon={Scale}>
         <div className="space-y-4">
-          <ComparisonTable
+          <DataTable
             caption={`Median ending balances for the index fund and the ${L} fund under monthly contributions and a lump sum`}
-            columns={['Framing', 'Index', L, 'Gap']}
-            rows={[
-              {
-                label: 'Monthly',
-                sublabel: `${formatCompactCurrency(inputs.monthlyContribution)}/mo + ${formatCompactCurrency(inputs.startingBalance)} start`,
-                values: [
-                  formatCompactCurrency(index.dca.p50),
-                  formatCompactCurrency(leveraged.dca.p50),
-                  <GapCell key="gap" gap={result.dcaEffect.dcaGap} base={index.dca.p50} />,
-                ],
-              },
-              {
-                label: 'Lump sum',
-                sublabel: `${formatCompactCurrency(result.totalContributed)} at month 0`,
-                values: [
-                  formatCompactCurrency(index.lumpSum.p50),
-                  formatCompactCurrency(leveraged.lumpSum.p50),
-                  <GapCell key="gap" gap={result.dcaEffect.lumpSumGap} base={index.lumpSum.p50} />,
-                ],
-              },
-            ]}
+            columns={framingColumns}
+            rows={framingRows}
+            rowKey={(row) => row.label}
           />
           <p className="text-sm text-muted-foreground">{dcaEffectSentence(result, L, inputs)}</p>
           <p className="text-sm text-muted-foreground">
-            Paths where the {L} fund ends behind: {formatPct(result.probLeveragedBehindDca)} with
-            monthly contributions, {formatPct(result.probLeveragedBehindLumpSum)} as a lump
+            Paths where the {L} fund ends behind: {formatPercent(result.probLeveragedBehindDca, WHOLE)} with
+            monthly contributions, {formatPercent(result.probLeveragedBehindLumpSum, WHOLE)} as a lump
             sum. {lumpSumScaleSentence(result, L)}
           </p>
         </div>
       </ResultCard>
 
-      {/* 4. Tail and drawdown */}
       <ResultCard title="Tail and drawdown" icon={TrendingDown}>
         <div className="space-y-4">
-          <ComparisonTable
+          <DataTable
             caption={`Drawdown and low-percentile outcomes for the index fund and the ${L} fund`}
-            columns={['Measure', 'Index', L]}
-            rows={[
+            columns={measureColumns}
+            rows={measureRows}
+            rowKey={(row) => row.label}
+          />
+          <KeyValueList
+            items={[
               {
-                label: 'Median max drawdown',
-                sublabel: 'Worst peak-to-trough fall in fund price',
-                values: [formatPct(mddIndex), formatPct(mddLeveraged)],
-              },
-              {
-                label: '10th percentile',
-                sublabel: 'Ending balance; 1 in 10 paths end lower',
-                values: [formatCompactCurrency(index.dca.p10), formatCompactCurrency(leveraged.dca.p10)],
-              },
-              {
-                label: '90th percentile',
-                sublabel: 'Ending balance; 1 in 10 paths end higher',
-                values: [formatCompactCurrency(index.dca.p90), formatCompactCurrency(leveraged.dca.p90)],
+                id: 'months-behind',
+                label: `Months the ${L} balance trailed`,
+                subtitle: `Median across paths, out of ${months} months`,
+                value: `${monthsBehind} mo`,
               },
             ]}
           />
-          <BreakdownRow
-            label={`Months the ${L} balance trailed`}
-            subtitle={`Median across paths, out of ${months} months`}
-            value={`${monthsBehind} mo`}
-          />
           <p className="text-sm text-muted-foreground">
-            Recovering from the median {L} drawdown ({formatPct(mddLeveraged)}) needs a gain of{' '}
-            {formatRecovery(mddLeveraged)}; for the index fund ({formatPct(mddIndex)}) it needs{' '}
-            {formatRecovery(mddIndex)}. With monthly contributions, money added during a drawdown buys
+            Recovering from the median {L} drawdown ({formatPercent(mddLeveraged, WHOLE)}) needs a gain of{' '}
+            {recoveryGain(mddLeveraged)}; for the index fund ({formatPercent(mddIndex, WHOLE)}) it needs{' '}
+            {recoveryGain(mddIndex)}. With monthly contributions, money added during a drawdown buys
             in at the lower price, which is part of why the cash-flow framing differs from the lump
             sum.
           </p>
         </div>
       </ResultCard>
 
-      {/* 5. Model and caveats */}
       <ResultCard title="Model and caveats" icon={Info}>
         <div className="space-y-4 text-sm text-muted-foreground">
           <p>
             Each of the {inputs.paths} paths draws one index return per month from a lognormal
-            distribution with a {formatPct(inputs.indexMeanReturn, 1)} expected annual return and{' '}
-            {formatPct(sigma, 1)} annual volatility. Both funds, and both the monthly and lump-sum
+            distribution with a {formatPercent(inputs.indexMeanReturn, { digits: 1 })} expected annual return and{' '}
+            {formatPercent(sigma, { digits: 1 })} annual volatility. Both funds, and both the monthly and lump-sum
             framings, use the same draws, so the comparison is not distorted by comparing different
             random markets. With {inputs.paths} paths the summary figures (the share of paths behind,
             the medians, and the gaps between them) can still carry sampling error of a few
@@ -274,23 +220,31 @@ export function LeverageResults({ result, inputs, isStale = false }: LeverageRes
           <p>
             The {L} fund&apos;s monthly log return is {multiple} times the index&apos;s, minus a
             volatility drag, minus financing on the borrowed exposure, minus its expense ratio. At these
-            settings those costs add up to roughly {formatPct(result.annualDragEstimate, 2)} a year
+            settings those costs add up to roughly {formatPercent(result.annualDragEstimate, TWO_DECIMALS)} a year
             relative to {multiple} times the index return:
           </p>
-          <div className="space-y-2">
-            <BreakdownRow
-              label="Volatility drag"
-              subtitle="(L² − L) / 2 × σ²"
-              value={formatPct(decay, 2)}
-            />
-            <BreakdownRow
-              label="Financing"
-              subtitle="(L − 1) × financing rate"
-              value={formatPct(financing, 2)}
-            />
-            <BreakdownRow label="Expense ratio" value={formatPct(inputs.expenseRatio, 2)} />
-            <BreakdownRow label="Total annual drag" value={formatPct(result.annualDragEstimate, 2)} />
-          </div>
+          <KeyValueList
+            items={[
+              {
+                id: 'volatility-drag',
+                label: 'Volatility drag',
+                subtitle: '(L\u00b2 \u2212 L) / 2 \u00d7 \u03c3\u00b2',
+                value: formatPercent(volatilityDrag, TWO_DECIMALS),
+              },
+              {
+                id: 'financing',
+                label: 'Financing',
+                subtitle: '(L \u2212 1) \u00d7 financing rate',
+                value: formatPercent(financing, TWO_DECIMALS),
+              },
+              { id: 'expense-ratio', label: 'Expense ratio', value: formatPercent(inputs.expenseRatio, TWO_DECIMALS) },
+              {
+                id: 'total-drag',
+                label: 'Total annual drag',
+                value: formatPercent(result.annualDragEstimate, TWO_DECIMALS),
+              },
+            ]}
+          />
           <p>
             The model assumes the same volatility every month. Real markets cluster their volatility,
             and a daily-reset fund loses more to decay in violent months (late 2008, March 2020) than a
@@ -309,7 +263,7 @@ export function LeverageResults({ result, inputs, isStale = false }: LeverageRes
             long-run S&amp;P 500 figures of roughly 10% return and 16% volatility. This is a simulation
             under stated assumptions, not a prediction.
           </p>
-          <StatusAlert variant="warning" icon={AlertTriangle} title="Leveraged ETF risk">
+          <StatusAlert tone="caution" icon={AlertTriangle} title="Leveraged ETF risk">
             Leveraged ETFs reset their exposure daily. Their prospectuses state that returns over
             periods longer than a day can differ significantly from the stated multiple of the index,
             and that a severe decline can erase most of the investment. Holding one through a deep

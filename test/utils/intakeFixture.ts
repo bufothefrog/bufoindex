@@ -45,7 +45,8 @@ export const OLD_CORE_SCREENS: Readonly<Record<string, OldScreenCopy>> = {
 export const OLD_CORE_QUESTIONS: Readonly<Record<string, OldQuestion>> = {
   'person.age': { path: 'person.age', label: 'Your age', kind: 'number', min: 16, max: 100, step: 1 },
   'person.state': { path: 'person.state', label: 'State you live in', kind: 'state' },
-  'person.filingStatus': { path: 'person.filingStatus', label: 'Tax filing status', kind: 'filing', options: [{ value: 'single', label: 'Single' }, { value: 'marriedJoint', label: 'Married filing jointly' }] },
+  // The old intake offered single and married filing jointly; all four since slice c3 (O10).
+  'person.filingStatus': { path: 'person.filingStatus', label: 'Tax filing status', kind: 'filing', options: [{ value: 'single', label: 'Single' }, { value: 'marriedJoint', label: 'Married filing jointly' }, { value: 'marriedSeparate', label: 'Married filing separately' }, { value: 'headOfHousehold', label: 'Head of household' }] },
   'income.grossPerPaycheck': { path: 'income.grossPerPaycheck', label: 'Gross pay per paycheck', kind: 'money', help: 'Before taxes and deductions.', min: 0 },
   'income.frequency': { path: 'income.frequency', label: 'How often you are paid', kind: 'frequency', options: [{ value: 'weekly', label: 'Every week' }, { value: 'bi-weekly', label: 'Every two weeks' }, { value: 'semi-monthly', label: 'Twice a month' }, { value: 'monthly', label: 'Once a month' }] },
   'income.netPerPaycheck': { path: 'income.netPerPaycheck', label: 'Take-home pay per paycheck', kind: 'money', help: 'What lands in your bank account after taxes and deductions.', min: 0 },

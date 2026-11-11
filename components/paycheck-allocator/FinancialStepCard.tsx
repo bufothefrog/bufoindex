@@ -1,34 +1,34 @@
 import React from 'react';
 import { CheckCircle, Info, TrendingUp, Target } from 'lucide-react';
-import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
+import { ExpandableListCard } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
-import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
-import { StepStatus } from '@/lib/constants/financialSteps';
-import { CONTRIBUTION_LIMITS_2026 } from '@/lib/constants/irs-2026';
-import { PaycheckProfile } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { KeyValueList } from '@/components/ui/results';
 import { monthlyToPaycheck } from '@/lib/calculations/core';
+import { limit401k, limitHsa, limitIra } from '@/lib/calculations/contributionLimits';
+import { StepStatus } from '@/lib/constants/financialSteps';
+import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
+import { TONE_TEXT, type Tone } from '@/lib/design-system/tone';
+import { formatCurrency } from '@/lib/format';
+import { PaycheckProfile } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
-interface FinancialStepCardProps {
+export interface FinancialStepCardProps {
   step: StepStatus;
   profile: PaycheckProfile;
   expanded: boolean;
   onToggle: () => void;
 }
 
-function getVariant(step: StepStatus): CardVariant {
+function stepTone(step: StepStatus): Tone {
   switch (step.urgencyLevel) {
     case 'critical':
-      return 'danger';
+      return 'negative';
     case 'important':
-      return 'warning';
+      return 'caution';
     case 'optimization':
-      return 'success';
-    case 'none':
+      return 'positive';
     default:
-      if (step.isComplete) return 'success';
-      if (step.isNotApplicable) return 'default';
-      return 'default';
+      return step.isComplete ? 'positive' : 'neutral';
   }
 }
 
@@ -37,15 +37,12 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
 
   // For allocation-based steps, show per-paycheck allocation amount
   if (step.allocation && ['employer-match', 'high-interest-debt', 'emergency-1month', 'emergency-full', 'taxable-investment'].includes(step.id)) {
-    const frequencyText = profile.income.frequency === 'bi-weekly' ? 'bi-weekly' :
-                         profile.income.frequency === 'semi-monthly' ? 'semi-monthly' :
-                         profile.income.frequency === 'weekly' ? 'weekly' : 'monthly';
     return (
       <div className="text-right">
-        <div className="text-sm font-bold text-info font-mono tabular-nums">
+        <div className={cn('text-sm font-bold font-mono tabular-nums', TONE_TEXT.info)}>
           {formatCurrency(step.allocation.amount)}
         </div>
-        <div className="text-xs text-muted-foreground">per {frequencyText} paycheck</div>
+        <div className="text-xs text-muted-foreground">per {PAY_FREQUENCY_META[profile.income.frequency].phrase} paycheck</div>
         {step.allocation.monthlyEquivalent && (
           <div className="text-xs text-muted-foreground">
             (<span className="font-mono tabular-nums">{formatCurrency(step.allocation.monthlyEquivalent)}/month</span>)
@@ -60,37 +57,24 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
   let max = 0;
   let progressPercent = 0;
 
+  const age = profile.preferences.age;
   switch (step.id) {
     case 'additional-401k':
       if (profile.benefits.employer401k.available) {
-        const age = profile.preferences.age;
-        // Mirrors lib/calculations/optimization.ts: SECURE 2.0 super catch-up
-        // applies only for ages 60-63; regular catch-up at 50+.
-        const catchUp = age >= 60 && age <= 63
-          ? CONTRIBUTION_LIMITS_2026.catchUp.superCatchUp401k
-          : age >= 50
-            ? CONTRIBUTION_LIMITS_2026.catchUp['401k']
-            : 0;
         current = profile.income.gross * (profile.benefits.employer401k.traditionalContribution + profile.benefits.employer401k.rothContribution) * 12;
-        max = CONTRIBUTION_LIMITS_2026.traditional401k + catchUp;
+        max = limit401k(age);
         progressPercent = Math.round((current / max) * 100);
       }
       break;
-    case 'roth-ira': {
-      const rothLimit = CONTRIBUTION_LIMITS_2026.ira
-        + (profile.preferences.age >= 50 ? CONTRIBUTION_LIMITS_2026.catchUp.ira : 0);
+    case 'roth-ira':
       current = (profile.benefits.ira?.currentContributions?.roth || 0) * 12;
-      max = rothLimit;
+      max = limitIra(age);
       progressPercent = Math.round((current / max) * 100);
       break;
-    }
     case 'hsa-max':
       if (profile.benefits.hsa.eligible) {
-        const hsaLimit = profile.benefits.hsa.coverageType === 'family'
-          ? CONTRIBUTION_LIMITS_2026.hsa.family
-          : CONTRIBUTION_LIMITS_2026.hsa.individual;
         current = profile.benefits.hsa.currentContribution * 12;
-        max = hsaLimit;
+        max = limitHsa(profile.benefits.hsa.coverageType, age);
         progressPercent = Math.round((current / max) * 100);
       }
       break;
@@ -123,12 +107,13 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
 }
 
 function StepExpandedContent({ step }: { step: StepStatus }) {
+  const critical = step.urgencyLevel === 'critical';
   return (
     <div className="space-y-4">
       {/* Why It Matters */}
       <div>
         <div className="flex items-center space-x-2 mb-2">
-          <Info className="w-4 h-4 text-info" aria-hidden="true" />
+          <Info className={cn('w-4 h-4', TONE_TEXT.info)} aria-hidden="true" />
           <h4 className="font-medium text-foreground">Why This Matters</h4>
         </div>
         <p className="text-sm text-muted-foreground">{step.whyItMatters}</p>
@@ -138,21 +123,30 @@ function StepExpandedContent({ step }: { step: StepStatus }) {
       {(step.potentialSavings.monthly > 0 || step.potentialSavings.annual > 0) && (
         <div>
           <div className="flex items-center space-x-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-success" aria-hidden="true" />
+            <TrendingUp className={cn('w-4 h-4', TONE_TEXT.positive)} aria-hidden="true" />
             <h4 className="font-medium text-foreground">Financial Impact</h4>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <BreakdownRow
-              label="Monthly Impact"
-              value={`${step.urgencyLevel === 'critical' ? '-' : '+'}${formatCurrency(step.potentialSavings.monthly)}`}
-              variant={step.urgencyLevel === 'critical' ? 'danger' : 'success'}
-            />
-            <BreakdownRow
-              label="Annual Impact"
-              value={`${step.urgencyLevel === 'critical' ? '-' : '+'}${formatCurrency(step.potentialSavings.annual)}`}
-              variant="info"
-            />
-          </div>
+          <KeyValueList
+            className="grid grid-cols-2 gap-4 space-y-0 text-sm"
+            items={[
+              {
+                id: 'monthly',
+                label: 'Monthly Impact',
+                value: step.potentialSavings.monthly,
+                format: 'currency',
+                prefix: critical ? '-' : '+',
+                tone: critical ? 'negative' : 'positive',
+              },
+              {
+                id: 'annual',
+                label: 'Annual Impact',
+                value: step.potentialSavings.annual,
+                format: 'currency',
+                prefix: critical ? '-' : '+',
+                tone: 'info',
+              },
+            ]}
+          />
         </div>
       )}
 
@@ -175,25 +169,25 @@ function StepExpandedContent({ step }: { step: StepStatus }) {
       {/* Status Messages */}
       <div className="pt-2 border-t border-border">
         {step.isComplete ? (
-          <StatusAlert variant="success" icon={CheckCircle}>
-            <span className="font-medium text-success">Complete.</span>
+          <StatusAlert tone="positive" icon={CheckCircle}>
+            <span className={cn('font-medium', TONE_TEXT.positive)}>Complete.</span>
           </StatusAlert>
         ) : step.isNotApplicable ? (
-          <StatusAlert variant="info">
+          <StatusAlert tone="info">
             <strong>Future opportunity:</strong> This step might become relevant if your situation changes
             (e.g., getting HSA eligibility, higher income, employer benefits).
           </StatusAlert>
-        ) : step.urgencyLevel === 'critical' ? (
-          <StatusAlert variant="danger">
+        ) : critical ? (
+          <StatusAlert tone="negative">
             <strong>Highest impact:</strong> The model places this step ahead of the others still open,
             based on the monthly cost of leaving it as is.
           </StatusAlert>
         ) : step.urgencyLevel === 'important' ? (
-          <StatusAlert variant="warning">
+          <StatusAlert tone="caution">
             <strong>High impact:</strong> The dollar amounts in this step are large relative to the other open steps.
           </StatusAlert>
         ) : (
-          <StatusAlert variant="info">
+          <StatusAlert tone="info">
             <strong>Optimization opportunity:</strong> Consider this step once higher priority items are complete.
           </StatusAlert>
         )}
@@ -208,13 +202,11 @@ export const FinancialStepCard = React.memo(function FinancialStepCard({
   expanded,
   onToggle,
 }: FinancialStepCardProps) {
-  const variant = getVariant(step);
-
   const subtitle = step.recommendation + (
     step.potentialSavings.monthly > 0 && step.urgencyLevel === 'critical'
-      ? ` — ${formatCurrency(step.potentialSavings.monthly)}/mo opportunity cost`
+      ? ` \u2014 ${formatCurrency(step.potentialSavings.monthly)}/mo opportunity cost`
       : step.potentialSavings.monthly > 0
-      ? ` — ${formatCurrency(step.potentialSavings.monthly)}/mo modeled gain`
+      ? ` \u2014 ${formatCurrency(step.potentialSavings.monthly)}/mo modeled gain`
       : ''
   );
 
@@ -223,7 +215,7 @@ export const FinancialStepCard = React.memo(function FinancialStepCard({
       icon={step.icon}
       title={step.name}
       subtitle={subtitle}
-      variant={variant}
+      tone={stepTone(step)}
       expanded={expanded}
       onToggle={onToggle}
       headerRight={<StepHeaderRight step={step} profile={profile} />}
@@ -232,3 +224,5 @@ export const FinancialStepCard = React.memo(function FinancialStepCard({
     </ExpandableListCard>
   );
 });
+
+export default FinancialStepCard;

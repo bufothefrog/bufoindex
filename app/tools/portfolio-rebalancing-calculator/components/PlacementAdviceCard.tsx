@@ -8,18 +8,21 @@ import {
   AccountType,
   AssetClass,
   RebalanceAsset,
+  RebalanceInputsV2,
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
-import {
-  selectCustomAssetClasses,
-  usePortfolioRebalancingStore,
-} from '@/lib/store/portfolioRebalancingStore';
+import { ACCOUNT_TYPE_LABELS } from '@/lib/constants/labels';
+import { MISSING_VALUE } from '@/lib/design-system/stat';
 
-const ACCOUNT_LABELS: Record<AccountType, string> = {
-  'taxable': 'taxable',
-  'tax-deferred': 'tax-deferred',
-  'tax-free': 'tax-free',
-};
+/** In-sentence account type: "in taxable", "moving to tax-deferred". */
+function accountPhrase(type: AccountType): string {
+  return ACCOUNT_TYPE_LABELS[type].toLowerCase();
+}
+
+export interface PlacementAdviceCardProps {
+  /** The inputs of the rebalance on display. */
+  inputs: RebalanceInputsV2;
+}
 
 /**
  * Tax-efficient placement suggestions. Iterates all holdings and emits
@@ -29,11 +32,8 @@ const ACCOUNT_LABELS: Record<AccountType, string> = {
  * Duplicate suggestions (same ticker in same account type held twice) are
  * collapsed to a single entry.
  */
-export function PlacementAdviceCard() {
-  const securities = usePortfolioRebalancingStore(s => s.inputs.securities);
-  const accounts = usePortfolioRebalancingStore(s => s.inputs.accounts);
-  const holdings = usePortfolioRebalancingStore(s => s.inputs.holdings);
-  const customAssetClasses = usePortfolioRebalancingStore(selectCustomAssetClasses);
+export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
+  const { securities, accounts, holdings, customAssetClasses } = inputs;
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();
@@ -97,12 +97,12 @@ export function PlacementAdviceCard() {
                 data-testid={`placement-advice-${s.key}`}
               >
                 <div className="text-foreground">
-                  <span className="font-semibold">{s.ticker || '—'}</span>
+                  <span className="font-semibold">{s.ticker || MISSING_VALUE}</span>
                   <span className="text-muted-foreground">
                     {' '}
-                    ({getAssetClassLabel(s.assetClass, customAssetClasses)}, in {ACCOUNT_LABELS[s.accountType]})
+                    ({getAssetClassLabel(s.assetClass, customAssetClasses)}, in {accountPhrase(s.accountType)})
                   </span>{' '}
-                  → consider moving to {ACCOUNT_LABELS[s.advice.preferredAccount]}.
+                  {'\u2192'} consider moving to {accountPhrase(s.advice.preferredAccount)}.
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {s.advice.reason}
@@ -115,3 +115,5 @@ export function PlacementAdviceCard() {
     </div>
   );
 }
+
+export default PlacementAdviceCard;

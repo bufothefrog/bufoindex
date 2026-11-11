@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { intakePaths } from '@/lib/constants/intake';
-import { PROFILE_FIELDS } from '@/lib/profile/defaults';
+import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 beforeEach(() => {
@@ -65,7 +65,7 @@ describe('NextSteps', () => {
     useProfileStore.getState().setFields({}, asked);
     // The intake never asks a few fields, so /start/profile would only
     // redirect to the overview; link it directly instead.
-    expect(asked.length).toBeLessThan(PROFILE_FIELDS.length);
+    expect(PROFILE_FIELDS.filter((field) => !asked.includes(field.path)).length).toBeGreaterThan(0);
 
     render(<NextSteps intent="retirement" />);
 
@@ -75,10 +75,7 @@ describe('NextSteps', () => {
   });
 
   it('swaps "Finish your profile" for the overview once every field is answered', () => {
-    useProfileStore.getState().setFields(
-      {},
-      PROFILE_FIELDS.map((field) => field.path)
-    );
+    useProfileStore.getState().setFields({}, [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS]);
 
     render(<NextSteps intent="portfolio" />);
 

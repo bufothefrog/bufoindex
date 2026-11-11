@@ -7,7 +7,7 @@ import { EmptyOverview } from '@/components/dashboard/EmptyOverview';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
 import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
-import { PROFILE_FIELDS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 // The ways into the guided flow: every path answers the shared core at
@@ -124,13 +124,22 @@ describe('ProfileCompletenessCard (overview)', () => {
 
   it('edits the basics once no profile question is left, instead of bouncing back to the overview', () => {
     const { unmount } = render(<ProfileCompletenessCard profile={withProvided(intakePaths('profile'))} />);
-    // Four fields are never asked by the intake, so they stay listed.
-    expect(screen.getByText(`${intakePaths('profile').length} of ${PROFILE_FIELDS.length}`)).toBeInTheDocument();
+    // The intake never asks the emergency-fund target months, so it stays
+    // listed. It asks the new cash on the accounts screen: answering the
+    // accounts answers the deprecated investing.newCashThisMonth too.
+    const asked = intakePaths('profile');
+    const answered = PROFILE_FIELDS.filter(
+      ({ path }) => asked.includes(path) || (path === 'investing.newCashThisMonth' && asked.includes('portfolio.accounts'))
+    );
+    expect(answered).toHaveLength(PROFILE_FIELDS.length - 1);
+    expect(screen.getByText(`${answered.length} of ${PROFILE_FIELDS.length}`)).toBeInTheDocument();
+    expect(screen.getByText(/Emergency fund target/)).toBeInTheDocument();
+    expect(screen.queryByText('New cash to invest this month')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Edit the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: /Fill in the rest/ })).not.toBeInTheDocument();
     unmount();
 
-    render(<ProfileCompletenessCard profile={withProvided(PROFILE_FIELDS.map((field) => field.path))} />);
+    render(<ProfileCompletenessCard profile={withProvided([...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS])} />);
     expect(screen.getByText('Every field has an answer from you.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Edit the basics/ })).toHaveAttribute('href', '/start');
   });
