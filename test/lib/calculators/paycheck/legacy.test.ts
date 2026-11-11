@@ -284,10 +284,12 @@ describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)', () => {
     expect(profile.debts[0]).toMatchObject({ id: 'd1', name: 'Car', balance: 9000 });
     expect(profile.spending).toMatchObject({ funMoneyMin: 200, funMoneyMax: 500 });
     expect(profile.assumptions.paycheck.optimizationGoal).toBe('wealth_maximization');
-    // Untouched old defaults are not imported: the profile keeps its own.
+    // An untouched old default equal to the profile's default changes nothing;
+    // one that differs comes in unprovided, so the inputs stay the old store's.
     expect(profile.person.age).toBe(30);
-    expect(profile.spending.necessaryMonthly).toBe(3000);
-    expect(profile.cash.emergencyFundBalance).toBe(5000);
+    expect(profile.spending.necessaryMonthly).toBe(2500);
+    expect(profile.cash.emergencyFundBalance).toBe(0);
+    expect(profile.investing.taxableMonthlyContribution).toBe(0);
     expect(profile.provided.sort()).toEqual(imported);
     expect(localStorage.getItem(KEY)).toBeNull();
   });
@@ -305,11 +307,41 @@ describe('importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)', () => {
     expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
   });
 
-  it('imports nothing from an untouched old store, and still removes the key', () => {
+  it('answers nothing from an untouched old store, and still removes the key', () => {
     store(envelope(OLD_DEFAULTS));
     expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
     expect(useProfileStore.getState().profile.provided).toEqual([]);
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('keeps the old 3% election and the old none taxable account a visitor left untouched', () => {
+    // The visitor changed their pay and state but never the 401(k) or the
+    // taxable account: the old allocator ran them at 3% and $0.
+    store(
+      envelope(
+        oldProfile((profile) => {
+          profile.income.grossPaycheck = 4200;
+          profile.income.netPaycheck = 3050;
+          profile.income.frequency = 'semi-monthly';
+          profile.taxes.state = 'NY';
+        })
+      )
+    );
+
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    const run = engineInputsFor(PAYCHECK_CALCULATOR, useProfileStore.getState().profile);
+    expect(run.benefits.employer401k).toMatchObject({ currentContribution: 0.03, traditionalContribution: 0.03 });
+    expect(run.preferences).toMatchObject({ hasTaxableAccount: false, taxableAccountContribution: 0 });
+    // Not answers: the intake still asks for them.
+    expect(useProfileStore.getState().profile.provided).not.toContain('workplace.contributionPercent');
+    expect(useProfileStore.getState().profile.provided).not.toContain('investing.taxableMonthlyContribution');
+  });
+
+  it('never writes the old 3% over a 401(k) election answered since', () => {
+    resetProfileStore({ profile: { workplace: { contributionPercent: 0.1 } } });
+    store(envelope(OLD_DEFAULTS));
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(useProfileStore.getState().profile.workplace.contributionPercent).toBe(0.1);
   });
 
   it('removes a corrupt payload without importing it', () => {
@@ -430,6 +462,86 @@ describe('importLegacyCalculatorStorage: the retirement key imported first', () 
     expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
     expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 5000, frequency: 'monthly' });
     expect(useProfileStore.getState().profile.provided).not.toContain('income.netPerPaycheck');
+  });
+
+  // The same annual income stored in another form by each calculator: the
+  // retirement import writes an old yearly or hourly salary as a monthly
+  // paycheck, and has no period for weekly pay.
+  it.each([
+    ['a yearly salary (the old default period)', { incomeAmount: 100800, incomePeriod: 'yearly' }, 4200, 3050, 'semi-monthly'],
+    ['an hourly wage', { incomeAmount: 50, incomePeriod: 'hourly' }, 4000, 2900, 'bi-weekly'],
+    ['a yearly salary paid weekly', { incomeAmount: 104000, incomePeriod: 'yearly' }, 2000, 1500, 'weekly'],
+  ] as const)(
+    'keeps the saved take-home pay with its own paycheck when the retirement key held the same income as %s',
+    (_, retirement, gross, net, frequency) => {
+      storeRetirement(retirement);
+      storePaycheck((profile) => {
+        profile.income.grossPaycheck = gross;
+        profile.income.netPaycheck = net;
+        profile.income.frequency = frequency;
+      });
+
+      expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR).sort()).toEqual(['income.frequency', 'income.grossPerPaycheck']);
+      expect(useProfileStore.getState().profile.income.frequency).toBe('monthly');
+      expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR).sort()).toEqual(
+        ['income.frequency', 'income.grossPerPaycheck', 'income.netPerPaycheck'].sort()
+      );
+      const { profile } = useProfileStore.getState();
+      expect(profile.income).toMatchObject({ grossPerPaycheck: gross, netPerPaycheck: net, frequency });
+      expect(profile.provided).toEqual(expect.arrayContaining(['income.grossPerPaycheck', 'income.netPerPaycheck', 'income.frequency']));
+    }
+  );
+
+  it('keeps the paycheck record when the paycheck key is imported first and the retirement key held the same income yearly', () => {
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+    storeRetirement({ incomeAmount: 100800, incomePeriod: 'yearly' });
+
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).not.toContain('income.grossPerPaycheck');
+    expect(useProfileStore.getState().profile.income).toMatchObject({
+      grossPerPaycheck: 4200,
+      netPerPaycheck: 3050,
+      frequency: 'semi-monthly',
+    });
+  });
+
+  it('keeps the whole pay group out when the retirement key held a different yearly income', () => {
+    storeRetirement({ incomeAmount: 120000, incomePeriod: 'yearly' });
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).not.toContain('income.netPerPaycheck');
+    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 10000, frequency: 'monthly' });
+    expect(useProfileStore.getState().profile.income.netPerPaycheck).not.toBe(3050);
+  });
+
+  it("imports the paycheck key's own pay over the retirement key's untouched old default salary", () => {
+    // The old retirement default (100,000 a year) comes in unprovided, so it
+    // does not hold back the pay the visitor saved in the allocator.
+    storeRetirement({});
+    storePaycheck((profile) => {
+      profile.income.grossPaycheck = 4200;
+      profile.income.netPaycheck = 3050;
+      profile.income.frequency = 'semi-monthly';
+    });
+
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(useProfileStore.getState().profile.income).toMatchObject({ grossPerPaycheck: 8333.33, frequency: 'monthly' });
+    expect(useProfileStore.getState().profile.provided).toEqual([]);
+    importLegacyCalculatorStorage(PAYCHECK_CALCULATOR);
+    expect(useProfileStore.getState().profile.income).toMatchObject({
+      grossPerPaycheck: 4200,
+      netPerPaycheck: 3050,
+      frequency: 'semi-monthly',
+    });
   });
 
   it("settles the display mode once, so a switch to today's dollars between the two imports stays", () => {

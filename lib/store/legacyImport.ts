@@ -16,7 +16,10 @@ import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/type
 import { fromEngineInputs, stableKey } from '@/lib/fields/binding';
 import { getAt, isRecord } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { providedPathFor } from '@/lib/profile/defaults';
+import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
+import { GROSS_PAY, NET_PAY, PAY_FREQUENCY } from '@/lib/fields/shared';
+import { getDefaultFinancialProfile, providedPathFor } from '@/lib/profile/defaults';
+import type { FinancialProfile } from '@/lib/profile/types';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { DEFAULT_DOLLAR_DISPLAY_MODE } from '@/lib/utils/displayDollars';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -120,24 +123,97 @@ function importDisplayMode(storage: Storage, ownKey: string, ownPayload: unknown
 }
 
 /**
+ * The writes among `defaults` (a group's writes for the frozen old
+ * defaults) whose value is not the shared profile's default at that path.
+ */
+function profileDefaultGaps(defaults: readonly Write[], profileDefaults: FinancialProfile): Write[] {
+  return defaults.filter((write) => stableKey(getAt(profileDefaults, write.path)) !== stableKey(write.value));
+}
+
+/**
+ * The profile paths where a calculator's frozen old default and the shared
+ * profile's default disagree (in binding order). A visitor who left such a
+ * value untouched saw the old default, so the import carries it over
+ * (importLegacyCalculatorStorage); test/lib/store/legacyImport.test.ts
+ * pins the list for each legacy calculator.
+ */
+export function legacyDefaultGaps<E, R>(def: CalculatorDefinition<E, R>): string[] {
+  if (!def.legacy) return [];
+  const defaults = def.legacy.storageDefaults();
+  const profileDefaults = getDefaultFinancialProfile();
+  return writeGroups(def, defaults, defaults).flatMap(([, writes]) =>
+    profileDefaultGaps(writes, profileDefaults).map((write) => write.path)
+  );
+}
+
+const GROSS_PATH = GROSS_PAY.path;
+const NET_PATH = NET_PAY.path;
+const FREQUENCY_PATH = PAY_FREQUENCY.path;
+const PAY_RATE_PATHS: ReadonlySet<string> = new Set([GROSS_PATH, FREQUENCY_PATH]);
+
+/** Paychecks per year for a stored frequency; null when it is not one. */
+function paychecksPerYear(frequency: unknown): number | null {
+  return typeof frequency === 'string' && Object.prototype.hasOwnProperty.call(PAY_FREQUENCY_META, frequency)
+    ? PAY_FREQUENCY_META[frequency as PayFrequency].perYear
+    : null;
+}
+
+/**
+ * True when the group writes the whole per-paycheck income record (gross,
+ * take-home and frequency), the take-home pay is still unanswered, and the
+ * answered gross and frequency describe the same annual income in another
+ * form (e.g. the retirement import's monthly paycheck for an old yearly
+ * salary). The per-paycheck record is the finer one of the same income, so
+ * the group then replaces the gross and frequency with its own and keeps
+ * its take-home pay. The annual incomes are compared within one cent per
+ * paycheck of the more frequent pay (each side was rounded to the cent per
+ * paycheck), never for exact equality.
+ */
+function finerIncomeRecord(group: readonly Write[], answered: readonly boolean[], profile: FinancialProfile): boolean {
+  const at = (path: string) => group.findIndex((write) => write.path === path);
+  const [gross, net, frequency] = [at(GROSS_PATH), at(NET_PATH), at(FREQUENCY_PATH)];
+  if (gross < 0 || net < 0 || frequency < 0 || answered[net] || !answered[gross] || !answered[frequency]) return false;
+  const ownPerYear = paychecksPerYear(group[frequency].value);
+  const heldPerYear = paychecksPerYear(profile.income.frequency);
+  const ownGross = group[gross].value;
+  if (ownPerYear === null || heldPerYear === null || typeof ownGross !== 'number' || !Number.isFinite(ownGross)) return false;
+  const tolerance = 0.01 * Math.max(ownPerYear, heldPerYear);
+  return Math.abs(ownGross * ownPerYear - profile.income.grossPerPaycheck * heldPerYear) <= tolerance;
+}
+
+/**
  * Imports `def.legacy.storageKey` into the profile, then removes the key.
  *
- * The writes are taken per group of coupled paths (writeGroups). A group is
- * imported only when its writes differ from what the same bindings write
- * for def.legacy.storageDefaults() (an untouched old default says nothing
- * about the visitor). A path already marked provided is never written (an
- * answer given since always wins); its group's other paths are imported
- * only when every such provided path already holds the value the group
- * would write, so coupled paths (an amount and its unit) never split.
- * Written values are marked provided; setValues refuses any that are not
- * valid profile values. A saved future-dollars display mode is carried into
- * the shared preference once, from every old key (importDisplayMode). The key is removed even when
- * its payload is corrupt or foreign, since nothing else will ever read it.
+ * The writes are taken per group of coupled paths (writeGroups), and a
+ * group is imported or skipped whole:
  *
- * Idempotent: once the key is gone a call does nothing, and a repeat import
- * would find every path it wrote already provided. Never throws. Returns the
- * profile paths it passed to setValues (a refused value among them stays
- * unprovided).
+ * - A group whose writes differ from what the same bindings write for
+ *   def.legacy.storageDefaults() holds the visitor's own values: it is
+ *   imported and its paths are marked provided.
+ * - A group equal to the old defaults is imported only when one of those
+ *   old defaults is not the shared profile's default (legacyDefaultGaps),
+ *   so the visitor keeps seeing what the old calculator showed them. These
+ *   values were never answered, so they are written unprovided: the intake
+ *   still asks for them, and a later import of the other old key (which
+ *   may hold the visitor's own answer) can still write them.
+ * - A path already marked provided is never written (an answer given since
+ *   always wins); its group's other paths are imported only when every such
+ *   provided path already holds the value the group would write, so coupled
+ *   paths (an amount and its unit) never split. One exception: when the
+ *   answered pay and frequency describe the same annual income as the
+ *   group's own per-paycheck record and its take-home pay is unanswered
+ *   (finerIncomeRecord), the group's gross, take-home and frequency are all
+ *   written, so the take-home pay keeps the pay it was saved with.
+ *
+ * setValues refuses any value that is not a valid profile value. A saved
+ * future-dollars display mode is carried into the shared preference once,
+ * from every old key (importDisplayMode). The key is removed even when its
+ * payload is corrupt or foreign, since nothing else will ever read it.
+ *
+ * Idempotent: once the key is gone a call does nothing. Never throws.
+ * Returns the profile paths it passed to setValues as the visitor's answers
+ * (a refused value among them stays unprovided); the unprovided writes of
+ * untouched old defaults are not listed.
  */
 export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E, R>): string[] {
   const legacy = def.legacy;
@@ -151,29 +227,38 @@ export function importLegacyCalculatorStorage<E, R>(def: CalculatorDefinition<E,
 
     const payload = readJson(storage, legacy.storageKey);
     const engine = payload === null ? null : readEngine(legacy, payload);
-    const writes: Write[] = [];
+    const answers: Write[] = [];
+    const untouched: Write[] = [];
     if (engine !== null) {
       const { profile } = profileStore;
       const provided = new Set(profile.provided);
+      const profileDefaults = getDefaultFinancialProfile();
       for (const [group, defaults] of writeGroups(def, engine, legacy.storageDefaults())) {
-        if (group.length === 0 || groupKey(group) === groupKey(defaults)) continue;
+        if (group.length === 0) continue;
+        const changed = groupKey(group) !== groupKey(defaults);
+        if (!changed && profileDefaultGaps(defaults, profileDefaults).length === 0) continue;
         const providedPaths = group.map((write) => providedPathFor(write.path));
         const answered = providedPaths.map((path) => path !== null && provided.has(path));
+        const holds = (write: Write) => stableKey(getAt(profile, write.path)) === stableKey(write.value);
+        const finer = finerIncomeRecord(group, answered, profile);
+        const replaces = (write: Write) => finer && PAY_RATE_PATHS.has(write.path) && !holds(write);
         // An answer given since wins, and the group stays whole: its other
         // paths come along only when every answered path already holds what
         // the group would write (e.g. the same pay and frequency imported
-        // from the other old calculator).
-        const agrees = group.every((write, j) => !answered[j] || stableKey(getAt(profile, write.path)) === stableKey(write.value));
+        // from the other old calculator), or describes the same income.
+        const agrees = group.every((write, j) => !answered[j] || replaces(write) || holds(write));
         if (!agrees) continue;
         group.forEach((write, j) => {
-          if (providedPaths[j] !== null && !answered[j]) writes.push(write);
+          if (providedPaths[j] !== null && (!answered[j] || replaces(write))) (changed ? answers : untouched).push(write);
         });
       }
     }
     importDisplayMode(storage, legacy.storageKey, payload);
-    if (writes.length > 0) profileStore.setValues(writes);
+    // Already provided paths stay provided; untouched old defaults add none.
+    if (untouched.length > 0) profileStore.setValues(untouched, { provide: [] });
+    if (answers.length > 0) profileStore.setValues(answers);
     storage.removeItem(legacy.storageKey);
-    return [...new Set(writes.map((write) => write.path))];
+    return [...new Set(answers.map((write) => write.path))];
   } catch {
     // Storage is blocked (e.g. a privacy mode): leave everything as it is.
     return [];

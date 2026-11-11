@@ -6,9 +6,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { getDefaultFinancialProfile } from '@/lib/profile';
+import { getAt } from '@/lib/fields/paths';
+import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
-import { importLegacyCalculatorStorage, LEGACY_DISPLAY_MODE_KEYS } from '@/lib/store/legacyImport';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { importLegacyCalculatorStorage, LEGACY_DISPLAY_MODE_KEYS, legacyDefaultGaps } from '@/lib/store/legacyImport';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 
@@ -105,11 +109,30 @@ describe('importLegacyCalculatorStorage', () => {
     expect(profile()).toBe(after);
   });
 
-  it('writes nothing when every stored value is an old default, and still removes the key', () => {
+  it('answers nothing when every stored value is an old default, and still removes the key', () => {
     store({ ...OLD_DEFAULTS });
     expect(importLegacyCalculatorStorage(DEFINITION)).toEqual([]);
     expect(profile().provided).toEqual([]);
     expect(window.localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('carries an untouched old default the profile default differs from, unprovided', () => {
+    // Old default age 25 against the profile's 30; the state (TX) and the
+    // retirement age (25 + 35 = 60) match the profile's defaults.
+    store({ ...OLD_DEFAULTS });
+    expect(legacyDefaultGaps(DEFINITION)).toEqual(['person.age']);
+    importLegacyCalculatorStorage(DEFINITION);
+    expect(profile().person.age).toBe(25);
+    expect(profile().person.retirementAge).toBe(60);
+    expect(profile().provided).toEqual([]);
+  });
+
+  it('never writes an untouched old default over a path the profile already provides', () => {
+    resetProfileStore({ profile: { person: { age: 41 } } });
+    store({ ...OLD_DEFAULTS });
+    importLegacyCalculatorStorage(DEFINITION);
+    expect(profile().person.age).toBe(41);
+    expect(profile().provided).toEqual(['person.age']);
   });
 
   it('leaves values the profile refuses unwritten and unprovided', () => {
@@ -237,5 +260,78 @@ describe('importLegacyCalculatorStorage', () => {
 describe('LEGACY_DISPLAY_MODE_KEYS', () => {
   it('names the old retirement and paycheck keys', () => {
     expect([...LEGACY_DISPLAY_MODE_KEYS].sort()).toEqual([RETIREMENT_LEGACY.storageKey, PAYCHECK_LEGACY.storageKey].sort());
+  });
+});
+
+/**
+ * Every profile path where a legacy calculator's frozen old default and the
+ * shared profile's default disagree. A change of either default changes
+ * this list, so it cannot silently reopen the gap the import closes.
+ */
+describe('legacyDefaultGaps', () => {
+  it('lists the retirement calculator paths whose old default is not the profile default', () => {
+    expect(legacyDefaultGaps(RETIREMENT_CALCULATOR)).toEqual([
+      'person.age', // old 25, profile 30
+      'investing.investedBalance', // old 10,000, profile 25,000
+      'income.grossPerPaycheck', // old 100,000 a year (8,333.33 a month), profile 3,500 bi-weekly
+      'income.frequency', // old yearly (monthly in the profile), profile bi-weekly
+      'investing.monthlyContribution', // old 2,000, profile 1,500
+      'spending.necessaryMonthly', // old 4,000, profile 3,000
+    ]);
+  });
+
+  it('lists the paycheck allocator paths whose old default is not the profile default', () => {
+    expect(legacyDefaultGaps(PAYCHECK_CALCULATOR)).toEqual([
+      'income.grossPerPaycheck', // old 2,500, profile 3,500
+      'income.netPerPaycheck', // old 1,900, profile 2,600
+      'person.state', // old CA, profile TX
+      'workplace.contributionPercent', // old 3%, profile 6%
+      'cash.emergencyFundBalance', // old 0, profile 5,000
+      'spending.necessaryMonthly', // old 2,500, profile 3,000
+      'investing.taxableMonthlyContribution', // old none ($0), profile $500 a month
+    ]);
+  });
+
+  it('is empty for a calculator without legacy storage', () => {
+    expect(legacyDefaultGaps({ ...DEFINITION, legacy: undefined })).toEqual([]);
+  });
+});
+
+describe('importLegacyCalculatorStorage: an untouched old store keeps its inputs', () => {
+  /** The engine values the old store ran with against those the imported profile runs with. */
+  function expectSameRun<E, R>(def: CalculatorDefinition<E, R>, skip: readonly string[] = []): void {
+    const old = def.legacy!.storageDefaults();
+    const now = engineInputsFor(def, profile());
+    for (const binding of def.bindings) {
+      if (skip.includes(binding.engine)) continue;
+      expect([binding.engine, getAt(now, binding.engine)]).toEqual([binding.engine, getAt(old, binding.engine)]);
+    }
+  }
+
+  it('runs the retirement calculator on the old defaults (the yearly salary as a monthly paycheck)', () => {
+    window.localStorage.setItem(
+      RETIREMENT_LEGACY.storageKey,
+      JSON.stringify({ state: { inputs: RETIREMENT_LEGACY.storageDefaults() }, version: 3 })
+    );
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
+    expect(profile().provided).toEqual([]);
+    // The profile holds pay per paycheck: 100,000 a year is 8,333.33 a month.
+    expectSameRun(RETIREMENT_CALCULATOR, ['currentIncome', 'incomeAmount', 'incomePeriod']);
+    const income = engineInputsFor(RETIREMENT_CALCULATOR, profile());
+    expect(income).toMatchObject({ incomeAmount: 8333.33, incomePeriod: 'monthly' });
+    expect(income.currentIncome).toBeCloseTo(100000, 0);
+  });
+
+  it('runs the paycheck allocator on the old defaults (401(k) at 3%, no taxable account)', () => {
+    window.localStorage.setItem(
+      PAYCHECK_LEGACY.storageKey,
+      JSON.stringify({ state: { profile: PAYCHECK_LEGACY.storageDefaults() }, version: 0 })
+    );
+    expect(importLegacyCalculatorStorage(PAYCHECK_CALCULATOR)).toEqual([]);
+    expect(profile().provided).toEqual([]);
+    expectSameRun(PAYCHECK_CALCULATOR, ['income']);
+    const run = engineInputsFor(PAYCHECK_CALCULATOR, profile());
+    expect(run.benefits.employer401k.currentContribution).toBe(0.03);
+    expect(run.preferences).toMatchObject({ hasTaxableAccount: false, taxableAccountContribution: 0 });
   });
 });

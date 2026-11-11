@@ -130,8 +130,9 @@ describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)', () => {
     expect(profile.person.filingStatus).toBe('marriedJoint');
     expect(profile.assumptions.retirement).toMatchObject({ riskProfile: 'custom', volatility: 0.12 });
     expect(profile.retirementIncome.annualHealthcareCost).toBe(9000);
-    // Untouched old defaults are not imported: the profile keeps its own.
-    expect(profile.investing.investedBalance).toBe(25000);
+    // An untouched old default equal to the profile's default changes nothing;
+    // one that differs comes in unprovided, so the inputs stay the old store's.
+    expect(profile.investing.investedBalance).toBe(10000);
     expect(profile.person.retirementAge).toBe(60);
     expect(profile.provided.sort()).toEqual(imported);
     expect(localStorage.getItem(KEY)).toBeNull();
@@ -153,11 +154,22 @@ describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)', () => {
     expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
   });
 
-  it('imports nothing from an untouched old store, and still removes the key', () => {
+  it('answers nothing from an untouched old store, and still removes the key', () => {
     store(envelope(OLD_DEFAULTS));
     expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
     expect(useProfileStore.getState().profile.provided).toEqual([]);
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('keeps the old defaults the profile defaults differ from, unprovided', () => {
+    store(envelope(OLD_DEFAULTS));
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    const { profile } = useProfileStore.getState();
+    expect(profile.person.age).toBe(25);
+    expect(profile.investing).toMatchObject({ investedBalance: 10000, monthlyContribution: 2000 });
+    expect(profile.spending.necessaryMonthly).toBe(4000);
+    expect(profile.income).toMatchObject({ grossPerPaycheck: 8333.33, frequency: 'monthly' });
+    expect(profile.provided).toEqual([]);
   });
 });
 
