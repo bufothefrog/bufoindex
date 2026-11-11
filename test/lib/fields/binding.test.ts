@@ -214,6 +214,33 @@ describe('engineErrorsToFields', () => {
     expect(engineErrorsToFields(bindings, { age: 'bad' })).toEqual({ 'override.age': 'bad' });
   });
 
+  it('passes over a later binding that read undefined when given the profile', () => {
+    const bindings: Binding<Engine>[] = [
+      { profile: 'person.age', engine: 'age' },
+      { engine: 'age', read: () => undefined, errorPath: 'override.age' },
+    ];
+    const get = makeGet(profile);
+    // toEngineInputs skips the undefined read and keeps person.age (40) ...
+    expect(toEngineInputs(bindings, engineBase(), get).age).toBe(40);
+    // ... so the error belongs on person.age, not on the binding that supplied nothing.
+    expect(engineErrorsToFields(bindings, { age: 'bad' }, get)).toEqual({ 'person.age': 'bad' });
+    // Without the profile every binding counts as supplying a value.
+    expect(engineErrorsToFields(bindings, { age: 'bad' })).toEqual({ 'override.age': 'bad' });
+  });
+
+  it('falls back to a shorter binding, or to calculation, when the longer ones read undefined', () => {
+    const bindings: Binding<Engine>[] = [
+      { profile: 'person', engine: 'taxes' },
+      { profile: 'person.missing', engine: 'taxes.state' },
+      { profile: 'person.alsoMissing', engine: 'age' },
+    ];
+    const get = makeGet(profile);
+    expect(engineErrorsToFields(bindings, { 'taxes.state': 'a', age: 'b' }, get)).toEqual({
+      'person.state': 'a',
+      calculation: 'b',
+    });
+  });
+
   it('keeps an error whose target path shares a name with an Object member', () => {
     const bindings: Binding<Engine>[] = [{ profile: 'toString', engine: 'age' }];
     expect(engineErrorsToFields(bindings, { age: 'Too young.' })).toEqual({ toString: 'Too young.' });
