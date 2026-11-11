@@ -32,6 +32,111 @@ Hard constraints carried into every slice:
 
 --------------------------------------------------------------------------------
 
+## 0. Owner decisions (2026-11-10) and the amendments they cause
+
+This section is authoritative. Where a later section disagrees with it, this section wins.
+
+The owner answered "go defaults" on 2026-11-10. Every decision in section 7 is taken at the
+default shown there in brackets, with one exception that was put to the owner as the
+recommended option and accepted:
+
+- **O6 (legacy links): drop them now.** Old share links are not supported. The hash and query
+  decoders are deleted in this rebuild instead of being kept for a deprecation window.
+
+Summary of what the build follows:
+
+| Decision | Outcome |
+|---|---|
+| O1 write-through | Yes. Calculator edits write to the shared profile. |
+| O2 "at once" | Topic screens, a few related fields per screen. |
+| O3 assumption screens in the intake | Yes, last screen of each intent, prefilled, skippable. |
+| O4 paycheck debts in the intake | Yes, with a one-tap "I have no debts". |
+| O5 rebalancer and the core gate | Holdings are asked in the intake; /start/portfolio skips the basics. |
+| O6 legacy links | Dropped now (see the amendments below). |
+| O7 old calculator localStorage | Imported once into the profile, non-default values only. |
+| O8 live recalculation | Yes, everywhere; the desktop Calculate button goes. |
+| O9 paycheck federal bracket | Keep the fixed 22% and correct the copy. |
+| O10 filing status | Profile widens to 4 values; retirement maps the two extra ones to single, with a note. |
+| O11 retirement income entry | Uses the shared gross-per-paycheck and frequency fields. |
+| O12 hidden engine inputs | Surface the five listed; withholding and isPeakEarnings stay internal. |
+| O13 deletions | Delete the /demo-only components. The unused insight modules stay (follow-up). |
+| O14 completeness | Counted by topic screen. |
+| O15 display mode | One shared preference. |
+| O16 cash-drag return | One constant, 7%. |
+| O17 invalid inputs | Keep the last results, marked stale. |
+| O18 validateProfile | Stays unwired. |
+| O19 state picker | StateSelector in both places. |
+| O20 docs | CLAUDE.md and the design doc are updated in x2. |
+
+### 0.1 Amendments caused by O6 (no legacy links)
+
+1. **Slice f6-hash-codec is removed.** There is no `lib/utils/hashCodec.ts`, no
+   `createLegacyDecoder`, and no move of the paycheck codec. The existing codec modules
+   (`lib/utils/index.ts` codec block, `lib/utils/retirementState.ts`,
+   `lib/utils/portfolioRebalancingState.ts`) and their tests are left untouched until their
+   last caller is gone, then deleted whole (encoders, decoders and tests). Each calculator
+   slice deletes what it stops using; x1 deletes whatever is left, including the hash
+   builders in `lib/profile/links.ts`.
+2. **Interim transport is unchanged.** From f5 on, the link builders produce
+   `${PATH}?from=profile#${hash}` so calculators that have not migrated yet still receive the
+   wizard handoff. Each calculator slice switches its links to
+   `calculatorHref(id, { fromProfile: true })`, which carries no hash.
+3. **Mount order is profile > defaults.** Section 2.8 step 2 (legacy link) does not exist.
+   `useCalculatorBootstrap(def, store)` waits for profile hydration, strips `?from=profile`
+   (reporting `arrivedFromProfile`), and silently strips any other hash or legacy query. The
+   page always shows the visitor's own profile.
+4. **No scenario layer.** `CalculatorRunState` has no `scenario` and no `setScenario`.
+   `useCalculatorValues(def, store)` returns `{ values, get, write }` only. There is no
+   `ScenarioBanner` component, no "Use these as my answers", and no `notice` slot usage for it.
+5. **`CalculatorDefinition.legacy` is storage-only:**
+   `legacy?: { storageKey: string; readStorage(raw: unknown): E | null; storageDefaults(): E }`.
+   It exists only for the one-time localStorage import (O7). There is no `decode`.
+   `lib/calculators/<id>/legacy.ts` exists for retirement and paycheck only. Portfolio and
+   leverage have none.
+6. **Tests.** No test asserts a scenario banner. s3 instead tests that a stray hash or legacy
+   query is stripped and ignored. Golden tests that compared against a codec or query reader
+   (c7) capture the old output as a fixture before the reader is deleted. f0 does not create
+   `test/utils/hashFixtures.ts`.
+7. **Bugs 2 and 3** (section 1) are resolved by deleting the codecs. The c5 regression test
+   for bug 2 (a non-Latin-1 account name survives a remount) stays, because persistence is now
+   the profile.
+8. **z1 is removed.** Nothing is left to delete later. /demo (x2) has no ScenarioBanner entry.
+
+### 0.2 Amendments from the production audit (docs/production-audit.md)
+
+These fold measured fixes into the slices that already own the code:
+
+| Audit item | Slice | Amendment |
+|---|---|---|
+| H7 formatter cost | f1 | `lib/format.ts` builds each `Intl.NumberFormat` once at module scope. |
+| H1 lazy charts | f3, c2, c7 | `ChartFrame` reserves a fixed height and can defer mounting its children until near the viewport (`deferUntilVisible`). Chart components are loaded with `next/dynamic` at their use sites in c2 and c7. |
+| H2 chart animation | f3, c2 | `components/ui/charts` exports `CHART_SERIES_DEFAULTS` with `isAnimationActive: false`; every series spreads it. Results render from the inputs snapshot that produced them. |
+| H3 leverage debounce | s1, c7 | Leverage `debounceMs` is 250, not 150. The chart is memoized. |
+| H4 paycheck delay | c3 | The 300 ms artificial delay is deleted with the old store. |
+| H5 worker pre-warm | s1, w1, c1 | `createWorkerRunner` exposes `prewarm()`. The retirement intake and the retirement page call it when idle. |
+| H6 server-rendered leverage | c7 | The page renders default inputs on the server; `useSearchParams` and its Suspense go. |
+| H7 dashboard stall | d1 | `LeverageCard` defers its simulation the way `RetirementOddsCard` already does. |
+| H8 KaTeX on the server | x2 | The methodology page renders formulas with `katex.renderToString` in a server component. |
+
+The additive engine option in H7 (`includePath: false` in `leverageComparison.ts`) is NOT taken:
+it touches a behaviour-frozen engine and was not approved.
+
+### 0.3 Delivery
+
+- The rebuild lands as five stacked draft PRs, one per phase, each based on the previous
+  phase's branch: `claude/rebuild-1-foundations` (f0, f1, f2, f3, f4, f5),
+  `claude/rebuild-2-platform` (s1, s2, s3, w1), `claude/rebuild-3-calculators` (c1 to c7),
+  `claude/rebuild-4-dashboard` (d1), `claude/rebuild-5-cleanup` (x1, x2). The first is based on
+  the prototype branch (PR #30). The suggested `refactor/dry-calculators` branch is not used.
+- The CI audit gate named in "Hard constraints" is `npm audit --audit-level=high --omit=dev`
+  (changed in PR #31).
+- Each slice is written by a builder agent with exclusive file ownership, then integrated,
+  gated and reviewed before its phase PR opens (docs/agents.md).
+- Stacked PRs do not target main, so the CI workflow's pull_request trigger is widened to
+  `claude/**` base branches on the first phase branch. No gate is added or changed.
+
+--------------------------------------------------------------------------------
+
 ## 1. Duplication headline (what the refactor removes)
 
 Numbers from the analyzers. Each was verified by probe or by file:line reads.
