@@ -7,6 +7,7 @@
 
 import { INCOME_PERIOD_MULTIPLIERS, annualizeIncome, type RetirementInputs } from '@/lib/calculations/retirement';
 import type { LegacyStorage } from '@/lib/calculators/types';
+import { isRecord } from '@/lib/fields/paths';
 
 /**
  * The old store's defaults, frozen as they were (not read from the live
@@ -73,10 +74,6 @@ const READERS: Readonly<Record<keyof RetirementInputs, Reader>> = {
   effectiveTaxRate: finiteOrNull,
   estimatedAnnualHealthcareCost: finiteOrNull,
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /**
  * The inputs in an old persist envelope (`{ state: { inputs }, version }`),

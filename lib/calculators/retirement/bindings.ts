@@ -22,12 +22,13 @@ import { annualizeIncome, type IncomePeriod, type RetirementInputs } from '@/lib
 import { FILING_STATUS_META } from '@/lib/constants/labels';
 import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import type { Binding } from '@/lib/fields/binding';
+import { FILING_STATUS, GROSS_PAY, PAY_FREQUENCY } from '@/lib/fields/shared';
 import type { Get, Write } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 
-const GROSS_PATH = 'income.grossPerPaycheck';
-const FREQUENCY_PATH = 'income.frequency';
-const FILING_PATH = 'person.filingStatus';
+const GROSS_PATH = GROSS_PAY.path;
+const FREQUENCY_PATH = PAY_FREQUENCY.path;
+const FILING_PATH = FILING_STATUS.path;
 
 /** The engine's period for each pay frequency; weekly has none and enters as yearly. */
 const INCOME_PERIOD: Readonly<Record<PayFrequency, IncomePeriod | null>> = {

@@ -22,5 +22,5 @@ export const retirementRunner = createWorkerRunner<RetirementInputs, RetirementR
 export const useRetirementStore: CalculatorStore<RetirementInputs, RetirementResults> = createCalculatorStore({
   definition: RETIREMENT_CALCULATOR,
   runner: retirementRunner,
-  devtoolsName: 'RetirementStore',
+  devtoolsName: 'calculator:retirement',
 });

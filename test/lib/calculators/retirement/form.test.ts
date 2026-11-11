@@ -89,7 +89,8 @@ describe('retirement form: screens', () => {
   it('asks these fields on each screen under the target-date profile', () => {
     expect(fieldsByScreen()).toEqual({
       about: ['person.age', 'person.state', 'person.filingStatus'],
-      pay: ['income.grossPerPaycheck', 'income.frequency', 'income.netPerPaycheck'],
+      // No take-home pay: no retirement binding reads it.
+      pay: ['income.grossPerPaycheck', 'income.frequency'],
       'must-pay': ['spending.necessaryMonthly'],
       savings: ['investing.monthlyContribution', 'investing.investedBalance'],
       target: ['person.retirementAge', 'spending.targetRetirementIncome', 'person.lifeExpectancy'],

@@ -41,8 +41,11 @@ export interface FieldSpec {
   visibleWhen?: (get: Get) => boolean;
   /** Collapsed one-line summary fragment. */
   summary?: (value: unknown, get: Get) => string | null;
-  /** Coupled writes (pure). */
-  onChange?: (value: unknown, get: Get) => Write[];
+  /**
+   * Coupled writes (pure). `get` already sees the new value; `before`, when
+   * given, sees the values as they were before this change.
+   */
+  onChange?: (value: unknown, get: Get, before?: Get) => Write[];
   // list
   row?: readonly FieldSpec[]; newRow?: (get: Get) => Record<string, unknown>;
   itemLabel?: (row: Record<string, unknown>, index: number) => string;

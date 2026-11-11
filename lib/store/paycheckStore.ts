@@ -12,5 +12,5 @@ import { createCalculatorStore, type CalculatorStore } from './createCalculatorS
 
 export const usePaycheckStore: CalculatorStore<PaycheckProfile, AllocationResult> = createCalculatorStore({
   definition: PAYCHECK_CALCULATOR,
-  devtoolsName: 'PaycheckCalculator',
+  devtoolsName: 'calculator:paycheck',
 });

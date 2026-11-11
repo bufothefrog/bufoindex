@@ -9,6 +9,7 @@ import type { RetirementInputs } from '@/lib/calculations/retirement';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_LEGACY, readRetirementStorage } from '@/lib/calculators/retirement/legacy';
 import { importLegacyCalculatorStorage } from '@/lib/store/legacyImport';
+import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 
@@ -157,5 +158,39 @@ describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)', () => {
     expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
     expect(useProfileStore.getState().profile.provided).toEqual([]);
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+});
+
+describe('importLegacyCalculatorStorage(RETIREMENT_CALCULATOR): the dollar display mode (O15)', () => {
+  // The old store persisted { inputs, showAdvanced, hasCalculatedOnce, displayMode } (v3).
+  const withMode = (displayMode: unknown, inputs: Partial<RetirementInputs> = {}) => ({
+    state: { inputs: { ...OLD_DEFAULTS, ...inputs }, showAdvanced: false, hasCalculatedOnce: true, displayMode },
+    version: 3,
+  });
+
+  beforeEach(() => {
+    usePreferencesStore.setState({ displayMode: 'today' });
+  });
+
+  it('carries a saved future-dollars choice into the shared preference, along with the inputs', () => {
+    store(withMode('nominal', { monthlySavings: 3100 }));
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual(['investing.monthlyContribution']);
+    expect(usePreferencesStore.getState().displayMode).toBe('nominal');
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('carries it even when no input differs from the old defaults', () => {
+    store(withMode('nominal'));
+    expect(importLegacyCalculatorStorage(RETIREMENT_CALCULATOR)).toEqual([]);
+    expect(usePreferencesStore.getState().displayMode).toBe('nominal');
+  });
+
+  it("keeps today's dollars for an old 'today' and for a payload that is not the old envelope", () => {
+    store(withMode('today'));
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('today');
+    localStorage.setItem(KEY, '{not json');
+    importLegacyCalculatorStorage(RETIREMENT_CALCULATOR);
+    expect(usePreferencesStore.getState().displayMode).toBe('today');
   });
 });

@@ -24,6 +24,11 @@ function isContainer(value: unknown): value is Container {
   return typeof value === 'object' && value !== null;
 }
 
+/** True for a plain object (not null, not a list): the shape of a stored record. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return isContainer(value) && !Array.isArray(value);
+}
+
 function hasOwn(container: Container, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(container, key);
 }

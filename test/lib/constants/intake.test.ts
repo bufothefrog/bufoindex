@@ -160,11 +160,40 @@ describe('behaviour-preserving: the provisional forms carry the old question set
     expect(askedScreens('core')).toEqual(oldScreens(OLD_CORE_FLOW, OLD_CORE_SCREENS, OLD_CORE_QUESTIONS));
   });
 
-  it('starts every calculator intent that asks the core with the core screens, worded the same', () => {
+  it('starts every calculator form that has basics with the core screens, labelled and bounded the same', () => {
+    // A form's basics show on its calculator page only (an intent's intake
+    // asks the shared core, then the form's own screens), so the page may
+    // keep its old help, hint and placeholder and leave out a core fact its
+    // engine does not read (retirement: take-home pay). Labels, kinds,
+    // options and bounds are the core's, and the order is the core's.
     const core = askedScreens('core');
+    const strip = (question: AskedScreen['questions'][number]) => {
+      const rest: Partial<AskedScreen['questions'][number]> = { ...question };
+      delete rest.help;
+      return rest;
+    };
     for (const intent of CALCULATOR_INTENTS) {
       if (!FORMS[intent].screens.some((s) => s.tier === 'core')) continue;
-      expect(askedScreens(intent).slice(0, core.length), intent).toEqual(core);
+      const basics = askedScreens(intent).slice(0, core.length);
+      expect(basics.map((screen) => screen.id), intent).toEqual(core.map((screen) => screen.id));
+      basics.forEach((screen, i) => {
+        expect({ ...screen, questions: [] }, intent).toEqual({ ...core[i], questions: [] });
+        const coreQuestions = new Map(core[i].questions.map((question) => [question.path, strip(question)]));
+        const paths = screen.questions.map((question) => question.path);
+        expect(paths, intent).toEqual(core[i].questions.map((q) => q.path).filter((path) => paths.includes(path)));
+        for (const question of screen.questions) expect(strip(question), intent).toEqual(coreQuestions.get(question.path));
+      });
+    }
+    expect(intakePaths('retirement')).not.toContain('income.netPerPaycheck');
+    expect(askedScreens('paycheck').slice(0, core.length).flatMap((screen) => screen.questions.map((q) => q.path))).toEqual([
+      ...CORE_PATHS,
+    ]);
+  });
+
+  it('never asks a calculator form\'s own basics in the intent intake: that asks the shared core', () => {
+    for (const intent of CALCULATOR_INTENTS) {
+      const screens = getIntakeScreens(intent, fromDefaults(), { mode: 'remaining', provided: [] });
+      expect(screens.some((screen) => screen.tier === 'core'), intent).toBe(false);
     }
   });
 
@@ -210,9 +239,13 @@ describe('intake screens', () => {
 
   it('asks the shared core in the same order for every intent that has it', () => {
     const withCore = CALCULATOR_INTENTS.filter((intent) => FORMS[intent].screens.some((s) => s.tier === 'core'));
-    for (const intent of [...withCore, 'profile'] as const) {
-      expect(intakePaths(intent).slice(0, CORE_PATHS.length)).toEqual([...CORE_PATHS]);
+    for (const intent of withCore) {
+      // The form's basics: the core facts its engine reads, in core order.
+      const basics = FORMS[intent].screens.filter((s) => s.tier === 'core').flatMap((s) => s.fields);
+      expect(basics, intent).toEqual(CORE_PATHS.filter((path) => basics.includes(path)));
+      expect(intakePaths(intent).slice(0, basics.length), intent).toEqual(basics);
     }
+    expect(intakePaths('profile').slice(0, CORE_PATHS.length)).toEqual([...CORE_PATHS]);
   });
 
   it('offers the typical-value skip, and keeps the defaults on an assumption screen', () => {

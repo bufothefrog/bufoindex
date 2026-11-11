@@ -269,6 +269,8 @@ export const HEALTHCARE_COST_MULTIPLIER: FieldSpec = {
   path: 'assumptions.retirement.healthcareCostMultiplier',
   kind: 'slider',
   label: 'Healthcare cost multiplier',
+  // The old calculator's readout under the slider, word for word.
+  help: (get) => `${num(get, 'assumptions.retirement.healthcareCostMultiplier')}x average cost`,
   min: 0.5,
   max: 3,
   step: 0.1,

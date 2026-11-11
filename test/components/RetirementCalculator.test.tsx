@@ -137,9 +137,43 @@ describe('RetirementCalculator', () => {
     renderWithProfile(<RetirementCalculator />, { profile: { person: { filingStatus: 'headOfHousehold' } } });
     await findResults();
 
-    expect(screen.getByText(FILING_NOTE)).toBeInTheDocument();
+    // Once, with the filing status (not repeated in the results column).
+    expect(screen.getAllByText(FILING_NOTE)).toHaveLength(1);
     act(() => useProfileStore.getState().setValues([{ path: 'person.filingStatus', value: 'single' }]));
     expect(screen.queryByText(FILING_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('shows the O10 note while there are no results to show', async () => {
+    // Retirement age equal to the age: no run, so no results at all.
+    renderWithProfile(<RetirementCalculator />, {
+      profile: { person: { filingStatus: 'headOfHousehold', age: 60, retirementAge: 60 } },
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+    expect(screen.queryByText('Implied Withdrawal Rate')).not.toBeInTheDocument();
+    expect(screen.getByText(FILING_NOTE)).toBeInTheDocument();
+  });
+
+  it('names the O10 mapping in the collapsed basics card once they are all answered', async () => {
+    renderWithProfile(<RetirementCalculator />, {
+      profile: {
+        person: { age: 41, state: 'TX', filingStatus: 'marriedSeparate' },
+        income: { grossPerPaycheck: 4000, frequency: 'bi-weekly' },
+      },
+    });
+    await findResults();
+    const about = screen.getByRole('region', { name: 'A little about you' });
+    expect(within(about).queryByText(/runs here as single/)).not.toBeInTheDocument();
+    expect(within(about).getByText(/married filing separately, run here as single/)).toBeInTheDocument();
+  });
+
+  it('does not hold results back over take-home pay, which retirement does not read', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { income: { grossPerPaycheck: 3000, netPerPaycheck: 9000 } } });
+    await findResults();
+    expect(screen.queryByText('Results out of date')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Take-home pay per paycheck')).not.toBeInTheDocument();
+    expect(useRetirementStore.getState().errors).toEqual({});
   });
 
   it('imports the old calculator storage once before the first run', async () => {

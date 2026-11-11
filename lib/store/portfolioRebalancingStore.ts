@@ -11,5 +11,5 @@ import { createCalculatorStore, type CalculatorStore } from './createCalculatorS
 
 export const usePortfolioRebalancingStore: CalculatorStore<RebalanceInputsV2, RebalanceResultV2> = createCalculatorStore({
   definition: PORTFOLIO_CALCULATOR,
-  devtoolsName: 'portfolio-rebalancing',
+  devtoolsName: 'calculator:portfolio',
 });

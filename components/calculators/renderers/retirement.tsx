@@ -7,6 +7,7 @@
 
 import type { CustomRenderers } from '@/components/fields/types';
 import { calculatorHref } from '@/lib/calculators/registry';
+import type { FinancialProfile } from '@/lib/profile/types';
 import { retirementRunner } from '@/lib/store/retirementStore';
 
 export const RETIREMENT_RENDERERS: CustomRenderers = {};
@@ -19,4 +20,5 @@ export const RETIREMENT_RENDERERS: CustomRenderers = {};
 export const RETIREMENT_INTAKE_PREWARM = (): void => retirementRunner.prewarm();
 
 /** Where the retirement intake leads once finished: the calculator, which reads the saved profile. */
-export const RETIREMENT_INTAKE_DESTINATION = (): string => calculatorHref('retirement', { fromProfile: true });
+export const RETIREMENT_INTAKE_DESTINATION: (profile: FinancialProfile) => string = () =>
+  calculatorHref('retirement', { fromProfile: true });
