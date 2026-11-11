@@ -1,21 +1,22 @@
 'use client';
 
 import React from 'react';
-import { ResultCard, SummaryCard } from '@/components/ui/cards';
-import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
+import dynamic from 'next/dynamic';
+import { AlertTriangle, Calculator, Target, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ResultCard } from '@/components/ui/cards';
+import { ChartFrame } from '@/components/ui/charts';
+import { KeyValueList, StatGrid } from '@/components/ui/results';
+import { ExpandableListCard } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
-import { formatCurrency, formatPercent } from '@/lib/utils';
-import {
-  TrendingUp,
-  Calculator,
-  AlertTriangle,
-  Target
-} from 'lucide-react';
-import { MonteCarloChart } from './MonteCarloChart';
-import { SavingsRateChart } from './SavingsRateChart';
+import { scenarioCountStat, successTone, withdrawalRateStat } from '@/lib/calculators/retirement/headline';
+import { formatCurrency, formatPercent } from '@/lib/format';
+
+// Loaded on demand (audit H1): Recharts stays out of the page's first chunk.
+const MonteCarloChart = dynamic(() => import('./MonteCarloChart'), { ssr: false });
+const SavingsRateChart = dynamic(() => import('./SavingsRateChart'), { ssr: false });
 
 export interface ResultsSectionProps {
   results: RetirementResults;
@@ -28,118 +29,87 @@ export interface ResultsSectionProps {
   stale: boolean;
 }
 
-function mapProbabilityToVariant(successProbability: number): CardVariant {
-  if (successProbability >= 0.7) return 'success';
-  if (successProbability >= 0.5) return 'warning';
-  return 'danger';
-}
-
-// Grade the plan's implied withdrawal rate against the 4% guideline: at or
-// below it is comfortable, within one point is marginal, beyond that is risky.
-function mapWithdrawalRateToColor(rate: number): 'success' | 'warning' | 'error' {
-  if (rate <= 0.04) return 'success';
-  if (rate <= 0.05) return 'warning';
-  return 'error';
-}
-
-function getScenarioIcon(successProbability: number) {
+function scenarioIcon(successProbability: number): LucideIcon {
   if (successProbability >= 0.9) return Target;
   if (successProbability >= 0.7) return Calculator;
   return AlertTriangle;
 }
+
+/** Savings Rate Impact: contributions start today, so the caption does not follow the toggle. */
+const SAVINGS_RATE_CAPTION = "contributions start today \u2014 shown in today's dollars in either display mode";
 
 export function ResultsSection({ results, inputs }: ResultsSectionProps) {
   // Display-only conversions (CLAUDE.md display-dollar boundary): nominal
   // figures deflate to today's dollars, and figures already in today's
   // dollars inflate in the future-dollar mode.
   const dollars = useDollarDisplay(inputs.inflationRate);
-  const toDisplay = dollars.fromNominal;
-  const toDisplayFromToday = dollars.fromReal;
   const [expandedScenario, setExpandedScenario] = React.useState<string | null>(null);
 
   return (
     <div className="space-y-4">
-      {/* Results Header - Dollar display mode */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{dollars.caption}</p>
         <DollarModeToggle value={dollars.mode} onChange={dollars.setMode} />
       </div>
 
-      {/* Results Header - Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SummaryCard
-          title="Implied Withdrawal Rate"
-          value={formatPercent(results.initialWithdrawalRate)}
-          icon={Target}
-          variant="bordered"
-          color={mapWithdrawalRateToColor(results.initialWithdrawalRate)}
-          label={
-            results.initialWithdrawalRate <= 0.04
-              ? 'at or below the 4% guideline'
-              : 'above the 4% guideline'
-          }
-        />
-        <SummaryCard
-          title="Scenarios Analyzed"
-          value={results.scenarios.length.toString()}
-          icon={Calculator}
-          variant="bordered"
-          color="info"
-          label="retirement options"
-        />
-      </div>
+      <StatGrid
+        stats={[withdrawalRateStat(results), scenarioCountStat(results)]}
+        columns={1}
+        size="lg"
+        align="center"
+        className="gap-4 md:grid-cols-2"
+      />
 
-      {/* Retirement Scenarios */}
       <div className="space-y-3">
         {results.scenarios.map((scenario) => {
-          const variant = mapProbabilityToVariant(scenario.successProbability);
-          const icon = getScenarioIcon(scenario.successProbability);
+          const tone = successTone(scenario.successProbability);
+          const success = formatPercent(scenario.successProbability);
           // Balance-at-retirement figures are nominal as of this scenario's
           // retirement year; the monthly withdrawal is in today's dollars and
           // first lands in that same year. Both convert over this horizon.
           const yearsToRetirement = scenario.retirementAge - inputs.startingAge;
+          const highRisk = tone === 'negative';
 
           return (
             <ExpandableListCard
               key={scenario.id}
-              icon={icon}
+              icon={scenarioIcon(scenario.successProbability)}
               title={scenario.name}
-              subtitle={`Retire at ${scenario.retirementAge} • ${formatPercent(scenario.successProbability)} success rate`}
-              value={formatCurrency(toDisplayFromToday(scenario.monthlyWithdrawal, yearsToRetirement))}
+              subtitle={`Retire at ${scenario.retirementAge} \u2022 ${success} success rate`}
+              value={formatCurrency(dollars.fromReal(scenario.monthlyWithdrawal, yearsToRetirement))}
               valueSubtext="monthly"
-              variant={variant}
+              tone={tone}
               expanded={expandedScenario === scenario.id}
               onToggle={() => setExpandedScenario(expandedScenario === scenario.id ? null : scenario.id)}
             >
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground">Required Balance</div>
-                  <div className="font-semibold">{formatCurrency(toDisplay(scenario.requiredBalance, yearsToRetirement))}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Projected Balance</div>
-                  <div className="font-semibold">{formatCurrency(toDisplay(scenario.projectedBalance, yearsToRetirement))}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Years of Income</div>
-                  <div className="font-semibold">{scenario.yearsOfIncome} years</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Success Probability</div>
-                  <div className="font-semibold">{formatPercent(scenario.successProbability)}</div>
-                </div>
-              </div>
+              <KeyValueList
+                layout="grid"
+                items={[
+                  {
+                    id: 'required',
+                    label: 'Required Balance',
+                    value: dollars.fromNominal(scenario.requiredBalance, yearsToRetirement),
+                    format: 'currency',
+                  },
+                  {
+                    id: 'projected',
+                    label: 'Projected Balance',
+                    value: dollars.fromNominal(scenario.projectedBalance, yearsToRetirement),
+                    format: 'currency',
+                  },
+                  { id: 'years', label: 'Years of Income', value: `${scenario.yearsOfIncome} years` },
+                  { id: 'success', label: 'Success Probability', value: success },
+                ]}
+              />
 
               {scenario.successProbability < 0.8 && (
                 <StatusAlert
-                  variant={scenario.successProbability < 0.5 ? 'danger' : 'warning'}
+                  tone={highRisk ? 'negative' : 'caution'}
                   icon={AlertTriangle}
-                  title={scenario.successProbability < 0.5 ? 'High Risk' : 'Consider Adjustments'}
+                  title={highRisk ? 'High Risk' : 'Consider Adjustments'}
                 >
                   This scenario has a {formatPercent(1 - scenario.successProbability)} chance of running out of money.
-                  {scenario.successProbability < 0.5 ?
-                    ' This is a very risky plan.' :
-                    ' Consider increasing savings or delaying retirement.'}
+                  {highRisk ? ' This is a very risky plan.' : ' Consider increasing savings or delaying retirement.'}
                 </StatusAlert>
               )}
             </ExpandableListCard>
@@ -147,27 +117,22 @@ export function ResultsSection({ results, inputs }: ResultsSectionProps) {
         })}
       </div>
 
-      {/* Monte Carlo Chart */}
-      <ResultCard 
-        title="Portfolio Projections" 
-        icon={TrendingUp}
-      >
-        <MonteCarloChart
-          netWorthByAge={results.netWorthByAge}
-          withdrawalsByAge={results.withdrawalsByAge}
-          inflationRate={inputs.inflationRate}
-          startingAge={inputs.startingAge}
-        />
+      <ResultCard title="Portfolio Projections" icon={TrendingUp}>
+        <ChartFrame height="tall" deferUntilVisible caption={dollars.chartCaption}>
+          <MonteCarloChart
+            netWorthByAge={results.netWorthByAge}
+            withdrawalsByAge={results.withdrawalsByAge}
+            inflationRate={inputs.inflationRate}
+            startingAge={inputs.startingAge}
+          />
+        </ChartFrame>
       </ResultCard>
 
-      {/* Savings Rate Impact Chart */}
-      <ResultCard 
-        title="Savings Rate Impact" 
-        icon={TrendingUp}
-      >
-        <SavingsRateChart inputs={inputs} />
+      <ResultCard title="Savings Rate Impact" icon={TrendingUp}>
+        <ChartFrame height="tall" deferUntilVisible caption={SAVINGS_RATE_CAPTION}>
+          <SavingsRateChart inputs={inputs} />
+        </ChartFrame>
       </ResultCard>
-
     </div>
   );
 }

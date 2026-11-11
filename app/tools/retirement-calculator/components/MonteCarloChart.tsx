@@ -1,22 +1,19 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import { Area, CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis } from 'recharts';
 import {
-  ComposedChart,
-  Line,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
-import { formatCurrency } from '@/lib/utils';
-import { getChartTheme, subscribeToThemeChanges } from '@/lib/chart-theme';
+  CHART_MARGINS,
+  CHART_SERIES_DEFAULTS,
+  ChartTooltipCard,
+  chartAxisProps,
+  chartGridProps,
+  useChartTheme,
+} from '@/components/ui/charts';
 import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
+import { formatCurrency } from '@/lib/format';
 
-interface MonteCarloChartProps {
+export interface MonteCarloChartProps {
   netWorthByAge: { [age: number]: number };
   withdrawalsByAge: { [age: number]: number };
   /** Sets the today's-dollars conversion (display only; the mode is the shared preference) */
@@ -24,181 +21,114 @@ interface MonteCarloChartProps {
   startingAge: number;
 }
 
-// Custom tooltip component (module-scoped so it is not re-created per render)
-interface TooltipProps {
+const AXIS_CURRENCY = { compact: 'axis' } as const;
+
+const axisCurrency = (value: number) => formatCurrency(value, AXIS_CURRENCY);
+
+interface ProjectionTooltipProps {
   active?: boolean;
-  payload?: Array<{
-    dataKey: string;
-    value: number;
-    color: string;
-    name: string;
-  }>;
+  payload?: ReadonlyArray<{ value: number | null; color?: string; name?: string }>;
   label?: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-background border border-border rounded-lg p-3 shadow-lg text-foreground">
-        <p className="text-foreground font-mono text-sm mb-2">
-          Age {label}
-        </p>
-        <div className="space-y-1 text-xs">
-          {payload.map((entry, index) => (
-            <p key={index} className="text-muted-foreground">
-              <span style={{ color: entry.color }}>{entry.name}:</span>{' '}
-              {entry.value !== null ? formatCurrency(entry.value) : 'N/A'}
-            </p>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
+function ProjectionTooltip({ active, payload, label }: ProjectionTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <ChartTooltipCard
+      title={`Age ${label}`}
+      rows={payload.map((entry) => ({
+        label: entry.name,
+        value: entry.value !== null ? formatCurrency(entry.value) : 'N/A',
+        color: entry.color,
+        muted: true,
+      }))}
+    />
+  );
+}
 
+/**
+ * Net worth by age (area, left axis) and annual withdrawals once they start
+ * (line, right axis). Rendered inside a ChartFrame, which sizes it.
+ */
+function MonteCarloChart({ netWorthByAge, withdrawalsByAge, inflationRate, startingAge }: MonteCarloChartProps) {
+  const theme = useChartTheme();
+  const { fromNominal, axisSuffix } = useDollarDisplay(inflationRate);
 
-export function MonteCarloChart({
-  netWorthByAge,
-  withdrawalsByAge,
-  inflationRate,
-  startingAge
-}: MonteCarloChartProps) {
-  const { fromNominal, chartCaption, axisSuffix: modeAxisSuffix } = useDollarDisplay(inflationRate);
-  const [chartTheme, setChartTheme] = useState(() => getChartTheme());
-
-  // Update theme when it changes
-  useEffect(() => {
-    const unsubscribe = subscribeToThemeChanges(() => {
-      setChartTheme(getChartTheme());
-    });
-    return unsubscribe;
-  }, []);
-
-  // Format currency values for axis labels (K/M notation)
-  const formatAxisCurrency = (value: number): string => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}k`;
-    } else {
-      return `$${value.toFixed(0)}`;
-    }
-  };
-
-  // Convert data to Recharts format. Simulation output is nominal; in 'today'
-  // mode each age-keyed value is deflated by the years elapsed since start.
+  // Simulation output is nominal; in 'today' mode each age-keyed value is
+  // deflated by the years elapsed since the start.
   const chartData = useMemo(() => {
     const ages = Object.keys(netWorthByAge).map(Number).sort((a, b) => a - b);
-
-    return ages.map(age => {
+    return ages.map((age) => {
       const yearsFromNow = age - startingAge;
       return {
         age,
         netWorth: fromNominal(netWorthByAge[age], yearsFromNow),
-        // Only show withdrawals when they actually start (not null/undefined)
-        withdrawals: withdrawalsByAge[age] !== undefined
-          ? fromNominal(withdrawalsByAge[age], yearsFromNow)
-          : null
+        // Withdrawals show only from the year they start.
+        withdrawals: withdrawalsByAge[age] !== undefined ? fromNominal(withdrawalsByAge[age], yearsFromNow) : null,
       };
     });
   }, [netWorthByAge, withdrawalsByAge, fromNominal, startingAge]);
 
+  const axis = chartAxisProps(theme);
+  const mutedLabel = { textAnchor: 'middle', fill: theme.muted } as const;
+  const successLabel = { textAnchor: 'middle', fill: theme.success } as const;
+
   return (
-    <div>
-      <p className="text-xs text-muted-foreground text-right">
-        {chartCaption}
-      </p>
-      <div className="h-96">
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart
-          data={chartData}
-          margin={{
-            top: 20,
-            right: 30,
-            left: 20,
-            bottom: 60,
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.3} />
-          <XAxis
-            dataKey="age"
-            stroke={chartTheme.muted}
-            fontSize={12}
-            fontFamily="IBM Plex Mono, monospace"
-            tick={{ fill: chartTheme.muted }}
-            label={{
-              value: 'Age',
-              position: 'insideBottom',
-              offset: -10,
-              style: { textAnchor: 'middle', fill: chartTheme.muted }
-            }}
-          />
-          <YAxis
-            yAxisId="left"
-            stroke={chartTheme.muted}
-            fontSize={12}
-            fontFamily="IBM Plex Mono, monospace"
-            tick={{ fill: chartTheme.muted }}
-            tickFormatter={formatAxisCurrency}
-            label={{
-              value: `Net Worth${modeAxisSuffix}`,
-              angle: -90,
-              position: 'insideLeft',
-              style: { textAnchor: 'middle', fill: chartTheme.muted }
-            }}
-          />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            stroke={chartTheme.success}
-            fontSize={12}
-            fontFamily="IBM Plex Mono, monospace"
-            tick={{ fill: chartTheme.success }}
-            tickFormatter={formatAxisCurrency}
-            label={{
-              value: `Annual Withdrawals${modeAxisSuffix}`,
-              angle: 90,
-              position: 'insideRight',
-              style: { textAnchor: 'middle', fill: chartTheme.success }
-            }}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            wrapperStyle={{
-              paddingTop: '20px',
-              fontSize: '12px',
-              fontFamily: 'IBM Plex Mono, monospace',
-              color: chartTheme.text
-            }}
-          />
-
-          {/* Net Worth area with fill */}
-          <Area
-            yAxisId="left"
-            type="monotone"
-            dataKey="netWorth"
-            stroke={chartTheme.primary}
-            fill={chartTheme.primary}
-            fillOpacity={0.1}
-            strokeWidth={2}
-            name="Net Worth"
-          />
-
-          {/* Annual Withdrawals line */}
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="withdrawals"
-            stroke={chartTheme.success}
-            strokeWidth={2}
-            dot={{ fill: chartTheme.success, strokeWidth: 2, r: 3 }}
-            connectNulls={false}
-            name="Annual Withdrawals"
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
-      </div>
-    </div>
+    <ComposedChart data={chartData} margin={CHART_MARGINS.labeled}>
+      <CartesianGrid {...chartGridProps(theme)} />
+      <XAxis
+        {...axis}
+        dataKey="age"
+        label={{ value: 'Age', position: 'insideBottom', offset: -10, style: mutedLabel }}
+      />
+      <YAxis
+        {...axis}
+        yAxisId="left"
+        tickFormatter={axisCurrency}
+        label={{ value: `Net Worth${axisSuffix}`, angle: -90, position: 'insideLeft', style: mutedLabel }}
+      />
+      <YAxis
+        {...axis}
+        yAxisId="right"
+        orientation="right"
+        stroke={theme.success}
+        tick={{ fill: theme.success }}
+        tickFormatter={axisCurrency}
+        label={{
+          value: `Annual Withdrawals${axisSuffix}`,
+          angle: 90,
+          position: 'insideRight',
+          style: successLabel,
+        }}
+      />
+      <Tooltip content={<ProjectionTooltip />} />
+      <Legend
+        wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontFamily: theme.fontMono, color: theme.text }}
+      />
+      <Area
+        {...CHART_SERIES_DEFAULTS}
+        yAxisId="left"
+        type="monotone"
+        dataKey="netWorth"
+        stroke={theme.primary}
+        fill={theme.primary}
+        fillOpacity={0.1}
+        strokeWidth={2}
+        name="Net Worth"
+      />
+      <Line
+        {...CHART_SERIES_DEFAULTS}
+        yAxisId="right"
+        type="monotone"
+        dataKey="withdrawals"
+        stroke={theme.success}
+        strokeWidth={2}
+        dot={{ fill: theme.success, strokeWidth: 2, r: 3 }}
+        connectNulls={false}
+        name="Annual Withdrawals"
+      />
+    </ComposedChart>
   );
 }
+
+export default MonteCarloChart;
