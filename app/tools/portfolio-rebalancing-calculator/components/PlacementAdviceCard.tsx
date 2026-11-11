@@ -19,6 +19,11 @@ function accountPhrase(type: AccountType): string {
   return ACCOUNT_TYPE_LABELS[type].toLowerCase();
 }
 
+export interface PlacementAdviceCardProps {
+  /** The inputs of the rebalance on display. */
+  inputs: RebalanceInputsV2;
+}
+
 /**
  * Tax-efficient placement suggestions. Iterates all holdings and emits
  * one suggestion per (security, account) pair where `placementAdvice`
@@ -27,11 +32,6 @@ function accountPhrase(type: AccountType): string {
  * Duplicate suggestions (same ticker in same account type held twice) are
  * collapsed to a single entry.
  */
-export interface PlacementAdviceCardProps {
-  /** The inputs of the rebalance on display. */
-  inputs: RebalanceInputsV2;
-}
-
 export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
   const { securities, accounts, holdings, customAssetClasses } = inputs;
 
