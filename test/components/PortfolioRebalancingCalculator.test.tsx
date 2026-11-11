@@ -176,6 +176,23 @@ describe('PortfolioRebalancingCalculator page', () => {
     expect(results()).toHaveTextContent('Drift Reduction');
   });
 
+  it('starts the custom targets from the preset in use (60/40 shown as 45/15/40)', async () => {
+    const user = userEvent.setup();
+    useProfileStore.getState().setValues([{ path: 'investing.targetMix', value: '60-40' }]);
+    render(<PortfolioRebalancingCalculatorPage />);
+    const before = store.getState().inputs?.classTargets;
+    await user.click(within(section('Target allocation')).getByRole('radio', { name: /Custom/ }));
+
+    const editor = screen.getByRole('group', { name: 'Target allocation' });
+    expect(within(editor).getByRole('textbox', { name: 'US Stock target' })).toHaveValue('45.0');
+    expect(within(editor).getByRole('textbox', { name: 'Bonds target' })).toHaveValue('40.0');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+    // The rebalance aims at the same targets as before the switch.
+    expect(store.getState().inputs?.classTargets).toEqual(before);
+  });
+
   it('adds a custom asset class from the targets editor', async () => {
     const user = userEvent.setup();
     useProfileStore.getState().setValues([{ path: 'investing.targetMix', value: 'custom' }]);

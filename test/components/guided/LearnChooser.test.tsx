@@ -73,8 +73,9 @@ describe('LearnChooser', () => {
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
-    // The intake never asks two profile fields, so profileCompleteness still
-    // lists them; /start/profile would only redirect, so link the overview.
+    // The intake never asks the emergency-fund target months, so
+    // profileCompleteness still lists it (the answered accounts answer the
+    // new cash); /start/profile would only redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
 
@@ -82,7 +83,7 @@ describe('LearnChooser', () => {
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
     expect(first).toHaveTextContent(
-      'No questions left to ask. The overview runs each calculator from your profile and lists the 2 details that still use a typical value.'
+      'No questions left to ask. The overview runs each calculator from your profile and lists the 1 detail that still uses a typical value.'
     );
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
   });

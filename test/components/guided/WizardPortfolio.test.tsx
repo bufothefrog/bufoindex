@@ -95,6 +95,18 @@ describe('Wizard, portfolio intent', () => {
     expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
   });
 
+  it('starts the custom targets from the preset chosen before', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="portfolio" />);
+    await user.click(screen.getByRole('radio', { name: /60% stocks/ }));
+    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+
+    const editor = screen.getByRole('group', { name: 'Target allocation' });
+    expect(within(editor).getByRole('textbox', { name: 'US Stock target' })).toHaveValue('45.0');
+    expect(within(editor).getByRole('textbox', { name: 'Intl Stock target' })).toHaveValue('15.0');
+    expect(within(editor).getByRole('textbox', { name: 'Bonds target' })).toHaveValue('40.0');
+  });
+
   it('shows the class-targets editor for the custom mix and saves the targets with it', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);

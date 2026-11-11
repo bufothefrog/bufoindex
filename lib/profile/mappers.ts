@@ -224,7 +224,7 @@ export function toRebalanceInputs(profile: FinancialProfile): RebalanceInputsV2 
 /**
  * How many of the 25 v1 fields the user actually answered, and which ones
  * are still placeholders. Paths in `provided` that are not v1 fields are
- * ignored.
+ * ignored, except the accounts list, which answers the new cash.
  *
  * @deprecated Slice w1 counts completeness by topic screen
  * (lib/calculators/forms.ts). Kept for its current callers until slice x1.
@@ -235,6 +235,10 @@ export function profileCompleteness(profile: FinancialProfile): {
   missing: { path: string; label: string }[];
 } {
   const answered = new Set(profile.provided);
+  // The new cash now lives on the accounts (each account's deposit), and no
+  // form asks investing.newCashThisMonth any more: an answered account list
+  // answers it.
+  if (answered.has('portfolio.accounts')) answered.add('investing.newCashThisMonth');
   const missing = PROFILE_FIELDS.filter((f) => !answered.has(f.path)).map(({ path, label }) => ({
     path,
     label,

@@ -124,8 +124,17 @@ describe('ProfileCompletenessCard (overview)', () => {
 
   it('edits the basics once no profile question is left, instead of bouncing back to the overview', () => {
     const { unmount } = render(<ProfileCompletenessCard profile={withProvided(intakePaths('profile'))} />);
-    // Two fields are never asked by the intake, so they stay listed.
-    expect(screen.getByText('23 of 25')).toBeInTheDocument();
+    // The intake never asks the emergency-fund target months, so it stays
+    // listed. It asks the new cash on the accounts screen: answering the
+    // accounts answers the deprecated investing.newCashThisMonth too.
+    const asked = intakePaths('profile');
+    const answered = PROFILE_FIELDS.filter(
+      ({ path }) => asked.includes(path) || (path === 'investing.newCashThisMonth' && asked.includes('portfolio.accounts'))
+    );
+    expect(answered).toHaveLength(PROFILE_FIELDS.length - 1);
+    expect(screen.getByText(`${answered.length} of ${PROFILE_FIELDS.length}`)).toBeInTheDocument();
+    expect(screen.getByText(/Emergency fund target/)).toBeInTheDocument();
+    expect(screen.queryByText('New cash to invest this month')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Edit the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: /Fill in the rest/ })).not.toBeInTheDocument();
     unmount();

@@ -17,9 +17,9 @@ import {
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { applyWrites, makeGet } from '@/lib/fields/paths';
-import { resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
+import { fieldWrites, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FieldSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { getDefaultFinancialProfile, presetClassTargets } from '@/lib/profile/defaults';
 import { askedScreens, fromDefaults, type OldQuestion } from '@/test/utils/intakeFixture';
 
 /** The questions the intake asked for the portfolio intent before c5 (slice w1's fixture), after the core. */
@@ -177,6 +177,42 @@ describe('portfolio form: screens', () => {
     expect(notes(fromDefaults({ 'assumptions.portfolio.allowTaxableSelling': true }))).toEqual([
       ['Selling in taxable may trigger capital gains tax.', 'caution'],
     ]);
+  });
+});
+
+describe('portfolio form: switching the target mix to Custom', () => {
+  const targetsAfter = (mix: unknown, previous: string, extra: Record<string, unknown> = {}) => {
+    const get = fromDefaults({ 'investing.targetMix': previous, ...extra });
+    const writes = fieldWrites(spec('investing.targetMix'), mix, get);
+    return writes.filter((write) => write.path === 'portfolio.classTargets').map((write) => write.value);
+  };
+
+  it('starts the editable targets from the preset in use, not from the stored ones', () => {
+    expect(targetsAfter('custom', '60-40')).toEqual([
+      [
+        { accountId: null, assetClass: 'us-stock', target: 0.45 },
+        { accountId: null, assetClass: 'intl-stock', target: 0.15 },
+        { accountId: null, assetClass: 'bonds', target: 0.4 },
+        { accountId: null, assetClass: 'cash', target: 0 },
+      ],
+    ]);
+  });
+
+  it("keeps the visitor's own classes, at the 0% the preset gave them", () => {
+    const stored = [
+      { accountId: null, assetClass: 'us-stock', target: 0.5 },
+      { accountId: null, assetClass: 'cac-1', target: 0.1 },
+    ];
+    const [targets] = targetsAfter('custom', '100-0', {
+      'portfolio.classTargets': stored,
+      'portfolio.customAssetClasses': [{ id: 'cac-1', label: 'Gold' }],
+    }) as { assetClass: string; target: number }[][];
+    expect(targets).toEqual([...presetClassTargets('100-0'), { accountId: null, assetClass: 'cac-1', target: 0 }]);
+  });
+
+  it('leaves the targets alone between presets, and for a mix that was already Custom', () => {
+    expect(targetsAfter('60-40', '80-20')).toEqual([]);
+    expect(targetsAfter('custom', 'custom')).toEqual([]);
   });
 });
 

@@ -16,8 +16,9 @@ import {
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { listRows } from '@/lib/fields/runtime';
-import type { FieldOption, FieldSpec } from '@/lib/fields/types';
+import type { FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
+import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/lib/profile/defaults';
 import type { TargetMixPreset } from '@/lib/profile/types';
 import {
   ACCOUNTS_PATH,
@@ -50,12 +51,35 @@ export function accountLabel(account: { name?: unknown }, index: number): string
 // Targets
 // ---------------------------------------------------------------------------
 
+function isPresetMix(value: unknown): value is PresetTargetMix {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(TARGET_MIX_WEIGHTS, value);
+}
+
+/**
+ * The editable targets when the mix changes from a preset to Custom: the
+ * preset's weights, so the visitor starts from the targets in use rather
+ * than from whatever classTargets last held. Rows of the visitor's own asset
+ * classes stay, at 0% (the preset gave them nothing); account-level rows stay
+ * as they are.
+ */
+function targetsFromPreset(value: unknown, get: Get, before?: Get): Write[] {
+  const previous = before?.(TARGET_MIX_PATH);
+  if (value !== 'custom' || !isPresetMix(previous)) return [];
+  const preset = presetClassTargets(previous);
+  const standard = new Set(preset.map((target) => target.assetClass));
+  const kept = readPortfolio(get)
+    .classTargets.filter((target) => target.accountId !== null || !standard.has(target.assetClass))
+    .map((target) => (target.accountId === null ? { ...target, target: 0 } : target));
+  return [{ path: CLASS_TARGETS_PATH, value: [...preset, ...kept] }];
+}
+
 export const TARGET_MIX: FieldSpec = {
   path: TARGET_MIX_PATH,
   kind: 'choice',
   label: 'Target mix',
   options: TARGET_MIX_OPTIONS,
   tier: 'details',
+  onChange: targetsFromPreset,
   summary: (value) => TARGET_MIX_LABELS[value as TargetMixPreset] ?? null,
 };
 

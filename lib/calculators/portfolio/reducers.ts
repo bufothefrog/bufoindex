@@ -10,8 +10,10 @@
  * security no holding refers to any more is dropped (pruneUnusedSecurities).
  *
  * New ids are '<prefix>-<n>' with the smallest n from the list's length + 1
- * up that no row of that list uses, so the same edits always give the same
- * ids (server and client agree, and tests can name them).
+ * up that no row of that list uses and no row of any list refers to, so the
+ * same edits always give the same ids (server and client agree, and tests
+ * can name them), and a new row never takes over a reference left behind by
+ * a removed one.
  */
 
 import {
@@ -64,8 +66,24 @@ export function portfolioWrites(before: Portfolio, after: Portfolio): Write[] {
   }));
 }
 
-function nextId(prefix: 'acc' | 'sec' | 'hld' | 'cac', rows: readonly { id: string }[]): string {
-  const taken = new Set(rows.map((row) => row.id));
+/** Every id a row refers to (an account, a security or an asset class), dangling or not. */
+function referencedIds(portfolio: Portfolio): Set<string> {
+  const ids = new Set<string>();
+  for (const holding of portfolio.holdings) {
+    ids.add(holding.accountId);
+    ids.add(holding.securityId);
+  }
+  for (const security of portfolio.securities) ids.add(security.assetClass);
+  for (const target of portfolio.classTargets) {
+    if (target.accountId !== null) ids.add(target.accountId);
+    ids.add(target.assetClass);
+  }
+  return ids;
+}
+
+function nextId(prefix: 'acc' | 'sec' | 'hld' | 'cac', rows: readonly { id: string }[], portfolio: Portfolio): string {
+  const taken = referencedIds(portfolio);
+  for (const row of rows) taken.add(row.id);
   let n = rows.length + 1;
   while (taken.has(`${prefix}-${n}`)) n += 1;
   return `${prefix}-${n}`;
@@ -100,7 +118,7 @@ export function pruneUnusedSecurities(portfolio: Portfolio): Portfolio {
 
 /** Appends a blank security; returns the lists and its id. */
 export function addSecurity(portfolio: Portfolio): [Portfolio, string] {
-  const id = nextId('sec', portfolio.securities);
+  const id = nextId('sec', portfolio.securities, portfolio);
   return [{ ...portfolio, securities: [...portfolio.securities, blankSecurity(id)] }, id];
 }
 
@@ -118,7 +136,7 @@ export function updateSecurity(portfolio: Portfolio, id: string, patch: Partial<
 /** Appends a numbered taxable account with no new cash. */
 export function addAccount(portfolio: Portfolio): Portfolio {
   const account: Account = {
-    id: nextId('acc', portfolio.accounts),
+    id: nextId('acc', portfolio.accounts, portfolio),
     name: `Account ${portfolio.accounts.length + 1}`,
     accountType: DEFAULT_ACCOUNT_TYPE,
     deposit: 0,
@@ -150,7 +168,7 @@ export function removeAccount(portfolio: Portfolio, id: string): Portfolio {
 export function addHolding(portfolio: Portfolio, accountId?: string): Portfolio {
   const [withSecurity, securityId] = addSecurity(portfolio);
   const holding: Holding = {
-    id: nextId('hld', portfolio.holdings),
+    id: nextId('hld', portfolio.holdings, portfolio),
     accountId: accountId ?? portfolio.accounts[0]?.id ?? '',
     securityId,
     shares: 0,
@@ -197,7 +215,7 @@ export function linkHoldingByTicker(portfolio: Portfolio, holdingId: string, tic
 
   const currentIsShared = portfolio.holdings.some((h) => h.id !== holdingId && h.securityId === currentSecurityId);
   if (currentIsShared) {
-    const newId = nextId('sec', portfolio.securities);
+    const newId = nextId('sec', portfolio.securities, portfolio);
     return updateHolding(
       { ...portfolio, securities: [...portfolio.securities, blankSecurity(newId, normalized)] },
       holdingId,
@@ -248,7 +266,7 @@ export function addCustomAssetClass(portfolio: Portfolio, label: string): [Portf
   if (!trimmed) return [portfolio, ''];
   const existing = portfolio.customAssetClasses.find((c) => c.label.toLowerCase() === trimmed.toLowerCase());
   if (existing) return [ensureAssetClassVisible(portfolio, existing.id), existing.id];
-  const id = nextId('cac', portfolio.customAssetClasses);
+  const id = nextId('cac', portfolio.customAssetClasses, portfolio);
   return [
     ensureAssetClassVisible({ ...portfolio, customAssetClasses: [...portfolio.customAssetClasses, { id, label: trimmed }] }, id),
     id,

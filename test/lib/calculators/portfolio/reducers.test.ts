@@ -122,6 +122,23 @@ describe('account actions', () => {
     expect(gap.accounts.map((a) => a.id)).toEqual(['acc-2', 'acc-3']);
   });
 
+  it('never gives a new row an id a row still refers to, so no dangling reference is taken over', () => {
+    // VTI is assigned to a custom class, the class is removed (the reference
+    // dangles), and a class with the same label is added again.
+    const [withGold, goldId] = addCustomAssetClass(seed(), 'GOLD');
+    const assigned = updateSecurity(withGold, 'sec-vti', { assetClass: goldId });
+    const removed = removeClassTarget(assigned, goldId);
+    const [again, againId] = addCustomAssetClass(removed, ' GOLD ');
+    expect(goldId).toBe('cac-1');
+    expect(againId).not.toBe(goldId);
+    expect(again.securities.find((sec) => sec.id === 'sec-vti')?.assetClass).toBe(goldId);
+
+    // A holding left pointing at a removed account keeps it from being reused.
+    const dangling = { ...seed(), accounts: seed().accounts.filter((a) => a.id !== 'acc-brok') };
+    const withStray = { ...dangling, holdings: [...dangling.holdings, { ...seed().holdings[0], id: 'hld-x', accountId: 'acc-2' }] };
+    expect(addAccount(withStray).accounts.map((a) => a.id)).toEqual(['acc-roth', 'acc-3']);
+  });
+
   it('updateAccount patches fields in place', () => {
     const roth = updateAccount(seed(), 'acc-roth', { deposit: 1000 }).accounts.find((a) => a.id === 'acc-roth');
     expect(roth?.deposit).toBe(1000);
