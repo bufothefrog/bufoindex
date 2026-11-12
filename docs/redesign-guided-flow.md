@@ -1,7 +1,9 @@
 # Guided-flow redesign sketch
 
-Status: proposal, not yet implemented. Written 2026-10-03 against the
-`Initial release` commit.
+Status: proposal, written 2026-10-03 against the `Initial release` commit.
+Sections 2.1, 2.3, 2.4, 3.4 and 9.1 were updated after the rebuild
+(docs/rebuild-plan.md) to match the code. The other sections are the
+original proposal and can describe the tree as it was before the rebuild.
 
 This document sketches a reimagined BufoIndex: a mobile-first landing page
 that asks what the visitor wants to do, a short intake that seeds the right
@@ -63,37 +65,40 @@ Facts that shape the redesign (file references are to the current tree):
 
 ### 2.1 Flow overview
 
-Revised 2026-10-03 after the first prototype: everyone answers the same
-short core intake first, then chooses what to learn, then answers only the
-questions that calculator still needs.
+Updated after the rebuild (docs/rebuild-plan.md) to match the code:
+everyone answers the same short core intake first, then chooses what to
+learn, then answers only the questions that calculator still needs. The
+rebalancer is the one exception (O5): it needs none of the core facts.
 
 ```
 /  (landing)
 |   hero + one primary CTA "Get started" -> /start
 |   preview cards for each calculator (what it answers) -> /start?next=<intent>
+|      (the rebalancer's card -> /start/portfolio)
 |   "Continue with my profile" (returning visitor) -> /start/choose
 |   "Just show me the tools" -> /tools
 |
-|-- /start   (core intake: seven shared fields on three short screens)
-|      age, state, filing status, gross pay + frequency, take-home,
+|-- /start   (core intake: seven shared fields on three topic screens)
+|      age, state, filing status; gross pay, frequency, take-home;
 |      must-pay monthly costs. Shared by every calculator.
 |      finish -> /start/<next> when a preview card set one, else:
 |
 |-- /start/choose   "What do you want to learn?"
 |      1. Finish your profile            -> /start/profile
-|         (becomes "See your overview"   -> /overview once complete)
+|         (becomes "See your overview"   -> /overview once nothing is left)
 |      2. Figure out where each paycheck should go   -> /start/paycheck
 |      3. See if I am on track to retire             -> /start/retirement
 |      4. Rebalance my accounts with new cash        -> /start/portfolio
 |      5. Compare leveraged vs plain index investing -> /start/leverage
 |      one-line summary of the core answers + "Edit the basics" -> /start
 |
-|-- /start/<intent>   (only the questions this calculator still needs;
+|-- /start/<intent>   (only the screens this calculator still needs;
 |      answered ones are not asked again; nothing left -> straight through)
-|      finish -> /tools/<calculator>#<hash>   (seeded and run on arrival)
+|      finish -> /tools/<calculator>?from=profile   (reads the profile, runs)
 |
 |-- /tools/<calculator>
-|      Results first. Quick answers collapsed; look-up details; assumptions.
+|      Results first on a phone. Quick answers collapsed once answered;
+|      look-up details; assumptions collapsed.
 |      "What next?" card at the end of the results:
 |         Finish your profile (or See your overview) -> /start/profile | /overview
 |         Try another calculator                     -> /start/choose
@@ -103,20 +108,25 @@ questions that calculator still needs.
 
 Rules that fall out of this:
 
-- Every entry path goes through `/start` first. The preview cards on the
-  landing page and the tool list exist to show what the site can answer,
-  not to bypass the shared questions. Direct links to a calculator still
-  work for returning visitors and for anyone who skips the flow; their
-  results end with the same "What next?" card, which offers the core
-  intake instead.
+- Every entry path except the rebalancer's goes through `/start` first. The
+  preview cards on the landing page and the tool list exist to show what
+  the site can answer, not to bypass the shared questions. Direct links to
+  a calculator still work for returning visitors and for anyone who skips
+  the flow; their results end with the same "What next?" card, which offers
+  the core intake instead.
 - A calculator intake never re-asks a question the profile already holds.
-  A skipped question is still unanswered and comes back the next time a
-  calculator needs it.
-- `/start/choose` and `/start/<intent>` redirect to `/start` when the core
-  is incomplete, so a bookmarked chooser cannot show an empty summary.
+  A skipped screen keeps its typical values, is not marked answered, and
+  comes back the next time a calculator needs it.
+- `/start/choose` redirects to `/start` when the core is incomplete, and
+  `/start/<intent>` sends a visitor without the basics through the core
+  first (`coreStartLink` in `lib/constants/intake.ts`), so a bookmarked
+  chooser cannot show an empty summary.
 - Saved answers are changed at `/start/review`, which re-asks every
   question prefilled; it is linked from the chooser and the overview's
-  completeness card. The calculators do not write back to the profile.
+  completeness card. Edits on a calculator page also write through to the
+  profile (O1), so the calculators and the overview always agree.
+- Links into a calculator carry only `?from=profile`; there is no URL-hash
+  state (section 9.1).
 
 ### 2.2 Landing page
 
@@ -134,53 +144,65 @@ Rules that fall out of this:
 
 ### 2.3 Intake wizard
 
-One question per screen, large input, Next pinned to the bottom of the
-viewport with the Skip affordance inside the same bar so it is visible on
-first paint, progress dots, Back always available. The wizard never asks
-anything that requires a document; those fields wait on the calculator.
+One topic screen at a time (O2): a few related fields under one question,
+with Next pinned to the bottom of the viewport and the Skip affordance
+inside the same bar so it is visible on first paint, progress dots, Back
+always available. Skip ("Skip, use a typical value") keeps the screen's
+typical values without marking them answered. Each intent ends on its
+assumption screen, prefilled, with "Keep the default assumptions" (O3).
 
-Two flows share one component:
+One component (`components/guided/Wizard.tsx`) runs every flow, and every
+screen is a `ScreenSpec` from the calculator's FormSpec
+(`lib/calculators/<id>/form.ts`), so the wizard and the calculator page ask
+the same fields with the same validation:
 
-- **Core** (`/start`): the seven shared fields on three screens. Heading "A few basics"
-  and a line saying every calculator uses these answers. Finishes to the
+- **Core** (`/start`): the seven shared fields on three screens
+  (`CORE_SCREENS` in `lib/fields/shared.ts`). Heading "A few basics" and a
+  line saying every calculator uses these answers. Finishes to the
   chooser, or to the intent a landing card chose.
-- **Calculator** (`/start/<intent>`): only the intent's own questions
-  whose profile path is not yet provided. Heading is the intent title with
-  "Just the questions this calculator still needs." Finishes to the
-  calculator's seeded link. The `profile` intent asks every remaining
-  question across sections, with "Skip the rest of this section", and
+- **Calculator** (`/start/<intent>`): the intent's non-core screens whose
+  fields are not all provided yet; a partly answered screen shows all of
+  its fields, prefilled. Finishes to the calculator at `?from=profile`. The
+  `profile` intent asks the profile form (`PROFILE_FORM` in
+  `lib/calculators/forms.ts`): every calculator's details screens with each
+  field asked once, then the emergency fund and the strategy preset, and
   finishes on the overview.
 
-Per-calculator questions (easy tier only; the core is asked once):
+Intake screens per calculator after the core:
 
-| Tool | Calculator-specific questions | Screens after the core |
-|---|---|---|
-| Paycheck | fun-money range; has 401k match (yes/no); match % and limit when yes | 2 to 3 |
-| Retirement | target retirement age, invested balance (rough), monthly contribution | 3 |
-| Portfolio | new cash this month, target mix preset (100/0, 80/20, 60/40) | 2 |
-| Leverage comparison | taxable monthly contribution, target retirement age, invested balance | 2 to 3 |
-| Finish your profile | everything above not yet answered, plus emergency fund balance and APY, and the strategy preset | up to 10 |
+| Tool | Intake screens |
+|---|---|
+| Paycheck | fun money and bonuses; emergency fund; 401(k) (match terms only with a plan); HSA; IRAs and taxable investing; debts (a one-tap "I have no debts", O4); assumptions |
+| Retirement | what you invest today; when you would like to retire (with target income and life expectancy); Social Security and healthcare; assumptions |
+| Portfolio | target allocation; accounts and new cash; holdings (O5); settings |
+| Leverage comparison | what goes into the comparison (stop age, taxable monthly contribution, invested balance, leverage ratio); market assumptions |
+| Finish your profile | every calculator's details screens not yet answered, then the emergency fund and the strategy preset |
 
 Design rules for the question set are unchanged: ask only what changes the
-first result materially, ask in the user's units, and defer anything that
-needs a document.
+first result materially, ask in the user's units, and keep a "where to find
+this" hint on anything that needs a document.
 
 ### 2.4 Calculator page, second pass
 
-Each calculator page is reorganized into three input groups instead of a
-flat stack of cards:
+Every calculator page is a `CalculatorPage`
+(`components/calculators/shared/CalculatorPage.tsx`): the form's screens
+render as one `FieldSection` card each, in three tiers (`Tier` in
+`lib/fields/types.ts`), with the results beside them in `CalculatorLayout`:
 
-1. **Quick answers** (collapsed). The intake fields. Shown as a one-line
-   summary ("32, TX, single, $4,200 take-home every 2 weeks") with an Edit
+1. **Quick answers** (`core`, collapsed once every field on the screen is
+   answered). The intake fields, shown as a one-line summary with an Edit
    action that expands the same inputs inline.
-2. **Details worth looking up** (expanded on first visit, collapsible). The
-   fields that need a document or some thought. Each has a short "where to
-   find this" hint. These are grouped, not one-per-screen, because the user
-   is now at a desk with the documents open and wants to enter several at
-   once.
-3. **Assumptions** (collapsed). Returns, volatility, inflation, tax rate
-   overrides, risk profile. Already exists as "Advanced" on the retirement
-   calculator and `AdvancedSettingsCard` on the paycheck allocator.
+2. **Details worth looking up** (`details`, expanded). The fields that need
+   a document or some thought, grouped by topic with a short "where to find
+   this" hint where it helps.
+3. **Assumptions** (`assumption`, collapsed). Returns, volatility,
+   inflation, tax rate overrides, risk profile, with a restore-defaults
+   action.
+
+Results follow the inputs live (O8): there is no Calculate button. On
+invalid inputs the last results stay on screen, marked stale (O17). Below
+`lg` the layout shows an Inputs | Results tab bar and a sticky bar whose one
+action is See results / Edit inputs; on desktop the two-column layout stays.
 
 Field tiering per calculator (current fields, grouped):
 
@@ -207,10 +229,6 @@ Portfolio rebalancer
 | Quick | accounts (name, type), new cash per account, target mix preset |
 | Look up | each holding's ticker, shares, price; custom asset classes; exact target percentages |
 | Assumptions | whole vs fractional shares, allow taxable selling, show placement advice |
-
-Results move above the look-up group on mobile, with the sticky bar's "Jump
-to results" and "Edit inputs" actions toggling between the two. On desktop
-the existing two-column layout stays.
 
 ### 2.5 Dashboard (`/overview`)
 
@@ -345,16 +363,23 @@ Mapping rules worth deciding up front:
 
 ### 3.4 Store and persistence
 
-`lib/store/profileStore.ts` (Zustand + persist, key `bufo-profile`). The
-three calculator stores stay as they are. When a calculator mounts:
+`lib/store/profileStore.ts` (Zustand + persist, localStorage key
+`bufo-profile`, versioned; older payloads go through
+`lib/profile/migrate.ts`). The profile is the only record of inputs: the
+calculator stores are run stores made by `createCalculatorStore`
+(`lib/store/createCalculatorStore.ts`) that hold results and persist
+nothing. When a calculator mounts:
 
-1. If the URL has a hash, use it (unchanged behaviour; shared links win).
-2. Else if a profile exists, derive inputs from it and show a "Using your
-   profile" banner with a link to `/overview`.
-3. Else fall back to the store's own persisted or default inputs.
+1. The old calculators' own localStorage inputs, if any, are imported into
+   the profile once and their keys removed (O7, `lib/store/legacyImport.ts`).
+2. The page reads its inputs from the profile through the calculator's
+   bindings (`lib/calculators/<id>/bindings.ts`), defaults filling anything
+   unanswered, and runs.
+3. Each edit writes through to the profile (O1) and re-runs.
 
-This keeps every existing test and link valid and makes the profile purely
-additive.
+There is no hash step: old share links are not supported (O6). The dollar
+display mode is one site-wide preference (`lib/store/preferencesStore.ts`,
+O15).
 
 ## 4. Mobile overhaul
 
@@ -692,14 +717,16 @@ provides auth and Postgres. Anyone can run a calculator and see results
 with no account. An account exists only to keep a profile and named
 scenarios for later, on any device.
 
-### 9.1 What the hashes do today, and what happens to each job
+### 9.1 What the hashes did, and where each job went
 
-| Job the hash does now | What happens |
+The rebuild removed URL-hash state (O6). Each job the hash used to do:
+
+| Job the hash did | Where it is now |
 |---|---|
-| Seed a calculator from somewhere else (wizard, dashboard) | Internal transport in phase 1 only. In phase 2 the calculators read the profile store directly (mount order: chosen scenario > profile > store defaults) and the URL is clean. |
-| Persist across reloads on one device | localStorage, one profile record instead of three stores. |
-| Share a scenario with someone else | Dropped. The Share buttons go. Existing links in the wild keep decoding for a deprecation window (decoders stay, encoders are removed from the UI), then the codecs are deleted along with their tests. |
-| Reproducibility for bug reports and methodology | A JSON export of the profile and scenarios (plaintext, produced on the device, never uploaded) replaces the hash in bug reports. |
+| Seed a calculator from somewhere else (wizard, dashboard) | The calculators read the shared profile directly; links carry only `?from=profile`. |
+| Persist across reloads on one device | localStorage, one profile record (`bufo-profile`) instead of per-calculator stores. |
+| Share a scenario with someone else | Dropped. The Share buttons and the codecs are gone, and old links are not decoded. |
+| Reproducibility for bug reports and methodology | Not replaced yet. A JSON export of the profile (plaintext, produced on the device, never uploaded) is the proposal for bug reports. |
 
 ### 9.2 Data model (Supabase Postgres, every table under row-level security)
 

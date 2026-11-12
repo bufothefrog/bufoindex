@@ -88,7 +88,7 @@ Reuse existing inputs from `components/ui/inputs/` and `components/shared/inputs
 ## Quick references
 
 - Design system, component hierarchy, theming rules: `CLAUDE.md`.
-- Calculation layer, Monte Carlo engine, URL-hash state, theming architecture: `docs/architecture.md`.
+- Calculation layer, Monte Carlo engine, shared profile and run stores, theming architecture: `docs/architecture.md`.
 - TypeScript / React conventions: `docs/agents/code-patterns.md`.
 - Resolving conflicts between parallel agents: `docs/agents/conflict-resolution.md`.
 

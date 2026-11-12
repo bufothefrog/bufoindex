@@ -1,5 +1,7 @@
 # BufoIndex DRY refactor: target architecture and migration plan
 
+Status: all five phases have landed. Hand-off notes are in docs/agents/agent-communication/rebuild-1-foundations.md through rebuild-5-cleanup.md. The original status line below is kept as a record.
+
 Status: design, ready for an implementation workflow. Repo at HEAD 0e8f421, worktree clean.
 Inputs: the three analyzer reports (stores-codecs-shells, fields-inputs-intake,
 results-charts-tests), docs/redesign-guided-flow.md (sections 2, 3, 9), and a
