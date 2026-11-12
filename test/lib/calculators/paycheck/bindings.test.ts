@@ -4,11 +4,11 @@
  * PaycheckProfile leaf bound or engine-only, the fixed federal bracket, the
  * form relations, and the reverse direction the legacy import uses.
  *
- * Golden fixture. The expected engine profiles are what the old mapper
- * (toPaycheckProfile in lib/profile/mappers.ts) returned for each profile,
- * metadata excluded, captured on 2026-11-12 before slice x1 deleted it,
- * written as the leaves that differ from its output for the v1 default
- * (DEFAULT_ENGINE). Non-integer figures are compared to 9 decimals.
+ * Golden fixture. The expected engine profiles were captured on 2026-11-12
+ * from the former lib/profile/mappers.ts (deleted in phase 5): what its
+ * toPaycheckProfile returned for each profile, metadata excluded, written as
+ * the leaves that differ from its output for the v1 default (DEFAULT_ENGINE).
+ * Non-integer figures are compared to 9 decimals.
  */
 
 import { describe, expect, it } from 'vitest';

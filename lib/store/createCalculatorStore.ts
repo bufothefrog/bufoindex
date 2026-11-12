@@ -122,7 +122,7 @@ export function createCalculatorStore<E, R>({
             resultsKey: job.key,
             errors: NO_ERRORS,
             stale: false,
-                    hasCalculatedOnce: true,
+            hasCalculatedOnce: true,
           });
 
         const fail = (error: unknown): void =>

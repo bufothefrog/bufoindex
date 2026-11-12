@@ -5,9 +5,9 @@
  * reverse direction the legacy import uses, and engine errors mapped back to
  * profile paths.
  *
- * Golden fixture. The expected inputs are what the old mapper
- * (toRetirementInputs in lib/profile/mappers.ts) returned for each profile,
- * captured on 2026-11-12 before slice x1 deleted it, written as the leaves
+ * Golden fixture. The expected inputs were captured on 2026-11-12 from the
+ * former lib/profile/mappers.ts (deleted in phase 5): what its
+ * toRetirementInputs returned for each profile, written as the leaves
  * that differ from its output for the v1 default (DEFAULT_INPUTS).
  */
 

@@ -60,6 +60,10 @@ unchanged.
   normalizing drops the leaf from any stored payload (provided entries for it go too), and
   migrateProfile reads a v1 answer from the raw payload and still moves it into the Brokerage
   deposit. A provided v1 new cash still does not mark `portfolio.accounts`.
+  So a v1 profile whose only answered field was the new cash loads with hasProfile false, and the
+  same holds for a v2 profile saved before the leaf was removed whose only answered mark was
+  `investing.newCashThisMonth`: it loads as "no saved profile" (the continue card is hidden), and
+  no value other than that leaf is lost.
 - Each deletion was grepped across app, components, lib, contexts, test, docs and config first.
   Nothing listed for deletion still had a live caller.
 
@@ -165,3 +169,5 @@ From all five phases:
 - (p5) Update the remaining sections of docs/redesign-guided-flow.md (1, 2.5, 6) or leave them as
   the historical proposal?
 - (p5) Delete the unused retirement insight modules now (O13 follow-up)?
+- (p5) Dark mode: the negative tone's text color (`text-destructive`) has about 1.7:1 contrast on
+  dark surfaces. This predates the rebuild and is a design-token change, not done here.

@@ -3,9 +3,9 @@
  * old mapper (toRebalanceInputs) did, every engine input is bound or
  * engine-only, and the engine's checks land on the fields that show them.
  *
- * Golden fixture. Each GOLDEN entry is what the old mapper
- * (toRebalanceInputs in lib/profile/mappers.ts) returned for that profile,
- * captured on 2026-11-12 before slice x1 deleted it: v1-shaped profiles
+ * Golden fixture. Each GOLDEN entry was captured on 2026-11-12 from the
+ * former lib/profile/mappers.ts (deleted in phase 5): what its
+ * toRebalanceInputs returned for that profile, for v1-shaped profiles
  * (migrateProfile from a v1 payload) and a v2 profile with several accounts,
  * holdings and a custom class. No documented exception.
  */
