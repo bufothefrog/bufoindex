@@ -15,7 +15,6 @@ import {
   BROKERAGE_ACCOUNT_ID,
   getDefaultFinancialProfile,
   getProfileValue,
-  isProfileFieldPath,
   isProfilePath,
   isValidProfileValue,
   newCashDepositWrites,
@@ -27,14 +26,13 @@ import {
   PROFILE_LEAF_PATHS,
   PROFILE_LIST_PATHS,
   PROFILE_LIST_ROW_DEFAULTS,
-  PROFILE_SECTION_LABELS,
   PROFILE_SECTIONS,
   providedPathFor,
-  splitProfilePath,
   TARGET_MIX_PRESETS,
   TARGET_MIX_WEIGHTS,
-} from '@/lib/profile';
-import type { FinancialProfile, PresetTargetMix } from '@/lib/profile';
+} from '@/lib/profile/defaults';
+import type { FinancialProfile } from '@/lib/profile/types';
+import type { PresetTargetMix } from '@/lib/profile/defaults';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
 import { RetirementConstants } from '@/lib/constants/retirement';
 
@@ -202,7 +200,7 @@ describe('PROFILE_FIELDS, sections and preset constants', () => {
       expect(PROFILE_LEAF_PATHS).toContain(field.path);
       expect(field.label.length).toBeGreaterThan(0);
       expect(field.path.startsWith(`${field.section}.`)).toBe(true);
-      expect(PROFILE_SECTION_LABELS[field.section as keyof typeof PROFILE_SECTION_LABELS]).toBeTruthy();
+      expect(PROFILE_SECTIONS).toContain(field.section);
     }
   });
 
@@ -213,12 +211,11 @@ describe('PROFILE_FIELDS, sections and preset constants', () => {
     expect(paths).not.toContain('provided');
   });
 
-  it('labels every section, and the sections are exactly the data keys of the profile', () => {
+  it('lists the sections, exactly the data keys of the profile', () => {
     const keys = Object.keys(getDefaultFinancialProfile()).filter(
       (k) => !['version', 'updatedAt', 'provided'].includes(k)
     );
     expect([...PROFILE_SECTIONS].sort()).toEqual(keys.sort());
-    for (const section of PROFILE_SECTIONS) expect(PROFILE_SECTION_LABELS[section]).toBeTruthy();
   });
 
   it('maps each strategy preset to its starting emergency-fund months', () => {
@@ -308,17 +305,6 @@ describe('path registry', () => {
     expect(getProfileValue(p, 'portfolio.holdings')).toHaveLength(4);
     expect(getProfileValue(p, 'nope.nothing')).toBeUndefined();
     expect(getProfileValue(p, 'person')).toBeUndefined();
-  });
-
-  it('keeps the deprecated leaf helpers for two-segment leaves', () => {
-    expect(splitProfilePath('person.age')).toEqual({ section: 'person', key: 'age' });
-    expect(splitProfilePath('investing.newCashThisMonth')).toEqual({ section: 'investing', key: 'newCashThisMonth' });
-    expect(splitProfilePath('person.nickname')).toBeNull();
-    expect(splitProfilePath('provided')).toBeNull();
-    expect(splitProfilePath('assumptions.retirement.volatility')).toBeNull();
-    expect(splitProfilePath('debts')).toBeNull();
-    expect(isProfileFieldPath('hsa.eligible')).toBe(true);
-    expect(isProfileFieldPath('debts')).toBe(false);
   });
 });
 

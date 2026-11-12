@@ -33,8 +33,9 @@ import { LEVERAGE_CALCULATOR, validateDcaComparisonInputs } from '@/lib/calculat
 import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
-import { getDefaultFinancialProfile, migrateProfile, patchWrites, applyProfileWrites } from '@/lib/profile';
-import type { FinancialProfile, ProfilePatch } from '@/lib/profile';
+import { applyProfileWrites, getDefaultFinancialProfile, patchWrites } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
+import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 
 const V1_DEFAULT = {
   version: 1,

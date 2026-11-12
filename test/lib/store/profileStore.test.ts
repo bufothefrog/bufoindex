@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROFILE_STORAGE_KEY, useProfileStore } from '@/lib/store/profileStore';
-import { getDefaultFinancialProfile } from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 
 const store = useProfileStore;
 const getState = () => store.getState();

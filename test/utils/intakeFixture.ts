@@ -7,13 +7,19 @@
  * so a calculator slice that grows its form edits only its own files.
  *
  * askedScreens(flow) reads what the intake asks now, in the same shape as
- * oldScreens(...), so a test compares the two question by question.
+ * oldScreens(...), so a test compares the two question by question;
+ * intakePaths(flow) lists every path a flow's intake can ask.
  */
 
 import { getIntakeScreens, intakeForm, type IntakeFlow } from '@/lib/constants/intake';
 import { resolveOptions, visibleScreenFields } from '@/lib/fields/runtime';
 import type { FieldOption, Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
+
+/** Every profile path a flow's intake can ask, in order, deduplicated. */
+export function intakePaths(flow: IntakeFlow): string[] {
+  return Array.from(new Set(intakeForm(flow).screens.flatMap((screen) => screen.fields)));
+}
 
 export type OldKind = 'money' | 'number' | 'percent' | 'state' | 'frequency' | 'filing' | 'choice';
 

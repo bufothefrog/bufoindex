@@ -23,7 +23,6 @@ import {
   STRATEGY_PRESET,
   TAXABLE_MONTHLY,
   intakeDerivedWrites,
-  offeredWithSaved,
   withOverrides,
 } from '@/lib/fields/shared';
 import { relationErrors, resolveOptions } from '@/lib/fields/runtime';
@@ -78,19 +77,6 @@ describe('shared field specs', () => {
       expect(resolveOptions(FILING_STATUS, getFrom({ 'person.filingStatus': saved })), saved).toEqual(offered);
     }
     expect(FILING_STATUS_META.marriedJoint.phrase).toBe('married filing jointly');
-  });
-
-  it('offeredWithSaved adds only a known saved value, and returns the offered list itself otherwise', () => {
-    const offered = [{ value: 'a', label: 'A' }];
-    const all = [...offered, { value: 'b', label: 'B' }];
-    const options = offeredWithSaved('x', offered, all);
-    expect(options(getFrom({ x: 'a' }))).toBe(offered);
-    expect(options(getFrom({ x: 'b' }))).toEqual([
-      { value: 'a', label: 'A' },
-      { value: 'b', label: 'B' },
-    ]);
-    expect(options(getFrom({ x: 'zzz' }))).toBe(offered);
-    expect(options(getFrom({}))).toBe(offered);
   });
 
   it('reuses the strategy preset options, Standard first', () => {

@@ -36,12 +36,12 @@ import { PORTFOLIO_CALCULATOR } from '@/lib/calculators/portfolio/definition';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
 import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
-import type { CalculatorDefinition } from '@/lib/calculators/types';
+import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import { stableKey } from '@/lib/fields/binding';
 import { getAt } from '@/lib/fields/paths';
 import { NET_PAY_AT_MOST_GROSS } from '@/lib/fields/shared';
-import { getDefaultFinancialProfile } from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
 import { importLegacyStorage } from '@/lib/store/legacyImport';
@@ -382,14 +382,14 @@ function expectInvariants(c: Case, before: FinancialProfile, after: FinancialPro
   // I4: an untouched old key alone reproduces the old calculator's run.
   const [only] = keys;
   if (keys.length === 1 && c.seed.patch.income === undefined && !only.payChanged && !only.electionChanged) {
-    if (only.id === 'retirement') expectSameRun(RETIREMENT_CALCULATOR);
-    else expectSameRun(PAYCHECK_CALCULATOR);
+    if (only.id === 'retirement') expectSameRun(RETIREMENT_CALCULATOR, RETIREMENT_LEGACY);
+    else expectSameRun(PAYCHECK_CALCULATOR, PAYCHECK_LEGACY);
   }
 }
 
 /** The old defaults' engine inputs against the imported profile's, leaf by leaf (income by annual value). */
-function expectSameRun<E, R>(def: CalculatorDefinition<E, R>): void {
-  const old = def.legacy!.storageDefaults();
+function expectSameRun<E, R>(def: CalculatorDefinition<E, R>, legacy: LegacyStorage<E>): void {
+  const old = legacy.storageDefaults();
   const now = engineInputsFor(def, profile());
   const incomeLeaves = new Set(['income', 'currentIncome', 'incomeAmount', 'incomePeriod']);
   for (const binding of def.bindings) {

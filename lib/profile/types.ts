@@ -11,7 +11,7 @@
  * - Model assumptions live under assumptions.<calculator>.
  * - Nullable leaves are overrides: null means "derive from the profile".
  * - Lists (debts and the portfolio lists) are first-class; their rows reuse
- *   the engine row types so the mappers copy them without reshaping.
+ *   the engine row types so the bindings copy them without reshaping.
  *
  * Units: money is US dollars; every rate or percentage is a decimal
  * (0.5 = 50%, 0.04 = 4% APY), matching PercentInput and the calculator
@@ -38,9 +38,6 @@ import type {
 export type PayFrequency = 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly';
 
 export type FilingStatus = 'single' | 'marriedJoint' | 'marriedSeparate' | 'headOfHousehold';
-
-/** @deprecated Use FilingStatus. Kept until slice x1. */
-export type ProfileFilingStatus = FilingStatus;
 
 /**
  * Strategy presets. Both are presented side by side; neither is a default
@@ -158,7 +155,9 @@ export interface FinancialProfile {
     /**
      * @deprecated The rebalancer reads the Brokerage account's deposit in
      * portfolio.accounts. A write here also sets that deposit (see
-     * newCashDepositWrites). Deleted in slice x1.
+     * newCashDepositWrites). Kept while the v1 profileCompleteness counts it
+     * (lib/profile/mappers.ts): a v1 answer is recorded in `provided` by
+     * this path.
      */
     newCashThisMonth: number;
   };

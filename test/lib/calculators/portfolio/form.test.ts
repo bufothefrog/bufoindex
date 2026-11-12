@@ -10,7 +10,6 @@ import { PORTFOLIO_FORM } from '@/lib/calculators/portfolio/form';
 import {
   CORE_PATHS,
   getIntakeScreens,
-  intakePaths,
   intentNeedsCore,
   remainingIntakeScreens,
   skipLabelFor,
@@ -20,7 +19,7 @@ import { applyWrites, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FieldSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, presetClassTargets } from '@/lib/profile/defaults';
-import { askedScreens, fromDefaults, type OldQuestion } from '@/test/utils/intakeFixture';
+import { askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/test/utils/intakeFixture';
 
 /** The questions the intake asked for the portfolio intent before c5 (slice w1's fixture), after the core. */
 const OLD_QUESTIONS: Record<string, OldQuestion> = {
@@ -153,7 +152,7 @@ describe('portfolio form: screens', () => {
       ...SETTINGS_PATHS,
     ]);
     expect(asked).toContain(OLD_QUESTIONS['investing.targetMix'].path);
-    // investing.newCashThisMonth is deprecated (removed in x1): its one home is
+    // investing.newCashThisMonth is deprecated (no form asks it): its one home is
     // the deposit of each account, asked with the old help on the accounts list.
     const deposit = spec('portfolio.accounts').row!.find((row) => row.path === 'deposit')!;
     const old = OLD_QUESTIONS['investing.newCashThisMonth'];

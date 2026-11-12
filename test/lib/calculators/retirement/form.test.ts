@@ -11,7 +11,6 @@ import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
 import {
   CORE_PATHS,
   getIntakeScreens,
-  intakePaths,
   remainingIntakeScreens,
   skipLabelFor,
   validateIntakeScreen,
@@ -19,7 +18,7 @@ import {
 import { fieldMap, resolveOptions, resolveOverrideDefault, summarizeScreen } from '@/lib/fields/runtime';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
-import { OLD_CORE_FLOW, askedScreens, fromDefaults, type OldQuestion } from '@/test/utils/intakeFixture';
+import { OLD_CORE_FLOW, askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/test/utils/intakeFixture';
 
 const ids = (overrides: Record<string, unknown> = {}) =>
   getIntakeScreens('retirement', fromDefaults(overrides)).map((s) => s.id);

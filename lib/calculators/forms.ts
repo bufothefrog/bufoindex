@@ -173,24 +173,6 @@ export function formForFlow(flow: FormFlow): FormSpec {
   return FORMS[flow];
 }
 
-let registry: ReadonlyMap<string, FieldSpec> | null = null;
-
-/**
- * Every field spec any form defines, keyed by profile path: the core, then
- * each calculator form, then the profile-only facts. Where two forms word
- * the same path differently, the first keeps it.
- */
-export function fieldRegistry(): ReadonlyMap<string, FieldSpec> {
-  if (registry) return registry;
-  const map = new Map<string, FieldSpec>();
-  const all = [CORE_FIELDS, ...Object.values(FORMS).map((form) => form.fields), PROFILE_EXTRA_FIELDS];
-  for (const spec of all.flat()) {
-    if (!map.has(spec.path)) map.set(spec.path, spec);
-  }
-  registry = map;
-  return registry;
-}
-
 export interface ProfileCompleteness {
   /** Topic screens whose every visible fact is answered. */
   provided: number;

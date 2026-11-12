@@ -16,9 +16,7 @@ import {
   getIntakeScreens,
   getIntentOption,
   getLearnOption,
-  intakePaths,
   isCoreComplete,
-  isIntakeFlow,
   isIntakeIntent,
   isProfileFinished,
   remainingIntakeScreens,
@@ -43,6 +41,7 @@ import {
   OLD_CORE_SCREENS,
   askedScreens,
   fromDefaults,
+  intakePaths,
   oldScreens,
   type AskedScreen,
   type OldQuestion,
@@ -442,12 +441,6 @@ describe('core paths', () => {
         profileWith(['person.age', 'person.retirementAge', 'investing.taxableMonthlyContribution', 'investing.investedBalance'])
       )
     ).toBe(false);
-  });
-
-  it('recognizes the core flow and every intent as flows', () => {
-    expect(isIntakeFlow('core')).toBe(true);
-    expect(isIntakeFlow('profile')).toBe(true);
-    expect(isIntakeFlow('choose')).toBe(false);
   });
 });
 

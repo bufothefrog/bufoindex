@@ -130,10 +130,6 @@ export function getLearnOption(intent: IntakeIntent): IntentOption {
 /** What the wizard asks: the shared core, or one intent's form. */
 export type IntakeFlow = IntakeIntent | 'core';
 
-export function isIntakeFlow(value: string): value is IntakeFlow {
-  return value === 'core' || isIntakeIntent(value);
-}
-
 /** Profile dot paths of the shared core questions, in the order they are asked. */
 export const CORE_PATHS: readonly string[] = CORE_SCREENS.flatMap((screen) => screen.fields);
 
@@ -239,11 +235,6 @@ export function intakeForm(flow: IntakeFlow, mode: IntakeMode = 'all'): FormSpec
 export function getIntakeScreens(flow: IntakeFlow, get: Get, options: IntakeScreenOptions = {}): ScreenSpec[] {
   const mode = options.mode ?? 'all';
   return screensFor(intakeForm(flow, mode), get, { mode, provided: options.provided, surface: 'intake' });
-}
-
-/** Every profile path an intent's intake can ask, in order, deduplicated. */
-export function intakePaths(flow: IntakeFlow): string[] {
-  return Array.from(new Set(intakeForm(flow).screens.flatMap((screen) => screen.fields)));
 }
 
 /**

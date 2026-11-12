@@ -5,7 +5,8 @@
  * defaults carries the answers over and fills the new leaves and lists with
  * their defaults. The one move is the one-off new cash: v1 kept it in
  * investing.newCashThisMonth, and v2 keeps it as the Brokerage account's
- * deposit in portfolio.accounts (the leaf stays, deprecated, until slice x1).
+ * deposit in portfolio.accounts (the leaf stays, deprecated, while the v1
+ * profileCompleteness counts it).
  * `provided` paths carry over; anything that is not a profile path is
  * dropped.
  */

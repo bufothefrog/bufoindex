@@ -17,7 +17,7 @@ import {
 } from '@/lib/calculations/retirement';
 import { RetirementConstants } from '@/lib/constants/retirement';
 import { formatCurrency, formatPercent } from '@/lib/format';
-import { RETIREMENT_AGE } from '@/lib/fields/shared';
+import { AGE, FILING_STATUS, RETIREMENT_AGE } from '@/lib/fields/shared';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 import { retirementFilingStatus } from './bindings';
@@ -37,7 +37,7 @@ export const TARGET_RETIREMENT_INCOME: FieldSpec = {
   kind: 'money',
   label: 'Target annual income in retirement',
   help: (get) => {
-    const years = num(get, RETIREMENT_AGE.path) - num(get, 'person.age');
+    const years = num(get, RETIREMENT_AGE.path) - num(get, AGE.path);
     const inflation = num(get, 'assumptions.retirement.inflationRate');
     const future = num(get, 'spending.targetRetirementIncome') * Math.pow(1 + inflation, years);
     return `That's ${formatCurrency(Math.round(future))} in future dollars`;
@@ -145,7 +145,7 @@ const VOLATILITY_PATH = 'assumptions.retirement.volatility';
 const wholePercent = (fraction: number) => formatPercent(fraction, { digits: 0 });
 
 function riskProfileOptions(get: Get): readonly FieldOption[] {
-  const tdf = tdfProfileFor(num(get, 'person.age'));
+  const tdf = tdfProfileFor(num(get, AGE.path));
   return [
     {
       value: 'tdf',
@@ -167,7 +167,7 @@ export const RISK_PROFILE: FieldSpec = {
   // current age, so switching back to Custom starts from them.
   onChange: (value, get): Write[] => {
     if (value !== 'tdf') return [];
-    const tdf = tdfProfileFor(num(get, 'person.age'));
+    const tdf = tdfProfileFor(num(get, AGE.path));
     return [
       { path: ACCUMULATION_RETURN_PATH, value: tdf.accumulationReturn },
       { path: RETIREMENT_RETURN_PATH, value: tdf.retirementReturn },
@@ -244,7 +244,7 @@ export const INFLATION_RATE: FieldSpec = {
 export function estimatedEffectiveTaxRate(get: Get): number {
   return calculateEffectiveTaxRate(
     num(get, TARGET_RETIREMENT_INCOME.path),
-    retirementFilingStatus(get('person.filingStatus') as FilingStatus)
+    retirementFilingStatus(get(FILING_STATUS.path) as FilingStatus)
   );
 }
 

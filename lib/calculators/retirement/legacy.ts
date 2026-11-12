@@ -8,6 +8,7 @@
 import { INCOME_PERIOD_MULTIPLIERS, annualizeIncome, type RetirementInputs } from '@/lib/calculations/retirement';
 import type { LegacyStorage } from '@/lib/calculators/types';
 import { isRecord } from '@/lib/fields/paths';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 
 /**
  * The old store's defaults, frozen as they were (not read from the live
@@ -41,7 +42,7 @@ const OLD_STORE_DEFAULTS: Readonly<RetirementInputs> = Object.freeze({
 
 type Reader = (value: unknown) => unknown;
 
-const finite: Reader = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+const finite: Reader = (value) => (isFiniteNumber(value) ? value : undefined);
 const finiteOrNull: Reader = (value) => (value === null ? null : finite(value));
 const oneOf =
   (values: readonly string[]): Reader =>

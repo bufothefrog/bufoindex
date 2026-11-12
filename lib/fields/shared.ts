@@ -25,26 +25,6 @@ export function withOverrides(spec: FieldSpec, overrides: Partial<Omit<FieldSpec
   return { ...spec, ...overrides };
 }
 
-/**
- * The options of a choice the intake offers only in part: `offered`, plus the
- * option for the saved value when the profile holds one of `all` that
- * `offered` leaves out. A value saved on a calculator then shows as chosen
- * and can be kept, instead of failing option membership until the visitor
- * picks a different (wrong) answer.
- */
-export function offeredWithSaved(
-  path: string,
-  offered: readonly FieldOption[],
-  all: readonly FieldOption[]
-): (get: Get) => readonly FieldOption[] {
-  return (get) => {
-    const saved = get(path);
-    if (offered.some((option) => option.value === saved)) return offered;
-    const kept = all.find((option) => option.value === saved);
-    return kept ? [...offered, kept] : offered;
-  };
-}
-
 function sentenceCase(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }

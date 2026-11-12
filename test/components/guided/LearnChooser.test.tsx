@@ -4,7 +4,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LearnChooser } from '@/components/guided/LearnChooser';
 import { Wizard } from '@/components/guided/Wizard';
-import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
+import { CORE_PATHS } from '@/lib/constants/intake';
+import { intakePaths } from '@/test/utils/intakeFixture';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 

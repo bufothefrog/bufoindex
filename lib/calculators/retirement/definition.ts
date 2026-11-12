@@ -1,6 +1,6 @@
 /**
- * The retirement calculator for the run store, validation and the legacy
- * import (docs/rebuild-plan.md section 2.6). Pure; the off-thread runner is
+ * The retirement calculator for the run store and validation
+ * (docs/rebuild-plan.md section 2.6). Pure; the off-thread runner is
  * added by lib/store/retirementStore.ts.
  */
 
@@ -16,7 +16,6 @@ import { makeGet } from '@/lib/fields/paths';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { RETIREMENT_BINDINGS } from './bindings';
 import { RETIREMENT_FORM } from './form';
-import { RETIREMENT_LEGACY } from './legacy';
 
 let base: RetirementInputs | null = null;
 
@@ -40,5 +39,4 @@ export const RETIREMENT_CALCULATOR: CalculatorDefinition<RetirementInputs, Retir
   validate: validateRetirementInputs,
   calculate: calculateRetirementAnalysis,
   debounceMs: 300,
-  legacy: RETIREMENT_LEGACY,
 };

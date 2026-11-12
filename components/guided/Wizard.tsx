@@ -119,10 +119,10 @@ function whenIdle(task: () => void): () => void {
 
 /**
  * The spec with the option its field held on arrival kept on offer. A
- * choice the intake offers only in part (offeredWithSaved) adds the saved
- * value's option from the working answers; once the visitor clicks another
- * option, that option would vanish, so the one chosen on arrival is
- * resolved against the arrival profile and kept.
+ * choice the intake offers only in part (options that add the saved value)
+ * adds the saved value's option from the working answers; once the visitor
+ * clicks another option, that option would vanish, so the one chosen on
+ * arrival is resolved against the arrival profile and kept.
  */
 function keepArrivalOption(spec: FieldSpec, arrival: Get): FieldSpec {
   const options = spec.options;

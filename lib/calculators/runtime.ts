@@ -1,6 +1,6 @@
 /**
  * The two pure steps between the profile and a calculator run: engine inputs
- * from the profile (replaces lib/profile/mappers.ts per calculator) and
+ * from the profile (through each calculator's bindings) and
  * validation of what the calculator page shows. No React, no storage.
  */
 

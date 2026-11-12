@@ -8,7 +8,8 @@ import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompleten
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
 import { IntentPicker } from '@/components/guided/IntentPicker';
 import { profileCompleteness } from '@/lib/calculators/forms';
-import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
+import { CORE_PATHS } from '@/lib/constants/intake';
+import { intakePaths } from '@/test/utils/intakeFixture';
 import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 

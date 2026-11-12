@@ -1,7 +1,8 @@
 /**
  * Paycheck bindings (docs/rebuild-plan.md section 2.5): which profile value
- * feeds each PaycheckProfile leaf. They reproduce lib/profile/mappers.ts
- * toPaycheckProfile, which slice x1 deletes. Pure.
+ * feeds each PaycheckProfile leaf. They reproduce the old profile mapper
+ * (toPaycheckProfile; test/lib/calculators/paycheck/bindings.test.ts keeps
+ * its output as the golden fixture). Pure.
  *
  * The engine profile is nested and the profile is flat (plan risk 1), so a
  * few leaves are derived:
@@ -26,6 +27,18 @@
 
 import { updateLegacyIncomeFields } from '@/lib/calculations/core';
 import type { Binding } from '@/lib/fields/binding';
+import {
+  AGE,
+  EMERGENCY_FUND_APY,
+  EMERGENCY_FUND_BALANCE,
+  FILING_STATUS,
+  GROSS_PAY,
+  NECESSARY_MONTHLY,
+  NET_PAY,
+  PAY_FREQUENCY,
+  STATE,
+  TAXABLE_MONTHLY,
+} from '@/lib/fields/shared';
 import type { Get, Write } from '@/lib/fields/types';
 import type { ContributionType } from '@/lib/profile/types';
 import type { IncomeData, PaycheckProfile } from '@/lib/types';
@@ -33,9 +46,9 @@ import type { IncomeData, PaycheckProfile } from '@/lib/types';
 export const CONTRIBUTION_TYPE_PATH = 'workplace.contributionType';
 export const CONTRIBUTION_PATH = 'workplace.contributionPercent';
 export const ROTH_PART_PATH = 'workplace.rothContributionPercent';
-const GROSS_PATH = 'income.grossPerPaycheck';
-const NET_PATH = 'income.netPerPaycheck';
-const FREQUENCY_PATH = 'income.frequency';
+const GROSS_PATH = GROSS_PAY.path;
+const NET_PATH = NET_PAY.path;
+const FREQUENCY_PATH = PAY_FREQUENCY.path;
 
 /** The traditional and Roth shares of a 401(k) election. */
 export interface Election401k {
@@ -108,8 +121,8 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   { profile: 'income.bonusFrequency', engine: 'income.bonusFrequency' },
 
   // Taxes.
-  { profile: 'person.state', engine: 'taxes.state' },
-  { profile: 'person.filingStatus', engine: 'taxes.filingStatus' },
+  { profile: STATE.path, engine: 'taxes.state' },
+  { profile: FILING_STATUS.path, engine: 'taxes.filingStatus' },
 
   // 401(k).
   { profile: 'workplace.has401k', engine: 'benefits.employer401k.available' },
@@ -161,9 +174,9 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
 
   // Preferences.
   { profile: 'cash.targetMonths', engine: 'preferences.emergencyFundMonths' },
-  { profile: 'cash.emergencyFundBalance', engine: 'preferences.currentEmergencyFund' },
-  { profile: 'cash.emergencyFundApy', engine: 'preferences.emergencyFundAPY' },
-  { profile: 'spending.necessaryMonthly', engine: 'preferences.necessaryExpenses' },
+  { profile: EMERGENCY_FUND_BALANCE.path, engine: 'preferences.currentEmergencyFund' },
+  { profile: EMERGENCY_FUND_APY.path, engine: 'preferences.emergencyFundAPY' },
+  { profile: NECESSARY_MONTHLY.path, engine: 'preferences.necessaryExpenses' },
   { profile: 'spending.funMoneyMin', engine: 'preferences.funMoney.min' },
   { profile: 'spending.funMoneyMax', engine: 'preferences.funMoney.max' },
   {
@@ -171,12 +184,12 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
     read: (get) => ((get('spending.funMoneyMin') as number) + (get('spending.funMoneyMax') as number)) / 2,
     errorPath: 'spending.funMoneyMax',
   },
-  { profile: 'person.age', engine: 'preferences.age' },
+  { profile: AGE.path, engine: 'preferences.age' },
   {
     engine: 'preferences.hasTaxableAccount',
-    read: (get) => (get('investing.taxableMonthlyContribution') as number) > 0,
+    read: (get) => (get(TAXABLE_MONTHLY.path) as number) > 0,
   },
-  { profile: 'investing.taxableMonthlyContribution', engine: 'preferences.taxableAccountContribution' },
+  { profile: TAXABLE_MONTHLY.path, engine: 'preferences.taxableAccountContribution' },
   { profile: 'assumptions.paycheck.expectedRetirementBracket', engine: 'preferences.expectedRetirementBracket' },
   { profile: 'assumptions.paycheck.riskTolerance', engine: 'preferences.riskTolerance' },
   { profile: 'assumptions.paycheck.optimizationGoal', engine: 'preferences.optimizationGoal' },

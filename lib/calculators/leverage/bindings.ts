@@ -20,7 +20,7 @@ import { LEVERAGE_INPUT_BOUNDS } from '@/lib/constants/leverage';
 import type { DcaComparisonInputs } from '@/lib/calculations/leverageComparison';
 import type { Binding } from '@/lib/fields/binding';
 import { isFiniteNumber } from '@/lib/fields/runtime';
-import { TAXABLE_MONTHLY } from '@/lib/fields/shared';
+import { AGE, INVESTED_BALANCE, MONTHLY_INVESTING, RETIREMENT_AGE, TAXABLE_MONTHLY } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
 import { clamp } from '@/lib/utils';
 
@@ -28,7 +28,6 @@ export const MONTHLY_CONTRIBUTION_PATH = 'leverage.monthlyContribution';
 export const YEARS_PATH = 'leverage.years';
 export const STARTING_BALANCE_PATH = 'leverage.startingBalance';
 export const LEVERAGE_RATIO_PATH = 'strategy.leverageRatio';
-export const TAXABLE_MONTHLY_PATH = TAXABLE_MONTHLY.path;
 
 const BOUNDS = LEVERAGE_INPUT_BOUNDS;
 
@@ -39,26 +38,26 @@ function numberAt(get: Get, path: string): number {
 
 /** True when the profile has a taxable monthly contribution, which the derived contribution then uses. */
 export function usesTaxableContribution(get: Get): boolean {
-  return numberAt(get, TAXABLE_MONTHLY_PATH) > 0;
+  return numberAt(get, TAXABLE_MONTHLY.path) > 0;
 }
 
 /** The monthly contribution the profile implies (the auto value of leverage.monthlyContribution). */
 export function derivedMonthlyContribution(get: Get): number {
   const monthly = usesTaxableContribution(get)
-    ? numberAt(get, TAXABLE_MONTHLY_PATH)
-    : numberAt(get, 'investing.monthlyContribution');
+    ? numberAt(get, TAXABLE_MONTHLY.path)
+    : numberAt(get, MONTHLY_INVESTING.path);
   return clamp(monthly, 0, BOUNDS.maxMonthlyContribution);
 }
 
 /** Whole years from the current age to the retirement age (the auto value of leverage.years). */
 export function derivedYears(get: Get): number {
-  const span = Math.round(numberAt(get, 'person.retirementAge') - numberAt(get, 'person.age'));
+  const span = Math.round(numberAt(get, RETIREMENT_AGE.path) - numberAt(get, AGE.path));
   return clamp(span, BOUNDS.minYears, BOUNDS.maxYears);
 }
 
 /** The invested balance (the auto value of leverage.startingBalance). */
 export function derivedStartingBalance(get: Get): number {
-  return clamp(numberAt(get, 'investing.investedBalance'), 0, BOUNDS.maxStartingBalance);
+  return clamp(numberAt(get, INVESTED_BALANCE.path), 0, BOUNDS.maxStartingBalance);
 }
 
 /** The override at `path` when it is set, otherwise the derived value. */

@@ -33,7 +33,8 @@ import {
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
-import { applyWrites, getAt, setAt } from '@/lib/fields/paths';
+import { applyWrites, getAt, isRecord, setAt } from '@/lib/fields/paths';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 import type { Write } from '@/lib/fields/types';
 import type {
   AccountRow,
@@ -243,7 +244,7 @@ export const PROFILE_LIST_ROW_DEFAULTS: { readonly [P in ProfileListPath]: Reado
 // Sections, labels, enums
 // ---------------------------------------------------------------------------
 
-/** Section order and display labels. */
+/** Section order. */
 export const PROFILE_SECTIONS: readonly ProfileSection[] = [
   'person',
   'income',
@@ -261,29 +262,10 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
   'assumptions',
 ];
 
-export const PROFILE_SECTION_LABELS: Record<ProfileSection, string> = {
-  person: 'About you',
-  income: 'Income',
-  spending: 'Spending',
-  cash: 'Cash and emergency fund',
-  workplace: 'Workplace retirement plan',
-  hsa: 'Health savings account',
-  ira: 'IRAs',
-  investing: 'Investing',
-  retirementIncome: 'Retirement income',
-  debts: 'Debts',
-  portfolio: 'Portfolio',
-  strategy: 'Strategy',
-  leverage: 'Leverage comparison',
-  assumptions: 'Assumptions',
-};
-
 /**
- * The 25 v1 leaf fields with their labels.
- *
- * @deprecated The field schema (lib/fields) owns labels from slice w1 on;
- * PROFILE_LEAF_PATHS lists every v2 leaf. Kept, with the old
- * profileCompleteness, until slice x1.
+ * The 25 v1 leaf fields with their labels, counted by the v1
+ * profileCompleteness (lib/profile/mappers.ts) that the guided-flow cards
+ * print. The field schema (lib/fields) owns every other label.
  */
 export const PROFILE_FIELDS: ProfileFieldMeta[] = [
   { path: 'person.age', label: 'Age', section: 'person' },
@@ -407,10 +389,6 @@ export const PROFILE_LIST_PATHS: readonly ProfileListPath[] = [
 
 const LIST_PATH_SET: ReadonlySet<string> = new Set(PROFILE_LIST_PATHS);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function ruleFor(key: string, example: unknown, topLevel: boolean, required = false): ValueRule {
   const nullType = NULLABLE_TYPES[key];
   const type: ValueType = nullType ?? (typeof example as ValueType);
@@ -446,8 +424,8 @@ const SECTION_TEMPLATE: Record<string, unknown> = Object.fromEntries(
 
 /**
  * Every leaf path of the v2 profile, in section order. It includes the
- * deprecated investing.newCashThisMonth until slice x1, and excludes lists,
- * version, updatedAt and provided.
+ * deprecated investing.newCashThisMonth, and excludes lists, version,
+ * updatedAt and provided.
  */
 export const PROFILE_LEAF_PATHS: readonly string[] = collectLeaves(SECTION_TEMPLATE, '', []);
 
@@ -542,7 +520,7 @@ export function providedPathFor(path: string): string | null {
 
 function matchesRule(rule: ValueRule, value: unknown): boolean {
   if (value === null) return rule.nullable;
-  if (rule.type === 'number') return typeof value === 'number' && Number.isFinite(value);
+  if (rule.type === 'number') return isFiniteNumber(value);
   if (rule.type === 'boolean') return typeof value === 'boolean';
   if (typeof value !== 'string') return false;
   if (rule.options) return rule.options.includes(value);
@@ -564,29 +542,6 @@ export function isValidProfileValue(path: string, value: unknown): boolean {
 /** Reads a profile path (leaf, list, row or row field); undefined for anything else. */
 export function getProfileValue(profile: FinancialProfile, path: string): unknown {
   return isProfilePath(path) ? getAt(profile, path) : undefined;
-}
-
-/**
- * True when `path` names a leaf.
- *
- * @deprecated Use isProfilePath, which also accepts lists and rows. Kept
- * until slice x1.
- */
-export function isProfileFieldPath(path: string): boolean {
-  return LEAF_RULES.has(path);
-}
-
-/**
- * Splits a two-segment leaf path into its section and key; null for any
- * other path.
- *
- * @deprecated Write by path with setValues. Kept for the intake until slice
- * w1.
- */
-export function splitProfilePath(path: string): { section: ProfileSection; key: string } | null {
-  const parts = path.split('.');
-  if (parts.length !== 2 || !LEAF_RULES.has(path)) return null;
-  return { section: parts[0] as ProfileSection, key: parts[1] };
 }
 
 // ---------------------------------------------------------------------------

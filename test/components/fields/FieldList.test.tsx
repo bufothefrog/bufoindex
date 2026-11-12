@@ -14,7 +14,7 @@ import { FieldInput, FieldList } from '@/components/fields';
 import type { CustomRenderers, FieldListProps } from '@/components/fields';
 import { makeGet } from '@/lib/fields/paths';
 import type { FieldErrors, FieldSpec } from '@/lib/fields/types';
-import { PROFILE_LIST_ROW_DEFAULTS } from '@/lib/profile';
+import { PROFILE_LIST_ROW_DEFAULTS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetProfileStore } from '@/test/utils/stores';
 import { FieldHarness, writeSpy } from './harness';

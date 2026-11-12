@@ -6,7 +6,6 @@ import {
   PROFILE_FORM_ORDER,
   PROFILE_FORM_SECTION_LABELS,
   composeProfileForm,
-  fieldRegistry,
   formForFlow,
   profileCompleteness,
   profileFormSection,
@@ -256,21 +255,6 @@ describe('composeProfileForm', () => {
       { path: 'c', value: 2 },
       { path: 'd', value: 1 },
     ]);
-  });
-});
-
-describe('fieldRegistry', () => {
-  it('lists every field any form defines, once, first wording first', () => {
-    const registry = fieldRegistry();
-    const all = new Set([CORE_FORM, ...Object.values(FORMS), PROFILE_FORM].flatMap((form) => form.fields.map((spec) => spec.path)));
-    expect(new Set(registry.keys())).toEqual(all);
-    const sources = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM];
-    for (const path of registry.keys()) {
-      const first = sources.find((form) => form.fields.some((spec) => spec.path === path))!;
-      expect(registry.get(path), path).toBe(fieldMap(first).get(path));
-    }
-    expect(registry.get('person.age')?.label).toBe('Your age');
-    expect(fieldRegistry()).toBe(registry);
   });
 });
 

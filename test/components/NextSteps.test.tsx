@@ -2,7 +2,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NextSteps } from '@/components/guided/NextSteps';
-import { intakePaths } from '@/lib/constants/intake';
+import { intakePaths } from '@/test/utils/intakeFixture';
 import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 

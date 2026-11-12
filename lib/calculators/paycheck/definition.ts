@@ -1,6 +1,6 @@
 /**
- * The paycheck allocator for the run store, validation and the legacy
- * import (docs/rebuild-plan.md section 2.6). The allocation is cheap, so it
+ * The paycheck allocator for the run store and validation
+ * (docs/rebuild-plan.md section 2.6). The allocation is cheap, so it
  * runs in-thread, 150 ms after the last edit; the old store's artificial
  * 300 ms delay is gone (audit H4). Pure.
  */
@@ -11,7 +11,6 @@ import type { FieldErrors } from '@/lib/fields/types';
 import type { AllocationResult, PaycheckProfile } from '@/lib/types';
 import { PAYCHECK_BINDINGS } from './bindings';
 import { PAYCHECK_FORM } from './form';
-import { PAYCHECK_LEGACY } from './legacy';
 
 let base: PaycheckProfile | null = null;
 
@@ -43,5 +42,4 @@ export const PAYCHECK_CALCULATOR: CalculatorDefinition<PaycheckProfile, Allocati
   validate: noEngineChecks,
   calculate: calculateOptimalAllocation,
   debounceMs: 150,
-  legacy: PAYCHECK_LEGACY,
 };

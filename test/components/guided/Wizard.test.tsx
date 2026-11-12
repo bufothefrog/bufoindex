@@ -5,9 +5,9 @@ import userEvent from '@testing-library/user-event';
 import { INTAKE_DESTINATION } from '@/components/calculators/renderers';
 import { Wizard } from '@/components/guided/Wizard';
 import { FORMS, PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
-import { CORE_PATHS, intakePaths, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
-import { offeredWithSaved } from '@/lib/fields/shared';
-import type { FieldOption, FormSpec } from '@/lib/fields/types';
+import { CORE_PATHS, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
+import { intakePaths } from '@/test/utils/intakeFixture';
+import type { FieldOption, FormSpec, Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
@@ -330,17 +330,15 @@ describe('Wizard mechanics (fixture form)', () => {
   /** FIXTURE with the mix offered in part: a saved 'custom' mix joins the three offered. */
   const withSavedMix = (): FormSpec => ({
     ...FIXTURE,
-    fields: FIXTURE.fields.map((spec) =>
-      spec.path === 'investing.targetMix'
-        ? {
-            ...spec,
-            options: offeredWithSaved('investing.targetMix', spec.options as readonly FieldOption[], [
-              ...(spec.options as readonly FieldOption[]),
-              { value: 'custom', label: 'Own mix' },
-            ]),
-          }
-        : spec
-    ),
+    fields: FIXTURE.fields.map((spec) => {
+      if (spec.path !== 'investing.targetMix') return spec;
+      const offered = spec.options as readonly FieldOption[];
+      const custom: FieldOption = { value: 'custom', label: 'Own mix' };
+      return {
+        ...spec,
+        options: (get: Get) => (get('investing.targetMix') === 'custom' ? [...offered, custom] : offered),
+      };
+    }),
     screens: FIXTURE.screens.filter((s) => s.id !== 'ages'),
   });
 

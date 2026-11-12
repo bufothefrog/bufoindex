@@ -9,8 +9,8 @@ import { engineInputsFor, prepareRun, validateFor } from '@/lib/calculators/runt
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { setAt } from '@/lib/fields/paths';
 import type { FieldErrors, FormSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile } from '@/lib/profile';
-import type { FinancialProfile } from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import type { FinancialProfile } from '@/lib/profile/types';
 
 interface Engine {
   age: number;

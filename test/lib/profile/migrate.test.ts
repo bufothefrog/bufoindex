@@ -8,12 +8,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  getDefaultFinancialProfile,
-  migrateProfile,
-  PROFILE_VERSION,
-  toRebalanceInputs,
-} from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
 
 /** v1 getDefaultFinancialProfile(), as JSON.parse returns it. */
 const V1_DEFAULT = {
@@ -109,7 +105,6 @@ describe('migrateProfile from v1', () => {
     expect(p.portfolio.securities).toEqual(defaults.portfolio.securities);
     expect(p.portfolio.holdings).toEqual(defaults.portfolio.holdings);
     expect(p.portfolio.classTargets).toEqual(defaults.portfolio.classTargets);
-    expect(toRebalanceInputs(p).accounts[1].deposit).toBe(3000);
   });
 
   it('cleans a hand-edited payload: invalid leaves take defaults, unknown keys and paths go', () => {
