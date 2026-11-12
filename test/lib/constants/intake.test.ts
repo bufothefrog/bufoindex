@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FORMS, PROFILE_FORM, PROFILE_FORM_ORDER, formForFlow, profileFormSection } from '@/lib/calculators/forms';
+import { CORE_FORM, FORMS, PROFILE_FORM, PROFILE_FORM_ORDER, formForFlow, profileFormSection } from '@/lib/calculators/forms';
 import {
   CORE_PATHS,
   CORE_START_PATH,
@@ -26,6 +26,9 @@ import {
   type IntakeIntent,
   type IntakeScreenOptions,
 } from '@/lib/constants/intake';
+import { makeGet } from '@/lib/fields/paths';
+import { summarizeScreen } from '@/lib/fields/runtime';
+import { CORE_SCREENS } from '@/lib/fields/shared';
 import type { ScreenSpec } from '@/lib/fields/types';
 import {
   PROFILE_LEAF_PATHS,
@@ -528,7 +531,9 @@ describe('LEARN_OPTIONS', () => {
 
 describe('coreSummary', () => {
   it('summarizes a complete core in one line', () => {
-    expect(coreSummary(profileWith([...CORE_PATHS]))).toBe('30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay');
+    expect(coreSummary(profileWith([...CORE_PATHS]))).toBe(
+      '30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs'
+    );
   });
 
   it('leaves out answers that are still placeholders', () => {
@@ -537,7 +542,7 @@ describe('coreSummary', () => {
       person: { ...base.person, age: 41, filingStatus: 'marriedJoint' },
       income: { ...base.income, grossPerPaycheck: 4250.4 },
     });
-    expect(coreSummary(profile)).toBe('41, married filing jointly, $4,250 per paycheck');
+    expect(coreSummary(profile)).toBe('41, married filing jointly, $4,250 gross per paycheck');
   });
 
   it('words each pay frequency, with or without the gross amount', () => {
@@ -545,11 +550,11 @@ describe('coreSummary', () => {
     const withFrequency = (frequency: FinancialProfile['income']['frequency'], provided: string[]) =>
       coreSummary(profileWith(provided, { income: { ...base.income, grossPerPaycheck: 1200, frequency } }));
 
-    expect(withFrequency('weekly', ['income.grossPerPaycheck', 'income.frequency'])).toBe('$1,200 every week');
-    expect(withFrequency('semi-monthly', ['income.grossPerPaycheck', 'income.frequency'])).toBe('$1,200 twice a month');
-    expect(withFrequency('monthly', ['income.grossPerPaycheck', 'income.frequency'])).toBe('$1,200 once a month');
+    expect(withFrequency('weekly', ['income.grossPerPaycheck', 'income.frequency'])).toBe('$1,200 gross every week');
+    expect(withFrequency('semi-monthly', ['income.grossPerPaycheck', 'income.frequency'])).toBe('$1,200 gross twice a month');
+    expect(withFrequency('monthly', ['income.grossPerPaycheck', 'income.frequency'])).toBe('$1,200 gross once a month');
     expect(withFrequency('semi-monthly', ['income.frequency', 'spending.necessaryMonthly'])).toBe(
-      'paid twice a month, $3,000/mo must-pay'
+      'paid twice a month, $3,000 a month in must-pay costs'
     );
   });
 
@@ -563,8 +568,22 @@ describe('coreSummary', () => {
 
   it('is empty when no summarized answer is saved', () => {
     expect(coreSummary(getDefaultFinancialProfile())).toBe('');
-    // Take-home pay is a core answer but not part of the summary.
-    expect(coreSummary(profileWith(['income.netPerPaycheck', 'investing.investedBalance']))).toBe('');
+    expect(coreSummary(profileWith(['investing.investedBalance', 'person.retirementAge']))).toBe('');
+  });
+
+  it('words take-home pay, with the cadence on the gross amount when both are saved', () => {
+    expect(coreSummary(profileWith(['income.netPerPaycheck']))).toBe('$2,600 take-home');
+    expect(coreSummary(profileWith(['income.netPerPaycheck', 'income.frequency']))).toBe(
+      'paid every 2 weeks, $2,600 take-home'
+    );
+  });
+
+  it('says what the collapsed core cards say, piece for piece', () => {
+    const profile = profileWith([...CORE_PATHS]);
+    const get = makeGet(profile);
+    const cards = CORE_SCREENS.map((screen) => summarizeScreen(CORE_FORM, screen, get));
+    expect(cards).toEqual(['30, TX, single', '$3,500 gross every 2 weeks, $2,600 take-home', '$3,000 a month']);
+    expect(coreSummary(profile)).toBe(`${cards[0]}, ${cards[1]}, ${cards[2]} in must-pay costs`);
   });
 });
 

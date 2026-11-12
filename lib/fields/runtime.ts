@@ -324,18 +324,63 @@ export function validateFields(form: FormSpec, get: Get, options: ValidateOption
   return out;
 }
 
+/** A list's noun from its label: 'Debts' -> 'debts' and, for one row, 'debt'. */
+function countNoun(label: string, count: number): string {
+  const plural = label.toLowerCase();
+  return count === 1 && plural.endsWith('s') ? plural.slice(0, -1) : plural;
+}
+
 /**
- * The collapsed one-line summary: each visible field's summary fragment, in
- * screen order, joined with ', '. Fields with no summary, or whose summary
- * returns null or '', are left out; the result is '' when nothing is left.
+ * The generic fragment of a field with no summary of its own:
+ *
+ * - a list: its row count with the label as the noun ("2 debts", "1 debt",
+ *   "no debts");
+ * - a nullable field holding null: "<label>: Auto";
+ * - a value that matches an option: "<label>: <option label>";
+ * - a number: "<label>: <formatFieldValue>" ("Your age: 30", "Rate: 4.5%");
+ * - a boolean without options: "<label>: Yes" or "No";
+ * - a non-blank string: "<label>: <string>".
+ *
+ * An empty value, or one of a kind it cannot word (an object), gives null.
+ */
+export function fallbackSummary(spec: FieldSpec, value: unknown, get: Get): string | null {
+  if (spec.kind === 'list') {
+    const count = listRows(value).length;
+    return count === 0 ? `no ${countNoun(spec.label, 2)}` : `${formatCount(count)} ${countNoun(spec.label, count)}`;
+  }
+  if (spec.nullable && value === null) return `${spec.label}: Auto`;
+  if (isEmptyValue(value)) return null;
+  const option = resolveOptions(spec, get).find((candidate) => candidate.value === value);
+  if (option) return `${spec.label}: ${option.label}`;
+  if (isFiniteNumber(value)) return `${spec.label}: ${formatFieldValue(spec, value)}`;
+  if (typeof value === 'boolean') return `${spec.label}: ${value ? 'Yes' : 'No'}`;
+  if (typeof value === 'string') return `${spec.label}: ${value.trim()}`;
+  return null;
+}
+
+/**
+ * The collapsed one-line summary: fragments of the visible fields, in screen
+ * order, joined with ', '.
+ *
+ * - First, each field's own summary. A field without one is left out, and a
+ *   summary that returns null or '' leaves its field out on purpose: a
+ *   screen with hand-written summaries words exactly what its author chose
+ *   (a yes/no that the next fragment covers, a balance kept off the line).
+ * - When that gives nothing (no field on the screen has a summary, or every
+ *   summary returned null), every visible field contributes its generic
+ *   fallbackSummary instead ("Your age: 30, Tax filing status: Single"), so
+ *   a card that holds values never shows an empty line.
+ *
+ * The result is '' only when no visible field holds a value.
  */
 export function summarizeScreen(form: FormSpec, screen: ScreenSpec, get: Get): string {
-  const parts: string[] = [];
-  for (const spec of visibleScreenFields(form, screen, get)) {
-    const part = spec.summary?.(get(spec.path), get);
-    if (part) parts.push(part);
-  }
-  return parts.join(', ');
+  const fields = visibleScreenFields(form, screen, get);
+  const join = (fragment: (spec: FieldSpec, value: unknown) => string | null | undefined) =>
+    fields
+      .map((spec) => fragment(spec, get(spec.path)))
+      .filter((part): part is string => Boolean(part))
+      .join(', ');
+  return join((spec, value) => spec.summary?.(value, get)) || join((spec, value) => fallbackSummary(spec, value, get));
 }
 
 /**

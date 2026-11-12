@@ -167,6 +167,17 @@ describe('retirement form: screens', () => {
     expect(spec.onChange!('custom', fromDefaults())).toEqual([]);
   });
 
+  it('summarizes the collapsed core cards with their values; take-home pay is not on them', () => {
+    const summary = (id: string, get = fromDefaults()) => summarizeScreen(RETIREMENT_FORM, screen(id), get);
+    // The filing status shows only when it runs here as single (the form's own FILING summary).
+    expect(summary('about')).toBe('30, TX');
+    expect(summary('about', fromDefaults({ 'person.filingStatus': 'marriedSeparate' }))).toBe(
+      '30, TX, married filing separately, run here as single'
+    );
+    expect(summary('pay')).toBe('$3,500 gross every 2 weeks');
+    expect(summary('must-pay')).toBe('$3,000 a month');
+  });
+
   it('summarizes the collapsed assumptions and details cards as the old cards did', () => {
     expect(summarizeScreen(RETIREMENT_FORM, screen('assumptions'), fromDefaults())).toBe(
       'Target-date glide path, 3% inflation, tax rate estimated from income, 1x healthcare'

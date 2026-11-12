@@ -22,10 +22,17 @@ import {
   STATE,
   STRATEGY_PRESET,
   TAXABLE_MONTHLY,
+  ageSummary,
+  filingStatusSummary,
+  grossPaySummary,
   intakeDerivedWrites,
+  monthlyCostSummary,
+  payFrequencySummary,
+  stateSummary,
+  takeHomeSummary,
   withOverrides,
 } from '@/lib/fields/shared';
-import { relationErrors, resolveOptions } from '@/lib/fields/runtime';
+import { relationErrors, resolveOptions, summarizeScreen } from '@/lib/fields/runtime';
 import type { FormSpec, Get } from '@/lib/fields/types';
 import { PAY_FREQUENCIES, PROFILE_ENUM_VALUES, isProfilePath } from '@/lib/profile/defaults';
 
@@ -186,5 +193,51 @@ describe('intakeDerivedWrites', () => {
     ]);
     expect(intakeDerivedWrites(getFrom({ 'person.age': 45, 'person.retirementAge': 46 }), new Set())).toEqual([]);
     expect(intakeDerivedWrites(getFrom({ 'person.age': 45 }), new Set())).toEqual([]);
+  });
+});
+
+describe('core summaries', () => {
+  const CORE: FormSpec = { id: 'core', fields: CORE_FIELDS, screens: CORE_SCREENS };
+  const cards = (values: Record<string, unknown> = {}) =>
+    CORE_SCREENS.map((screen) => summarizeScreen(CORE, screen, getFrom(values)));
+  const BASE = {
+    'person.age': 25,
+    'person.state': 'CA',
+    'person.filingStatus': 'single',
+    'income.grossPerPaycheck': 4000,
+    'income.frequency': 'bi-weekly',
+    'income.netPerPaycheck': 3000,
+    'spending.necessaryMonthly': 3000,
+  };
+
+  it('words each collapsed core card in one compact line', () => {
+    expect(cards(BASE)).toEqual(['25, CA, single', '$4,000 gross every 2 weeks, $3,000 take-home', '$3,000 a month']);
+    expect(
+      cards({ ...BASE, 'person.filingStatus': 'headOfHousehold', 'income.frequency': 'semi-monthly', 'income.grossPerPaycheck': 5250.6 })
+    ).toEqual(['25, CA, head of household', '$5,251 gross twice a month, $3,000 take-home', '$3,000 a month']);
+  });
+
+  it('moves the cadence to the frequency when no gross amount carries it', () => {
+    expect(cards({ ...BASE, 'income.grossPerPaycheck': undefined })[1]).toBe('paid every 2 weeks, $3,000 take-home');
+    expect(cards({ ...BASE, 'income.grossPerPaycheck': undefined, 'income.netPerPaycheck': undefined })[1]).toBe(
+      'paid every 2 weeks'
+    );
+  });
+
+  it('gives each piece null for a value it cannot word', () => {
+    expect([ageSummary(undefined), ageSummary(NaN), ageSummary('30')]).toEqual([null, null, null]);
+    expect([stateSummary(''), stateSummary(undefined)]).toEqual([null, null]);
+    expect([filingStatusSummary('toString'), filingStatusSummary(undefined)]).toEqual([null, null]);
+    expect(grossPaySummary(undefined, 'weekly')).toBeNull();
+    expect(grossPaySummary(1200, 'toString')).toBe('$1,200 gross per paycheck');
+    expect([payFrequencySummary('yearly'), takeHomeSummary(null), monthlyCostSummary(Infinity)]).toEqual([null, null, null]);
+  });
+
+  it('words every filing status and pay frequency from the label constants', () => {
+    for (const [status, meta] of Object.entries(FILING_STATUS_META)) expect(filingStatusSummary(status)).toBe(meta.phrase);
+    for (const frequency of PAY_FREQUENCIES) {
+      expect(grossPaySummary(100, frequency)).toBe(`$100 gross ${PAY_FREQUENCY_META[frequency].cadence}`);
+      expect(payFrequencySummary(frequency)).toBe(`paid ${PAY_FREQUENCY_META[frequency].cadence}`);
+    }
   });
 });

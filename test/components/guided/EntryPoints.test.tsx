@@ -89,9 +89,9 @@ describe('ContinueProfileCard', () => {
 
     const link = screen.getByRole('link', { name: /Continue with my profile/ });
     expect(link).toHaveAttribute('href', '/start/choose');
-    // Default core values, all marked as answered (take-home is not summarized).
+    // Default core values, all marked as answered.
     expect(link).toHaveTextContent(
-      '30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. 3 of 17 topics answered, saved in this browser.'
+      '30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs. 3 of 17 topics answered, saved in this browser.'
     );
   });
 
