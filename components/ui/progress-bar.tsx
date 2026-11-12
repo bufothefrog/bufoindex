@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { clamp, cn } from '@/lib/utils';
 import { TONE_FILL, type Tone } from '@/lib/design-system/tone';
 
 export interface ProgressBarProps {
@@ -28,7 +28,7 @@ export function ProgressBar({
 }: ProgressBarProps) {
   // A range with max <= min is empty; a non-finite value counts as min.
   const top = Math.max(min, max);
-  const clamped = Number.isFinite(value) ? Math.min(top, Math.max(min, value)) : min;
+  const clamped = Number.isFinite(value) ? clamp(value, min, top) : min;
   const share = top > min ? (clamped - min) / (top - min) : 0;
 
   return (

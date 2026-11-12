@@ -47,21 +47,6 @@ export interface FormulaRegistry {
   byCalculator: Record<string, string[]>;
 }
 
-export interface ValidationResult {
-  success: boolean;
-  errors: string[];
-  warnings: string[];
-  performance?: {
-    executionTime: number;
-    memoryUsage: number;
-  };
-}
-
-export interface FormulaDecoratorOptions extends Omit<FormulaMetadata, 'lastUpdated'> {
-  calculator?: string;
-  skipValidation?: boolean;
-}
-
 // Utility types for formula functions
 export type FormulaFunction = (...args: unknown[]) => number | number[] | object;
 

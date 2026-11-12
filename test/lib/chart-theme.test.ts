@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   CHART_FONT_MONO_FALLBACK,
   CHART_MARGINS,
@@ -6,7 +6,6 @@ import {
   chartAxisProps,
   chartGridProps,
   getChartTheme,
-  subscribeToThemeChanges,
   thinPoints,
   type ChartTheme,
 } from '@/lib/chart-theme';
@@ -55,21 +54,6 @@ describe('getChartTheme', () => {
   it('falls back to the default mono stack when --font-mono is not set', () => {
     expect(getChartTheme().fontMono).toBe(CHART_FONT_MONO_FALLBACK);
     expect(CHART_FONT_MONO_FALLBACK.endsWith(', monospace')).toBe(true);
-  });
-});
-
-describe('subscribeToThemeChanges', () => {
-  it('calls back when the <html> class changes and stops after unsubscribe', async () => {
-    const callback = vi.fn();
-    const unsubscribe = subscribeToThemeChanges(callback);
-    document.documentElement.classList.add('dark');
-    await Promise.resolve();
-    expect(callback).toHaveBeenCalledTimes(1);
-
-    unsubscribe();
-    document.documentElement.classList.remove('dark');
-    await Promise.resolve();
-    expect(callback).toHaveBeenCalledTimes(1);
   });
 });
 

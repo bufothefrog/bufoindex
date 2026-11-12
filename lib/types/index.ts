@@ -211,32 +211,6 @@ export interface AllocationResult {
   };
 }
 
-// UI State interfaces
-
-export interface CalculatorState {
-  profile: PaycheckProfile;
-  result: AllocationResult | null;
-  isCalculating: boolean;
-  activeSection: string;
-  showAdvanced: boolean;
-}
-
-export interface FormErrors {
-  [key: string]: string | undefined;
-}
-
-// Export data structure for future cross-calculator integration
-export interface ExportableData {
-  version: string;
-  timestamp: number;
-  profile: PaycheckProfile;
-  result?: AllocationResult;
-  metadata: {
-    source: string;
-    calculatorVersion: string;
-  };
-}
-
 // Constants - imported from single source of truth
 import {
   FEDERAL_TAX_BRACKETS_2026,
@@ -256,4 +230,4 @@ export const CONTRIBUTION_LIMITS = {
 } as const;
 
 // State income tax rates moved to lib/constants/states-2026.ts
-// (single source of truth). Import STATE_TAX_RATES from there.
+// (single source of truth). Import STATE_TAX_RATES_2026 from there.

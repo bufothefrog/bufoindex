@@ -12,6 +12,7 @@ import {
   fieldWrites,
   formatFieldValue,
   isFieldVisible,
+  isFiniteNumber,
   resolveOptions,
   resolveOverrideDefault,
   resolveText,
@@ -34,7 +35,7 @@ const YES_NO: readonly FieldOption[] = [
 ];
 
 function asNumber(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return isFiniteNumber(value) ? value : 0;
 }
 
 function asString(value: unknown): string {

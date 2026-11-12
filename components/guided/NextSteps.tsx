@@ -4,6 +4,7 @@ import React from 'react';
 import type { Route } from 'next';
 import { ClipboardList, Compass, LayoutDashboard, Signpost, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
+import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import {
   LEARN_CHOOSER_PATH,
   coreStartLink,
@@ -40,8 +41,7 @@ export function NextSteps({ intent, className }: NextStepsProps) {
     title: 'What next?',
     icon: Signpost,
     className,
-    headerClassName: 'p-4 pb-3 sm:p-6 sm:pb-4',
-    contentClassName: 'p-4 pt-0 sm:p-6 sm:pt-0',
+    ...DENSE_CARD_CLASSES,
     testId: 'next-steps',
   } as const;
 
