@@ -83,7 +83,8 @@ lib/
   fields/, profile/      # Field schema and the shared profile
   store/, workers/       # Profile and preference stores, run stores, worker runner
   constants/             # Sourced figures (irs-2026.ts, states-2026.ts, ...)
-  utils/                 # Seeded RNG, display-dollar conversion
+  utils/                 # cn, clamp, tax-rate helpers, seeded RNG, display-dollar
+                         #   conversion, paycheck step status
   formulas/, format.ts, chart-theme.ts
 test/                    # Vitest suites, factories, helpers
 docs/                    # architecture.md, agents.md, agents/ (patterns, coordination)

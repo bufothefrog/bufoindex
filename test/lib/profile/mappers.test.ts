@@ -1,11 +1,11 @@
 /**
- * The v1 field count (profileCompleteness in lib/profile/mappers.ts), which
- * the guided-flow cards print as "N of 25 details answered".
+ * The v1 field count (profileFieldCompleteness in lib/profile/mappers.ts),
+ * which the guided-flow cards print as "N of 25 details answered".
  */
 
 import { describe, expect, it } from 'vitest';
 import { getDefaultFinancialProfile, PROFILE_FIELDS } from '@/lib/profile/defaults';
-import { profileCompleteness } from '@/lib/profile/mappers';
+import { profileFieldCompleteness } from '@/lib/profile/mappers';
 import { migrateProfile } from '@/lib/profile/migrate';
 import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 
@@ -17,9 +17,9 @@ function makeProfile(overrides: ProfilePatch = {}): FinancialProfile {
   return migrateProfile(overrides, 1);
 }
 
-describe('profileCompleteness', () => {
+describe('profileFieldCompleteness', () => {
   it('reports nothing provided for a fresh profile', () => {
-    const c = profileCompleteness(getDefaultFinancialProfile());
+    const c = profileFieldCompleteness(getDefaultFinancialProfile());
     expect(c.provided).toBe(0);
     expect(c.total).toBe(25);
     expect(c.missing).toHaveLength(25);
@@ -27,7 +27,7 @@ describe('profileCompleteness', () => {
   });
 
   it('counts known provided paths and ignores unknown ones', () => {
-    const c = profileCompleteness({
+    const c = profileFieldCompleteness({
       ...getDefaultFinancialProfile(),
       provided: ['person.age', 'income.frequency', 'cash.targetMonths', 'not.a.field', 'hsa.eligible', 'debts'],
     });
@@ -39,15 +39,15 @@ describe('profileCompleteness', () => {
   });
 
   it('reports complete when every field is provided', () => {
-    const c = profileCompleteness(makeProfile({ provided: PROFILE_FIELDS.map((f) => f.path) }));
+    const c = profileFieldCompleteness(makeProfile({ provided: PROFILE_FIELDS.map((f) => f.path) }));
     expect(c).toEqual({ provided: 25, total: 25, missing: [] });
     // The new v2 leaves do not count toward the v1 completeness.
-    const c2 = profileCompleteness({ ...getDefaultFinancialProfile(), provided: ['hsa.eligible', 'debts'] });
+    const c2 = profileFieldCompleteness({ ...getDefaultFinancialProfile(), provided: ['hsa.eligible', 'debts'] });
     expect(c2.provided).toBe(0);
   });
 
   it('keeps the same result for the same v1 answers after migration', () => {
-    const c = profileCompleteness(makeProfile({ provided: PROFILE_FIELDS.map((f) => f.path) }));
+    const c = profileFieldCompleteness(makeProfile({ provided: PROFILE_FIELDS.map((f) => f.path) }));
     expect(c).toEqual({ provided: 25, total: 25, missing: [] });
   });
 });

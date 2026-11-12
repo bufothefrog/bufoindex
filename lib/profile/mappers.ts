@@ -14,7 +14,7 @@ import type { FinancialProfile } from './types';
  * (each account's deposit) and no form asks investing.newCashThisMonth, so
  * an answered account list answers it.
  */
-export function profileCompleteness(profile: FinancialProfile): {
+export function profileFieldCompleteness(profile: FinancialProfile): {
   provided: number;
   total: number;
   missing: { path: string; label: string }[];

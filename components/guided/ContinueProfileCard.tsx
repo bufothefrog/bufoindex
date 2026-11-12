@@ -4,7 +4,7 @@ import React from 'react';
 import type { Route } from 'next';
 import { UserRound } from 'lucide-react';
 import { LEARN_CHOOSER_PATH, coreSummary } from '@/lib/constants/intake';
-import { profileCompleteness } from '@/lib/profile/mappers';
+import { profileFieldCompleteness } from '@/lib/profile/mappers';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { OptionCard } from './OptionCard';
 
@@ -28,7 +28,7 @@ export function ContinueProfileCard({ className }: ContinueProfileCardProps) {
 
   if (!hasHydrated || !hasProfile) return null;
 
-  const { provided, total } = profileCompleteness(profile);
+  const { provided, total } = profileFieldCompleteness(profile);
   const saved = `${provided} of ${total} details saved in this browser.`;
   const summary = coreSummary(profile);
 

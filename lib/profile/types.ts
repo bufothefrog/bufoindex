@@ -155,9 +155,9 @@ export interface FinancialProfile {
     /**
      * @deprecated The rebalancer reads the Brokerage account's deposit in
      * portfolio.accounts. A write here also sets that deposit (see
-     * newCashDepositWrites). Kept while the v1 profileCompleteness counts it
-     * (lib/profile/mappers.ts): a v1 answer is recorded in `provided` by
-     * this path.
+     * newCashDepositWrites). Kept while the v1 profileFieldCompleteness
+     * counts it (lib/profile/mappers.ts): a v1 answer is recorded in
+     * `provided` by this path.
      */
     newCashThisMonth: number;
   };

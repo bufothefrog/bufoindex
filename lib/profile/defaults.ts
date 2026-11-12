@@ -264,7 +264,7 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
 
 /**
  * The 25 v1 leaf fields with their labels, counted by the v1
- * profileCompleteness (lib/profile/mappers.ts) that the guided-flow cards
+ * profileFieldCompleteness (lib/profile/mappers.ts) that the guided-flow cards
  * print. The field schema (lib/fields) owns every other label.
  */
 export const PROFILE_FIELDS: ProfileFieldMeta[] = [

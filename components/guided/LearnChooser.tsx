@@ -12,7 +12,7 @@ import {
   remainingIntakeScreens,
   type IntentOption,
 } from '@/lib/constants/intake';
-import { profileCompleteness } from '@/lib/profile/mappers';
+import { profileFieldCompleteness } from '@/lib/profile/mappers';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,7 @@ function buildEntries(profile: FinancialProfile): ChooserEntry[] {
         id: 'overview',
         href: '/overview',
         title: 'See your overview',
-        description: overviewDescription(profileCompleteness(profile).missing.length),
+        description: overviewDescription(profileFieldCompleteness(profile).missing.length),
         icon: LayoutDashboard,
         tone: 'emphasis',
       };

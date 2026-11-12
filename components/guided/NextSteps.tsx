@@ -11,7 +11,7 @@ import {
   isProfileFinished,
   type IntakeIntent,
 } from '@/lib/constants/intake';
-import { profileCompleteness } from '@/lib/profile/mappers';
+import { profileFieldCompleteness } from '@/lib/profile/mappers';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { OptionCard } from './OptionCard';
 
@@ -68,7 +68,7 @@ export function NextSteps({ intent, className }: NextStepsProps) {
   // or no profile questions left (a few fields are not asked by any intake,
   // so /start/profile would only redirect to the overview).
   const finished = isProfileFinished(profile);
-  const { provided, total } = profileCompleteness(profile);
+  const { provided, total } = profileFieldCompleteness(profile);
   const finishDescription = `${provided} of ${total} details answered. Answer the rest once; every calculator and your overview use it.`;
 
   return (

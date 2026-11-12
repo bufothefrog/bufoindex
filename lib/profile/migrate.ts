@@ -6,7 +6,7 @@
  * their defaults. The one move is the one-off new cash: v1 kept it in
  * investing.newCashThisMonth, and v2 keeps it as the Brokerage account's
  * deposit in portfolio.accounts (the leaf stays, deprecated, while the v1
- * profileCompleteness counts it).
+ * profileFieldCompleteness counts it).
  * `provided` paths carry over; anything that is not a profile path is
  * dropped.
  */

@@ -25,8 +25,8 @@ app/                     # App Router routes
 components/
   ui/                    # Canonical primitives: button, card, input, slider, checkbox,
                          #   segmented-control, progress-bar, ThemeToggle, FieldMessages,
-                         #   inputs/ (BaseInput, EnhancedMoneyInput re-exported as MoneyInput,
-                         #   PercentInput, NumberInput, SliderField, TickerCombobox),
+                         #   inputs/ (BaseInput, MoneyInput, PercentInput, NumberInput,
+                         #   SliderField, TickerCombobox),
                          #   cards/ (BaseCard, InputCard, ResultCard; density.ts),
                          #   results/ (StatTile, StatGrid, KeyValueList, DataTable, Disclaimer),
                          #   charts/ (ChartFrame, ChartTooltipCard, useChartTheme),
@@ -48,12 +48,14 @@ lib/
   calculators/           # registry.ts, forms.ts, runtime.ts, types.ts, legacyImports.ts,
                          #   <id>/{form,fields,bindings,definition,headline}.ts per calculator
   fields/                # Field schema: types, paths, runtime (validation), binding, shared
-  profile/               # The shared profile: types, defaults, migrate, mappers, links
+  profile/               # The shared profile: types, defaults, migrate, mappers
   store/                 # profileStore, preferencesStore, createCalculatorStore + one run
                          #   store per calculator, legacyImport
   workers/               # createWorkerRunner, exposeCalculation, retirementWorker
   constants/             # Sourced constants: irs-2026.ts, states-2026.ts, retirement.ts, ...
-  utils/                 # random.ts (seeded LCG + Box-Muller), displayDollars.ts
+  utils/                 # index.ts (cn, clamp, formatNumberWithCommas, tax-rate helpers),
+                         #   random.ts (seeded LCG + Box-Muller), displayDollars.ts,
+                         #   stepStatusUtils.ts (paycheck step status)
   dashboard/derive.ts, format.ts, chart-theme.ts, design-system/ (tone, stat, types),
                          #   formulas/, types/, demo/ (the /demo chart fixture)
 test/
@@ -121,7 +123,7 @@ Forbidden: hardcoded color literals (`#fff`, `bg-blue-500`, `text-gray-600`), ch
 - **Field schema.** A field is a `FieldSpec` keyed by its profile path and grouped into topic screens by a `FormSpec` (`lib/fields/types.ts`). The same spec drives the wizard, the calculator sections, validation and profile completeness.
 - **A calculator is five files** in `lib/calculators/<id>/`: `form.ts` (its FormSpec), `fields.ts` (its own FieldSpecs), `bindings.ts` (profile to engine inputs), `definition.ts` (the `CalculatorDefinition`: form, bindings, engine checks, calculate) and `headline.ts` (the summary the dashboard shows). A few carry one extra module (`legacy.ts`, `reducers.ts`, `narrative.ts`). Names, paths and disclaimers live only in `lib/calculators/registry.ts`; the profile form is composed in `lib/calculators/forms.ts`.
 - **Run stores.** Each calculator has a run store made by `createCalculatorStore` (`lib/store/createCalculatorStore.ts`): it validates, memoizes, debounces and runs, holds results only and persists nothing. Slow engines pass a runner from `lib/workers/createWorkerRunner.ts`.
-- **No URL-hash sharing.** Links into a calculator carry only `?from=profile` (`lib/profile/links.ts`); old share links are not supported.
+- **No URL-hash sharing.** Links into a calculator carry only `?from=profile` (`calculatorHref` in `lib/calculators/registry.ts`); old share links are not supported.
 - **Sourced constants:** tax brackets, contribution limits, and rates live in `lib/constants/` with citation comments (see `irs-2026.ts`, `states-2026.ts`). Update only the constants file when a new tax year lands.
 - **Display-dollar boundary:** simulations run in nominal dollars; `lib/utils/displayDollars.ts` converts for display only and must never feed back into calculations. Display formatting goes through `lib/format.ts`.
 - Components: typed props, named export of the props type, default export of the component.

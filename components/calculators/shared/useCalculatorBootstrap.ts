@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
-import { PROFILE_HANDOFF_PARAM, PROFILE_HANDOFF_VALUE } from '@/lib/profile/links';
+import { PROFILE_HANDOFF_PARAM, PROFILE_HANDOFF_VALUE } from '@/lib/calculators/registry';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
 import { importLegacyStorage } from '@/lib/store/legacyImport';
 import { useProfileStore } from '@/lib/store/profileStore';

@@ -31,7 +31,7 @@ What is and isn't randomized:
 
 ## Shared profile and run stores
 
-There is no backend and no URL-hash sharing: links into a calculator carry only `?from=profile` (`lib/profile/links.ts`), and old share links are not supported. Inputs live in one place, the shared financial profile.
+There is no backend and no URL-hash sharing: links into a calculator carry only `?from=profile` (`calculatorHref` in `lib/calculators/registry.ts`), and old share links are not supported. Inputs live in one place, the shared financial profile.
 
 - **Profile.** `FinancialProfile` (`lib/profile/types.ts`) holds every input any calculator, the intake or the dashboard uses. `lib/store/profileStore.ts` persists it to localStorage (key `bufo-profile`, versioned; older payloads go through `lib/profile/migrate.ts` and every payload is normalized). Each saved answer is listed in `provided`, which drives profile completeness. Calculator edits write through to the profile.
 - **Field schema.** Each field is a `FieldSpec` keyed by its profile path (`lib/fields/types.ts`), grouped into topic screens by a `FormSpec`. One spec drives the wizard at `/start`, the calculator's sections (`components/fields/`), validation (`lib/fields/runtime.ts`) and completeness. The profile form is composed from every calculator's form in `lib/calculators/forms.ts`.

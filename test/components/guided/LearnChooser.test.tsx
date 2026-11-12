@@ -75,7 +75,7 @@ describe('LearnChooser', () => {
 
   it('points the profile option at the overview once the intake questions run out', () => {
     // The intake never asks the emergency-fund target months, so
-    // profileCompleteness still lists it (the answered accounts answer the
+    // profileFieldCompleteness still lists it (the answered accounts answer the
     // new cash); /start/profile would only redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
