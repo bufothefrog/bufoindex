@@ -62,6 +62,10 @@ On /overview (same profile, before -> after):
   a year"). A missing months-on-hand prints U+2014 instead of "-".
 - Strategy label "Cashflow investor" -> "Cash-flow investor" (summary, control, preset tile). The
   control is a radio group (aria-checked, arrow keys) instead of two aria-pressed buttons.
+- Strategy summary paragraph: like the leverage card, it prints a saved leverage ratio with two
+  decimals through lib/format (2.25x, was 2.3x).
+- Paycheck card: the allocation amounts render in the KeyValueList value style (monospace, beside
+  the description) instead of on the title line.
 - Profile completeness by topic: "1 of 25 fields answered" -> "0 of 17 topics answered" (basics);
   missing list shows topic titles; "New cash to invest this month" and "Emergency fund target" are
   never listed; "Every field has..." -> "Every topic has an answer from you."
@@ -114,3 +118,8 @@ NextSteps and IntentPicker goes from `/start?next=portfolio` to `/start/portfoli
   "Answer a few quick questions ... age, state, filing status, pay". New wording?
 - The leverage card now runs 500 paths after first paint (needed to match the comparison page);
   move the dashboard simulations off-thread later?
+- The deferral moves both simulations after first paint, but the longest main-thread task is not
+  shorter than before (the leverage card now runs the calculator's 500 paths instead of 300), so
+  moving the dashboard simulations off the main thread is a possible follow-up.
+- The retirement card always shows today's dollars and does not follow the saved dollar display
+  mode (true before this phase too).
