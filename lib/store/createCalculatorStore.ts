@@ -23,8 +23,7 @@
  *
  * stale is true from an error until a run (or a memo hit) brings the results
  * back in line with valid values; a valid submit clears errors at once but
- * leaves stale as it is until then. isCalculating is true while a dispatched
- * run is in flight, not during the debounce.
+ * leaves stale as it is until then.
  */
 
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
@@ -49,7 +48,6 @@ export interface CalculatorRunState<E, R> {
   errors: FieldErrors;
   /** True while the results on display do not reflect the latest valid values because of an error. */
   stale: boolean;
-  isCalculating: boolean;
   hasCalculatedOnce: boolean;
   /** stableKey(inputs); the memo key. */
   resultsKey: string | null;
@@ -79,7 +77,6 @@ function initialRunData<E, R>(): RunData<E, R> {
     results: null,
     errors: {},
     stale: false,
-    isCalculating: false,
     hasCalculatedOnce: false,
     resultsKey: null,
   };
@@ -125,12 +122,11 @@ export function createCalculatorStore<E, R>({
             resultsKey: job.key,
             errors: NO_ERRORS,
             stale: false,
-            isCalculating: false,
-            hasCalculatedOnce: true,
+                    hasCalculatedOnce: true,
           });
 
         const fail = (error: unknown): void =>
-          set({ errors: { calculation: calculationErrorMessage(error) }, stale: true, isCalculating: false });
+          set({ errors: { calculation: calculationErrorMessage(error) }, stale: true });
 
         const dispatch = (job: Job<E>): void => {
           const id = ++seq;
@@ -146,7 +142,6 @@ export function createCalculatorStore<E, R>({
             succeed(job, results);
             return;
           }
-          set({ isCalculating: true });
           let run: Promise<R>;
           try {
             run = runner(job.inputs);
@@ -182,7 +177,7 @@ export function createCalculatorStore<E, R>({
             const { inputs, errors } = prepareRun(definition, values);
             if (Object.keys(errors).length > 0) {
               abandon();
-              set({ errors, stale: true, isCalculating: false });
+              set({ errors, stale: true });
               return;
             }
 
@@ -190,7 +185,7 @@ export function createCalculatorStore<E, R>({
             const state = get();
             if (state.results !== null && key === state.resultsKey) {
               abandon();
-              set({ errors: NO_ERRORS, stale: false, isCalculating: false });
+              set({ errors: NO_ERRORS, stale: false });
               return;
             }
             if (Object.keys(state.errors).length > 0) set({ errors: NO_ERRORS });

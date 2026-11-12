@@ -76,7 +76,6 @@ describe('the retirement run store', () => {
       expect(scenario.successProbability).toBeGreaterThanOrEqual(0);
       expect(scenario.successProbability).toBeLessThanOrEqual(1);
     }
-    expect(state.isCalculating).toBe(false);
     expect(state.hasCalculatedOnce).toBe(true);
     expect(state.errors).toEqual({});
     expect(state.stale).toBe(false);
@@ -176,6 +175,5 @@ describe('stale-response dropping', () => {
     expect(analysisSpy).toHaveBeenCalledTimes(2);
     expect(getState().results).toBe(resultsB);
     expect(seen).not.toContain(resultsA);
-    expect(getState().isCalculating).toBe(false);
   });
 });
