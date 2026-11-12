@@ -28,7 +28,6 @@ import {
 } from '@/lib/constants/intake';
 import type { ScreenSpec } from '@/lib/fields/types';
 import {
-  PROFILE_FIELDS,
   PROFILE_LEAF_PATHS,
   PROFILE_LIST_PATHS,
   getDefaultFinancialProfile,
@@ -593,7 +592,7 @@ describe('isProfileFinished', () => {
 
   it('is true once the profile intake has nothing left, though a few fields are never asked', () => {
     const asked = intakePaths('profile');
-    const neverAsked = PROFILE_FIELDS.map((field) => field.path).filter((path) => !asked.includes(path));
+    const neverAsked = PROFILE_LEAF_PATHS.filter((path) => !asked.includes(path));
     // The derived emergency-month target is never asked; with the provisional
     // forms neither is the contribution rate.
     expect(neverAsked).toContain('cash.targetMonths');

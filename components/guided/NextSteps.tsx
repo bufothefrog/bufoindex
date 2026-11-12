@@ -5,13 +5,13 @@ import type { Route } from 'next';
 import { ClipboardList, Compass, LayoutDashboard, Signpost, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
+import { profileCompleteness, topicsAnsweredText } from '@/lib/calculators/forms';
 import {
   LEARN_CHOOSER_PATH,
   coreStartLink,
   isProfileFinished,
   type IntakeIntent,
 } from '@/lib/constants/intake';
-import { profileFieldCompleteness } from '@/lib/profile/mappers';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { OptionCard } from './OptionCard';
 
@@ -64,12 +64,12 @@ export function NextSteps({ intent, className }: NextStepsProps) {
     );
   }
 
-  // Offer the overview once nothing is left to finish: every field answered,
-  // or no profile questions left (a few fields are not asked by any intake,
-  // so /start/profile would only redirect to the overview).
+  // Offer the overview once nothing is left to finish: no profile questions
+  // left (skipped basics are edited through /start, and a few fields are not
+  // asked by any intake, so /start/profile would only redirect to the
+  // overview).
   const finished = isProfileFinished(profile);
-  const { provided, total } = profileFieldCompleteness(profile);
-  const finishDescription = `${provided} of ${total} details answered. Answer the rest once; every calculator and your overview use it.`;
+  const finishDescription = `${topicsAnsweredText(profileCompleteness(profile))}. Answer the rest once; every calculator and your overview use it.`;
 
   return (
     <BaseCard {...cardProps}>

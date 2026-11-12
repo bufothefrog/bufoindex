@@ -129,12 +129,17 @@ describe('setFields', () => {
     expect(getState().profile.provided).toEqual(['person.age', 'portfolio.accounts']);
   });
 
-  it('mirrors the intake new-cash answer into the Brokerage deposit', () => {
-    getState().setFields({ investing: { newCashThisMonth: 2400 } }, ['investing.newCashThisMonth']);
+  it('records the new cash on the Brokerage deposit only (the v1 leaf is gone)', () => {
+    getState().setFields({}, ['investing.newCashThisMonth']);
+    expect(getState().profile.provided).toEqual([]);
+    getState().setFields({ portfolio: { accounts: [
+      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
+      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 2400 },
+    ] } }, ['portfolio.accounts']);
     const { profile } = getState();
-    expect(profile.investing.newCashThisMonth).toBe(2400);
+    expect(profile.investing).not.toHaveProperty('newCashThisMonth');
     expect(profile.portfolio.accounts.find((a) => a.name === 'Brokerage')?.deposit).toBe(2400);
-    expect(profile.provided).toEqual(['investing.newCashThisMonth']);
+    expect(profile.provided).toEqual(['portfolio.accounts']);
   });
 
   it('persists only the profile', () => {
@@ -390,22 +395,31 @@ describe('rehydration from localStorage', () => {
     expect(profile.version).toBe(2);
     expect(profile.updatedAt).toBe(1761000000000);
     expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 85 });
-    expect(profile.investing).toEqual(v1.investing);
+    // The v1 new cash moves to the Brokerage deposit; v2 has no such leaf.
+    expect(profile.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(profile.portfolio.accounts[1]).toEqual({ id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 3000 });
     expect(profile.assumptions).toEqual(getDefaultFinancialProfile().assumptions);
-    expect(profile.provided).toEqual(['person.age', 'investing.newCashThisMonth']);
+    expect(profile.provided).toEqual(['person.age']);
 
     const persisted = readPersisted();
     expect(persisted?.version).toBe(2);
     expect(persisted?.state.profile).toEqual(profile);
   });
 
-  it('keeps a saved v2 deposit that differs from the deprecated new-cash leaf', async () => {
+  it('loads a saved v2 profile that still holds the removed new-cash leaf, dropping only that leaf', async () => {
     const saved = getDefaultFinancialProfile();
+    saved.person.age = 44;
     saved.portfolio.accounts[1].deposit = 400;
-    saved.provided = ['portfolio.accounts'];
-    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
-    expect(getState().profile).toEqual(saved);
+    saved.provided = ['person.age', 'portfolio.accounts', 'investing.newCashThisMonth'];
+    const stored = JSON.parse(JSON.stringify(saved));
+    stored.investing.newCashThisMonth = 9000;
+    await rehydrateWith(JSON.stringify({ state: { profile: stored }, version: 2 }));
+
+    expect(getState().hasHydrated).toBe(true);
+    expect(getState().hasProfile).toBe(true);
+    expect(getState().profile).toEqual({ ...saved, provided: ['person.age', 'portfolio.accounts'] });
+    expect(getState().profile.investing).not.toHaveProperty('newCashThisMonth');
+    expect(getState().profile.portfolio.accounts[1].deposit).toBe(400);
   });
 
   it('reads a payload saved by a later version but never overwrites it', async () => {

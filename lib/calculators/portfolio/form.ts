@@ -7,8 +7,8 @@
  *   editor (which also registers custom asset classes).
  * - accounts: each account's name, type and new cash. The deposits are the
  *   one record of the new cash: an account list in profile.provided means
- *   they are answered. The deprecated investing.newCashThisMonth is no
- *   longer asked; a saved answer to it already sits in the Brokerage deposit
+ *   they are answered. A v1 answer to the removed
+ *   investing.newCashThisMonth moves into the Brokerage deposit
  *   (migrateProfile), and the accounts screen shows it prefilled until the
  *   list itself is answered.
  * - holdings: what each account holds, at what price.

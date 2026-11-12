@@ -152,14 +152,6 @@ export interface FinancialProfile {
     /** Portion of the monthly contribution going to a taxable brokerage. */
     taxableMonthlyContribution: number;
     targetMix: TargetMixPreset;
-    /**
-     * @deprecated The rebalancer reads the Brokerage account's deposit in
-     * portfolio.accounts. A write here also sets that deposit (see
-     * newCashDepositWrites). Kept while the v1 profileFieldCompleteness
-     * counts it (lib/profile/mappers.ts): a v1 answer is recorded in
-     * `provided` by this path.
-     */
-    newCashThisMonth: number;
   };
   retirementIncome: {
     /** Annual benefit in today's dollars. */
@@ -250,13 +242,3 @@ type DeepPartial<T> = T extends readonly unknown[]
 export type ProfilePatch = {
   [K in keyof FinancialProfile]?: DeepPartial<FinancialProfile[K]>;
 };
-
-/** Metadata for one v1 leaf field (PROFILE_FIELDS). */
-export interface ProfileFieldMeta {
-  /** Dot path, e.g. 'person.age'. */
-  path: string;
-  /** Human-readable label. */
-  label: string;
-  /** The FinancialProfile section key the field lives in, e.g. 'person'. */
-  section: string;
-}

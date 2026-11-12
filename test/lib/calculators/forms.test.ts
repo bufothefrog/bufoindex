@@ -9,6 +9,7 @@ import {
   formForFlow,
   profileCompleteness,
   profileFormSection,
+  topicsAnsweredText,
 } from '@/lib/calculators/forms';
 import { CORE_SCREENS, PROFILE_EXTRA_SCREENS } from '@/lib/fields/shared';
 import { makeGet } from '@/lib/fields/paths';
@@ -318,5 +319,12 @@ describe('profileCompleteness (by topic screen)', () => {
     const all = PROFILE_FORM.screens.flatMap((s) => s.fields);
     const result = profileCompleteness(profileWith(all));
     expect(result).toEqual({ provided: result.total, total: PROFILE_FORM.screens.length, missing: [] });
+  });
+});
+
+describe('topicsAnsweredText', () => {
+  it('reads the count the way every completeness card prints it', () => {
+    expect(topicsAnsweredText({ provided: 3, total: 17 })).toBe('3 of 17 topics answered');
+    expect(topicsAnsweredText({ provided: 0, total: 0 })).toBe('0 of 0 topics answered');
   });
 });

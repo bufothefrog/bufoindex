@@ -74,29 +74,42 @@ describe('LearnChooser', () => {
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
-    // The intake never asks the emergency-fund target months, so
-    // profileFieldCompleteness still lists it (the answered accounts answer the
-    // new cash); /start/profile would only redirect, so link the overview.
+    // Every topic the profile intake asks is answered, though the intake never
+    // asks the emergency-fund target months; /start/profile would only
+    // redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
 
     const first = optionLinks()[0];
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
-    expect(first).toHaveTextContent(
-      'No questions left to ask. The overview runs each calculator from your profile and lists the 1 detail that still uses a typical value.'
-    );
+    expect(first).toHaveTextContent('Every topic is saved. The overview runs each calculator from your profile.');
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
   });
 
-  it('swaps option one for the overview when every profile detail is saved', () => {
+  it('counts the topics still on typical values when a skipped basic is all that is left', () => {
+    // The basics were finished in this tab with the age skipped: /start/profile
+    // does not ask the basics again, so the overview is offered while the
+    // "A little about you" topic still uses a typical value.
+    sessionStorage.setItem('bufo-core-finished', '1');
+    answer(intakePaths('profile').filter((path) => path !== 'person.age'));
+    render(<LearnChooser />);
+
+    const first = optionLinks()[0];
+    expect(first).toHaveAttribute('href', '/overview');
+    expect(first).toHaveTextContent(
+      'No questions left to ask. The overview runs each calculator from your profile and lists the 1 topic that still uses a typical value.'
+    );
+  });
+
+  it('swaps option one for the overview when every profile path is saved', () => {
     answer([...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS]);
     render(<LearnChooser />);
 
     const first = optionLinks()[0];
     expect(first).toHaveAttribute('href', '/overview');
     expect(first).toHaveTextContent('See your overview');
-    expect(first).toHaveTextContent('Every detail is saved. The overview runs each calculator from your profile.');
+    expect(first).toHaveTextContent('Every topic is saved. The overview runs each calculator from your profile.');
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
     expect(optionLinks()).toHaveLength(5);
   });

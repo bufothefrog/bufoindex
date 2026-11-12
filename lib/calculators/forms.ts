@@ -223,3 +223,11 @@ export function profileCompleteness(profile: FinancialProfile): ProfileCompleten
   const missing = screensFor(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided, surface: 'intake' });
   return { provided: total - missing.length, total, missing };
 }
+
+/** The unit the completeness count is read in, after "N of M". */
+export const TOPICS_ANSWERED = 'topics answered';
+
+/** "N of M topics answered": the completeness count as every card prints it. */
+export function topicsAnsweredText({ provided, total }: Pick<ProfileCompleteness, 'provided' | 'total'>): string {
+  return `${provided} of ${total} ${TOPICS_ANSWERED}`;
+}

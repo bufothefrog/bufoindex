@@ -9,7 +9,7 @@ import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
 import { profileCompleteness } from '@/lib/calculators/forms';
 import { CORE_PATHS } from '@/lib/constants/intake';
 import { intakePaths } from '@/test/utils/intakeFixture';
-import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 // The ways into the guided flow: every path answers the shared core at
@@ -88,7 +88,7 @@ describe('ContinueProfileCard', () => {
     expect(link).toHaveAttribute('href', '/start/choose');
     // Default core values, all marked as answered (take-home is not summarized).
     expect(link).toHaveTextContent(
-      `30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. ${CORE_PATHS.length} of ${PROFILE_FIELDS.length} details saved in this browser.`
+      '30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay. 3 of 17 topics answered, saved in this browser.'
     );
   });
 
@@ -96,7 +96,8 @@ describe('ContinueProfileCard', () => {
     useProfileStore.getState().setFields({}, ['investing.investedBalance']);
     render(<ContinueProfileCard />);
     const link = screen.getByRole('link', { name: /Continue with my profile/ });
-    expect(link).toHaveTextContent(`1 of ${PROFILE_FIELDS.length} details saved in this browser.`);
+    // One invested-balance answer completes no topic (O14).
+    expect(link).toHaveTextContent('0 of 17 topics answered, saved in this browser.');
     expect(link).not.toHaveTextContent('must-pay');
   });
 });
@@ -126,9 +127,9 @@ describe('ProfileCompletenessCard (overview)', () => {
 
   it('edits the basics once no profile question is left, instead of bouncing back to the overview', () => {
     // Counted by topic screen (O14): every topic the profile intake asks is
-    // answered. The deprecated new cash (now the accounts' deposits) and the
-    // never-asked emergency-fund target months are no topic, so neither is
-    // listed.
+    // answered. The never-asked emergency-fund target months are no topic,
+    // and the v1 new cash (now the accounts' deposits) is no profile path, so
+    // neither is listed.
     const { unmount } = render(<ProfileCompletenessCard profile={withProvided(intakePaths('profile'))} />);
     const { total } = profileCompleteness(withProvided([]));
     expect(screen.getByText(`${total} of ${total}`)).toBeInTheDocument();

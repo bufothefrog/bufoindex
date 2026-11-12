@@ -33,7 +33,7 @@ import {
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
-import { applyWrites, getAt, isRecord, setAt } from '@/lib/fields/paths';
+import { getAt, isRecord, setAt } from '@/lib/fields/paths';
 import { isFiniteNumber } from '@/lib/fields/runtime';
 import type { Write } from '@/lib/fields/types';
 import type {
@@ -45,7 +45,6 @@ import type {
   FinancialProfile,
   HoldingRow,
   PayFrequency,
-  ProfileFieldMeta,
   ProfileListPath,
   ProfilePatch,
   ProfileSection,
@@ -151,7 +150,6 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       monthlyContribution: 1500,
       taxableMonthlyContribution: 500,
       targetMix: '80-20',
-      newCashThisMonth: DEFAULT_NEW_CASH,
     },
     retirementIncome: {
       socialSecurityBenefit: 30000,
@@ -260,39 +258,6 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
   'strategy',
   'leverage',
   'assumptions',
-];
-
-/**
- * The 25 v1 leaf fields with their labels, counted by the v1
- * profileFieldCompleteness (lib/profile/mappers.ts) that the guided-flow cards
- * print. The field schema (lib/fields) owns every other label.
- */
-export const PROFILE_FIELDS: ProfileFieldMeta[] = [
-  { path: 'person.age', label: 'Age', section: 'person' },
-  { path: 'person.state', label: 'State of residence', section: 'person' },
-  { path: 'person.filingStatus', label: 'Tax filing status', section: 'person' },
-  { path: 'person.retirementAge', label: 'Target retirement age', section: 'person' },
-  { path: 'income.grossPerPaycheck', label: 'Gross pay per paycheck', section: 'income' },
-  { path: 'income.netPerPaycheck', label: 'Take-home pay per paycheck', section: 'income' },
-  { path: 'income.frequency', label: 'Pay frequency', section: 'income' },
-  { path: 'spending.necessaryMonthly', label: 'Necessary monthly expenses', section: 'spending' },
-  { path: 'spending.funMoneyMin', label: 'Fun money per month (minimum)', section: 'spending' },
-  { path: 'spending.funMoneyMax', label: 'Fun money per month (maximum)', section: 'spending' },
-  { path: 'spending.targetRetirementIncome', label: 'Target retirement income per year', section: 'spending' },
-  { path: 'cash.emergencyFundBalance', label: 'Emergency fund balance', section: 'cash' },
-  { path: 'cash.emergencyFundApy', label: 'Emergency fund APY', section: 'cash' },
-  { path: 'cash.targetMonths', label: 'Emergency fund target (months of expenses)', section: 'cash' },
-  { path: 'workplace.has401k', label: 'Workplace 401(k) available', section: 'workplace' },
-  { path: 'workplace.matchPercent', label: 'Employer match rate', section: 'workplace' },
-  { path: 'workplace.matchLimit', label: 'Employer match limit (share of salary)', section: 'workplace' },
-  { path: 'workplace.contributionPercent', label: 'Your 401(k) contribution (share of salary)', section: 'workplace' },
-  { path: 'investing.investedBalance', label: 'Invested balance (excluding emergency fund)', section: 'investing' },
-  { path: 'investing.monthlyContribution', label: 'Total monthly investing contribution', section: 'investing' },
-  { path: 'investing.taxableMonthlyContribution', label: 'Monthly taxable brokerage contribution', section: 'investing' },
-  { path: 'investing.targetMix', label: 'Target stock/bond mix', section: 'investing' },
-  { path: 'investing.newCashThisMonth', label: 'New cash to invest this month', section: 'investing' },
-  { path: 'strategy.preset', label: 'Strategy preset', section: 'strategy' },
-  { path: 'strategy.leverageRatio', label: 'Leverage ratio to compare', section: 'strategy' },
 ];
 
 /**
@@ -423,9 +388,8 @@ const SECTION_TEMPLATE: Record<string, unknown> = Object.fromEntries(
 );
 
 /**
- * Every leaf path of the v2 profile, in section order. It includes the
- * deprecated investing.newCashThisMonth, and excludes lists, version,
- * updatedAt and provided.
+ * Every leaf path of the v2 profile, in section order. It excludes lists,
+ * version, updatedAt and provided.
  */
 export const PROFILE_LEAF_PATHS: readonly string[] = collectLeaves(SECTION_TEMPLATE, '', []);
 
@@ -659,8 +623,6 @@ export function normalizeProfile(
 // Writes
 // ---------------------------------------------------------------------------
 
-const NEW_CASH_PATH = 'investing.newCashThisMonth';
-
 /**
  * The write that puts `amount` of one-off new cash on the Brokerage account
  * (the account with BROKERAGE_ACCOUNT_ID, else the first taxable account) as
@@ -711,9 +673,8 @@ function admitWrite(profile: FinancialProfile, path: string, value: unknown): { 
  * Applies writes in order, refusing each one whose path is not a profile
  * path, whose value is invalid, or that would give two rows of a list the
  * same id (the previous value stays). List writes are
- * normalized like normalizeProfile does. A write to the deprecated
- * investing.newCashThisMonth also sets the Brokerage deposit
- * (newCashDepositWrites). Returns the new profile and the accepted paths;
+ * normalized like normalizeProfile does. Returns the new profile and the
+ * accepted paths;
  * `provided` and `updatedAt` are left to the caller.
  */
 export function applyProfileWrites(
@@ -727,9 +688,6 @@ export function applyProfileWrites(
     if (!admitted) continue;
     next = setAt(next, write.path, admitted.value);
     accepted.push(write.path);
-    if (write.path === NEW_CASH_PATH) {
-      next = applyWrites(next, newCashDepositWrites(next, admitted.value as number));
-    }
   }
   return { profile: next, accepted };
 }

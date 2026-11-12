@@ -3,7 +3,7 @@ import { UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { profileCompleteness } from '@/lib/calculators/forms';
+import { profileCompleteness, TOPICS_ANSWERED } from '@/lib/calculators/forms';
 import { isProfileFinished } from '@/lib/constants/intake';
 import { formatPercent } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -30,7 +30,7 @@ export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProp
               <span className="font-semibold tabular-nums">
                 {provided} of {total}
               </span>{' '}
-              topics answered
+              {TOPICS_ANSWERED}
             </span>
             <span className="tabular-nums text-muted-foreground">{formatPercent(share, { digits: 0 })}</span>
           </div>

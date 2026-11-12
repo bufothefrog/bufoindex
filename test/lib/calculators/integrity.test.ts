@@ -4,10 +4,7 @@
  *
  * - Every FieldSpec path (and every list row field) is a profile path.
  * - Every profile leaf and list has an input: a FieldSpec, or a custom
- *   renderer's `covers` entry. The one exception is the deprecated
- *   investing.newCashThisMonth, which no form asks (the accounts list holds
- *   the new cash) and which stays while the v1 profileFieldCompleteness
- *   counts it.
+ *   renderer's `covers` entry, with no exception.
  * - Every engine leaf is bound or listed in its calculator's ENGINE_ONLY.
  * - No FieldSpec is defined twice: a path appears once per form, and a path
  *   that several forms ask comes from one shared spec, the forms changing
@@ -31,12 +28,6 @@ import type { FieldSpec, FormSpec } from '@/lib/fields/types';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, isProfilePath } from '@/lib/profile/defaults';
 
 const ALL_FORMS: readonly FormSpec[] = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM];
-
-/** Profile paths no form asks, each with the reason. */
-const NO_INPUT: Readonly<Record<string, string>> = {
-  'investing.newCashThisMonth':
-    'Deprecated: the accounts list asks the new cash; kept while the v1 profileFieldCompleteness counts it.',
-};
 
 /** The FieldSpec keys a form may change on a shared spec: wording and tier only. */
 const WORDING_KEYS: ReadonlySet<string> = new Set(['label', 'question', 'help', 'hint', 'placeholder', 'summary', 'tier']);
@@ -96,7 +87,7 @@ describe('field specs and the profile', () => {
     }
   });
 
-  it('gives every profile leaf and list an input, apart from the named exceptions', () => {
+  it('gives every profile leaf and list an input', () => {
     const asked = new Set<string>();
     for (const form of ALL_FORMS) {
       for (const spec of form.fields) {
@@ -105,8 +96,7 @@ describe('field specs and the profile', () => {
       }
     }
     const missing = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => !asked.has(path));
-    expect(missing).toEqual(Object.keys(NO_INPUT));
-    for (const reason of Object.values(NO_INPUT)) expect(reason.length).toBeGreaterThan(0);
+    expect(missing).toEqual([]);
   });
 
   it('does not count version, updatedAt or provided as profile paths', () => {

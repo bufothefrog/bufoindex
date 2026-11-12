@@ -132,8 +132,8 @@ describe('ProfileCompletenessCard', () => {
     expect(screen.getByText(`and ${total - 1 - 6} more.`)).toBeInTheDocument();
   });
 
-  it('is complete for a visitor who answered everything but the deprecated new cash', () => {
-    const answered = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => path !== 'investing.newCashThisMonth');
+  it('is complete for a visitor who answered every profile path', () => {
+    const answered = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS];
     render(<ProfileCompletenessCard profile={withProvided(answered)} />);
     const { total } = profileCompleteness(withProvided([]));
     expect(screen.getByText(`${total} of ${total}`)).toBeInTheDocument();
