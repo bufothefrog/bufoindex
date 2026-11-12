@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Area, CartesianGrid, ComposedChart, Line, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceDot,
+  ReferenceLine,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import {
   CHART_MARGINS,
   CHART_SERIES_DEFAULTS,
@@ -10,11 +20,13 @@ import {
   chartGridProps,
   useChartTheme,
 } from '@/components/ui/charts';
-import { requiredSavingsCurve, type SavingsRateInputs, type SavingsRatePoint } from '@/lib/calculations/savingsRate';
-import { formatCurrency } from '@/lib/format';
+import type { SavingsRatePoint } from '@/lib/calculations/savingsRate';
+import { formatCurrency, formatPercent } from '@/lib/format';
+import { savingsRateMarkers, type SavingsRateMarkerInputs } from './savingsRateMarkers';
 
 export interface SavingsRateChartProps {
-  inputs: SavingsRateInputs;
+  /** The curve's inputs plus monthlySavings and retirementAge for the visitor's markers. */
+  inputs: SavingsRateMarkerInputs;
 }
 
 /** The curve's rates are already in percent (0 to 100). */
@@ -52,15 +64,34 @@ function SavingsTooltip({ active, payload, accentColor }: SavingsTooltipProps) {
 
 /**
  * The savings rate each retirement age from 45 (or ten years out) to 70
- * requires (lib/calculations/savingsRate). Rendered inside a ChartFrame,
- * which sizes it.
+ * requires (lib/calculations/savingsRate), with the visitor's current savings
+ * rate as a dashed line and their planned retirement age as a dot on the
+ * curve when it is plotted (./savingsRateMarkers, which also builds the
+ * caption's sentence). Rendered inside a ChartFrame, which sizes it.
  */
 function SavingsRateChart({ inputs }: SavingsRateChartProps) {
   const theme = useChartTheme();
-  const { startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome } = inputs;
-  const data = useMemo(
-    () => requiredSavingsCurve({ startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome }),
-    [startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome]
+  const {
+    startingAge,
+    targetIncome,
+    startingBalance,
+    accumulationReturn,
+    currentIncome,
+    monthlySavings,
+    retirementAge,
+  } = inputs;
+  const { curve: data, currentSavingsRate, plannedPoint } = useMemo(
+    () =>
+      savingsRateMarkers({
+        startingAge,
+        targetIncome,
+        startingBalance,
+        accumulationReturn,
+        currentIncome,
+        monthlySavings,
+        retirementAge,
+      }),
+    [startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome, monthlySavings, retirementAge]
   );
 
   const axis = chartAxisProps(theme);
@@ -98,6 +129,37 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
         strokeWidth={2}
         dot={{ fill: accent, strokeWidth: 2, r: 3 }}
       />
+      {currentSavingsRate !== null && (
+        <ReferenceLine
+          y={currentSavingsRate}
+          stroke={theme.warning}
+          strokeDasharray="6 4"
+          strokeWidth={2}
+          ifOverflow="extendDomain"
+          label={{
+            value: `Your savings rate: ${formatPercent(currentSavingsRate / 100, { digits: 0 })}`,
+            position: 'insideTopRight',
+            fill: theme.text,
+            fontSize: 12,
+          }}
+        />
+      )}
+      {plannedPoint && (
+        <ReferenceDot
+          x={plannedPoint.retirementAge}
+          y={plannedPoint.requiredSavingsRate}
+          r={6}
+          fill={theme.primary}
+          stroke={theme.background}
+          strokeWidth={2}
+          label={{
+            value: `Retire at ${plannedPoint.retirementAge}`,
+            position: 'top',
+            fill: theme.text,
+            fontSize: 12,
+          }}
+        />
+      )}
     </ComposedChart>
   );
 }

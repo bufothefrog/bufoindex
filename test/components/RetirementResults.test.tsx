@@ -28,6 +28,12 @@ vi.mock('recharts', async (importOriginal) => {
   };
 });
 
+// $2,000 x 12 / $100,000 = 24%; retiring at 60 needs 9.69% on the curve
+// (test/components/retirement/savingsRateMarkers.test.ts).
+const SAVINGS_CAPTION =
+  "contributions start today \u2014 shown in today's dollars in either display mode. " +
+  'Your current savings rate is 24%. Retiring at 60 needs about 10%.';
+
 const INPUTS: RetirementInputs = {
   startingAge: 25,
   retirementAge: 60,
@@ -193,13 +199,14 @@ describe('ResultsSection', () => {
     renderResults();
 
     const projections = screen.getByRole('figure', { name: "in today's dollars" });
-    const savings = screen.getByRole('figure', {
-      name: "contributions start today \u2014 shown in today's dollars in either display mode",
-    });
+    const savings = screen.getByRole('figure', { name: SAVINGS_CAPTION });
     expect(await within(projections).findByText("Net Worth (today's $)")).toBeInTheDocument();
     expect(within(projections).getByText("Annual Withdrawals (today's $)")).toBeInTheDocument();
     expect(await within(savings).findByText('Required Savings Rate (%)')).toBeInTheDocument();
     expect(within(savings).getByText('Retirement Age')).toBeInTheDocument();
+    // The visitor's own position, drawn on the chart and said in the caption.
+    expect(within(savings).getByText('Your savings rate: 24%')).toBeInTheDocument();
+    expect(within(savings).getByText('Retire at 60')).toBeInTheDocument();
 
     act(() => usePreferencesStore.setState({ displayMode: 'nominal' }));
     const future = screen.getByRole('figure', { name: 'in future dollars' });
@@ -207,7 +214,7 @@ describe('ResultsSection', () => {
     expect(within(future).getByText('Annual Withdrawals (future $)')).toBeInTheDocument();
     // The savings caption does not follow the toggle.
     expect(
-      screen.getByRole('figure', { name: "contributions start today \u2014 shown in today's dollars in either display mode" })
+      screen.getByRole('figure', { name: SAVINGS_CAPTION })
     ).toBeInTheDocument();
   });
 });
