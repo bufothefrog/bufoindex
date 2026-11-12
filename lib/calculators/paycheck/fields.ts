@@ -23,6 +23,7 @@ import {
   RISK_TOLERANCE_OPTIONS,
 } from '@/lib/constants/labels';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
+import { AGE, TAXABLE_MONTHLY } from '@/lib/fields/shared';
 import type { CrossFieldRule, FieldSpec, Get, ScreenNote } from '@/lib/fields/types';
 import type { BonusFrequency, ContributionType, HsaCoverage, OptimizationGoal, RiskTolerance } from '@/lib/profile/types';
 import { CONTRIBUTION_PATH, CONTRIBUTION_TYPE_PATH, ROTH_PART_PATH } from './bindings';
@@ -256,7 +257,7 @@ export const HSA_INVESTING: FieldSpec = {
  * catch-up included: the same figure the HSA step card shows (bug 4).
  */
 function hsaLimit(get: Get): number {
-  return limitHsa(get(HSA_COVERAGE.path) as HsaCoverage, get('person.age') as number);
+  return limitHsa(get(HSA_COVERAGE.path) as HsaCoverage, get(AGE.path) as number);
 }
 
 /** The old HSA card's explanatory copy, word for word, as notes (plan section 2.13). */
@@ -348,7 +349,7 @@ export const IRA_ROTH_BALANCE: FieldSpec = {
 
 export const TAXABLE_NOTE: ScreenNote = {
   text: 'Taxable accounts: No contribution limits or withdrawal restrictions, but gains and dividends are taxed in the year they occur.',
-  visibleWhen: (get) => (get('investing.taxableMonthlyContribution') as number) > 0,
+  visibleWhen: (get) => (get(TAXABLE_MONTHLY.path) as number) > 0,
 };
 
 // ---------------------------------------------------------------------------

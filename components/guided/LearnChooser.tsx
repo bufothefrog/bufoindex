@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { LayoutDashboard } from 'lucide-react';
+import { profileCompleteness } from '@/lib/calculators/forms';
 import {
   CORE_START_PATH,
   LEARN_OPTIONS,
@@ -12,7 +13,6 @@ import {
   remainingIntakeScreens,
   type IntentOption,
 } from '@/lib/constants/intake';
-import { profileCompleteness } from '@/lib/profile/mappers';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
@@ -40,14 +40,14 @@ function remainingHint(count: number): string {
 }
 
 /**
- * What the overview card says once nothing is left to finish. The intake
- * does not ask a few profile fields (and skipped basics are edited through
- * "Edit the basics"), so running out of questions can still leave some
- * fields on typical values; the overview lists them.
+ * What the overview card says once nothing is left to finish, by topic
+ * screen (O14). Skipped basics are edited through "Edit the basics", not
+ * asked again, so running out of questions can still leave some topics on
+ * typical values; the overview lists them.
  */
 function overviewDescription(missingCount: number): string {
-  if (missingCount === 0) return 'Every detail is saved. The overview runs each calculator from your profile.';
-  const onDefaults = missingCount === 1 ? '1 detail that still uses' : `${missingCount} details that still use`;
+  if (missingCount === 0) return 'Every topic is saved. The overview runs each calculator from your profile.';
+  const onDefaults = missingCount === 1 ? '1 topic that still uses' : `${missingCount} topics that still use`;
   return `No questions left to ask. The overview runs each calculator from your profile and lists the ${onDefaults} a typical value.`;
 }
 

@@ -2,7 +2,7 @@
   "name": "bufoindex",
   "version": "1.0.0",
   "private": true,
-  "description": "Interactive personal-finance calculators: paycheck allocation, Monte Carlo retirement modeling, and multi-account portfolio rebalancing. Client-side only; scenarios share via URL hash.",
+  "description": "Interactive personal-finance calculators: paycheck allocation, Monte Carlo retirement modeling, multi-account portfolio rebalancing, and a leveraged versus plain index fund comparison. Client-side only.",
   "homepage": "https://bufoindex.com",
   "repository": {
     "type": "git",

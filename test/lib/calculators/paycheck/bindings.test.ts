@@ -1,9 +1,14 @@
 /**
  * The paycheck bindings and definition: the golden test against the old
- * mapper (toPaycheckProfile) for v1-shaped profiles, the 401(k) truth table,
- * every PaycheckProfile leaf bound or engine-only, the fixed federal
- * bracket, the form relations, and the reverse direction the legacy import
- * uses.
+ * mapper's output for v1-shaped profiles, the 401(k) truth table, every
+ * PaycheckProfile leaf bound or engine-only, the fixed federal bracket, the
+ * form relations, and the reverse direction the legacy import uses.
+ *
+ * Golden fixture. The expected engine profiles were captured on 2026-11-12
+ * from the former lib/profile/mappers.ts (deleted in phase 5): what its
+ * toPaycheckProfile returned for each profile, metadata excluded, written as
+ * the leaves that differ from its output for the v1 default (DEFAULT_ENGINE).
+ * Non-integer figures are compared to 9 decimals.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -11,13 +16,13 @@ import { getDefaultProfile } from '@/lib/calculations/core';
 import { PAYCHECK_BINDINGS, PAYCHECK_ENGINE_ONLY, split401k } from '@/lib/calculators/paycheck/bindings';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
+import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
-import { makeGet } from '@/lib/fields/paths';
+import { applyWrites, makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
-import { toPaycheckProfile } from '@/lib/profile/mappers';
 import { migrateProfile } from '@/lib/profile/migrate';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { PaycheckProfile } from '@/lib/types';
@@ -115,19 +120,151 @@ const CUSTOM_V1: ProfilePatch = {
   investing: { investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900 },
 };
 
-describe('golden: engineInputsFor equals the old mapper for v1-shaped profiles, metadata excluded', () => {
-  it.each<[string, ProfilePatch]>([
-    ['the default', {}],
-    ['a custom profile (weekly pay, joint filing)', CUSTOM_V1],
-    ['bi-weekly pay', { income: { frequency: 'bi-weekly', grossPerPaycheck: 3100, netPerPaycheck: 2300 } }],
-    ['semi-monthly pay', { income: { frequency: 'semi-monthly', grossPerPaycheck: 4000, netPerPaycheck: 3000 } }],
-    ['monthly pay, no taxable investing', { income: { frequency: 'monthly', grossPerPaycheck: 8000 }, investing: { taxableMonthlyContribution: 0 } }],
-  ])('%s', (_name, patch) => {
-    const profile = v1(patch);
-    expect(withoutMetadata(engineInputsFor(PAYCHECK_CALCULATOR, profile))).toEqual(withoutMetadata(toPaycheckProfile(profile)));
+/** A non-integer figure of the captured output, compared to 9 decimals. */
+const near = (value: number) => expect.closeTo(value, 9);
+
+/** The old mapper's output for the v1 default, metadata excluded. */
+const DEFAULT_ENGINE = {
+  income: {
+    grossPaycheck: 3500,
+    netPaycheck: 2600,
+    frequency: 'bi-weekly',
+    regularBonus: false,
+    bonusAmount: 0,
+    bonusFrequency: 'annual',
+    monthlyGross: near(7583.333333333333),
+    monthlyNet: near(5633.333333333333),
+    gross: near(7583.333333333333),
+    net: near(5633.333333333333),
+    bonusExpected: 0,
+  },
+  taxes: {
+    federalBracket: 0.22,
+    state: 'TX',
+    filingStatus: 'single',
+    currentWithholding: { federal: 800, state: 200, fica: 382 },
+  },
+  benefits: {
+    employer401k: {
+      available: true,
+      matchPercent: 0.5,
+      matchLimit: 0.06,
+      currentContribution: 0.06,
+      contributionType: 'traditional',
+      traditionalContribution: 0.06,
+      rothContribution: 0,
+      afterTaxAvailable: false,
+      currentYTD: 0,
+    },
+    hsa: {
+      eligible: false,
+      employerContribution: 0,
+      currentContribution: 0,
+      currentYTD: 0,
+      coverageType: 'individual',
+      investmentStrategy: false,
+    },
+    ira: {
+      hasIRA: false,
+      accountTypes: { traditional: false, roth: false },
+      currentContributions: { traditional: 0, roth: 0 },
+      currentBalances: { traditional: 0, roth: 0 },
+    },
+    other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+  },
+  debts: [],
+  preferences: {
+    emergencyFundMonths: 3,
+    currentEmergencyFund: 5000,
+    emergencyFundAPY: 0.04,
+    necessaryExpenses: 3000,
+    funMoney: { min: 300, max: 600, current: 450 },
+    age: 30,
+    hasTaxableAccount: true,
+    taxableAccountContribution: 500,
+    isPeakEarnings: false,
+    expectedRetirementBracket: 0.12,
+    riskTolerance: 'moderate',
+    optimizationGoal: 'balanced',
+  },
+};
+
+/** The captured default output with the given engine leaves changed. */
+const engineWith = (changed: Record<string, unknown>) =>
+  applyWrites(
+    DEFAULT_ENGINE,
+    Object.entries(changed).map(([path, value]) => ({ path, value }))
+  );
+
+describe('golden: engineInputsFor equals the old mapper output for v1-shaped profiles, metadata excluded', () => {
+  it.each<[string, ProfilePatch, Record<string, unknown>]>([
+    ['the default', {}, {}],
+    [
+      'a custom profile (weekly pay, joint filing)',
+      CUSTOM_V1,
+      {
+        'income.grossPaycheck': 2100,
+        'income.netPaycheck': 1550,
+        'income.frequency': 'weekly',
+        'income.monthlyGross': 9100,
+        'income.monthlyNet': near(6716.666666666666),
+        'income.gross': 9100,
+        'income.net': near(6716.666666666666),
+        'taxes.state': 'CA',
+        'taxes.filingStatus': 'marriedJoint',
+        'preferences.necessaryExpenses': 4200,
+        'preferences.funMoney.min': 250,
+        'preferences.funMoney.max': 900,
+        'preferences.funMoney.current': 575,
+        'preferences.age': 38,
+        'preferences.taxableAccountContribution': 900,
+      },
+    ],
+    [
+      'bi-weekly pay',
+      { income: { frequency: 'bi-weekly', grossPerPaycheck: 3100, netPerPaycheck: 2300 } },
+      {
+        'income.grossPaycheck': 3100,
+        'income.netPaycheck': 2300,
+        'income.monthlyGross': near(6716.666666666666),
+        'income.monthlyNet': near(4983.333333333333),
+        'income.gross': near(6716.666666666666),
+        'income.net': near(4983.333333333333),
+      },
+    ],
+    [
+      'semi-monthly pay',
+      { income: { frequency: 'semi-monthly', grossPerPaycheck: 4000, netPerPaycheck: 3000 } },
+      {
+        'income.grossPaycheck': 4000,
+        'income.netPaycheck': 3000,
+        'income.frequency': 'semi-monthly',
+        'income.monthlyGross': 8000,
+        'income.monthlyNet': 6000,
+        'income.gross': 8000,
+        'income.net': 6000,
+      },
+    ],
+    [
+      'monthly pay, no taxable investing',
+      { income: { frequency: 'monthly', grossPerPaycheck: 8000 }, investing: { taxableMonthlyContribution: 0 } },
+      {
+        'income.grossPaycheck': 8000,
+        'income.frequency': 'monthly',
+        'income.monthlyGross': 8000,
+        'income.monthlyNet': 2600,
+        'income.gross': 8000,
+        'income.net': 2600,
+        'preferences.hasTaxableAccount': false,
+        'preferences.taxableAccountContribution': 0,
+      },
+    ],
+  ])('%s', (_name, patch, changed) => {
+    expect(withoutMetadata(engineInputsFor(PAYCHECK_CALCULATOR, v1(patch)))).toEqual(engineWith(changed));
   });
 
-  it('matches the old mapper on the v2 leaves too: bonus, plan, HSA, IRAs, debts and assumptions', () => {
+  it('matches the old mapper output on the v2 leaves too: bonus, plan, HSA, IRAs, debts and assumptions', () => {
+    const debts = [{ id: 'd1', name: 'Card', balance: 3000, interestRate: 0.22, minimumPayment: 90, extraPayment: 50, taxDeductible: false }];
     const profile = withWrites([
       { path: 'income.hasBonus', value: true },
       { path: 'income.bonusAmount', value: 6000 },
@@ -145,16 +282,39 @@ describe('golden: engineInputsFor equals the old mapper for v1-shaped profiles, 
       { path: 'ira.roth', value: true },
       { path: 'ira.rothMonthly', value: 500 },
       { path: 'ira.rothBalance', value: 20000 },
-      {
-        path: 'debts',
-        value: [{ id: 'd1', name: 'Card', balance: 3000, interestRate: 0.22, minimumPayment: 90, extraPayment: 50, taxDeductible: false }],
-      },
+      { path: 'debts', value: debts },
       { path: 'assumptions.paycheck.riskTolerance', value: 'optimizer' },
       { path: 'assumptions.paycheck.optimizationGoal', value: 'wealth_maximization' },
       { path: 'assumptions.paycheck.expectedRetirementBracket', value: 0.22 },
     ]);
     const inputs = engineInputsFor(PAYCHECK_CALCULATOR, profile);
-    expect(withoutMetadata(inputs)).toEqual(withoutMetadata(toPaycheckProfile(profile)));
+    expect(withoutMetadata(inputs)).toEqual(
+      engineWith({
+        'income.regularBonus': true,
+        'income.bonusAmount': 6000,
+        'income.bonusFrequency': 'quarterly',
+        'income.bonusExpected': 2000,
+        'benefits.employer401k.currentContribution': 0.1,
+        'benefits.employer401k.contributionType': 'split',
+        'benefits.employer401k.traditionalContribution': near(0.06),
+        'benefits.employer401k.rothContribution': 0.04,
+        'benefits.employer401k.afterTaxAvailable': true,
+        'benefits.hsa.eligible': true,
+        'benefits.hsa.currentContribution': 300,
+        'benefits.hsa.coverageType': 'family',
+        'benefits.hsa.investmentStrategy': true,
+        'benefits.ira.hasIRA': true,
+        'benefits.ira.accountTypes.roth': true,
+        'benefits.ira.currentContributions.roth': 500,
+        'benefits.ira.currentBalances.roth': 20000,
+        debts,
+        'preferences.emergencyFundMonths': 6,
+        'preferences.currentEmergencyFund': 12000,
+        'preferences.expectedRetirementBracket': 0.22,
+        'preferences.riskTolerance': 'optimizer',
+        'preferences.optimizationGoal': 'wealth_maximization',
+      })
+    );
     // 10% total, 4% of it Roth: 6% traditional (to float precision).
     expect(inputs.benefits.employer401k.traditionalContribution).toBeCloseTo(0.06, 10);
     expect(inputs.benefits.employer401k.rothContribution).toBe(0.04);
@@ -285,7 +445,8 @@ describe('the definition and its relations', () => {
     expect(PAYCHECK_CALCULATOR.debounceMs).toBe(150);
     expect(PAYCHECK_CALCULATOR.form).toBe(PAYCHECK_FORM);
     expect(PAYCHECK_CALCULATOR.bindings).toBe(PAYCHECK_BINDINGS);
-    expect(PAYCHECK_CALCULATOR.legacy).toBe(PAYCHECK_LEGACY);
+    expect(LEGACY_IMPORTS[0].legacy).toBe(PAYCHECK_LEGACY);
+    expect(LEGACY_IMPORTS[0].bindings).toBe(PAYCHECK_BINDINGS);
     expect(PAYCHECK_CALCULATOR.validate(engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()))).toEqual({});
   });
 
@@ -294,11 +455,11 @@ describe('the definition and its relations', () => {
       { path: 'income.grossPerPaycheck', value: 2000 },
       { path: 'income.netPerPaycheck', value: 2600 },
     ]);
-    expect(validateFor(PAYCHECK_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(PAYCHECK_CALCULATOR, profile).errors).toEqual({
       'income.netPerPaycheck':
         'Take-home pay is above gross pay. Take-home is what is left after taxes and deductions, so it is usually lower.',
     });
-    expect(validateFor(PAYCHECK_CALCULATOR, withWrites([{ path: 'income.netPerPaycheck', value: 3500 }]))).toEqual({});
+    expect(prepareRun(PAYCHECK_CALCULATOR, withWrites([{ path: 'income.netPerPaycheck', value: 3500 }])).errors).toEqual({});
   });
 
   it('flags a fun-money minimum above the maximum', () => {
@@ -306,10 +467,10 @@ describe('the definition and its relations', () => {
       { path: 'spending.funMoneyMin', value: 700 },
       { path: 'spending.funMoneyMax', value: 600 },
     ]);
-    expect(validateFor(PAYCHECK_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(PAYCHECK_CALCULATOR, profile).errors).toEqual({
       'spending.funMoneyMax': 'The minimum is above the maximum. Adjust one of them.',
     });
-    expect(validateFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile())).toEqual({});
+    expect(prepareRun(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()).errors).toEqual({});
   });
 });
 

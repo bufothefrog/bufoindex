@@ -13,8 +13,6 @@ import {
   TONE_FILL,
   TONE_SURFACE,
   TONE_TEXT,
-  toneFromLegacy,
-  type LegacyTone,
   type Tone,
 } from '@/lib/design-system/tone';
 import { MISSING_VALUE, formatStatValue } from '@/lib/design-system/stat';
@@ -55,32 +53,6 @@ describe('tone class maps', () => {
     for (const map of [TONE_TEXT, TONE_BORDER, TONE_SURFACE, TONE_FILL]) {
       expect(map.brand).toContain('dark:');
     }
-  });
-});
-
-describe('toneFromLegacy', () => {
-  it.each<[LegacyTone, Tone]>([
-    ['default', 'neutral'],
-    ['neutral', 'neutral'],
-    ['success', 'positive'],
-    ['up', 'positive'],
-    ['warning', 'caution'],
-    ['danger', 'negative'],
-    ['error', 'negative'],
-    ['down', 'negative'],
-    ['info', 'info'],
-    ['sage', 'brand'],
-    ['emphasis', 'brand'],
-    ['selected', 'brand'],
-  ])('maps the legacy name %s to %s', (legacy, tone) => {
-    expect(toneFromLegacy(legacy)).toBe(tone);
-  });
-
-  it('keeps the legacy alert and row colors: danger is text-destructive, warning is text-warning', () => {
-    expect(TONE_TEXT[toneFromLegacy('danger')]).toBe('text-destructive');
-    expect(TONE_TEXT[toneFromLegacy('warning')]).toBe('text-warning');
-    expect(TONE_TEXT[toneFromLegacy('success')]).toBe('text-success');
-    expect(TONE_TEXT[toneFromLegacy('default')]).toBe('text-foreground');
   });
 });
 

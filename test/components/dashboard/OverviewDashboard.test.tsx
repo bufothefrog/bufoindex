@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import OverviewDashboard from '@/components/dashboard/OverviewDashboard';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
@@ -14,10 +14,6 @@ import { profileCompleteness } from '@/lib/calculators/forms';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetProfileStore } from '@/test/utils/stores';
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('before the profile store has hydrated', () => {
   it('shows only the loading skeleton, even with answers in the store', () => {
@@ -136,8 +132,8 @@ describe('ProfileCompletenessCard', () => {
     expect(screen.getByText(`and ${total - 1 - 6} more.`)).toBeInTheDocument();
   });
 
-  it('is complete for a visitor who answered everything but the deprecated new cash', () => {
-    const answered = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => path !== 'investing.newCashThisMonth');
+  it('is complete for a visitor who answered every profile path', () => {
+    const answered = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS];
     render(<ProfileCompletenessCard profile={withProvided(answered)} />);
     const { total } = profileCompleteness(withProvided([]));
     expect(screen.getByText(`${total} of ${total}`)).toBeInTheDocument();

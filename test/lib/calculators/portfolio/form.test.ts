@@ -10,7 +10,6 @@ import { PORTFOLIO_FORM } from '@/lib/calculators/portfolio/form';
 import {
   CORE_PATHS,
   getIntakeScreens,
-  intakePaths,
   intentNeedsCore,
   remainingIntakeScreens,
   skipLabelFor,
@@ -20,7 +19,8 @@ import { applyWrites, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FieldSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, presetClassTargets } from '@/lib/profile/defaults';
-import { askedScreens, fromDefaults, type OldQuestion } from '@/test/utils/intakeFixture';
+import { migrateProfile } from '@/lib/profile/migrate';
+import { askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/test/utils/intakeFixture';
 
 /** The questions the intake asked for the portfolio intent before c5 (slice w1's fixture), after the core. */
 const OLD_QUESTIONS: Record<string, OldQuestion> = {
@@ -153,7 +153,7 @@ describe('portfolio form: screens', () => {
       ...SETTINGS_PATHS,
     ]);
     expect(asked).toContain(OLD_QUESTIONS['investing.targetMix'].path);
-    // investing.newCashThisMonth is deprecated (removed in x1): its one home is
+    // The v1 investing.newCashThisMonth is no profile path now: its one home is
     // the deposit of each account, asked with the old help on the accounts list.
     const deposit = spec('portfolio.accounts').row!.find((row) => row.path === 'deposit')!;
     const old = OLD_QUESTIONS['investing.newCashThisMonth'];
@@ -261,6 +261,9 @@ describe('portfolio form: the fields', () => {
     const accounts = spec('portfolio.accounts');
     expect(accounts.confirmRemove!({ name: 'Roth IRA' }, 0)).toBe('Delete Roth IRA? Its holdings will be removed too.');
     expect(accounts.confirmRemove!({ name: '' }, 1)).toBe('Delete account 2? Its holdings will be removed too.');
+    // The remove button names the account as the prompt does.
+    expect(accounts.removeLabel!({ name: 'Roth IRA' }, 0)).toBe('Remove Roth IRA');
+    expect(accounts.removeLabel!({ name: '' }, 2)).toBe('Remove account 3');
     const defaults = getDefaultFinancialProfile().portfolio;
     expect(accounts.removeRow!(fromDefaults(), 0)).toEqual([
       { path: 'portfolio.securities', value: [defaults.securities[0], defaults.securities[1]] },
@@ -362,12 +365,17 @@ describe("portfolio intake: 'remaining' mode", () => {
   });
 
   it('asks the accounts again after an old new-cash answer, prefilled with it', () => {
-    // A provided investing.newCashThisMonth sits in the Brokerage deposit
-    // (migrateProfile) but does not answer the accounts list.
-    const profile = {
+    // A v1 new-cash answer moves into the Brokerage deposit (migrateProfile)
+    // but does not answer the accounts list.
+    const v1 = {
       ...getDefaultFinancialProfile(),
+      version: 1,
+      investing: { ...getDefaultFinancialProfile().investing, newCashThisMonth: 2400 },
       provided: [...CORE_PATHS, 'investing.newCashThisMonth', 'investing.targetMix'],
     };
+    const profile = migrateProfile(v1, 1);
+    expect(profile.portfolio.accounts[1].deposit).toBe(2400);
+    expect(profile.provided).toEqual([...CORE_PATHS, 'investing.targetMix']);
     expect(ids(remainingIntakeScreens('portfolio', profile))).toEqual(['accounts', 'holdings', 'settings']);
   });
 });

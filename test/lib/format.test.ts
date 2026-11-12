@@ -21,16 +21,6 @@ import {
   type FormatKind,
   type PercentFormatOptions,
 } from '@/lib/format';
-import {
-  formatCurrency as utilsFormatCurrency,
-  formatPercent as utilsFormatPercent,
-  formatYearsAndMonths as utilsFormatYearsAndMonths,
-} from '@/lib/utils';
-import {
-  formatCurrency as coreFormatCurrency,
-  formatPercent as coreFormatPercent,
-} from '@/lib/calculations/core';
-import { formatPercent as percentInputFormatPercent } from '@/components/ui/inputs/PercentInput';
 
 const MINUS = '\u2212';
 
@@ -155,7 +145,7 @@ describe('formatPercent', () => {
     [-0.1, { signed: true }, `${MINUS}10%`],
     [0.0004, { signed: true }, '0%'],
     [-0.0004, { signed: true }, '0%'],
-    // Fixed digits, no grouping (leverage formatPct, PercentInput formatPercent)
+    // Fixed digits, no grouping (leverage formatPct, the PercentInput slider labels)
     [0.434, { digits: 0 }, '43%'],
     [0.125, { digits: 0 }, '13%'],
     [0.0795, { digits: 2 }, '7.95%'],
@@ -320,20 +310,6 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
   const FRACTIONS = [0, 0.0004, -0.0004, 0.003, -0.003, 0.07, 0.075, 0.0795, 0.095, -0.1, 0.12345, 0.125, 0.434, 1, 12.345];
   const RATIOS = [1, 1.5, 2, 2.25, 2.256, 2.999, 3];
 
-  it('lib/utils and lib/calculations/core formatCurrency equal formatCurrency(n)', () => {
-    for (const n of MONEY) {
-      expect(formatCurrency(n)).toBe(utilsFormatCurrency(n));
-      expect(formatCurrency(n)).toBe(coreFormatCurrency(n));
-    }
-  });
-
-  it('lib/utils and lib/calculations/core formatPercent equal formatPercent(f)', () => {
-    for (const f of [...FRACTIONS, NaN]) {
-      expect(formatPercent(f)).toBe(utilsFormatPercent(f));
-      expect(formatPercent(f)).toBe(coreFormatPercent(f));
-    }
-  });
-
   it('leverage formatCompactCurrency equals formatCurrency(n, { compact: true })', () => {
     for (const n of [...MONEY, -0.3]) {
       expect(formatCurrency(n, { compact: true })).toBe(formatCompactCurrency(n));
@@ -346,7 +322,7 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
     }
   });
 
-  // formatPct and PercentInput formatPercent print "-0.0%" for small negatives;
+  // formatPct printed "-0.0%" for small negatives;
   // the new function prints that as "0.0%". Every other output is identical.
   const unsignedZero = (legacy: string) => (/^-0(\.0+)?%$/.test(legacy) ? legacy.slice(1) : legacy);
 
@@ -366,13 +342,6 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
         expect(formatPercent(f, { digits, signed: true })).toBe(formatSignedPct(f, digits));
       }
       expect(formatPercent(f, { digits: 1, signed: true })).toBe(formatSignedPct(f));
-    }
-  });
-
-  it('PercentInput formatPercent equals formatPercent(f, { digits }), negative zero aside', () => {
-    for (const f of FRACTIONS) {
-      expect(formatPercent(f, { digits: 1 })).toBe(unsignedZero(percentInputFormatPercent(f)));
-      expect(formatPercent(f, { digits: 2 })).toBe(unsignedZero(percentInputFormatPercent(f, 2)));
     }
   });
 
@@ -398,11 +367,5 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
       '3.3 months',
       '12 months',
     ]);
-  });
-
-  it('lib/utils formatYearsAndMonths equals formatYearsAndMonths', () => {
-    for (const v of [-2, 0, 0.03, 0.25, 1 / 12, 0.99, 1, 1 + 1 / 12, 2, 2.5, 30.7]) {
-      expect(formatYearsAndMonths(v)).toBe(utilsFormatYearsAndMonths(v));
-    }
   });
 });

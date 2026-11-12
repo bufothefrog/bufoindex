@@ -5,14 +5,10 @@
  */
 
 import React, { useState } from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Checkbox, { type CheckboxProps } from '@/components/ui/checkbox';
-
-afterEach(() => {
-  cleanup();
-});
 
 function Harness({ initial = false, onChange, ...rest }: Partial<CheckboxProps> & { initial?: boolean }) {
   const [checked, setChecked] = useState(initial);

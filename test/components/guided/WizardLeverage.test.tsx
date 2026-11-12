@@ -7,8 +7,8 @@
  */
 
 import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Wizard, isCoreReady } from '@/components/guided/Wizard';
 import { CORE_PATHS, isCoreComplete } from '@/lib/constants/intake';
@@ -30,10 +30,6 @@ beforeEach(() => {
   resetRouterMock();
   clearBrowserState();
   resetProfileStore();
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 describe('Wizard, leverage intent', () => {

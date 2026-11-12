@@ -1,14 +1,11 @@
 /**
  * The one tone scale for results, alerts and tiles.
  *
- * It replaces seven older vocabularies that named the same few colors
- * differently: StatusAlert (info / warning / danger / success), BreakdownRow
- * (default / success / warning / danger / info), ExpandableListCard's
- * CardVariant (default / success / warning / danger, which also clashed with
- * the CardVariant in lib/design-system/types.ts), BaseCard's ComponentColor
- * and ResultCard's status (sage / success / warning / error / info),
- * SummaryCard's change direction (up / down / neutral), OptionCard's tone
- * (default / emphasis / selected) and the dashboard StatTile's `emphasis` flag.
+ * Results, alerts, tiles, progress bars and list cards take a `tone` from
+ * this scale; the older alert and card variants are gone. BaseCard and
+ * ResultCard take a `tone` from it too (four of the six; no tone is the sage
+ * card chrome). OptionCard's `tone` keeps its own small vocabulary for option
+ * surfaces.
  *
  * Every class below is a semantic token (or the sage brand scale with its
  * dark-mode pair), so each map works in light and dark mode. The strings are
@@ -59,41 +56,3 @@ export const TONE_FILL: Readonly<Record<Tone, string>> = {
   info: 'bg-info',
   brand: 'bg-sage-500 dark:bg-sage-400',
 };
-
-/** Every name the older vocabularies used for a tone. */
-export type LegacyTone =
-  | 'default'
-  | 'neutral'
-  | 'success'
-  | 'warning'
-  | 'danger'
-  | 'error'
-  | 'info'
-  | 'sage'
-  | 'emphasis'
-  | 'selected'
-  | 'up'
-  | 'down';
-
-const LEGACY_TONES: Readonly<Record<LegacyTone, Tone>> = {
-  default: 'neutral',
-  neutral: 'neutral',
-  success: 'positive',
-  warning: 'caution',
-  danger: 'negative',
-  error: 'negative',
-  info: 'info',
-  sage: 'brand',
-  emphasis: 'brand',
-  selected: 'brand',
-  up: 'positive',
-  down: 'negative',
-};
-
-/**
- * Maps a name from one of the older vocabularies onto the tone scale, so a
- * component can keep accepting its old `variant` while rendering by tone.
- */
-export function toneFromLegacy(legacy: LegacyTone): Tone {
-  return LEGACY_TONES[legacy];
-}

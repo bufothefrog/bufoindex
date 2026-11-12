@@ -7,18 +7,19 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import { FormulaRegistryEntry, type FormulaCategory } from '@/lib/formulas/types';
+import type { FormulaCategory } from '@/lib/formulas/types';
+import type { RenderedFormula } from './renderLatex';
 import { FormulaDisplay } from './FormulaDisplay';
 
 export interface FormulaCategoryProps {
   title: string;
   category: FormulaCategory;
-  formulas: FormulaRegistryEntry[];
+  formulas: RenderedFormula[];
   defaultExpanded?: boolean;
   compact?: boolean;
   showSearch?: boolean;
-  onFormulaClick?: (formula: FormulaRegistryEntry) => void;
-  onMiniCalculatorOpen?: (formula: FormulaRegistryEntry) => void;
+  onFormulaClick?: (formula: RenderedFormula) => void;
+  onMiniCalculatorOpen?: (formula: RenderedFormula) => void;
 }
 
 const CATEGORY_DESCRIPTIONS: Record<FormulaCategory, string> = {

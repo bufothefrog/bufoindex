@@ -43,23 +43,7 @@ export interface FormulaRegistryEntry extends FormulaMetadata {
 
 export interface FormulaRegistry {
   formulas: Map<string, FormulaRegistryEntry>;
-  categories: Record<FormulaCategory, string[]>;
   byCalculator: Record<string, string[]>;
-}
-
-export interface ValidationResult {
-  success: boolean;
-  errors: string[];
-  warnings: string[];
-  performance?: {
-    executionTime: number;
-    memoryUsage: number;
-  };
-}
-
-export interface FormulaDecoratorOptions extends Omit<FormulaMetadata, 'lastUpdated'> {
-  calculator?: string;
-  skipValidation?: boolean;
 }
 
 // Utility types for formula functions

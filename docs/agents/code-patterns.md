@@ -69,8 +69,9 @@ Conventions:
 - Named export of the component **and** the props type.
 - Props interfaces use JSDoc on each prop so editor hover shows useful info.
 - Theming uses semantic Tailwind classes (`bg-background`, `text-muted-foreground`, `border-border`, `bg-sage-*`) — see `CLAUDE.md`.
-- Charts pull colors from `getChartTheme()` in `@/lib/chart-theme`. Never hardcode chart colors.
-- Keep components free of business logic — call into `lib/calculations/` instead.
+- Charts sit in a `ChartFrame` and pull colors from `useChartTheme()` in `@/components/ui/charts` (it wraps `getChartTheme()` from `@/lib/chart-theme` and follows theme changes). Never hardcode chart colors.
+- A form input for a profile field is a `FieldSpec` rendered by `@/components/fields`, not a hand-wired input.
+- Keep components free of business logic: call into `lib/calculations/` through the calculator's definition and run store instead.
 
 ## Imports
 
@@ -124,6 +125,6 @@ Notes:
 
 - React state living inside calculation modules.
 - `as any` to silence type errors — tighten the types instead.
-- Hardcoded color literals in components (`#fff`, `text-gray-600`, `bg-blue-500`). Use semantic Tailwind classes or `getChartTheme()`.
+- Hardcoded color literals in components (`#fff`, `text-gray-600`, `bg-blue-500`). Use semantic Tailwind classes or `useChartTheme()`.
 - Duplicate components when one already exists in `/demo` or `components/ui/`. Compose, don't fork.
 - Calling `npm run build` from CI workflows you've added without confirming you actually need a separate job; the existing CI already runs build.

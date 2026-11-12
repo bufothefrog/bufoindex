@@ -144,13 +144,6 @@ export function addAccount(portfolio: Portfolio): Portfolio {
   return { ...portfolio, accounts: [...portfolio.accounts, account] };
 }
 
-export function updateAccount(portfolio: Portfolio, id: string, patch: Partial<Omit<Account, 'id'>>): Portfolio {
-  return {
-    ...portfolio,
-    accounts: portfolio.accounts.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-  };
-}
-
 /** Removes the account and its holdings, then the securities only they held. */
 export function removeAccount(portfolio: Portfolio, id: string): Portfolio {
   return pruneUnusedSecurities({

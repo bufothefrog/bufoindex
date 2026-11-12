@@ -2,8 +2,8 @@ import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NextSteps } from '@/components/guided/NextSteps';
-import { intakePaths } from '@/lib/constants/intake';
-import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
+import { intakePaths } from '@/test/utils/intakeFixture';
+import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 beforeEach(() => {
@@ -57,7 +57,7 @@ describe('NextSteps', () => {
   it('offers to finish the profile and try another calculator when a partial profile exists', () => {
     useProfileStore
       .getState()
-      .setFields({ person: { age: 41, state: 'CA' } }, ['person.age', 'person.state']);
+      .setFields({ person: { age: 41, state: 'CA' } }, ['person.age', 'person.state', 'person.filingStatus']);
 
     render(<NextSteps intent="paycheck" />);
 
@@ -65,7 +65,8 @@ describe('NextSteps', () => {
 
     const finish = linkNamed(/Finish your profile/);
     expect(finish).toHaveAttribute('href', '/start/profile');
-    expect(finish).toHaveTextContent(`2 of ${PROFILE_FIELDS.length} details answered.`);
+    // Counted by topic screen (O14): age, state and filing status make one topic.
+    expect(finish).toHaveTextContent('1 of 17 topics answered.');
     expect(finish).toHaveTextContent('Answer the rest once; every calculator and your overview use it.');
 
     expect(linkNamed(/Try another calculator/)).toHaveAttribute('href', '/start/choose');
@@ -79,7 +80,7 @@ describe('NextSteps', () => {
     useProfileStore.getState().setFields({}, asked);
     // The intake never asks a few fields, so /start/profile would only
     // redirect to the overview; link it directly instead.
-    expect(PROFILE_FIELDS.filter((field) => !asked.includes(field.path)).length).toBeGreaterThan(0);
+    expect(PROFILE_LEAF_PATHS.filter((path) => !asked.includes(path)).length).toBeGreaterThan(0);
 
     render(<NextSteps intent="retirement" />);
 

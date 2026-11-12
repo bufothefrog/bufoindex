@@ -8,12 +8,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  getDefaultFinancialProfile,
-  migrateProfile,
-  PROFILE_VERSION,
-  toRebalanceInputs,
-} from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
 
 /** v1 getDefaultFinancialProfile(), as JSON.parse returns it. */
 const V1_DEFAULT = {
@@ -83,6 +79,8 @@ describe('migrateProfile from v1', () => {
 
   it('carries every answered v1 field and its provided path over, and fills the new leaves with defaults', () => {
     const p = migrateProfile(V1_ALL_PROVIDED, 1);
+    // The one-off new cash is no v2 leaf: its value moves to the Brokerage
+    // deposit (next test) and its provided path goes.
     const defaults = getDefaultFinancialProfile();
     expect(p.version).toBe(2);
     expect(p.updatedAt).toBe(1761000000000);
@@ -91,9 +89,9 @@ describe('migrateProfile from v1', () => {
     expect(p.spending).toEqual(V1_ALL_PROVIDED.spending);
     expect(p.cash).toEqual(V1_ALL_PROVIDED.cash);
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
-    expect(p.investing).toEqual(V1_ALL_PROVIDED.investing);
+    expect(p.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(p.strategy).toEqual(V1_ALL_PROVIDED.strategy);
-    expect(p.provided).toEqual(V1_ALL_PROVIDED.provided);
+    expect(p.provided).toEqual(V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth'));
     for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'assumptions'] as const) {
       expect(p[key]).toEqual(defaults[key]);
     }
@@ -109,7 +107,6 @@ describe('migrateProfile from v1', () => {
     expect(p.portfolio.securities).toEqual(defaults.portfolio.securities);
     expect(p.portfolio.holdings).toEqual(defaults.portfolio.holdings);
     expect(p.portfolio.classTargets).toEqual(defaults.portfolio.classTargets);
-    expect(toRebalanceInputs(p).accounts[1].deposit).toBe(3000);
   });
 
   it('cleans a hand-edited payload: invalid leaves take defaults, unknown keys and paths go', () => {
@@ -123,7 +120,7 @@ describe('migrateProfile from v1', () => {
     expect(p.spending).toEqual({ ...defaults.spending, necessaryMonthly: -200 });
     expect(p.cash).toEqual(defaults.cash);
     expect(p.workplace).toEqual(defaults.workplace);
-    expect(p.investing).toEqual({ ...defaults.investing, newCashThisMonth: -250 });
+    expect(p.investing).toEqual(defaults.investing);
     expect(p.strategy).toEqual({ preset: 'cashflow-investor', leverageRatio: 3 });
     expect(p).not.toHaveProperty('extras');
     // Negative new cash deposits nothing, as the v1 mapper clamped it.
@@ -149,13 +146,23 @@ describe('migrateProfile at the current version', () => {
     expect(PROFILE_VERSION).toBe(2);
   });
 
-  it('normalizes only: a v2 deposit is not overwritten by the deprecated leaf', () => {
+  it('normalizes only: a stored v2 profile that still holds the removed new-cash leaf loses that leaf and nothing else', () => {
     const saved = getDefaultFinancialProfile();
+    saved.person.age = 44;
     saved.portfolio.accounts[1].deposit = 400;
-    saved.investing.newCashThisMonth = 9000;
-    const p = migrateProfile(JSON.parse(JSON.stringify(saved)), 2);
-    expect(p).toEqual(saved);
-    expect(migrateProfile(saved, 3)).toEqual(saved);
+    saved.provided = ['person.age', 'portfolio.accounts', 'investing.newCashThisMonth'];
+    const stored = JSON.parse(JSON.stringify(saved));
+    stored.investing.newCashThisMonth = 9000;
+    const expected = { ...saved, provided: ['person.age', 'portfolio.accounts'] };
+
+    let p: ReturnType<typeof migrateProfile> | undefined;
+    expect(() => {
+      p = migrateProfile(stored, 2);
+    }).not.toThrow();
+    expect(p).toEqual(expected);
+    expect(p?.investing).not.toHaveProperty('newCashThisMonth');
+    expect(p?.portfolio.accounts[1].deposit).toBe(400);
+    expect(migrateProfile(stored, 3)).toEqual(expected);
   });
 
   it('is idempotent across a v1 migration and a later load', () => {

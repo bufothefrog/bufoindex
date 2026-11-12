@@ -42,9 +42,10 @@ const HOW_IT_WORKS = [
 ]
 
 /**
- * Calculator previews. Each card links to the shared core intake with
- * `next` set, so every path answers the basics first and then continues to
- * that calculator's remaining questions. The icon and the "what it shows"
+ * Calculator previews. Each card links through coreStartLink: the shared
+ * core intake with `next` set, so the path answers the basics first and then
+ * continues to that calculator's remaining questions, or straight to the
+ * portfolio intake, which needs no basics (O5). The icon and the "what it shows"
  * line come from INTENT_OPTIONS so the landing page and the chooser agree;
  * the name comes from the calculator registry.
  */

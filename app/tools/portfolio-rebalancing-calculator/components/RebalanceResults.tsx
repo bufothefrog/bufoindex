@@ -229,7 +229,7 @@ function AccountPlan({ account, mode, customAssetClasses }: AccountPlanProps) {
   const title = `${accountName || 'Account'} \u2014 ${ACCOUNT_TYPE_LABELS[accountType]}`;
 
   return (
-    <ResultCard title={title} icon={ArrowRight} status="success" testId={`account-plan-${accountId}`}>
+    <ResultCard title={title} icon={ArrowRight} tone="positive" testId={`account-plan-${accountId}`}>
       <div className="space-y-4">
         <KeyValueList
           className="grid grid-cols-2 gap-3 space-y-0"

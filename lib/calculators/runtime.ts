@@ -1,6 +1,6 @@
 /**
  * The two pure steps between the profile and a calculator run: engine inputs
- * from the profile (replaces lib/profile/mappers.ts per calculator) and
+ * from the profile (through each calculator's bindings) and
  * validation of what the calculator page shows. No React, no storage.
  */
 
@@ -19,12 +19,21 @@ export function engineInputsFor<E, R>(def: CalculatorDefinition<E, R>, values: F
 /** Engine inputs and validation errors from one pass over the profile. */
 export interface PreparedRun<E> {
   inputs: E;
+  /** Keyed by profile path ('calculation' for errors with no field). */
   errors: FieldErrors;
 }
 
 /**
- * validateFor and engineInputsFor in one pass, so the run store builds the
- * engine inputs once per submit. See validateFor for the error rules.
+ * The engine inputs (as engineInputsFor) and the validation errors in one
+ * pass, so the run store builds the engine inputs once per submit.
+ *
+ * Form checks first: validateFields has no surface filter, so this validates
+ * screen by screen over the form's calculator-surface screens ('both' and
+ * 'calculator'), which is what the calculator page shows; intake-only
+ * screens are not checked. Then def.validate on the engine inputs, mapped
+ * back through engineErrorsToFields. On the same path the form message wins,
+ * because it names the field and its bounds the way the input shows them;
+ * engine errors fill only the paths the form left clean.
  */
 export function prepareRun<E, R>(def: CalculatorDefinition<E, R>, values: FinancialProfile): PreparedRun<E> {
   const get = makeGet(values);
@@ -42,17 +51,3 @@ export function prepareRun<E, R>(def: CalculatorDefinition<E, R>, values: Financ
   return { inputs, errors };
 }
 
-/**
- * Errors keyed by profile path ('calculation' for errors with no field).
- *
- * Form checks first: validateFields has no surface filter, so this validates
- * screen by screen over the form's calculator-surface screens ('both' and
- * 'calculator'), which is what the calculator page shows; intake-only
- * screens are not checked. Then def.validate on the engine inputs, mapped
- * back through engineErrorsToFields. On the same path the form message wins,
- * because it names the field and its bounds the way the input shows them;
- * engine errors fill only the paths the form left clean.
- */
-export function validateFor<E, R>(def: CalculatorDefinition<E, R>, values: FinancialProfile): FieldErrors {
-  return prepareRun(def, values).errors;
-}

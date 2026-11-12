@@ -6,57 +6,24 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-export type MaxWidth = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '7xl' | 'full';
-
-const MAX_WIDTH_CLASSES: Record<MaxWidth, string> = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-  '7xl': 'max-w-7xl',
-  full: 'max-w-full'
-};
-
 export interface ResponsiveGridProps {
   children: React.ReactNode;
   hasResults?: boolean;
-  className?: string;
-  maxWidth?: MaxWidth;
-  gap?: 'sm' | 'md' | 'lg' | 'xl';
-  testId?: string;
 }
 
-export function ResponsiveGrid({
-  children,
-  hasResults = false,
-  className,
-  maxWidth = '7xl',
-  gap = 'md',
-  testId
-}: ResponsiveGridProps) {
-  const gapClasses = {
-    sm: 'gap-4',
-    md: 'gap-6',
-    lg: 'gap-8',
-    xl: 'gap-12'
-  };
-  
-  // Dynamic grid based on content state
-  const gridClasses = cn(
-    "grid transition-all duration-500",
-    gapClasses[gap],
-    hasResults 
-      ? "grid-cols-1 lg:grid-cols-2" // Results present: 2-column layout
-      : "grid-cols-1 lg:grid-cols-3", // No results: 3-column with empty state
-    MAX_WIDTH_CLASSES[maxWidth],
-    "mx-auto"
-  );
-  
+/** Two columns with results, three (inputs over two) without; one column below lg. */
+export function ResponsiveGrid({ children, hasResults = false }: ResponsiveGridProps) {
   return (
-    <div 
-      className={cn(gridClasses, className)}
-      data-testid={testId}
+    <div
+      className={cn(
+        "grid transition-all duration-500",
+        "gap-6",
+        hasResults
+          ? "grid-cols-1 lg:grid-cols-2" // Results present: 2-column layout
+          : "grid-cols-1 lg:grid-cols-3", // No results: 3-column with empty state
+        "max-w-7xl",
+        "mx-auto"
+      )}
     >
       {children}
     </div>
@@ -97,24 +64,10 @@ export const ResultSection = GridSection;
 /**
  * Empty State Section
  */
-export type FeatureDotColor = 'success' | 'info' | 'warning' | 'destructive' | 'primary';
-
-const featureDotClasses: Record<FeatureDotColor, string> = {
-  success: 'bg-success',
-  info: 'bg-info',
-  warning: 'bg-warning',
-  destructive: 'bg-destructive',
-  primary: 'bg-primary'
-};
-
 export interface EmptyStateSectionProps {
   title: string;
   description: string;
   icon?: React.ComponentType<{ className?: string }>;
-  features?: Array<{
-    color: FeatureDotColor;
-    text: string;
-  }>;
   className?: string;
   id?: string;
 }
@@ -123,7 +76,6 @@ export function EmptyStateSection({
   title,
   description, 
   icon: Icon,
-  features = [],
   className,
   id
 }: EmptyStateSectionProps) {
@@ -145,19 +97,6 @@ export function EmptyStateSection({
           <p className="text-muted-foreground mb-4 sm:mb-6 max-w-sm">
             {description}
           </p>
-          
-          {features.length > 0 && (
-            <div className="text-sm text-muted-foreground space-y-2">
-              {features.map((feature, index) => (
-                <div key={index} className="flex items-center justify-center space-x-2">
-                  <div
-                    className={cn("w-2 h-2 rounded-full", featureDotClasses[feature.color])}
-                  />
-                  <span>{feature.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -169,31 +108,12 @@ export function EmptyStateSection({
  */
 export interface ContainerProps {
   children: React.ReactNode;
-  maxWidth?: MaxWidth;
-  padding?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
 
-export function Container({
-  children,
-  maxWidth = '7xl',
-  padding = 'md',
-  className
-}: ContainerProps) {
-  const paddingClasses = {
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8',
-    xl: 'p-12'
-  };
-  
+export function Container({ children, className }: ContainerProps) {
   return (
-    <div className={cn(
-      MAX_WIDTH_CLASSES[maxWidth],
-      paddingClasses[padding],
-      'mx-auto',
-      className
-    )}>
+    <div className={cn('max-w-7xl', 'p-6', 'mx-auto', className)}>
       {children}
     </div>
   );

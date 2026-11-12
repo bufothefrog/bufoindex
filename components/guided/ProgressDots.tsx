@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { clamp, cn } from '@/lib/utils';
 
 export interface ProgressDotsProps {
   /** Number of screens. */
@@ -14,7 +14,7 @@ export interface ProgressDotsProps {
 /** Compact step indicator: one dot per screen plus a "Step x of y" caption. */
 export function ProgressDots({ total, current, label, className }: ProgressDotsProps) {
   const safeTotal = Math.max(1, total);
-  const step = Math.min(Math.max(current, 0), safeTotal - 1);
+  const step = clamp(current, 0, safeTotal - 1);
 
   return (
     <div className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1', className)}>

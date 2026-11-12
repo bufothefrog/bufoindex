@@ -28,7 +28,6 @@ import {
   removeCustomAssetClass,
   removeHolding,
   setClassTarget,
-  updateAccount,
   updateHolding,
   updateSecurity,
   type Portfolio,
@@ -65,7 +64,6 @@ describe('the reducers never mutate their input', () => {
       addSecurity(p);
       updateSecurity(p, 'sec-vti', { price: 1 });
       addAccount(p);
-      updateAccount(p, 'acc-roth', { deposit: 1 });
       removeAccount(p, 'acc-roth');
       addHolding(p);
       updateHolding(p, 'hld-roth-vti', { shares: 1 });
@@ -137,12 +135,6 @@ describe('account actions', () => {
     const dangling = { ...seed(), accounts: seed().accounts.filter((a) => a.id !== 'acc-brok') };
     const withStray = { ...dangling, holdings: [...dangling.holdings, { ...seed().holdings[0], id: 'hld-x', accountId: 'acc-2' }] };
     expect(addAccount(withStray).accounts.map((a) => a.id)).toEqual(['acc-roth', 'acc-3']);
-  });
-
-  it('updateAccount patches fields in place', () => {
-    const roth = updateAccount(seed(), 'acc-roth', { deposit: 1000 }).accounts.find((a) => a.id === 'acc-roth');
-    expect(roth?.deposit).toBe(1000);
-    expect(roth?.accountType).toBe('tax-free');
   });
 
   it('removeAccount drops its holdings and garbage-collects orphaned securities', () => {

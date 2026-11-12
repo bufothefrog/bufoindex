@@ -12,9 +12,9 @@
  *
  * Persisted data under an older version goes through migrateProfile, then
  * every payload is normalized, so a hand-edited value can never break the
- * mappers. A payload saved under a later version is read (normalized to v2)
- * but never overwritten in that session, so a rollback cannot delete the
- * fields the later version added.
+ * engine bindings. A payload saved under a later version is read
+ * (normalized to v2) but never overwritten in that session, so a rollback
+ * cannot delete the fields the later version added.
  */
 
 import { create } from 'zustand';
@@ -135,7 +135,8 @@ export const useProfileStore = create<ProfileState>()(
       storage: createJSONStorage(profileStorage),
       partialize: (state) => ({ profile: state.profile }),
       // Persisted data is untrusted: normalize it against the defaults so a
-      // missing section or a hand-edited value can never break the mappers.
+      // missing section or a hand-edited value can never break the engine
+      // bindings.
       merge: (persisted, current) => {
         const raw = (persisted as { profile?: unknown } | undefined)?.profile;
         const profile = raw === undefined ? current.profile : normalizeProfile(raw);

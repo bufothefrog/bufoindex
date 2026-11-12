@@ -23,8 +23,6 @@ import {
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers';
 
 const store = usePortfolioRebalancingStore;
 const profile = () => useProfileStore.getState().profile;

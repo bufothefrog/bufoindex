@@ -51,6 +51,8 @@ export interface FieldSpec {
   itemLabel?: (row: Record<string, unknown>, index: number) => string;
   addLabel?: string; emptyText?: string; minRows?: number; maxRows?: number;
   confirmRemove?: (row: Record<string, unknown>, index: number) => string | null;
+  /** Accessible name of a row's remove button (default "Remove <itemLabel>"). */
+  removeLabel?: (row: Record<string, unknown>, index: number) => string;
   /** Cascading removal (accounts -> holdings). */
   removeRow?: (get: Get, index: number) => Write[];
   /** Ids into the CustomRenderers prop. */

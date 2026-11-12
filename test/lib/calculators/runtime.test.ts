@@ -1,16 +1,16 @@
 /**
- * engineInputsFor and validateFor (prepareRun) against a small fake
+ * engineInputsFor and prepareRun against a small fake
  * calculator: two 1:1 bindings, one derived binding with an errorPath, a
  * form with a calculator screen, an intake-only screen and a relation.
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { engineInputsFor, prepareRun, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { setAt } from '@/lib/fields/paths';
 import type { FieldErrors, FormSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile } from '@/lib/profile';
-import type { FinancialProfile } from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import type { FinancialProfile } from '@/lib/profile/types';
 
 interface Engine {
   age: number;
@@ -28,7 +28,7 @@ const FORM: FormSpec = {
   ],
   screens: [
     { id: 'basics', title: 'Basics', tier: 'core', fields: ['person.age', 'person.retirementAge'] },
-    // Intake-only and impossible to satisfy: proves validateFor skips it.
+    // Intake-only and impossible to satisfy: proves prepareRun skips it.
     { id: 'intake', title: 'Intake', tier: 'assumption', surface: 'intake', fields: ['person.lifeExpectancy'] },
   ],
   relations: [
@@ -99,30 +99,30 @@ describe('engineInputsFor', () => {
   });
 });
 
-describe('validateFor', () => {
+describe('prepareRun errors', () => {
   it('returns no errors for valid values, ignoring intake-only screens', () => {
     // lifeExpectancy 85 fails its min of 200, but only the intake shows it.
-    expect(validateFor(DEFINITION, getDefaultFinancialProfile())).toEqual({});
+    expect(prepareRun(DEFINITION, getDefaultFinancialProfile()).errors).toEqual({});
   });
 
   it('reports form bounds and relations on profile paths', () => {
-    expect(validateFor(DEFINITION, profileWith({ 'person.age': 12, 'person.retirementAge': 10 }))).toEqual({
+    expect(prepareRun(DEFINITION, profileWith({ 'person.age': 12, 'person.retirementAge': 10 })).errors).toEqual({
       'person.age': 'Age must be between 18 and 90.',
       'person.retirementAge': 'Retirement age must be between 30 and 100.',
     });
-    expect(validateFor(DEFINITION, profileWith({ 'person.age': 50, 'person.retirementAge': 45 }))).toEqual({
+    expect(prepareRun(DEFINITION, profileWith({ 'person.age': 50, 'person.retirementAge': 45 })).errors).toEqual({
       'person.retirementAge': 'Retirement age must be after your age.',
     });
   });
 
   it('maps engine errors back through the bindings', () => {
     // years = 75 - 30 = 45 > 40, reported on the derived binding's errorPath.
-    expect(validateFor(DEFINITION, profileWith({ 'person.retirementAge': 75 }))).toEqual({
+    expect(prepareRun(DEFINITION, profileWith({ 'person.retirementAge': 75 })).errors).toEqual({
       'person.retirementAge': 'At most 40 years.',
     });
     // age 85 passes the form (max 90) but not the engine (max 80); state XX is not a form field.
     expect(
-      validateFor(DEFINITION, profileWith({ 'person.age': 85, 'person.retirementAge': 86, 'person.state': 'XX' }))
+      prepareRun(DEFINITION, profileWith({ 'person.age': 85, 'person.retirementAge': 86, 'person.state': 'XX' })).errors
     ).toEqual({
       'person.age': 'The engine models ages up to 80.',
       'person.state': 'Unknown state.',
@@ -131,7 +131,7 @@ describe('validateFor', () => {
 
   it('keeps the form message when the form and the engine flag the same path', () => {
     // age 95 fails both the form (max 90) and the engine (max 80).
-    expect(validateFor(DEFINITION, profileWith({ 'person.age': 95, 'person.retirementAge': 96 }))).toEqual({
+    expect(prepareRun(DEFINITION, profileWith({ 'person.age': 95, 'person.retirementAge': 96 })).errors).toEqual({
       'person.age': 'Age must be between 18 and 90.',
     });
   });
@@ -141,7 +141,7 @@ describe('validateFor', () => {
       ...DEFINITION,
       validate: () => ({ untouched: 'Something else went wrong.' }),
     };
-    expect(validateFor(definition, getDefaultFinancialProfile())).toEqual({
+    expect(prepareRun(definition, getDefaultFinancialProfile()).errors).toEqual({
       calculation: 'Something else went wrong.',
     });
   });

@@ -7,13 +7,12 @@ export { StatTile } from './StatTile';
 export type { StatTileProps, StatTileSize, StatTileAlign } from './StatTile';
 export { StatGrid } from './StatGrid';
 export type { StatGridProps, StatGridColumns } from './StatGrid';
-export { KeyValueList, KeyValueRow } from './KeyValueList';
+export { KeyValueList } from './KeyValueList';
 export type {
   KeyValueListProps,
   KeyValueListLayout,
   KeyValueItem,
   KeyValuePrefix,
-  KeyValueRowProps,
 } from './KeyValueList';
 export { DataTable } from './DataTable';
 export type { DataTableProps, DataTableColumn, DataTableAlign } from './DataTable';

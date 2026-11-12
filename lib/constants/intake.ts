@@ -130,10 +130,6 @@ export function getLearnOption(intent: IntakeIntent): IntentOption {
 /** What the wizard asks: the shared core, or one intent's form. */
 export type IntakeFlow = IntakeIntent | 'core';
 
-export function isIntakeFlow(value: string): value is IntakeFlow {
-  return value === 'core' || isIntakeIntent(value);
-}
-
 /** Profile dot paths of the shared core questions, in the order they are asked. */
 export const CORE_PATHS: readonly string[] = CORE_SCREENS.flatMap((screen) => screen.fields);
 
@@ -241,11 +237,6 @@ export function getIntakeScreens(flow: IntakeFlow, get: Get, options: IntakeScre
   return screensFor(intakeForm(flow, mode), get, { mode, provided: options.provided, surface: 'intake' });
 }
 
-/** Every profile path an intent's intake can ask, in order, deduplicated. */
-export function intakePaths(flow: IntakeFlow): string[] {
-  return Array.from(new Set(intakeForm(flow).screens.flatMap((screen) => screen.fields)));
-}
-
 /**
  * The screens `intent` still asks in 'remaining' mode given the saved
  * profile: what /start/<intent> shows on arrival. Empty means that page goes
@@ -259,10 +250,10 @@ export function remainingIntakeScreens(intent: IntakeIntent, profile: FinancialP
 /**
  * Whether "Finish your profile" has nothing left to do, so the guided flow
  * offers the overview in its place: the profile intake has no screen left.
- * A few profile fields (target retirement income, your 401(k) contribution
- * rate, the emergency-fund target months, the leverage ratio) are not asked
- * by any intake yet, and the match terms are not asked without a 401(k), so
- * /start/profile would only redirect to the overview.
+ * Fields on a calculator-only screen are never asked by an intake, and
+ * fields behind an unmet condition (the match terms without a 401(k)) are
+ * not asked, so /start/profile can have nothing left to ask while some
+ * fields are unanswered; it would then only redirect to the overview.
  */
 export function isProfileFinished(profile: FinancialProfile): boolean {
   return remainingIntakeScreens('profile', profile).length === 0;

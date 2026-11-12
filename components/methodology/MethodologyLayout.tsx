@@ -14,7 +14,8 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
-import { FormulaRegistryEntry, FormulaCategory } from '@/lib/formulas/types';
+import type { FormulaCategory } from '@/lib/formulas/types';
+import type { RenderedFormula } from './renderLatex';
 import { FormulaCategory as FormulaCategoryComponent } from './FormulaCategory';
 
 export interface MethodologyLayoutProps {
@@ -22,17 +23,17 @@ export interface MethodologyLayoutProps {
   title: string;
   description?: string;
   formulas: {
-    core: FormulaRegistryEntry[];
-    intermediate: FormulaRegistryEntry[];
-    advanced: FormulaRegistryEntry[];
-    assumptions: FormulaRegistryEntry[];
+    core: RenderedFormula[];
+    intermediate: RenderedFormula[];
+    advanced: RenderedFormula[];
+    assumptions: RenderedFormula[];
   };
   metadata?: {
     totalFormulas: number;
     lastUpdated: string;
   };
-  onFormulaSelect?: (formula: FormulaRegistryEntry) => void;
-  onMiniCalculatorOpen?: (formula: FormulaRegistryEntry) => void;
+  onFormulaSelect?: (formula: RenderedFormula) => void;
+  onMiniCalculatorOpen?: (formula: RenderedFormula) => void;
   onBackToCalculator?: () => void;
 }
 

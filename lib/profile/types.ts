@@ -11,7 +11,7 @@
  * - Model assumptions live under assumptions.<calculator>.
  * - Nullable leaves are overrides: null means "derive from the profile".
  * - Lists (debts and the portfolio lists) are first-class; their rows reuse
- *   the engine row types so the mappers copy them without reshaping.
+ *   the engine row types so the bindings copy them without reshaping.
  *
  * Units: money is US dollars; every rate or percentage is a decimal
  * (0.5 = 50%, 0.04 = 4% APY), matching PercentInput and the calculator
@@ -38,9 +38,6 @@ import type {
 export type PayFrequency = 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly';
 
 export type FilingStatus = 'single' | 'marriedJoint' | 'marriedSeparate' | 'headOfHousehold';
-
-/** @deprecated Use FilingStatus. Kept until slice x1. */
-export type ProfileFilingStatus = FilingStatus;
 
 /**
  * Strategy presets. Both are presented side by side; neither is a default
@@ -155,12 +152,6 @@ export interface FinancialProfile {
     /** Portion of the monthly contribution going to a taxable brokerage. */
     taxableMonthlyContribution: number;
     targetMix: TargetMixPreset;
-    /**
-     * @deprecated The rebalancer reads the Brokerage account's deposit in
-     * portfolio.accounts. A write here also sets that deposit (see
-     * newCashDepositWrites). Deleted in slice x1.
-     */
-    newCashThisMonth: number;
   };
   retirementIncome: {
     /** Annual benefit in today's dollars. */
@@ -251,13 +242,3 @@ type DeepPartial<T> = T extends readonly unknown[]
 export type ProfilePatch = {
   [K in keyof FinancialProfile]?: DeepPartial<FinancialProfile[K]>;
 };
-
-/** Metadata for one v1 leaf field (PROFILE_FIELDS). */
-export interface ProfileFieldMeta {
-  /** Dot path, e.g. 'person.age'. */
-  path: string;
-  /** Human-readable label. */
-  label: string;
-  /** The FinancialProfile section key the field lives in, e.g. 'person'. */
-  section: string;
-}

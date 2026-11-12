@@ -3,10 +3,11 @@
  * old mapper (toRebalanceInputs) did, every engine input is bound or
  * engine-only, and the engine's checks land on the fields that show them.
  *
- * Golden. toRebalanceInputs (lib/profile/mappers.ts) is still the profile
- * link's mapper, so the comparison runs against it live, for v1-shaped
- * profiles (migrateProfile from a v1 payload) and for a v2 profile with
- * several accounts, holdings and a custom class. No documented exception.
+ * Golden fixture. Each GOLDEN entry was captured on 2026-11-12 from the
+ * former lib/profile/mappers.ts (deleted in phase 5): what its
+ * toRebalanceInputs returned for that profile, for v1-shaped profiles
+ * (migrateProfile from a v1 payload) and a v2 profile with several accounts,
+ * holdings and a custom class. No documented exception.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -17,13 +18,13 @@ import {
   classTargetsFor,
 } from '@/lib/calculators/portfolio/bindings';
 import { PORTFOLIO_CALCULATOR, validateRebalanceInputs } from '@/lib/calculators/portfolio/definition';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { applyProfileWrites, getDefaultFinancialProfile, migrateProfile } from '@/lib/profile';
-import type { FinancialProfile } from '@/lib/profile';
-import { toRebalanceInputs } from '@/lib/profile/mappers';
+import { applyProfileWrites, getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
+import type { FinancialProfile } from '@/lib/profile/types';
 
 const V1_DEFAULT = {
   version: 1,
@@ -96,17 +97,78 @@ const SEVERAL: Write[] = [
   { path: 'assumptions.portfolio.showPlacementAdvice', value: false },
 ];
 
-describe('portfolio bindings: golden against toRebalanceInputs', () => {
-  const cases: [string, FinancialProfile][] = [
-    ['the default profile', getDefaultFinancialProfile()],
-    ['the v1 default', fromV1({})],
-    ['a v1 100/0 mix with $2,400 of new cash', fromV1({ targetMix: '100-0', newCashThisMonth: 2400 })],
-    ['a v1 60/40 mix with negative new cash (clamped to 0)', fromV1({ targetMix: '60-40', newCashThisMonth: -50 })],
-    ['several accounts, holdings and a custom class', profileWith(SEVERAL)],
+/** The worked example's securities and holdings, which every v1 profile and the default carry. */
+const EXAMPLE_SECURITIES = [
+  { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
+  { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
+  { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+];
+const EXAMPLE_HOLDINGS = [
+  { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
+  { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
+  { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
+  { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+];
+
+/** The old mapper's output for the worked example with this Brokerage deposit and these portfolio-wide weights (us, intl, bonds, cash). */
+function exampleInputs(brokerageDeposit: number, [us, intl, bonds, cash]: readonly number[]): RebalanceInputsV2 {
+  return {
+    setupMode: 'multi-shared',
+    securities: EXAMPLE_SECURITIES,
+    accounts: [
+      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
+      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: brokerageDeposit },
+    ],
+    holdings: EXAMPLE_HOLDINGS,
+    classTargets: [
+      { accountId: null, assetClass: 'us-stock', target: us },
+      { accountId: null, assetClass: 'intl-stock', target: intl },
+      { accountId: null, assetClass: 'bonds', target: bonds },
+      { accountId: null, assetClass: 'cash', target: cash },
+    ],
+    customAssetClasses: [],
+    allowTaxableSelling: false,
+    showPlacementAdvice: true,
+    mode: 'whole',
+  };
+}
+
+/** The value of the SEVERAL write at `path`. */
+const severalValue = (path: string): unknown => SEVERAL.find((write) => write.path === path)?.value;
+
+describe('portfolio bindings: golden against the old mapper output', () => {
+  const GOLDEN: [string, FinancialProfile, RebalanceInputsV2][] = [
+    ['the default profile', getDefaultFinancialProfile(), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
+    ['the v1 default', fromV1({}), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
+    [
+      'a v1 100/0 mix with $2,400 of new cash',
+      fromV1({ targetMix: '100-0', newCashThisMonth: 2400 }),
+      exampleInputs(2400, [0.75, 0.25, 0, 0]),
+    ],
+    [
+      'a v1 60/40 mix with negative new cash (clamped to 0)',
+      fromV1({ targetMix: '60-40', newCashThisMonth: -50 }),
+      exampleInputs(0, [0.45, 0.15, 0.4, 0]),
+    ],
+    [
+      'several accounts, holdings and a custom class',
+      profileWith(SEVERAL),
+      {
+        setupMode: 'multi-shared',
+        securities: severalValue('portfolio.securities'),
+        accounts: severalValue('portfolio.accounts'),
+        holdings: severalValue('portfolio.holdings'),
+        classTargets: severalValue('portfolio.classTargets'),
+        customAssetClasses: severalValue('portfolio.customAssetClasses'),
+        allowTaxableSelling: true,
+        showPlacementAdvice: false,
+        mode: 'fractional',
+      } as RebalanceInputsV2,
+    ],
   ];
 
-  it.each(cases)('%s', (_name, profile) => {
-    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual(toRebalanceInputs(profile));
+  it.each(GOLDEN)('%s', (_name, profile, expected) => {
+    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual(expected);
   });
 
   it('pins the default profile inputs and their rebalance', () => {
@@ -235,7 +297,7 @@ describe('portfolio definition', () => {
         ],
       },
     ]);
-    expect(validateFor(PORTFOLIO_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, profile).errors).toEqual({
       'portfolio.classTargets': 'Target allocations must sum to 100% (currently 130.00%).',
     });
   });
@@ -246,21 +308,21 @@ describe('portfolio definition', () => {
     const securities = base.portfolio.securities.map((s, i) => (i === 1 ? { ...s, price: -5 } : s));
     // The engine inputs are built from the profile directly, past the store's own checks.
     const broken: FinancialProfile = { ...base, portfolio: { ...base.portfolio, holdings, securities } };
-    expect(validateFor(PORTFOLIO_CALCULATOR, broken)).toEqual({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, broken).errors).toEqual({
       'portfolio.holdings': 'Price cannot be negative.',
     });
     const negative: FinancialProfile = {
       ...base,
       portfolio: { ...base.portfolio, accounts: base.portfolio.accounts.map((a, i) => (i === 2 ? { ...a, deposit: -1 } : a)) },
     };
-    expect(validateFor(PORTFOLIO_CALCULATOR, negative)).toEqual({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, negative).errors).toEqual({
       'portfolio.accounts.2.deposit': 'New cash must be at least $0.',
     });
   });
 
   it('needs at least one account', () => {
     const none: FinancialProfile = profileWith([{ path: 'portfolio.accounts', value: [] }]);
-    expect(validateFor(PORTFOLIO_CALCULATOR, none)).toMatchObject({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, none).errors).toMatchObject({
       'portfolio.accounts': 'Accounts needs at least 1 entry.',
     });
   });

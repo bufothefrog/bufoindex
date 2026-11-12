@@ -4,8 +4,7 @@
  * The component's contract: `value` is a decimal fraction (0.075 = 7.5%),
  * the display is the percentage form, and onChange emits decimals. Covers
  * parsing/precision, min/max gating of typed values, negative handling,
- * arrow-key stepping, the % suffix, slider mode (showSlider), and the
- * formatPercent/parsePercent helpers.
+ * arrow-key stepping, the % suffix and slider mode (showSlider).
  *
  * Interaction tests use a stateful harness that feeds onChange back into
  * value, matching how calculator pages use the component.
@@ -14,12 +13,8 @@
 import React from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest';
-import {
-  PercentInput,
-  formatPercent,
-  parsePercent,
-} from '@/components/ui/inputs/PercentInput';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { PercentInput } from '@/components/ui/inputs/PercentInput';
 
 // Radix Slider (used in showSlider mode) measures its thumb with
 // ResizeObserver, which jsdom does not provide.
@@ -61,10 +56,6 @@ function ControlledPercent({
 }
 
 describe('PercentInput', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it('associates the label with the input and renders the % suffix', () => {
     render(
       <PercentInput name="rate" label="Return rate" value={0.07} onChange={vi.fn()} />,
@@ -281,20 +272,5 @@ describe('PercentInput', () => {
     expect(
       screen.getByRole('slider', { name: 'Stock allocation' }),
     ).toBeInTheDocument();
-  });
-});
-
-describe('formatPercent / parsePercent helpers', () => {
-  it('formatPercent converts decimals to percent strings', () => {
-    expect(formatPercent(0.6)).toBe('60.0%');
-    expect(formatPercent(0.0525, 2)).toBe('5.25%');
-    expect(formatPercent(0)).toBe('0.0%');
-  });
-
-  it('parsePercent converts percent strings to decimals', () => {
-    expect(parsePercent('7.5%')).toBeCloseTo(0.075, 10);
-    expect(parsePercent('60')).toBeCloseTo(0.6, 10);
-    expect(parsePercent('')).toBe(0);
-    expect(parsePercent('abc')).toBe(0);
   });
 });

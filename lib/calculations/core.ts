@@ -380,27 +380,10 @@ export function estimateMonthlyExpenses(profile: PaycheckProfile): number {
 }
 
 /**
- * Format currency for display
+ * Currency and percentage display, from the shared formatters (byte-identical
+ * default output).
  */
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-/**
- * Format percentage for display
- */
-export function formatPercent(decimal: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'percent',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  }).format(decimal);
-}
+export { formatCurrency, formatPercent } from '@/lib/format';
 
 /**
  * Calculate compound growth

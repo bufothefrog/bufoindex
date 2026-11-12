@@ -6,24 +6,39 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ComponentColor, CardVariant, ComponentSize } from '@/lib/design-system/types';
+import { TONE_BORDER, TONE_TEXT, type Tone } from '@/lib/design-system/tone';
 import { LucideIcon } from 'lucide-react';
+
+/** default: the plain card; bordered: a 2px border in the card's tone (ResultCard). */
+type BaseCardVariant = 'default' | 'bordered';
+
+/** The tones a result card can take; without one the card uses the sage brand chrome. */
+export type CardTone = Extract<Tone, 'positive' | 'caution' | 'negative' | 'info'>;
+
+/** The hover border of a bordered card in a tone (TONE_BORDER at 50% instead of 30%). */
+const TONE_BORDER_HOVER: Readonly<Record<CardTone, string>> = {
+  positive: 'hover:border-success/50',
+  caution: 'hover:border-warning/50',
+  negative: 'hover:border-destructive/50',
+  info: 'hover:border-info/50',
+};
+
+const BRAND_BORDER = 'border-sage-200 dark:border-sage-600 hover:border-sage-300 dark:hover:border-sage-500';
+const BRAND_TITLE = 'text-sage-700 dark:text-sage-200';
+const BRAND_ICON = 'text-sage-500 dark:text-sage-400';
 
 interface BaseCardProps {
   title?: string;
   icon?: LucideIcon;
   children: React.ReactNode;
-  variant?: CardVariant;
-  color?: ComponentColor;
-  size?: ComponentSize;
+  variant?: BaseCardVariant;
+  /** Colors the title, the icon and (bordered) the border; sage without one. */
+  tone?: CardTone;
   className?: string;
   headerClassName?: string;
   contentClassName?: string;
-  titleClassName?: string;
   testId?: string;
   actions?: React.ReactNode;
-  collapsible?: boolean;
-  defaultCollapsed?: boolean;
 }
 
 export function BaseCard({
@@ -31,295 +46,74 @@ export function BaseCard({
   icon: Icon,
   children,
   variant = 'default',
-  color = 'sage',
-  size = 'md',
+  tone,
   className,
   headerClassName,
   contentClassName,
-  titleClassName,
   testId,
   actions,
-  collapsible = false,
-  defaultCollapsed = false
 }: BaseCardProps) {
-  const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed);
-  
-  // Variant-specific styling
-  const variantClasses = {
-    default: '',
-    gradient: getGradientClasses(color),
-    bordered: getBorderedClasses(color),
-    elevated: 'shadow-lg border-none'
-  };
-  
-  // Size-specific styling
-  const sizeClasses = {
-    sm: {
-      card: 'text-sm',
-      header: 'p-4 pb-2',
-      content: 'p-4 pt-0',
-      contentStandalone: 'p-4',
-      icon: 'w-4 h-4',
-      title: 'text-base'
-    },
-    md: {
-      card: '',
-      header: 'p-6 pb-4',
-      content: 'p-6 pt-0',
-      contentStandalone: 'p-6',
-      icon: 'w-5 h-5',
-      title: 'text-lg'
-    },
-    lg: {
-      card: 'text-base',
-      header: 'p-8 pb-4',
-      content: 'p-8 pt-0',
-      contentStandalone: 'p-8',
-      icon: 'w-6 h-6',
-      title: 'text-xl'
-    }
-  };
-  
-  const currentSize = sizeClasses[size];
-  
   return (
-    <Card 
+    <Card
       className={cn(
-        variantClasses[variant],
-        currentSize.card,
+        variant === 'bordered' && cn('border-2', tone ? cn(TONE_BORDER[tone], TONE_BORDER_HOVER[tone]) : BRAND_BORDER),
         className
       )}
       data-testid={testId}
     >
       {title && (
-        <CardHeader 
+        <CardHeader
           className={cn(
-            currentSize.header,
+            'p-6 pb-4',
             headerClassName
           )}
         >
           <div className="flex items-center justify-between">
             <CardTitle className={cn(
               "flex items-center space-x-2",
-              currentSize.title,
-              getColorClasses(color, 'text'),
-              titleClassName
+              'text-lg',
+              tone ? TONE_TEXT[tone] : BRAND_TITLE
             )}>
               {Icon && (
                 <Icon className={cn(
-                  currentSize.icon,
-                  getColorClasses(color, 'icon')
+                  'w-5 h-5',
+                  tone ? TONE_TEXT[tone] : BRAND_ICON
                 )} />
               )}
               <span>{title}</span>
             </CardTitle>
-            
+
             <div className="flex items-center space-x-2">
               {actions}
-              {collapsible && (
-                <button
-                  onClick={() => setIsCollapsed(!isCollapsed)}
-                  className={cn(
-                    "p-1 rounded hover:bg-secondary transition-colors",
-                    getColorClasses(color, 'button')
-                  )}
-                  aria-label={isCollapsed ? 'Expand section' : 'Collapse section'}
-                >
-                  <svg
-                    className={cn(
-                      "w-4 h-4 transition-transform",
-                      isCollapsed ? "rotate-180" : ""
-                    )}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-              )}
             </div>
           </div>
         </CardHeader>
       )}
-      
-      {!isCollapsed && (
-        <CardContent className={cn(
-          title ? currentSize.content : currentSize.contentStandalone,
-          contentClassName
-        )}>
-          {children}
-        </CardContent>
-      )}
+
+      <CardContent className={cn(
+        title ? 'p-6 pt-0' : 'p-6',
+        contentClassName
+      )}>
+        {children}
+      </CardContent>
     </Card>
   );
 }
 
 /**
- * Gradient background classes for different colors
- */
-function getGradientClasses(color: ComponentColor): string {
-  const gradients = {
-    sage: 'bg-linear-to-r from-sage-50 to-sage-100 dark:from-sage-800 dark:to-sage-700 border-sage-200 dark:border-sage-600',
-    success: 'bg-linear-to-r from-success/10 to-success/20 border-success/30',
-    warning: 'bg-linear-to-r from-warning/10 to-warning/20 border-warning/30',
-    error: 'bg-linear-to-r from-destructive/10 to-destructive/20 border-destructive/30',
-    info: 'bg-linear-to-r from-info/10 to-info/20 border-info/30'
-  };
-  
-  return gradients[color];
-}
-
-/**
- * Bordered classes for different colors
- */
-function getBorderedClasses(color: ComponentColor): string {
-  const borders = {
-    sage: 'border-2 border-sage-200 dark:border-sage-600 hover:border-sage-300 dark:hover:border-sage-500',
-    success: 'border-2 border-success/30 hover:border-success/50',
-    warning: 'border-2 border-warning/30 hover:border-warning/50',
-    error: 'border-2 border-destructive/30 hover:border-destructive/50',
-    info: 'border-2 border-info/30 hover:border-info/50'
-  };
-  
-  return borders[color];
-}
-
-/**
- * Color classes for different elements
- */
-function getColorClasses(color: ComponentColor, element: 'text' | 'icon' | 'button'): string {
-  const colors = {
-    sage: {
-      text: 'text-sage-700 dark:text-sage-200',
-      icon: 'text-sage-500 dark:text-sage-400',
-      button: 'hover:bg-sage-100 dark:hover:bg-sage-700 text-sage-600 dark:text-sage-300'
-    },
-    success: {
-      text: 'text-success',
-      icon: 'text-success',
-      button: 'hover:bg-success/10 text-success'
-    },
-    warning: {
-      text: 'text-warning',
-      icon: 'text-warning',
-      button: 'hover:bg-warning/10 text-warning'
-    },
-    error: {
-      text: 'text-destructive',
-      icon: 'text-destructive',
-      button: 'hover:bg-destructive/10 text-destructive'
-    },
-    info: {
-      text: 'text-info',
-      icon: 'text-info',
-      button: 'hover:bg-info/10 text-info'
-    }
-  };
-  
-  return colors[color][element];
-}
-
-/**
  * Input Card - Specialized card for form sections
  */
-interface InputCardProps extends Omit<BaseCardProps, 'variant'> {
-  required?: boolean;
-}
+type InputCardProps = Omit<BaseCardProps, 'variant'>;
 
-export function InputCard({ 
-  required = false, 
-  title, 
-  ...props 
-}: InputCardProps) {
-  const displayTitle = required && title ? `${title} *` : title;
-  
-  return (
-    <BaseCard
-      {...props}
-      title={displayTitle}
-      variant="default"
-      titleClassName={cn(
-        required && 'after:content-[""] after:text-destructive',
-        props.titleClassName
-      )}
-    />
-  );
+export function InputCard(props: InputCardProps) {
+  return <BaseCard {...props} variant="default" />;
 }
 
 /**
  * Result Card - Specialized card for displaying results
  */
-interface ResultCardProps extends Omit<BaseCardProps, 'variant' | 'color'> {
-  status?: 'success' | 'warning' | 'error' | 'info';
-  highlight?: boolean;
-}
+type ResultCardProps = Omit<BaseCardProps, 'variant'>;
 
-export function ResultCard({ 
-  status, 
-  highlight = false,
-  ...props 
-}: ResultCardProps) {
-  const color: ComponentColor = status || 'sage';
-  const variant: CardVariant = highlight ? 'gradient' : 'bordered';
-  
-  return (
-    <BaseCard
-      {...props}
-      variant={variant}
-      color={color}
-    />
-  );
-}
-
-/**
- * Summary Card - For displaying key metrics
- */
-interface SummaryCardProps extends Omit<BaseCardProps, 'children'> {
-  value: string | number;
-  label: string;
-  change?: {
-    value: string | number;
-    direction: 'up' | 'down' | 'neutral';
-  };
-  secondaryValue?: string;
-}
-
-export function SummaryCard({
-  value,
-  label,
-  change,
-  secondaryValue,
-  ...props
-}: SummaryCardProps) {
-  return (
-    <BaseCard {...props} size="sm">
-      <div className="text-center space-y-2">
-        <div className="text-2xl font-bold text-foreground">
-          {value}
-        </div>
-        <div className="text-sm text-muted-foreground">
-          {label}
-        </div>
-        {change && (
-          <div className={cn(
-            "text-xs flex items-center justify-center space-x-1",
-            change.direction === 'up' && "text-success",
-            change.direction === 'down' && "text-destructive",
-            change.direction === 'neutral' && "text-muted-foreground"
-          )}>
-            {change.direction !== 'neutral' && (
-              <span>{change.direction === 'up' ? '↑' : '↓'}</span>
-            )}
-            <span>{change.value}</span>
-          </div>
-        )}
-        {secondaryValue && (
-          <div className="text-xs text-muted-foreground">
-            {secondaryValue}
-          </div>
-        )}
-      </div>
-    </BaseCard>
-  );
+export function ResultCard(props: ResultCardProps) {
+  return <BaseCard {...props} variant="bordered" />;
 }

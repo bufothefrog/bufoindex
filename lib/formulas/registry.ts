@@ -6,18 +6,11 @@
 import {
   FormulaRegistry,
   FormulaRegistryEntry,
-  FormulaCategory,
   RegisteredFormula
 } from './types';
 
 class FormulaRegistryImpl implements FormulaRegistry {
   public formulas = new Map<string, FormulaRegistryEntry>();
-  public categories: Record<FormulaCategory, string[]> = {
-    core: [],
-    intermediate: [],
-    advanced: [],
-    assumptions: []
-  };
   public byCalculator: Record<string, string[]> = {};
 
   /**
@@ -40,11 +33,6 @@ class FormulaRegistryImpl implements FormulaRegistry {
 
     this.formulas.set(id, entry);
 
-    // Update category index
-    if (!this.categories[metadata.category].includes(id)) {
-      this.categories[metadata.category].push(id);
-    }
-
     // Update calculator index
     if (calculator) {
       if (!this.byCalculator[calculator]) {
@@ -57,22 +45,6 @@ class FormulaRegistryImpl implements FormulaRegistry {
   }
 
   /**
-   * Get formula by ID
-   */
-  getFormula(id: string): FormulaRegistryEntry | undefined {
-    return this.formulas.get(id);
-  }
-
-  /**
-   * Get all formulas in a category
-   */
-  getFormulasByCategory(category: FormulaCategory): FormulaRegistryEntry[] {
-    return this.categories[category]
-      .map(id => this.formulas.get(id))
-      .filter((formula): formula is FormulaRegistryEntry => formula !== undefined);
-  }
-
-  /**
    * Get all formulas for a calculator
    */
   getFormulasByCalculator(calculator: string): FormulaRegistryEntry[] {
@@ -80,83 +52,6 @@ class FormulaRegistryImpl implements FormulaRegistry {
     return formulaIds
       .map(id => this.formulas.get(id))
       .filter((formula): formula is FormulaRegistryEntry => formula !== undefined);
-  }
-
-  /**
-   * Get all registered formulas
-   */
-  getAllFormulas(): FormulaRegistryEntry[] {
-    return Array.from(this.formulas.values());
-  }
-
-  /**
-   * Search formulas by name or description
-   */
-  searchFormulas(query: string): FormulaRegistryEntry[] {
-    const lowercaseQuery = query.toLowerCase();
-    return this.getAllFormulas().filter(formula =>
-      formula.name.toLowerCase().includes(lowercaseQuery) ||
-      formula.description.toLowerCase().includes(lowercaseQuery) ||
-      formula.purpose.toLowerCase().includes(lowercaseQuery)
-    );
-  }
-
-  /**
-   * Mark a formula as validated
-   */
-  markValidated(id: string, isValid: boolean): void {
-    const formula = this.formulas.get(id);
-    if (formula) {
-      formula.validated = isValid;
-    }
-  }
-
-  /**
-   * Get validation status summary
-   */
-  getValidationSummary(): {
-    total: number;
-    validated: number;
-    pending: number;
-    byCategory: Record<FormulaCategory, { total: number; validated: number }>;
-  } {
-    const all = this.getAllFormulas();
-    const validated = all.filter(f => f.validated);
-
-    const byCategory: Record<FormulaCategory, { total: number; validated: number }> = {
-      core: { total: 0, validated: 0 },
-      intermediate: { total: 0, validated: 0 },
-      advanced: { total: 0, validated: 0 },
-      assumptions: { total: 0, validated: 0 }
-    };
-
-    all.forEach(formula => {
-      byCategory[formula.category].total++;
-      if (formula.validated) {
-        byCategory[formula.category].validated++;
-      }
-    });
-
-    return {
-      total: all.length,
-      validated: validated.length,
-      pending: all.length - validated.length,
-      byCategory
-    };
-  }
-
-  /**
-   * Clear all registered formulas (for testing)
-   */
-  clear(): void {
-    this.formulas.clear();
-    this.categories = {
-      core: [],
-      intermediate: [],
-      advanced: [],
-      assumptions: []
-    };
-    this.byCalculator = {};
   }
 
   /**
@@ -182,6 +77,3 @@ class FormulaRegistryImpl implements FormulaRegistry {
 
 // Global registry instance
 export const formulaRegistry = new FormulaRegistryImpl();
-
-// Export for testing
-export const createFormulaRegistry = () => new FormulaRegistryImpl();

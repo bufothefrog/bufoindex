@@ -1,8 +1,9 @@
 /**
  * Calculator contracts (docs/rebuild-plan.md section 2.6, as amended by
  * section 0). A CalculatorMeta is what the registry, the shell and the
- * metadata need; a CalculatorDefinition is what the run store, validation
- * and the legacy storage import need. Pure types, no runtime.
+ * metadata need; a CalculatorDefinition is what the run store and
+ * validation need; a LegacyImport is what the one-time import of an old
+ * calculator's localStorage key needs. Pure types, no runtime.
  */
 
 import type { DisclaimerFragment } from '@/lib/constants/disclaimers';
@@ -64,6 +65,4 @@ export interface CalculatorDefinition<E, R> {
    * portfolio 0, leverage 250 (audit H3).
    */
   debounceMs: number;
-  /** Retirement and paycheck only (plan section 0.1 item 5). */
-  legacy?: LegacyStorage<E>;
 }

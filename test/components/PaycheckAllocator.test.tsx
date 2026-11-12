@@ -15,7 +15,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { PaycheckAllocator } from '@/components/paycheck-allocator/PaycheckAllocator';
 import { calculatorMeta } from '@/lib/calculators/registry';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { paycheckLink } from '@/lib/profile/links';
 import { usePaycheckStore } from '@/lib/store/paycheckStore';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { PROFILE_STORAGE_KEY, useProfileStore } from '@/lib/store/profileStore';
@@ -29,6 +28,14 @@ const TAX_NOTE =
 
 /** Waits for the first results (the bootstrap submits immediately once hydrated). */
 const findResults = () => screen.findByText('Long-Term Impact');
+
+/**
+ * An old handoff link: the deleted paycheckLink built it for the default
+ * profile, with the profile in the hash (captured before slice x1 deleted
+ * the builder and its codec).
+ */
+const OLD_HANDOFF_LINK =
+  '/tools/paycheck-allocator?from=profile#eyJ2IjoyLCJwIjp7ImlnIjo3NTgzLjMzMzMzMzMzMzMzMywiaW4iOjU2MzMuMzMzMzMzMzMzMzMzLCJpZiI6ImJpLXdlZWtseSIsImlwZyI6MzUwMCwiaXBuIjoyNjAwLCJ0cyI6IlRYIiwiYjQwMSI6eyJhIjp0cnVlLCJtcCI6MC41LCJtbCI6MC4wNiwiY2MiOjAuMDYsInRjIjowLjA2fSwicHIiOnsibmUiOjMwMDAsImVmbSI6MywiZWYiOjUwMDAsImZtbiI6MzAwLCJmbXgiOjYwMCwiYWdlIjozMCwiaHRhIjp0cnVlLCJ0YWMiOjUwMH19fQ';
 
 const CARD = { id: 'd1', name: 'Card', balance: 3000, interestRate: 0.22, minimumPayment: 90, extraPayment: 10, taxDeductible: false };
 const CAR = { id: 'd2', name: 'Car', balance: 9000, interestRate: 0.05, minimumPayment: 250, extraPayment: 0, taxDeductible: false };
@@ -166,7 +173,7 @@ describe('PaycheckAllocator', () => {
     // The old handoff link carried the profile in its hash, and the old page
     // read that hash back on every load, undoing the edits made since.
     resetProfileStore({ profile: { person: { age: 35 } } });
-    const link = paycheckLink(useProfileStore.getState().profile);
+    const link = OLD_HANDOFF_LINK;
     window.history.replaceState(null, '', link);
     expect(window.location.hash).not.toBe('');
 

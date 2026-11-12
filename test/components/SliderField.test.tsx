@@ -6,9 +6,9 @@
  */
 
 import React, { useState } from 'react';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { SliderField, type SliderFieldProps } from '@/components/ui/inputs';
 import { ResizeObserverStub } from './fields/harness';
 
@@ -18,10 +18,6 @@ beforeAll(() => {
 
 afterAll(() => {
   vi.unstubAllGlobals();
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 function Harness({ initial = 1, onChange, ...rest }: Partial<SliderFieldProps> & { initial?: number }) {

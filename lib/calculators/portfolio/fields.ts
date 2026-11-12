@@ -42,9 +42,18 @@ function plural(count: number, one: string, many: string): string {
   return `${formatCount(count)} ${count === 1 ? one : many}`;
 }
 
+function accountName(account: { name?: unknown }): string | null {
+  return typeof account.name === 'string' && account.name !== '' ? account.name : null;
+}
+
 /** An account's name, or its place in the list ('Account 2') while it has none. */
 export function accountLabel(account: { name?: unknown }, index: number): string {
-  return typeof account.name === 'string' && account.name !== '' ? account.name : `Account ${index + 1}`;
+  return accountName(account) ?? `Account ${index + 1}`;
+}
+
+/** An account's name inside a sentence: its own name, else "account 2". */
+function accountInText(account: { name?: unknown }, index: number): string {
+  return accountName(account) ?? `account ${index + 1}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,8 +156,8 @@ export const ACCOUNTS: FieldSpec = {
   itemLabel: (row, index) => accountLabel(row, index),
   addLabel: 'Add account',
   minRows: 1,
-  confirmRemove: (row, index) =>
-    `Delete ${typeof row.name === 'string' && row.name !== '' ? row.name : `account ${index + 1}`}? Its holdings will be removed too.`,
+  confirmRemove: (row, index) => `Delete ${accountInText(row, index)}? Its holdings will be removed too.`,
+  removeLabel: (row, index) => `Remove ${accountInText(row, index)}`,
   // The account's holdings go with it, and so do the securities only they held.
   removeRow: (get, index) => {
     const portfolio = readPortfolio(get);

@@ -7,14 +7,6 @@
 
 import type { Metadata } from 'next';
 import { composeDisclaimer, DISCLAIMER } from '@/lib/constants/disclaimers';
-import {
-  LEVERAGE_PATH,
-  PAYCHECK_PATH,
-  PORTFOLIO_PATH,
-  PROFILE_HANDOFF_PARAM,
-  PROFILE_HANDOFF_VALUE,
-  RETIREMENT_PATH,
-} from '@/lib/profile/links';
 import type { CalculatorId, CalculatorMeta } from './types';
 
 /** The calculator's card on the /tools index. */
@@ -38,7 +30,7 @@ export const CALCULATORS: Readonly<Record<CalculatorId, CalculatorEntry>> = {
     id: 'paycheck',
     title: 'Paycheck Allocator Calculator',
     shortTitle: 'Paycheck Allocator',
-    path: PAYCHECK_PATH,
+    path: '/tools/paycheck-allocator',
     description:
       'Allocates your monthly paycheck across fixed costs, tax-advantaged accounts, and flexible spending, in priority order by after-tax return. Each step shows the math behind its placement.',
     metaDescription:
@@ -57,7 +49,7 @@ export const CALCULATORS: Readonly<Record<CalculatorId, CalculatorEntry>> = {
     id: 'retirement',
     title: 'Retirement Planning Calculator',
     shortTitle: 'Retirement Calculator',
-    path: RETIREMENT_PATH,
+    path: '/tools/retirement-calculator',
     description:
       'Monte Carlo retirement modeling with Social Security, healthcare costs, and side-by-side scenario comparison.',
     metaDescription:
@@ -76,7 +68,7 @@ export const CALCULATORS: Readonly<Record<CalculatorId, CalculatorEntry>> = {
     id: 'portfolio',
     title: 'Portfolio Rebalancing Calculator',
     shortTitle: 'Portfolio Rebalancer',
-    path: PORTFOLIO_PATH,
+    path: '/tools/portfolio-rebalancing-calculator',
     description:
       'Rebalance toward your asset-class targets using new deposits across one or more accounts, with whole or fractional shares and tax-aware placement advice.',
     metaDescription:
@@ -95,7 +87,7 @@ export const CALCULATORS: Readonly<Record<CalculatorId, CalculatorEntry>> = {
     id: 'leverage',
     title: 'Leverage Comparison',
     shortTitle: 'Leverage Comparison',
-    path: LEVERAGE_PATH,
+    path: '/tools/leverage-comparison',
     description:
       'Monthly contributions into a plain index fund versus the same contributions into a daily-reset leveraged fund, across simulated markets, alongside the usual lump-sum framing on the same dollars.',
     metaDescription:
@@ -129,6 +121,14 @@ export function calculatorMetadata(id: CalculatorId): Metadata {
   const { shortTitle, metaDescription } = CALCULATORS[id];
   return { title: shortTitle, description: metaDescription };
 }
+
+/**
+ * Query parameter and value that mark a handoff from the wizard or the
+ * dashboard (`?from=profile`); the calculator bootstrap strips the marker on
+ * arrival and reads its inputs from the shared profile.
+ */
+export const PROFILE_HANDOFF_PARAM = 'from';
+export const PROFILE_HANDOFF_VALUE = 'profile';
 
 /**
  * The calculator's path; with fromProfile, plus `?from=profile` so the page

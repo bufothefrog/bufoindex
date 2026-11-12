@@ -30,11 +30,12 @@ import {
   derivedYears,
 } from '@/lib/calculators/leverage/bindings';
 import { LEVERAGE_CALCULATOR, validateDcaComparisonInputs } from '@/lib/calculators/leverage/definition';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
-import { getDefaultFinancialProfile, migrateProfile, patchWrites, applyProfileWrites } from '@/lib/profile';
-import type { FinancialProfile, ProfilePatch } from '@/lib/profile';
+import { applyProfileWrites, getDefaultFinancialProfile, patchWrites } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
+import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 
 const V1_DEFAULT = {
   version: 1,
@@ -232,11 +233,11 @@ describe('validateDcaComparisonInputs', () => {
 
   it('shows that error with the results, whether the contribution is derived or an override', () => {
     const derived = migrateProfile(v1(GOLDEN[5].edits), 1);
-    expect(validateFor(LEVERAGE_CALCULATOR, derived)).toEqual({
+    expect(prepareRun(LEVERAGE_CALCULATOR, derived).errors).toEqual({
       calculation: 'Enter a monthly contribution or a starting balance.',
     });
     const overridden = withPatch({ leverage: { monthlyContribution: 0, startingBalance: 0 } });
-    expect(validateFor(LEVERAGE_CALCULATOR, overridden)).toEqual({
+    expect(prepareRun(LEVERAGE_CALCULATOR, overridden).errors).toEqual({
       calculation: 'Enter a monthly contribution or a starting balance.',
     });
   });
@@ -248,7 +249,7 @@ describe('validateDcaComparisonInputs', () => {
       assumptions: { leverage: { indexMeanReturn: 0.5, expenseRatio: -0.01 } },
       person: { age: 60, retirementAge: 40 },
     });
-    expect(validateFor(LEVERAGE_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(LEVERAGE_CALCULATOR, profile).errors).toEqual({
       'leverage.monthlyContribution': 'Monthly contribution must be between $0 and $1,000,000.',
       'leverage.years': 'Years must be between 1 yrs and 60 yrs.',
       'strategy.leverageRatio': 'Leverage ratio must be between 1 and 3.',

@@ -4,21 +4,24 @@
 
 **Live: https://bufoindex.com**
 
-Interactive personal-finance calculators that show their work. Every number on screen traces back to a formula you can inspect — the retirement calculator ships a [methodology page](https://bufoindex.com/tools/retirement-calculator/methodology) with the actual equations. Everything runs client-side: no backend, no accounts, no data leaving the browser. Scenarios are encoded into the URL hash, so sharing a configuration is just sharing a link.
+Interactive personal-finance calculators that show their work. Every number on screen traces back to a formula you can inspect: the retirement calculator ships a [methodology page](https://bufoindex.com/tools/retirement-calculator/methodology) with the actual equations. Everything runs client-side: no backend, no accounts, no data leaving the browser. A short guided intake builds one financial profile, saved in your browser, that every calculator and the overview dashboard read, so you answer each question once.
 
 ## Calculators
 
 - **[Paycheck Allocator](https://bufoindex.com/tools/paycheck-allocator)** — allocates a monthly paycheck across fixed costs, tax-advantaged accounts, and flex spending, with bracket-aware federal and state tax math (2026 IRS and state figures, sourced in `lib/constants/`).
 - **[Retirement Calculator](https://bufoindex.com/tools/retirement-calculator)** — Monte Carlo retirement modeling that genuinely models Social Security timing and benefits, healthcare cost growth, and a target-date-fund glide path, with side-by-side scenario comparison. Results can be viewed in today's dollars or future (nominal) dollars via a display toggle.
 - **[Portfolio Rebalancer](https://bufoindex.com/tools/portfolio-rebalancing-calculator)** — multi-account rebalancing with custom asset classes, a securities registry shared across accounts, and tax-aware placement advice.
+- **[Leverage Comparison](https://bufoindex.com/tools/leverage-comparison)** - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded random paths, with the lump-sum framing alongside.
+
+The guided intake lives at [/start](https://bufoindex.com/start) and the dashboard at [/overview](https://bufoindex.com/overview).
 
 ## How it works
 
 - **Pure calculation layer.** All financial logic lives in `lib/calculations/` as pure TypeScript — no React, DOM, or storage imports — so every formula is unit-testable against hand-computed values.
 - **Seeded Monte Carlo.** The retirement simulation draws normally distributed annual returns via a Box–Muller transform over a seeded LCG (`lib/utils/random.ts`). A fixed default seed makes results reproducible: the same inputs always give the same success probability.
-- **Versioned URL-hash state.** Each calculator serializes its inputs to a compact, versioned, base64url-encoded hash — short keys, defaults elided. Decoders accept every prior schema version and migrate forward, so old shared links keep working.
+- **One shared profile.** Every input lives in a single versioned financial profile in localStorage. Each field is described once as a `FieldSpec` (`lib/fields/`), and that spec drives the intake, the calculator forms, validation and profile completeness. Each calculator maps the profile to its engine inputs through bindings in `lib/calculators/<id>/` and runs through one shared run-store factory; the retirement simulation runs in a web worker.
 - **Display-dollar boundary.** Simulations run in nominal dollars; the today's-dollars toggle converts at display time only (`lib/utils/displayDollars.ts`) and never feeds back into calculations.
-- **Semantic-token theming.** Light and dark mode are driven by design tokens in `app/globals.css`; charts pull colors through `getChartTheme()` so they follow the active theme.
+- **Semantic-token theming.** Light and dark mode are driven by design tokens in `app/globals.css`; charts pull colors through `useChartTheme()` (a wrapper over `getChartTheme()`) so they follow the active theme.
 
 Details in [`docs/architecture.md`](./docs/architecture.md).
 
@@ -63,26 +66,33 @@ app/                     # Next.js App Router routes
   tools/                 # Calculator pages, plus the components and charts
                          #   specific to each (paycheck-allocator,
                          #   retirement-calculator + methodology,
-                         #   portfolio-rebalancing-calculator)
+                         #   portfolio-rebalancing-calculator, leverage-comparison)
+  start/, overview/      # Guided intake and the dashboard
   demo/                  # Public component gallery
 components/
-  ui/                    # Primitives: button, card, input, slider, inputs/, cards/, layouts/
-  shared/                # Tooltip, UtilityBar, DollarModeToggle, inputs/, layout/, cards/
-  paycheck-allocator/    # Paycheck-allocator UI
-  calculators/, retirement/, methodology/
+  ui/                    # Primitives: button, card, input, slider, inputs/, cards/,
+                         #   results/, charts/, layouts/
+  fields/                # Renderers for the field schema
+  calculators/           # CalculatorPage shell, per-calculator renderers
+  shared/                # UtilityBar, DollarModeToggle, inputs/, cards/
+  guided/, dashboard/, paycheck-allocator/, methodology/
 contexts/                # ThemeContext (light/dark)
 lib/
-  calculations/          # Pure financial logic — no React
-  constants/             # Sourced figures (irs-2026.ts, states-2026.ts, …)
-  utils/                 # URL-hash codecs, seeded RNG, display-dollar conversion
-  store/, types/, formulas/, chart-theme.ts
+  calculations/          # Pure financial logic, no React
+  calculators/           # Per-calculator form, fields, bindings, definition, headline
+  fields/, profile/      # Field schema and the shared profile
+  store/, workers/       # Profile and preference stores, run stores, worker runner
+  constants/             # Sourced figures (irs-2026.ts, states-2026.ts, ...)
+  utils/                 # cn, clamp, tax-rate helpers, seeded RNG, display-dollar
+                         #   conversion, paycheck step status
+  formulas/, format.ts, chart-theme.ts
 test/                    # Vitest suites, factories, helpers
 docs/                    # architecture.md, agents.md, agents/ (patterns, coordination)
 ```
 
 ## Testing
 
-Every module in `lib/calculations/` has a matching suite in `test/lib/calculations/`; codecs and utilities are covered in `test/lib/utils/`, stores in `test/lib/store/`, the formula registry in `test/lib/formulas/`, and components in `test/components/` (`npm run test:run`). Calculation tests assert real numeric values, hand-computed where practical. Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts` — a higher bar for `lib/calculations/` than for the rest — and CI fails when they are not met.
+Every module in `lib/calculations/` has a matching suite in `test/lib/calculations/`; utilities are covered in `test/lib/utils/`, the field schema in `test/lib/fields/`, calculator wiring in `test/lib/calculators/`, the profile in `test/lib/profile/`, stores in `test/lib/store/`, the formula registry in `test/lib/formulas/`, and components in `test/components/` (`npm run test:run`). Calculation tests assert real numeric values, hand-computed where practical. Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts` (a higher bar for `lib/calculations/` than for the rest), and CI fails when they are not met.
 
 ## Development process
 

@@ -8,11 +8,12 @@
  */
 
 import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Wizard } from '@/components/guided/Wizard';
-import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
+import { CORE_PATHS } from '@/lib/constants/intake';
+import { intakePaths } from '@/test/utils/intakeFixture';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -36,10 +37,6 @@ beforeEach(() => {
   resetRouterMock();
   clearBrowserState();
   resetProfileStore();
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 const next = () => userEvent.setup().click(screen.getByRole('button', { name: /Next/ }));

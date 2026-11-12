@@ -6,17 +6,13 @@
  */
 
 import React, { useState } from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Coins, Scissors } from 'lucide-react';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import type { DollarDisplayMode } from '@/lib/utils/displayDollars';
-
-afterEach(() => {
-  cleanup();
-});
 
 type Strategy = 'standard' | 'cashflow' | 'growth';
 

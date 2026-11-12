@@ -11,7 +11,7 @@ import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_LEGACY, readPaycheckStorage } from '@/lib/calculators/paycheck/legacy';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { NET_PAY_AT_MOST_GROSS } from '@/lib/fields/shared';
 import { importLegacyStorage } from '@/lib/store/legacyImport';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
@@ -572,7 +572,7 @@ describe('importLegacyStorage: the take-home pay keeps its share of gross pay', 
       JSON.stringify({ state: { inputs: { ...RETIREMENT_LEGACY.storageDefaults(), ...inputs } }, version: 3 })
     );
   const paycheckIncome = () => engineInputsFor(PAYCHECK_CALCULATOR, useProfileStore.getState().profile).income;
-  const paycheckErrors = () => validateFor(PAYCHECK_CALCULATOR, useProfileStore.getState().profile);
+  const paycheckErrors = () => prepareRun(PAYCHECK_CALCULATOR, useProfileStore.getState().profile).errors;
 
   it('applies the profile default share when only the retirement key is there, salary untouched', () => {
     storeRetirement({ startingAge: 40 });

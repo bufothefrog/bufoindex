@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { BaseInput, MoneyInput, NumberInput, PercentInput, SliderField, StateSelector } from '@/components/ui/inputs';
+import { BaseInput, MoneyInput, NumberInput, PercentInput, SliderField } from '@/components/ui/inputs';
+import { StateSelector } from '@/components/shared/inputs/StateSelector';
 import type { InputSize } from '@/components/ui/inputs';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +13,7 @@ import {
   fieldWrites,
   formatFieldValue,
   isFieldVisible,
+  isFiniteNumber,
   resolveOptions,
   resolveOverrideDefault,
   resolveText,
@@ -34,7 +36,7 @@ const YES_NO: readonly FieldOption[] = [
 ];
 
 function asNumber(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return isFiniteNumber(value) ? value : 0;
 }
 
 function asString(value: unknown): string {

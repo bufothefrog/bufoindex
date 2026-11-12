@@ -6,10 +6,10 @@ import {
   PROFILE_FORM_ORDER,
   PROFILE_FORM_SECTION_LABELS,
   composeProfileForm,
-  fieldRegistry,
   formForFlow,
   profileCompleteness,
   profileFormSection,
+  topicsAnsweredText,
 } from '@/lib/calculators/forms';
 import { CORE_SCREENS, PROFILE_EXTRA_SCREENS } from '@/lib/fields/shared';
 import { makeGet } from '@/lib/fields/paths';
@@ -124,6 +124,25 @@ describe('PROFILE_FORM', () => {
     // Leverage's facts screen keeps only what no earlier screen asks (the age, the retirement age and the
     // invested balance were asked before it, and the taxable contribution on paycheck's ira-taxable screen).
     expect(PROFILE_FORM.screens.find((screen) => screen.id === 'facts')?.fields).toEqual(['strategy.leverageRatio']);
+  });
+
+  it('gives a trimmed screen its own wording: the leverage facts screen speaks of the ratio alone', () => {
+    const facts = PROFILE_FORM.screens.find((screen) => screen.id === 'facts')!;
+    expect(facts).toMatchObject({
+      title: 'Leverage ratio',
+      question: 'Which leverage ratio should the comparison use?',
+      description:
+        'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
+    });
+    // The leverage intake asks the whole screen, with its own wording.
+    expect(FORMS.leverage.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
+    // A screen that keeps every field keeps its wording even with copy for it.
+    const whole = composeProfileForm(
+      { id: 'core', fields: [], screens: [] },
+      [{ form: FORMS.leverage, section: 'portfolio', trimmedCopy: { facts: { title: 'Trimmed' } } }],
+      { id: 'extra', fields: [], screens: [] }
+    );
+    expect(whole.form.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
   });
 
   it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {
@@ -259,21 +278,6 @@ describe('composeProfileForm', () => {
   });
 });
 
-describe('fieldRegistry', () => {
-  it('lists every field any form defines, once, first wording first', () => {
-    const registry = fieldRegistry();
-    const all = new Set([CORE_FORM, ...Object.values(FORMS), PROFILE_FORM].flatMap((form) => form.fields.map((spec) => spec.path)));
-    expect(new Set(registry.keys())).toEqual(all);
-    const sources = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM];
-    for (const path of registry.keys()) {
-      const first = sources.find((form) => form.fields.some((spec) => spec.path === path))!;
-      expect(registry.get(path), path).toBe(fieldMap(first).get(path));
-    }
-    expect(registry.get('person.age')?.label).toBe('Your age');
-    expect(fieldRegistry()).toBe(registry);
-  });
-});
-
 describe('profileCompleteness (by topic screen)', () => {
   const topics = (profile: FinancialProfile) =>
     screensFor(PROFILE_FORM, makeGet(profile), { mode: 'all', surface: 'intake' });
@@ -315,5 +319,12 @@ describe('profileCompleteness (by topic screen)', () => {
     const all = PROFILE_FORM.screens.flatMap((s) => s.fields);
     const result = profileCompleteness(profileWith(all));
     expect(result).toEqual({ provided: result.total, total: PROFILE_FORM.screens.length, missing: [] });
+  });
+});
+
+describe('topicsAnsweredText', () => {
+  it('reads the count the way every completeness card prints it', () => {
+    expect(topicsAnsweredText({ provided: 3, total: 17 })).toBe('3 of 17 topics answered');
+    expect(topicsAnsweredText({ provided: 0, total: 0 })).toBe('0 of 0 topics answered');
   });
 });

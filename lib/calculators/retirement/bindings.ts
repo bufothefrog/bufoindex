@@ -1,7 +1,7 @@
 /**
  * Retirement bindings (docs/rebuild-plan.md section 2.5): which profile
- * value feeds each RetirementInputs leaf. They reproduce
- * lib/profile/mappers.ts toRetirementInputs, which slice x1 deletes. Pure.
+ * value feeds each RetirementInputs leaf. The golden fixture in
+ * test/lib/calculators/retirement/bindings.test.ts pins the result. Pure.
  *
  * Two leaves are derived:
  *
@@ -24,7 +24,17 @@ import { annualizeIncome, type IncomePeriod, type RetirementInputs } from '@/lib
 import { FILING_STATUS_META } from '@/lib/constants/labels';
 import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import type { Binding } from '@/lib/fields/binding';
-import { FILING_STATUS, GROSS_PAY, PAY_FREQUENCY } from '@/lib/fields/shared';
+import {
+  AGE,
+  FILING_STATUS,
+  GROSS_PAY,
+  INVESTED_BALANCE,
+  MONTHLY_INVESTING,
+  NECESSARY_MONTHLY,
+  PAY_FREQUENCY,
+  RETIREMENT_AGE,
+  STATE,
+} from '@/lib/fields/shared';
 import type { Get, Write } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 
@@ -92,11 +102,11 @@ export function filingStatusNote(status: FilingStatus): string | null {
 }
 
 export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
-  { profile: 'person.age', engine: 'startingAge' },
-  { profile: 'person.retirementAge', engine: 'retirementAge' },
+  { profile: AGE.path, engine: 'startingAge' },
+  { profile: RETIREMENT_AGE.path, engine: 'retirementAge' },
   { profile: 'person.lifeExpectancy', engine: 'lifeExpectancy' },
   { profile: 'spending.targetRetirementIncome', engine: 'targetIncome' },
-  { profile: 'investing.investedBalance', engine: 'startingBalance' },
+  { profile: INVESTED_BALANCE.path, engine: 'startingBalance' },
   {
     engine: 'currentIncome',
     read: (get) => {
@@ -112,8 +122,8 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
     errorPath: GROSS_PATH,
   },
   { engine: 'incomePeriod', read: (get) => incomeEntry(get).period },
-  { profile: 'investing.monthlyContribution', engine: 'monthlySavings' },
-  { profile: 'spending.necessaryMonthly', engine: 'necessaryMonthlyExpenses' },
+  { profile: MONTHLY_INVESTING.path, engine: 'monthlySavings' },
+  { profile: NECESSARY_MONTHLY.path, engine: 'necessaryMonthlyExpenses' },
   { profile: 'assumptions.retirement.accumulationReturn', engine: 'accumulationReturn' },
   { profile: 'assumptions.retirement.retirementReturn', engine: 'retirementReturn' },
   { profile: 'assumptions.retirement.inflationRate', engine: 'inflationRate' },
@@ -127,7 +137,7 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
     write: (value) => [{ path: FILING_PATH, value }],
     errorPath: FILING_PATH,
   },
-  { profile: 'person.state', engine: 'state' },
+  { profile: STATE.path, engine: 'state' },
   { profile: 'assumptions.retirement.riskProfile', engine: 'riskProfile' },
   { profile: 'assumptions.retirement.effectiveTaxRate', engine: 'effectiveTaxRate' },
   { profile: 'retirementIncome.annualHealthcareCost', engine: 'estimatedAnnualHealthcareCost' },

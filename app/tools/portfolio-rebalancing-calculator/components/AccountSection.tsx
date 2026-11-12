@@ -68,7 +68,7 @@ export function AccountSection({
         </div>
       ) : (
         <div className="space-y-2">
-          {holdings.map(holding => {
+          {holdings.map((holding, localIndex) => {
             const security = securities.find(s => s.id === holding.securityId) ?? null;
             const globalIndex = allHoldings.findIndex(h => h.id === holding.id);
             return (
@@ -79,6 +79,7 @@ export function AccountSection({
                 securities={securities}
                 index={globalIndex}
                 canRemove
+                context={`${title} holding ${localIndex + 1}`}
                 classTargets={classTargets}
                 customAssetClasses={customAssetClasses}
                 onChangeHolding={patch => update(p => updateHolding(p, holding.id, patch))}

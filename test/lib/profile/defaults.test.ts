@@ -15,7 +15,6 @@ import {
   BROKERAGE_ACCOUNT_ID,
   getDefaultFinancialProfile,
   getProfileValue,
-  isProfileFieldPath,
   isProfilePath,
   isValidProfileValue,
   newCashDepositWrites,
@@ -23,18 +22,16 @@ import {
   normalizeProvided,
   presetClassTargets,
   PRESET_EMERGENCY_MONTHS,
-  PROFILE_FIELDS,
   PROFILE_LEAF_PATHS,
   PROFILE_LIST_PATHS,
   PROFILE_LIST_ROW_DEFAULTS,
-  PROFILE_SECTION_LABELS,
   PROFILE_SECTIONS,
   providedPathFor,
-  splitProfilePath,
   TARGET_MIX_PRESETS,
   TARGET_MIX_WEIGHTS,
-} from '@/lib/profile';
-import type { FinancialProfile, PresetTargetMix } from '@/lib/profile';
+} from '@/lib/profile/defaults';
+import type { FinancialProfile } from '@/lib/profile/types';
+import type { PresetTargetMix } from '@/lib/profile/defaults';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
 import { RetirementConstants } from '@/lib/constants/retirement';
 
@@ -82,7 +79,6 @@ describe('getDefaultFinancialProfile', () => {
         monthlyContribution: 1500,
         taxableMonthlyContribution: 500,
         targetMix: '80-20',
-        newCashThisMonth: 1000,
       },
       retirementIncome: { socialSecurityBenefit: 30000, socialSecurityAge: 67, annualHealthcareCost: null },
       debts: [],
@@ -154,7 +150,7 @@ describe('getDefaultFinancialProfile', () => {
 
   it('puts the default new cash on the Brokerage account', () => {
     const p = getDefaultFinancialProfile();
-    expect(p.portfolio.accounts.find((a) => a.id === BROKERAGE_ACCOUNT_ID)?.deposit).toBe(p.investing.newCashThisMonth);
+    expect(p.portfolio.accounts.find((a) => a.id === BROKERAGE_ACCOUNT_ID)?.deposit).toBe(1000);
   });
 
   it('returns a fresh object each call', () => {
@@ -194,31 +190,25 @@ describe('target mix', () => {
   });
 });
 
-describe('PROFILE_FIELDS, sections and preset constants', () => {
-  it('keeps the 25 v1 leaves, each a v2 leaf with a label and a known section', () => {
-    expect(PROFILE_FIELDS).toHaveLength(25);
-    expect(PROFILE_FIELDS.map((f) => f.path)).toEqual(V1_LEAF_PATHS);
-    for (const field of PROFILE_FIELDS) {
-      expect(PROFILE_LEAF_PATHS).toContain(field.path);
-      expect(field.label.length).toBeGreaterThan(0);
-      expect(field.path.startsWith(`${field.section}.`)).toBe(true);
-      expect(PROFILE_SECTION_LABELS[field.section as keyof typeof PROFILE_SECTION_LABELS]).toBeTruthy();
-    }
+describe('v1 leaves, sections and preset constants', () => {
+  it('keeps every v1 leaf but the one-off new cash, which v2 holds as the Brokerage deposit', () => {
+    expect(V1_LEAF_PATHS).toHaveLength(25);
+    expect(V1_LEAF_PATHS.filter((path) => !PROFILE_LEAF_PATHS.includes(path))).toEqual(['investing.newCashThisMonth']);
+    expect(isProfilePath('investing.newCashThisMonth')).toBe(false);
   });
 
-  it('excludes version, updatedAt and provided', () => {
-    const paths = PROFILE_FIELDS.map((f) => f.path);
+  it('excludes version, updatedAt and provided from the leaf paths', () => {
+    const paths = PROFILE_LEAF_PATHS;
     expect(paths).not.toContain('version');
     expect(paths).not.toContain('updatedAt');
     expect(paths).not.toContain('provided');
   });
 
-  it('labels every section, and the sections are exactly the data keys of the profile', () => {
+  it('lists the sections, exactly the data keys of the profile', () => {
     const keys = Object.keys(getDefaultFinancialProfile()).filter(
       (k) => !['version', 'updatedAt', 'provided'].includes(k)
     );
     expect([...PROFILE_SECTIONS].sort()).toEqual(keys.sort());
-    for (const section of PROFILE_SECTIONS) expect(PROFILE_SECTION_LABELS[section]).toBeTruthy();
   });
 
   it('maps each strategy preset to its starting emergency-fund months', () => {
@@ -228,7 +218,7 @@ describe('PROFILE_FIELDS, sections and preset constants', () => {
 
 describe('path registry', () => {
   it('lists every leaf of the default profile once, in section order', () => {
-    expect(PROFILE_LEAF_PATHS).toHaveLength(67);
+    expect(PROFILE_LEAF_PATHS).toHaveLength(66);
     expect(new Set(PROFILE_LEAF_PATHS).size).toBe(PROFILE_LEAF_PATHS.length);
     expect(PROFILE_LEAF_PATHS.slice(0, 5)).toEqual([
       'person.age',
@@ -239,7 +229,7 @@ describe('path registry', () => {
     ]);
     expect(PROFILE_LEAF_PATHS).toContain('assumptions.retirement.effectiveTaxRate');
     expect(PROFILE_LEAF_PATHS).toContain('retirementIncome.annualHealthcareCost');
-    expect(PROFILE_LEAF_PATHS).toContain('investing.newCashThisMonth');
+    expect(PROFILE_LEAF_PATHS).not.toContain('investing.newCashThisMonth');
     expect(PROFILE_LEAF_PATHS[PROFILE_LEAF_PATHS.length - 1]).toBe('assumptions.leverage.indexExpenseRatio');
     for (const path of PROFILE_LEAF_PATHS) {
       expect(getProfileValue(getDefaultFinancialProfile(), path), path).not.toBeUndefined();
@@ -308,17 +298,6 @@ describe('path registry', () => {
     expect(getProfileValue(p, 'portfolio.holdings')).toHaveLength(4);
     expect(getProfileValue(p, 'nope.nothing')).toBeUndefined();
     expect(getProfileValue(p, 'person')).toBeUndefined();
-  });
-
-  it('keeps the deprecated leaf helpers for two-segment leaves', () => {
-    expect(splitProfilePath('person.age')).toEqual({ section: 'person', key: 'age' });
-    expect(splitProfilePath('investing.newCashThisMonth')).toEqual({ section: 'investing', key: 'newCashThisMonth' });
-    expect(splitProfilePath('person.nickname')).toBeNull();
-    expect(splitProfilePath('provided')).toBeNull();
-    expect(splitProfilePath('assumptions.retirement.volatility')).toBeNull();
-    expect(splitProfilePath('debts')).toBeNull();
-    expect(isProfileFieldPath('hsa.eligible')).toBe(true);
-    expect(isProfileFieldPath('debts')).toBe(false);
   });
 });
 
@@ -660,15 +639,11 @@ describe('applyProfileWrites', () => {
     expect(accepted).toEqual(['portfolio.accounts.0', 'portfolio.accounts.1.id']);
   });
 
-  it('mirrors the deprecated new-cash leaf into the Brokerage deposit', () => {
+  it('refuses a write to the removed v1 new-cash leaf and leaves the deposits alone', () => {
     const { profile, accepted } = applyProfileWrites(base, [{ path: 'investing.newCashThisMonth', value: 2400 }]);
-    expect(profile.investing.newCashThisMonth).toBe(2400);
-    expect(profile.portfolio.accounts[1].deposit).toBe(2400);
-    expect(profile.portfolio.accounts[0].deposit).toBe(0);
-    expect(accepted).toEqual(['investing.newCashThisMonth']);
-
-    const negative = applyProfileWrites(base, [{ path: 'investing.newCashThisMonth', value: -50 }]).profile;
-    expect(negative.investing.newCashThisMonth).toBe(-50);
-    expect(negative.portfolio.accounts[1].deposit).toBe(0);
+    expect(profile).toEqual(base);
+    expect(profile.investing).not.toHaveProperty('newCashThisMonth');
+    expect(profile.portfolio.accounts.map((account) => account.deposit)).toEqual([0, 1000]);
+    expect(accepted).toEqual([]);
   });
 });

@@ -9,14 +9,10 @@
  * registry's published example output. If either side drifts — the engine
  * changes, the registry copy changes, or a new formula is registered without
  * an engine counterpart — this suite fails.
- *
- * Also covers the registry container itself (category/calculator indexes,
- * search, validation bookkeeping) via a fresh instance so the global
- * registry's auto-registered state is never mutated.
  */
 
 import { describe, expect, it } from 'vitest'
-import { createFormulaRegistry, formulaRegistry } from '@/lib/formulas/registry'
+import { formulaRegistry } from '@/lib/formulas/registry'
 // Side-effect import: registers the retirement formulas with the global registry.
 import '@/lib/formulas/retirement-formulas'
 import {
@@ -33,9 +29,6 @@ import {
 } from '@/lib/calculations/retirement'
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random'
 import { RetirementConstants } from '@/lib/constants/retirement'
-import type { FormulaMetadata } from '@/lib/formulas/types'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 
 /**
  * Feed boxMullerRandom a fixed pair of uniform draws instead of the seeded
@@ -135,7 +128,7 @@ describe('formula registry <-> calculation engine consistency', () => {
       'retirement-target-date-glide-path-return',
     ])
     // The calculator index and the global map agree.
-    expect(formulaRegistry.getAllFormulas()).toHaveLength(ids.length)
+    expect(formulaRegistry.formulas.size).toBe(ids.length)
   })
 
   it('documents the engine paths that produce the headline success probability', () => {
@@ -311,114 +304,5 @@ describe('engine functions match the published LaTeX on hand-computed fixtures',
       N: 100,
     })
     expect(runMonteCarloSimulation(draining, 100)).toBe(0)
-  })
-})
-
-describe('FormulaRegistryImpl bookkeeping (fresh instance)', () => {
-  function makeMetadata(overrides: Partial<FormulaMetadata> = {}): FormulaMetadata {
-    return {
-      name: 'Test Formula',
-      category: 'core',
-      latex: 'y = x',
-      variables: { x: { symbol: 'x', description: 'input value' } },
-      description: 'Identity formula used for registry tests',
-      purpose: 'Exercise registry indexing',
-      example: { inputs: { x: 1 }, output: 1, explanation: 'identity' },
-      sources: [],
-      assumptions: [],
-      limitations: [],
-      ...overrides,
-    }
-  }
-
-  it('indexes registered formulas by id, category, and calculator', () => {
-    const registry = createFormulaRegistry()
-    registry.registerFormula('f1', 'fnOne', makeMetadata(), 'retirement')
-    registry.registerFormula(
-      'f2',
-      'fnTwo',
-      makeMetadata({ name: 'Second Formula', category: 'intermediate' }),
-      'paycheck',
-    )
-
-    expect(registry.getFormula('f1')?.functionName).toBe('fnOne')
-    expect(registry.getFormula('missing')).toBeUndefined()
-    expect(registry.getFormulasByCategory('core').map((f) => f.id)).toEqual([
-      'f1',
-    ])
-    expect(
-      registry.getFormulasByCategory('intermediate').map((f) => f.id),
-    ).toEqual(['f2'])
-    expect(registry.getFormulasByCalculator('retirement').map((f) => f.id)).toEqual(
-      ['f1'],
-    )
-    expect(registry.getFormulasByCalculator('nope')).toEqual([])
-  })
-
-  it('re-registering the same id does not duplicate index entries', () => {
-    const registry = createFormulaRegistry()
-    registry.registerFormula('f1', 'fnOne', makeMetadata(), 'retirement')
-    registry.registerFormula('f1', 'fnOneUpdated', makeMetadata(), 'retirement')
-
-    expect(registry.getAllFormulas()).toHaveLength(1)
-    expect(registry.categories.core).toEqual(['f1'])
-    expect(registry.byCalculator['retirement']).toEqual(['f1'])
-    // The later registration wins in the map.
-    expect(registry.getFormula('f1')?.functionName).toBe('fnOneUpdated')
-  })
-
-  it('searchFormulas matches name, description, and purpose case-insensitively', () => {
-    const registry = createFormulaRegistry()
-    registry.registerFormula(
-      'f1',
-      'fnOne',
-      makeMetadata({ name: 'Compound Growth', description: 'grows money' }),
-    )
-    registry.registerFormula(
-      'f2',
-      'fnTwo',
-      makeMetadata({ name: 'Drawdown', purpose: 'Model spending in retirement' }),
-    )
-
-    expect(registry.searchFormulas('COMPOUND').map((f) => f.id)).toEqual(['f1'])
-    expect(registry.searchFormulas('spending').map((f) => f.id)).toEqual(['f2'])
-    expect(registry.searchFormulas('nonexistent')).toEqual([])
-  })
-
-  it('markValidated updates getValidationSummary counts', () => {
-    const registry = createFormulaRegistry()
-    registry.registerFormula('f1', 'fnOne', makeMetadata())
-    registry.registerFormula(
-      'f2',
-      'fnTwo',
-      makeMetadata({ name: 'Second', category: 'advanced' }),
-    )
-
-    expect(registry.getValidationSummary()).toMatchObject({
-      total: 2,
-      validated: 0,
-      pending: 2,
-    })
-
-    registry.markValidated('f1', true)
-    const summary = registry.getValidationSummary()
-    expect(summary.validated).toBe(1)
-    expect(summary.pending).toBe(1)
-    expect(summary.byCategory.core).toEqual({ total: 1, validated: 1 })
-    expect(summary.byCategory.advanced).toEqual({ total: 1, validated: 0 })
-
-    // Revoking validation is symmetric.
-    registry.markValidated('f1', false)
-    expect(registry.getValidationSummary().validated).toBe(0)
-  })
-
-  it('clear() empties formulas and all indexes', () => {
-    const registry = createFormulaRegistry()
-    registry.registerFormula('f1', 'fnOne', makeMetadata(), 'retirement')
-    registry.clear()
-
-    expect(registry.getAllFormulas()).toEqual([])
-    expect(registry.categories.core).toEqual([])
-    expect(registry.getFormulasByCalculator('retirement')).toEqual([])
   })
 })

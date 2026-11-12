@@ -88,31 +88,6 @@ export const getChartTheme = (): ChartTheme => {
   };
 };
 
-/**
- * Listen for theme changes and update charts
- */
-export const subscribeToThemeChanges = (callback: () => void) => {
-  if (typeof window === 'undefined') return () => {};
-
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        const target = mutation.target as HTMLElement;
-        if (target === document.documentElement) {
-          callback();
-        }
-      }
-    });
-  });
-
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class']
-  });
-
-  return () => observer.disconnect();
-};
-
 /** Axis font size in px, shared by every chart. */
 const AXIS_FONT_SIZE = 12;
 

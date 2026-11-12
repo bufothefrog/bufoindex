@@ -1,6 +1,6 @@
 /**
  * Number Input Component
- * Flexible number input with customizable formatting and validation
+ * Number input with grouped display, decimals, prefix and suffix
  */
 
 import React from 'react';
@@ -18,13 +18,13 @@ interface NumberInputProps extends BaseInputProps {
   step?: number;
   allowDecimals?: boolean;
   precision?: number; // Decimal places when allowDecimals is true
-  formatDisplay?: (value: number) => string;
-  parseValue?: (displayValue: string) => number;
   prefix?: string;
   suffix?: string;
   /** xl is the intake wizard's size. */
   size?: InputSize;
   textAlign?: 'left' | 'center' | 'right';
+  /** Replaces the visible label as the input's accessible name (start it with the label). */
+  ariaLabel?: string;
 }
 
 export function NumberInput({
@@ -43,16 +43,14 @@ export function NumberInput({
   step = 1,
   allowDecimals = true,
   precision = 2,
-  formatDisplay,
-  parseValue,
   prefix,
   suffix,
   size = 'md',
   textAlign = 'right',
   testId,
+  ariaLabel,
 }: NumberInputProps) {
-  // Default formatters
-  const defaultFormatDisplay = (val: number): string => {
+  const format = (val: number): string => {
     if (val === 0) return '';
     if (allowDecimals) {
       return val.toLocaleString('en-US', {
@@ -63,18 +61,25 @@ export function NumberInput({
     return val.toLocaleString('en-US');
   };
   
-  const defaultParseValue = (displayVal: string): number => {
+  const parse = (displayVal: string): number => {
     const cleaned = displayVal.replace(/[^\d.-]/g, '');
     return parseFloat(cleaned) || 0;
   };
-  
-  const format = formatDisplay || defaultFormatDisplay;
-  const parse = parseValue || defaultParseValue;
   
   const [displayValue, setDisplayValue] = React.useState(
     value !== 0 ? format(value) : ''
   );
   const [isFocused, setIsFocused] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  // Set on focus when the whole formatted text was selected (a keyboard
+  // focus, or a select-then-focus fill), so the raw text that replaces it is
+  // selected again and typing replaces it instead of appending to it.
+  const reselectOnFocus = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (!isFocused || !reselectOnFocus.current) return;
+    reselectOnFocus.current = false;
+    inputRef.current?.select();
+  }, [isFocused]);
 
   // The rendered text is derived instead of synced in an effect
   // (https://react.dev/learn/you-might-not-need-an-effect): while the field
@@ -166,7 +171,9 @@ export function NumberInput({
     }
   };
   
-  const handleFocus = () => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { selectionStart, selectionEnd, value: text } = e.currentTarget;
+    reselectOnFocus.current = text !== '' && selectionStart === 0 && selectionEnd === text.length;
     setIsFocused(true);
     // Show raw value for easier editing
     if (value !== 0) {
@@ -215,6 +222,7 @@ export function NumberInput({
       testId={testId}
       size={size}
       {...(describedBy ? { 'aria-describedby': describedBy } : {})}
+      {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
     >
       <div className={cn('relative w-full', wordUnit && 'flex items-center gap-2')}>
         {prefix && (
@@ -227,6 +235,7 @@ export function NumberInput({
         )}
 
         <input
+          ref={inputRef}
           type="text"
           inputMode={allowDecimals ? 'decimal' : 'numeric'}
           value={shownValue}
@@ -274,47 +283,3 @@ export function NumberInput({
     </BaseInput>
   );
 }
-
-/**
- * Preset configurations for common number input types
- */
-export const NumberInputPresets = {
-  integer: {
-    allowDecimals: false,
-    textAlign: 'right' as const,
-    min: 0
-  },
-  
-  currency: {
-    allowDecimals: true,
-    precision: 2,
-    prefix: '$',
-    textAlign: 'right' as const,
-    min: 0
-  },
-  
-  percentage: {
-    allowDecimals: true,
-    precision: 1,
-    suffix: '%',
-    textAlign: 'center' as const,
-    min: 0,
-    max: 100
-  },
-  
-  age: {
-    allowDecimals: false,
-    textAlign: 'center' as const,
-    min: 0,
-    max: 150,
-    step: 1
-  },
-  
-  year: {
-    allowDecimals: false,
-    textAlign: 'center' as const,
-    min: 1900,
-    max: 2100,
-    step: 1
-  }
-} as const;

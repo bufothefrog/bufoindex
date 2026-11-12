@@ -83,7 +83,7 @@ export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
 
   return (
     <div data-testid="placement-advice-card">
-      <ResultCard title="Tax-Efficient Placement" icon={Lightbulb} status="info">
+      <ResultCard title="Tax-Efficient Placement" icon={Lightbulb} tone="info">
         {suggestions.length === 0 ? (
           <div className="text-sm text-muted-foreground">
             Your holdings are already in tax-efficient accounts.

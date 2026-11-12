@@ -8,13 +8,11 @@
  */
 
 import React from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { PlacementAdviceCard } from '@/app/tools/portfolio-rebalancing-calculator/components/PlacementAdviceCard';
 import { RebalanceResults } from '@/app/tools/portfolio-rebalancing-calculator/components/RebalanceResults';
 import type { RebalanceInputsV2, RebalanceResultV2 } from '@/lib/calculations/portfolioRebalancing';
-
-afterEach(cleanup);
 
 const CUSTOM = [{ id: 'crypto', label: 'Crypto' }];
 

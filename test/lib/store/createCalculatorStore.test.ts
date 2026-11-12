@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { setAt } from '@/lib/fields/paths';
 import type { FieldErrors, FormSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile } from '@/lib/profile';
-import type { FinancialProfile } from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import type { FinancialProfile } from '@/lib/profile/types';
 import { createCalculatorStore } from '@/lib/store/createCalculatorStore';
 
 interface Engine {
@@ -98,7 +98,6 @@ describe('initial state', () => {
       results: null,
       errors: {},
       stale: false,
-      isCalculating: false,
       hasCalculatedOnce: false,
       resultsKey: null,
     });
@@ -115,7 +114,6 @@ describe('synchronous dispatch (debounceMs 0, no runner)', () => {
       results: DEFAULT_RESULTS,
       errors: {},
       stale: false,
-      isCalculating: false,
       hasCalculatedOnce: true,
       resultsKey: '{"age":30,"mix":{"bonds":0.4,"stocks":0.6},"years":30}',
     });
@@ -206,7 +204,8 @@ describe('newest run wins', () => {
 
     store.getState().submit(profileWith({ 'person.age': 40 }));
     store.getState().submit(profileWith({ 'person.age': 50 }));
-    expect(store.getState().isCalculating).toBe(true);
+    // Nothing is on display while both runs are in flight.
+    expect(store.getState().results).toBeNull();
 
     calls[1].resolve({ total: 50 });
     await store.getState().flush();
@@ -216,7 +215,6 @@ describe('newest run wins', () => {
 
     expect(store.getState().results).toEqual({ total: 50 });
     expect(store.getState().inputs?.age).toBe(50);
-    expect(store.getState().isCalculating).toBe(false);
     expect(seen).not.toContainEqual({ total: 40 });
   });
 
@@ -265,7 +263,7 @@ describe('validation errors', () => {
     store.getState().submit(profileWith({ 'person.age': 12 }));
     vi.advanceTimersByTime(200);
     expect(runner).toHaveBeenCalledTimes(1);
-    expect(store.getState().isCalculating).toBe(false);
+    expect(store.getState().stale).toBe(true);
     calls[0].resolve(DEFAULT_RESULTS);
     await Promise.resolve();
     expect(store.getState().results).toBeNull();
@@ -327,7 +325,6 @@ describe('failed runs', () => {
       resultsKey: '{"age":30,"mix":{"bonds":0.4,"stocks":0.6},"years":30}',
       errors: { calculation: 'Worker said no.' },
       stale: true,
-      isCalculating: false,
     });
   });
 
@@ -338,7 +335,7 @@ describe('failed runs', () => {
     const store = createCalculatorStore({ definition: definition(0), runner });
     expect(() => store.getState().submit(profileWith())).not.toThrow();
     await store.getState().flush();
-    expect(store.getState()).toMatchObject({ errors: { calculation: 'sync boom' }, stale: true, isCalculating: false });
+    expect(store.getState()).toMatchObject({ errors: { calculation: 'sync boom' }, stale: true });
   });
 
   it('a non-Error rejection gets a generic message', async () => {
@@ -398,7 +395,6 @@ describe('reset', () => {
       results: null,
       errors: {},
       stale: false,
-      isCalculating: false,
       hasCalculatedOnce: false,
       resultsKey: null,
     });

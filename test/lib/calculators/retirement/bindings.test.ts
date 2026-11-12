@@ -1,9 +1,14 @@
 /**
  * The retirement bindings and definition: the golden test against the old
- * mapper (toRetirementInputs) for v1-shaped profiles, every RetirementInputs
+ * mapper's output for v1-shaped profiles, every RetirementInputs
  * leaf bound or engine-only, the derived income and filing-status leaves, the
  * reverse direction the legacy import uses, and engine errors mapped back to
  * profile paths.
+ *
+ * Golden fixture. The expected inputs were captured on 2026-11-12 from the
+ * former lib/profile/mappers.ts (deleted in phase 5): what its
+ * toRetirementInputs returned for each profile, written as the leaves
+ * that differ from its output for the v1 default (DEFAULT_INPUTS).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -11,14 +16,14 @@ import type { RetirementInputs } from '@/lib/calculations/retirement';
 import { RETIREMENT_BINDINGS, RETIREMENT_ENGINE_ONLY, filingStatusNote, retirementFilingStatus } from '@/lib/calculators/retirement/bindings';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
+import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
 import { migrateProfile } from '@/lib/profile/migrate';
 import type { Write } from '@/lib/fields/types';
-import { toRetirementInputs } from '@/lib/profile/mappers';
 import type { FilingStatus, FinancialProfile, PayFrequency, ProfilePatch } from '@/lib/profile/types';
 
 /** A v1-shaped profile: the given v1 sections over the v1 defaults, loaded the way a saved v1 profile is. */
@@ -60,16 +65,65 @@ const CUSTOM_V1: ProfilePatch = {
   investing: { investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900 },
 };
 
-describe('golden: engineInputsFor equals the old mapper for v1-shaped profiles', () => {
-  it.each<[string, ProfilePatch]>([
-    ['the default', {}],
-    ['a custom profile (weekly pay, joint filing)', CUSTOM_V1],
-    ['bi-weekly pay', { income: { frequency: 'bi-weekly', grossPerPaycheck: 3100 } }],
-    ['semi-monthly pay', { income: { frequency: 'semi-monthly', grossPerPaycheck: 4000 } }],
-    ['monthly pay', { income: { frequency: 'monthly', grossPerPaycheck: 8000 }, person: { age: 51, retirementAge: 66 } }],
-  ])('%s', (_name, patch) => {
-    const profile = v1(patch);
-    expect(engineInputsFor(RETIREMENT_CALCULATOR, profile)).toEqual(toRetirementInputs(profile));
+/** The old mapper's output for the v1 default. */
+const DEFAULT_INPUTS: RetirementInputs = {
+  startingAge: 30,
+  retirementAge: 60,
+  lifeExpectancy: 85,
+  targetIncome: 80000,
+  startingBalance: 25000,
+  currentIncome: 91000,
+  incomeAmount: 3500,
+  incomePeriod: 'biweekly',
+  monthlySavings: 1500,
+  necessaryMonthlyExpenses: 3000,
+  accumulationReturn: 0.08,
+  retirementReturn: 0.06,
+  inflationRate: 0.03,
+  socialSecurityAge: 67,
+  socialSecurityBenefit: 30000,
+  healthcareCostMultiplier: 1,
+  volatility: 0.15,
+  filingStatus: 'single',
+  state: 'TX',
+  riskProfile: 'tdf',
+  effectiveTaxRate: null,
+  estimatedAnnualHealthcareCost: null,
+};
+
+describe('golden: engineInputsFor equals the old mapper output for v1-shaped profiles', () => {
+  it.each<[string, ProfilePatch, Partial<RetirementInputs>]>([
+    ['the default', {}, {}],
+    [
+      'a custom profile (weekly pay, joint filing)',
+      CUSTOM_V1,
+      {
+        startingAge: 38,
+        retirementAge: 58,
+        targetIncome: 110000,
+        startingBalance: 140000,
+        currentIncome: 109200,
+        incomeAmount: 109200,
+        incomePeriod: 'yearly',
+        monthlySavings: 2200,
+        necessaryMonthlyExpenses: 4200,
+        filingStatus: 'marriedJoint',
+        state: 'CA',
+      },
+    ],
+    ['bi-weekly pay', { income: { frequency: 'bi-weekly', grossPerPaycheck: 3100 } }, { currentIncome: 80600, incomeAmount: 3100 }],
+    [
+      'semi-monthly pay',
+      { income: { frequency: 'semi-monthly', grossPerPaycheck: 4000 } },
+      { currentIncome: 96000, incomeAmount: 4000, incomePeriod: 'semimonthly' },
+    ],
+    [
+      'monthly pay',
+      { income: { frequency: 'monthly', grossPerPaycheck: 8000 }, person: { age: 51, retirementAge: 66 } },
+      { startingAge: 51, retirementAge: 66, currentIncome: 96000, incomeAmount: 8000, incomePeriod: 'monthly' },
+    ],
+  ])('%s', (_name, patch, changed) => {
+    expect(engineInputsFor(RETIREMENT_CALCULATOR, v1(patch))).toEqual({ ...DEFAULT_INPUTS, ...changed });
   });
 
   it('pins the default profile value by value', () => {
@@ -111,7 +165,16 @@ describe('golden: engineInputsFor equals the old mapper for v1-shaped profiles',
       { path: 'assumptions.retirement.healthcareCostMultiplier', value: 1.5 },
     ]);
     const inputs = engineInputsFor(RETIREMENT_CALCULATOR, profile);
-    expect(inputs).toEqual(toRetirementInputs(profile));
+    expect(inputs).toEqual({
+      ...DEFAULT_INPUTS,
+      lifeExpectancy: 92,
+      socialSecurityAge: 70,
+      socialSecurityBenefit: 24000,
+      healthcareCostMultiplier: 1.5,
+      riskProfile: 'custom',
+      effectiveTaxRate: 0.18,
+      estimatedAnnualHealthcareCost: 9000,
+    });
     expect(inputs).toMatchObject({
       lifeExpectancy: 92,
       socialSecurityBenefit: 24000,
@@ -131,7 +194,6 @@ describe('golden: engineInputsFor equals the old mapper for v1-shaped profiles',
   ])('maps filing status %s to %s in one binding (O10)', (status, expected) => {
     const profile = withWrites([{ path: 'person.filingStatus', value: status }]);
     expect(engineInputsFor(RETIREMENT_CALCULATOR, profile).filingStatus).toBe(expected);
-    expect(toRetirementInputs(profile).filingStatus).toBe(expected);
     expect(retirementFilingStatus(status)).toBe(expected);
     expect(RETIREMENT_BINDINGS.filter((binding) => binding.engine === 'filingStatus')).toHaveLength(1);
   });
@@ -189,7 +251,8 @@ describe('the definition', () => {
     expect(RETIREMENT_CALCULATOR.id).toBe('retirement');
     expect(RETIREMENT_CALCULATOR.debounceMs).toBe(300);
     expect(RETIREMENT_CALCULATOR.form).toBe(RETIREMENT_FORM);
-    expect(RETIREMENT_CALCULATOR.legacy).toBe(RETIREMENT_LEGACY);
+    expect(LEGACY_IMPORTS[1].legacy).toBe(RETIREMENT_LEGACY);
+    expect(LEGACY_IMPORTS[1].bindings).toBe(RETIREMENT_BINDINGS);
   });
 
   it('maps engine errors back to profile paths, the form message first', () => {
@@ -197,7 +260,7 @@ describe('the definition', () => {
       { path: 'person.age', value: 60 },
       { path: 'person.retirementAge', value: 60 },
     ]);
-    expect(validateFor(RETIREMENT_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(RETIREMENT_CALCULATOR, profile).errors).toEqual({
       'person.retirementAge': 'The retirement age needs to be above your current age.',
     });
     // An engine-only rule reaches its field: a negative healthcare override.
@@ -207,7 +270,7 @@ describe('the definition', () => {
     expect(RETIREMENT_CALCULATOR.validate(engineInputsFor(RETIREMENT_CALCULATOR, negative))).toEqual({
       estimatedAnnualHealthcareCost: 'Estimated healthcare cost cannot be negative.',
     });
-    expect(validateFor(RETIREMENT_CALCULATOR, negative)).toEqual({
+    expect(prepareRun(RETIREMENT_CALCULATOR, negative).errors).toEqual({
       'retirementIncome.annualHealthcareCost': 'Annual healthcare cost must be at least $0.',
     });
   });

@@ -35,13 +35,13 @@ import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
 import { PORTFOLIO_CALCULATOR } from '@/lib/calculators/portfolio/definition';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
-import type { CalculatorDefinition } from '@/lib/calculators/types';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
+import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import { stableKey } from '@/lib/fields/binding';
 import { getAt } from '@/lib/fields/paths';
 import { NET_PAY_AT_MOST_GROSS } from '@/lib/fields/shared';
-import { getDefaultFinancialProfile } from '@/lib/profile';
+import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
 import { importLegacyStorage } from '@/lib/store/legacyImport';
@@ -310,8 +310,8 @@ function expectInvariants(c: Case, before: FinancialProfile, after: FinancialPro
 
   // I1: take-home pay never above gross pay (every payload in the grid has net <= gross).
   expect(income.netPerPaycheck).toBeLessThanOrEqual(income.grossPerPaycheck);
-  expect(Object.values(validateFor(PAYCHECK_CALCULATOR, after))).not.toContain(NET_PAY_AT_MOST_GROSS.message);
-  expect(Object.values(validateFor(RETIREMENT_CALCULATOR, after))).not.toContain(NET_PAY_AT_MOST_GROSS.message);
+  expect(Object.values(prepareRun(PAYCHECK_CALCULATOR, after).errors)).not.toContain(NET_PAY_AT_MOST_GROSS.message);
+  expect(Object.values(prepareRun(RETIREMENT_CALCULATOR, after).errors)).not.toContain(NET_PAY_AT_MOST_GROSS.message);
 
   // I2: gross and frequency are one record's pair, or an annual income
   // written for the frequency the profile holds (to the cent).
@@ -382,14 +382,14 @@ function expectInvariants(c: Case, before: FinancialProfile, after: FinancialPro
   // I4: an untouched old key alone reproduces the old calculator's run.
   const [only] = keys;
   if (keys.length === 1 && c.seed.patch.income === undefined && !only.payChanged && !only.electionChanged) {
-    if (only.id === 'retirement') expectSameRun(RETIREMENT_CALCULATOR);
-    else expectSameRun(PAYCHECK_CALCULATOR);
+    if (only.id === 'retirement') expectSameRun(RETIREMENT_CALCULATOR, RETIREMENT_LEGACY);
+    else expectSameRun(PAYCHECK_CALCULATOR, PAYCHECK_LEGACY);
   }
 }
 
 /** The old defaults' engine inputs against the imported profile's, leaf by leaf (income by annual value). */
-function expectSameRun<E, R>(def: CalculatorDefinition<E, R>): void {
-  const old = def.legacy!.storageDefaults();
+function expectSameRun<E, R>(def: CalculatorDefinition<E, R>, legacy: LegacyStorage<E>): void {
+  const old = legacy.storageDefaults();
   const now = engineInputsFor(def, profile());
   const incomeLeaves = new Set(['income', 'currentIncome', 'incomeAmount', 'incomePeriod']);
   for (const binding of def.bindings) {

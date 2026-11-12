@@ -47,6 +47,39 @@ describe('HoldingRow', () => {
     Object.values(noops).forEach(fn => fn.mockClear());
   });
 
+  it('names each input with its label and the row context, and only the label without one', () => {
+    const { rerender } = render(
+      <HoldingRow
+        holding={makeHolding()}
+        security={security}
+        securities={[security, other]}
+        index={0}
+        canRemove
+        context="Roth IRA holding 1"
+        {...noops}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Ticker, Roth IRA holding 1' })).toBe(screen.getByTestId('holding-ticker-0'));
+    expect(screen.getByRole('textbox', { name: 'Price / share, Roth IRA holding 1' })).toBe(inputIn('holding-price-0'));
+    expect(screen.getByRole('combobox', { name: 'Asset class, Roth IRA holding 1' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Shares, Roth IRA holding 1' })).toBe(inputIn('holding-shares-0'));
+    // The visible labels stay as they were.
+    expect(screen.getByText('Price / share')).toBeInTheDocument();
+
+    rerender(
+      <HoldingRow
+        holding={makeHolding()}
+        security={security}
+        securities={[security, other]}
+        index={0}
+        canRemove
+        {...noops}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Price / share' })).toBe(inputIn('holding-price-0'));
+    expect(screen.getByRole('combobox', { name: 'Ticker' })).toBe(screen.getByTestId('holding-ticker-0'));
+  });
+
   it('renders ticker, price, asset class, and shares inline', () => {
     render(
       <HoldingRow
