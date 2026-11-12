@@ -452,10 +452,14 @@ describe('core paths', () => {
 });
 
 describe('guided-flow routes', () => {
-  it('starts every intent at the shared core', () => {
+  it('starts every intent that needs the core at the shared core', () => {
     expect(CORE_START_PATH).toBe('/start');
     expect(coreStartLink('retirement')).toBe('/start?next=retirement');
     expect(coreStartLink('profile')).toBe('/start?next=profile');
+  });
+
+  it('starts the portfolio intake on its own screens, without the core (O5)', () => {
+    expect(coreStartLink('portfolio')).toBe('/start/portfolio');
   });
 
   it('continues the core to the chosen intent, otherwise to the chooser', () => {

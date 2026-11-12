@@ -1,16 +1,13 @@
 import React from 'react';
 import { Shield } from 'lucide-react';
 import { ResultCard } from '@/components/ui/cards';
-import { formatCurrency, formatPercent } from '@/lib/calculations/core';
+import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
+import { StatGrid } from '@/components/ui/results';
+import { STRATEGY_PRESET_LABELS } from '@/lib/constants/labels';
+import { ASSUMED_PORTFOLIO_RETURN, summarizeCashBuffer } from '@/lib/dashboard/derive';
+import type { StatSpec } from '@/lib/design-system/stat';
+import { formatCurrency, formatMonths, formatPercent } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
-import { DASHBOARD_CARD_LAYOUT } from './cardLayout';
-import { StatTile } from './StatTile';
-import {
-  ASSUMED_PORTFOLIO_RETURN,
-  formatMonths,
-  STRATEGY_LABELS,
-  summarizeCashBuffer,
-} from './derive';
 
 export interface CashBufferCardProps {
   profile: FinancialProfile;
@@ -19,43 +16,47 @@ export interface CashBufferCardProps {
 export function CashBufferCard({ profile }: CashBufferCardProps) {
   const cash = summarizeCashBuffer(profile);
 
+  const onHand: StatSpec[] = [
+    {
+      id: 'balance',
+      label: 'Emergency fund',
+      value: cash.balance,
+      format: 'currency',
+      hint: `Earning ${formatPercent(profile.cash.emergencyFundApy)} APY`,
+    },
+    {
+      id: 'months',
+      label: 'Months on hand',
+      value: cash.monthsOnHand,
+      format: 'months',
+      hint:
+        cash.monthsOnHand === null
+          ? 'Necessary expenses not set'
+          : `At ${formatCurrency(cash.necessaryMonthly)}/mo necessary expenses`,
+    },
+  ];
+
+  const presetTargets: StatSpec[] = cash.presets.map((p) => {
+    const active = p.preset === cash.activePreset;
+    return {
+      id: p.preset,
+      label: STRATEGY_PRESET_LABELS[p.preset],
+      value: p.target,
+      format: 'currency',
+      hint: formatMonths(p.months),
+      tone: active ? 'brand' : 'neutral',
+      badge: active ? 'Active' : undefined,
+    };
+  });
+
   return (
-    <ResultCard title="Cash buffer" icon={Shield} {...DASHBOARD_CARD_LAYOUT} testId="overview-cash">
+    <ResultCard title="Cash buffer" icon={Shield} className="h-full" {...DENSE_CARD_CLASSES} testId="overview-cash">
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <StatTile
-            label="Emergency fund"
-            value={formatCurrency(cash.balance)}
-            hint={`Earning ${formatPercent(profile.cash.emergencyFundApy)} APY`}
-          />
-          <StatTile
-            label="Months on hand"
-            value={cash.monthsOnHand === null ? '-' : formatMonths(cash.monthsOnHand)}
-            hint={
-              cash.monthsOnHand === null
-                ? 'Necessary expenses not set'
-                : `At ${formatCurrency(cash.necessaryMonthly)}/mo necessary expenses`
-            }
-          />
-        </div>
+        <StatGrid stats={onHand} />
 
         <div>
           <h4 className="mb-2 text-sm font-medium text-foreground">Target under each preset</h4>
-          <div className="grid grid-cols-2 gap-3">
-            {cash.presets.map((p) => {
-              const active = p.preset === cash.activePreset;
-              return (
-                <StatTile
-                  key={p.preset}
-                  label={STRATEGY_LABELS[p.preset]}
-                  value={formatCurrency(p.target)}
-                  hint={formatMonths(p.months)}
-                  emphasis={active}
-                  badge={active ? 'Active' : undefined}
-                />
-              );
-            })}
-          </div>
+          <StatGrid stats={presetTargets} />
           {cash.usesCustomTarget && (
             <p className="mt-2 text-xs text-muted-foreground">
               Your own target of {formatMonths(cash.activeMonths)} ({formatCurrency(cash.activeTarget)}) is used

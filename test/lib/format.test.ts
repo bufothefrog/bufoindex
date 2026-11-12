@@ -31,10 +31,6 @@ import {
   formatPercent as coreFormatPercent,
 } from '@/lib/calculations/core';
 import { formatPercent as percentInputFormatPercent } from '@/components/ui/inputs/PercentInput';
-import {
-  formatMonths as dashboardFormatMonths,
-  formatMultiple as dashboardFormatMultiple,
-} from '@/components/dashboard/derive';
 
 const MINUS = '\u2212';
 
@@ -386,16 +382,22 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
     }
   });
 
-  it('dashboard formatMultiple equals formatMultiple(v, { digits: 1, trimZeros: false })', () => {
-    for (const v of [...RATIOS, 1.96, NaN, Infinity]) {
-      expect(formatMultiple(v, { digits: 1, trimZeros: false })).toBe(dashboardFormatMultiple(v));
-    }
+  // The dashboard's own formatMultiple and formatMonths copies were deleted in
+  // slice d1; the dashboard now calls these. Pinned to what the copies printed.
+  it('formatMultiple prints the leverage ratios as the dashboard did', () => {
+    expect([1, 1.5, 2, 3].map((v) => formatMultiple(v))).toEqual(['1x', '1.5x', '2x', '3x']);
   });
 
-  it('dashboard formatMonths equals formatMonths', () => {
-    for (const v of [0, 0.96, 1, 2.04, 2.5, 3.25, 12]) {
-      expect(formatMonths(v)).toBe(dashboardFormatMonths(v));
-    }
+  it('formatMonths prints months on hand as the dashboard did', () => {
+    expect([0, 0.96, 1, 2.04, 2.5, 3.25, 12].map((v) => formatMonths(v))).toEqual([
+      '0 months',
+      '1 month',
+      '1 month',
+      '2 months',
+      '2.5 months',
+      '3.3 months',
+      '12 months',
+    ]);
   });
 
   it('lib/utils formatYearsAndMonths equals formatYearsAndMonths', () => {

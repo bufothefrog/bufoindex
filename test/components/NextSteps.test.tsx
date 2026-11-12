@@ -40,6 +40,20 @@ describe('NextSteps', () => {
     expect(linkNamed(/Answer a few quick questions/)).toHaveAttribute('href', '/start?next=leverage');
   });
 
+  it('sends the no-profile portfolio link straight to its intake and the other calculators through the core (O5)', () => {
+    const cases = [
+      ['portfolio', '/start/portfolio'],
+      ['retirement', '/start?next=retirement'],
+      ['paycheck', '/start?next=paycheck'],
+      ['leverage', '/start?next=leverage'],
+    ] as const;
+    for (const [intent, href] of cases) {
+      const { unmount } = render(<NextSteps intent={intent} />);
+      expect.soft(linkNamed(/Answer a few quick questions/)).toHaveAttribute('href', href);
+      unmount();
+    }
+  });
+
   it('offers to finish the profile and try another calculator when a partial profile exists', () => {
     useProfileStore
       .getState()

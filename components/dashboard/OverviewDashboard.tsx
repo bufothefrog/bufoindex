@@ -2,11 +2,15 @@
 
 import React, { useCallback, useMemo } from 'react';
 import type { Route } from 'next';
-import { DisclaimerFooter } from '@/components/ui/layouts/CalculatorLayout';
-import { calculateOptimalAllocation } from '@/lib/calculations/core';
+import { Disclaimer } from '@/components/ui/results';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
+import { calculatorHref } from '@/lib/calculators/registry';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { composeDisclaimer, DISCLAIMER } from '@/lib/constants/disclaimers';
+import { STRATEGY_PRESET_LABELS, STRATEGY_PRESET_OPTIONS, TARGET_MIX_LABELS } from '@/lib/constants/labels';
+import { strategyDescription } from '@/lib/dashboard/derive';
 import { PRESET_EMERGENCY_MONTHS } from '@/lib/profile/defaults';
-import { portfolioLink } from '@/lib/profile/links';
-import { toPaycheckProfile } from '@/lib/profile/mappers';
 import type { FinancialProfile, ProfilePatch, StrategyPreset } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import type { AllocationResult } from '@/lib/types';
@@ -20,15 +24,15 @@ import { PaycheckCard } from './PaycheckCard';
 import { ProfileCompletenessCard } from './ProfileCompletenessCard';
 import { ResetProfileButton } from './ResetProfileButton';
 import { RetirementOddsCard } from './RetirementOddsCard';
-import { StrategyToggle } from './StrategyToggle';
-import { STRATEGY_LABELS, strategyDescription } from './derive';
 
 export interface OverviewDashboardProps {
   className?: string;
 }
 
-const DISCLAIMER =
-  'This overview provides educational information only and should not be considered personalized financial advice. Every figure is a model output from the inputs and assumptions shown; the profile is stored only in this browser. Consider consulting with a qualified financial advisor before making significant financial decisions.';
+const OVERVIEW_DISCLAIMER = composeDisclaimer(DISCLAIMER.overview, DISCLAIMER.overviewModel, DISCLAIMER.consultAdvisor);
+
+/** The strategy control shows each preset's label only; the description is in the summary below it. */
+const STRATEGY_OPTIONS = STRATEGY_PRESET_OPTIONS.map(({ value, label }) => ({ value, label }));
 
 /**
  * /overview: one screen computed from the shared profile. Rendering waits for
@@ -66,7 +70,15 @@ export function OverviewDashboard({ className }: OverviewDashboardProps) {
         </div>
         {ready && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <StrategyToggle value={profile.strategy.preset} onChange={handleStrategyChange} />
+            <SegmentedControl
+              label="Strategy"
+              options={STRATEGY_OPTIONS}
+              value={profile.strategy.preset}
+              onChange={handleStrategyChange}
+              size="md"
+              fullWidth
+              className="w-full sm:w-auto"
+            />
             <ResetProfileButton onReset={reset} />
           </div>
         )}
@@ -80,7 +92,7 @@ export function OverviewDashboard({ className }: OverviewDashboardProps) {
         <ProfileOverview profile={profile} />
       )}
 
-      <DisclaimerFooter text={DISCLAIMER} />
+      <Disclaimer text={OVERVIEW_DISCLAIMER} />
     </div>
   );
 }
@@ -90,27 +102,25 @@ interface ProfileOverviewProps {
 }
 
 function ProfileOverview({ profile }: ProfileOverviewProps) {
-  const paycheckProfile = useMemo(() => toPaycheckProfile(profile), [profile]);
+  const paycheckInputs = useMemo(() => engineInputsFor(PAYCHECK_CALCULATOR, profile), [profile]);
   const allocation = useMemo<AllocationResult | null>(() => {
     try {
-      return calculateOptimalAllocation(paycheckProfile);
+      return PAYCHECK_CALCULATOR.calculate(paycheckInputs);
     } catch {
       return null;
     }
-  }, [paycheckProfile]);
+  }, [paycheckInputs]);
 
   return (
     <div className="space-y-4 md:space-y-6">
       <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">
-          {STRATEGY_LABELS[profile.strategy.preset]}:
-        </span>{' '}
+        <span className="font-medium text-foreground">{STRATEGY_PRESET_LABELS[profile.strategy.preset]}:</span>{' '}
         {strategyDescription(profile.strategy.preset, profile.strategy.leverageRatio)} Switch the preset above to see
         the alternative; the cash buffer card shows both targets either way.
       </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-        <PaycheckCard profile={profile} paycheckProfile={paycheckProfile} allocation={allocation} />
+        <PaycheckCard inputs={paycheckInputs} allocation={allocation} />
         <RetirementOddsCard profile={profile} />
         <CashBufferCard profile={profile} />
         <LeverageCard profile={profile} />
@@ -121,9 +131,9 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           Also seeded from this profile: the portfolio rebalancer, with the{' '}
-          {profile.investing.targetMix.replace('-', '/')} target mix and this month&apos;s new cash.
+          {TARGET_MIX_LABELS[profile.investing.targetMix].toLowerCase()} target mix and this month&apos;s new cash.
         </p>
-        <CardLinkButton href={portfolioLink(profile) as Route}>Open the rebalancer</CardLinkButton>
+        <CardLinkButton href={calculatorHref('portfolio', { fromProfile: true }) as Route}>Open the rebalancer</CardLinkButton>
       </div>
     </div>
   );

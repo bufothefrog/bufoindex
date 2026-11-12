@@ -4,12 +4,14 @@ import type { Route } from 'next';
 import { ArrowRight, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { buttonVariants } from '@/components/ui/button';
+import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import { CORE_START_PATH, coreStartLink } from '@/lib/constants/intake';
 import { cn } from '@/lib/utils';
-import { DASHBOARD_CARD_LAYOUT } from './cardLayout';
 
-// Every path starts with the shared basics; `next` picks the calculator the
-// intake continues to once they are answered.
+// Each entry starts with the shared basics and `next` picks the calculator the
+// intake continues to once they are answered, except the portfolio entry: the
+// rebalancer reads no core field, so coreStartLink sends it straight to
+// /start/portfolio (O5).
 const INTAKES: ReadonlyArray<{ href: Route; label: string; description: string }> = [
   { href: coreStartLink('paycheck') as Route, label: 'Then a paycheck', description: 'Where the next paycheck goes' },
   { href: coreStartLink('retirement') as Route, label: 'Then retirement', description: 'Simulated odds for a retirement age' },
@@ -21,7 +23,7 @@ const INTAKES: ReadonlyArray<{ href: Route; label: string; description: string }
 export function EmptyOverview() {
   return (
     <div className="mx-auto max-w-xl">
-      <BaseCard title="No profile yet" icon={UserRound} {...DASHBOARD_CARD_LAYOUT} testId="overview-empty">
+      <BaseCard title="No profile yet" icon={UserRound} {...DENSE_CARD_CLASSES} testId="overview-empty">
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             The overview is computed from a profile saved in this browser. The basics take a few questions;

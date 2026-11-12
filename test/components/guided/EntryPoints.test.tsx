@@ -6,6 +6,8 @@ import sitemap from '@/app/sitemap';
 import { EmptyOverview } from '@/components/dashboard/EmptyOverview';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
+import { IntentPicker } from '@/components/guided/IntentPicker';
+import { profileCompleteness } from '@/lib/calculators/forms';
 import { CORE_PATHS, intakePaths } from '@/lib/constants/intake';
 import { PROFILE_FIELDS, PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -29,7 +31,7 @@ describe('landing page', () => {
     expect(started[0]).toHaveAttribute('href', '/start');
   });
 
-  it('previews each calculator and routes it through the core first', () => {
+  it('previews each calculator and routes it through the core first, the portfolio straight to its intake (O5)', () => {
     render(<HomePage />);
     const section = screen.getByRole('region', { name: 'What you can learn' });
     const hrefs = within(section)
@@ -38,7 +40,7 @@ describe('landing page', () => {
     expect(hrefs).toEqual([
       '/start?next=paycheck',
       '/start?next=retirement',
-      '/start?next=portfolio',
+      '/start/portfolio',
       '/start?next=leverage',
       '/tools',
     ]);
@@ -100,13 +102,35 @@ describe('ContinueProfileCard', () => {
 });
 
 describe('EmptyOverview', () => {
-  it('starts with the basics, then offers each calculator through the core', () => {
+  it('starts with the basics, then offers each calculator through the core, the portfolio straight to its intake (O5)', () => {
     render(<EmptyOverview />);
     expect(screen.getByRole('link', { name: /Start with the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.getByRole('link', { name: /Then a paycheck/ })).toHaveAttribute('href', '/start?next=paycheck');
     expect(screen.getByRole('link', { name: /Then retirement/ })).toHaveAttribute('href', '/start?next=retirement');
-    expect(screen.getByRole('link', { name: /Then a portfolio/ })).toHaveAttribute('href', '/start?next=portfolio');
+    expect(screen.getByRole('link', { name: /Then a portfolio/ })).toHaveAttribute('href', '/start/portfolio');
     expect(screen.getByRole('link', { name: /Then the leverage comparison/ })).toHaveAttribute(
+      'href',
+      '/start?next=leverage'
+    );
+  });
+});
+
+describe('IntentPicker', () => {
+  it('routes each calculator through the core, the portfolio straight to its intake (O5)', () => {
+    render(<IntentPicker />);
+    expect.soft(screen.getByRole('link', { name: /Rebalance my accounts with new cash/ })).toHaveAttribute(
+      'href',
+      '/start/portfolio'
+    );
+    expect.soft(screen.getByRole('link', { name: /See if I am on track to retire/ })).toHaveAttribute(
+      'href',
+      '/start?next=retirement'
+    );
+    expect.soft(screen.getByRole('link', { name: /Figure out where each paycheck should go/ })).toHaveAttribute(
+      'href',
+      '/start?next=paycheck'
+    );
+    expect.soft(screen.getByRole('link', { name: /Compare leveraged vs plain index investing/ })).toHaveAttribute(
       'href',
       '/start?next=leverage'
     );
@@ -123,24 +147,22 @@ describe('ProfileCompletenessCard (overview)', () => {
   });
 
   it('edits the basics once no profile question is left, instead of bouncing back to the overview', () => {
+    // Counted by topic screen (O14): every topic the profile intake asks is
+    // answered. The deprecated new cash (now the accounts' deposits) and the
+    // never-asked emergency-fund target months are no topic, so neither is
+    // listed.
     const { unmount } = render(<ProfileCompletenessCard profile={withProvided(intakePaths('profile'))} />);
-    // The intake never asks the emergency-fund target months, so it stays
-    // listed. It asks the new cash on the accounts screen: answering the
-    // accounts answers the deprecated investing.newCashThisMonth too.
-    const asked = intakePaths('profile');
-    const answered = PROFILE_FIELDS.filter(
-      ({ path }) => asked.includes(path) || (path === 'investing.newCashThisMonth' && asked.includes('portfolio.accounts'))
-    );
-    expect(answered).toHaveLength(PROFILE_FIELDS.length - 1);
-    expect(screen.getByText(`${answered.length} of ${PROFILE_FIELDS.length}`)).toBeInTheDocument();
-    expect(screen.getByText(/Emergency fund target/)).toBeInTheDocument();
+    const { total } = profileCompleteness(withProvided([]));
+    expect(screen.getByText(`${total} of ${total}`)).toBeInTheDocument();
+    expect(screen.getByText('Every topic has an answer from you.')).toBeInTheDocument();
+    expect(screen.queryByText(/Emergency fund target/)).not.toBeInTheDocument();
     expect(screen.queryByText('New cash to invest this month')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Edit the basics/ })).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: /Fill in the rest/ })).not.toBeInTheDocument();
     unmount();
 
     render(<ProfileCompletenessCard profile={withProvided([...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS])} />);
-    expect(screen.getByText('Every field has an answer from you.')).toBeInTheDocument();
+    expect(screen.getByText('Every topic has an answer from you.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Edit the basics/ })).toHaveAttribute('href', '/start');
   });
 });
