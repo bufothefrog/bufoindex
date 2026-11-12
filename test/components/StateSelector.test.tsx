@@ -8,15 +8,11 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { StateSelector } from '@/components/shared/inputs/StateSelector';
 
 describe('StateSelector', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it('associates the visible label with the combobox input', () => {
     render(<StateSelector label="State" value="" onChange={vi.fn()} />);
     expect(screen.getByRole('combobox', { name: 'State' })).toBeInTheDocument();

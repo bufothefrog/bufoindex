@@ -4,14 +4,10 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { DollarSign } from 'lucide-react';
 import { KeyValueList, type KeyValueItem } from '@/components/ui/results';
-
-afterEach(() => {
-  cleanup();
-});
 
 const items: KeyValueItem[] = [
   { id: 'net', label: 'Net pay', subtitle: 'Per paycheck', value: 2345.6, format: 'currency', icon: DollarSign },

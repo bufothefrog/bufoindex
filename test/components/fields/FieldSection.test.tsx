@@ -8,15 +8,11 @@
 import React, { useState } from 'react';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { FieldSection, FieldSections } from '@/components/fields';
 import type { FieldSectionsProps } from '@/components/fields';
 import type { FieldErrors, FieldSpec, FormSpec, ScreenSpec } from '@/lib/fields/types';
 import { FieldHarness, writeSpy } from './harness';
-
-afterEach(() => {
-  cleanup();
-});
 
 const money = (value: unknown) => `$${Number(value).toLocaleString('en-US')}`;
 

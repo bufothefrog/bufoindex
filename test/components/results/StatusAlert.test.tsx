@@ -5,16 +5,12 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { AlertTriangle, DollarSign } from 'lucide-react';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { BreakdownRow } from '@/components/calculators/shared/BreakdownRow';
 import type { Tone } from '@/lib/design-system/tone';
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('StatusAlert', () => {
   it('shows the title and the body', () => {

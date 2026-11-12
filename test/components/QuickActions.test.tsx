@@ -14,9 +14,9 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { QuickActions } from '@/components/paycheck-allocator/QuickActions';
 import {
   createPaycheckProfile,
@@ -381,10 +381,6 @@ const GOLDEN_OUTPUT: Record<string, { text: string[]; buttons: string[] }> = {
 };
 
 describe('QuickActions', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   describe('golden output', () => {
     it.each(Object.keys(GOLDEN_PROFILES))('prints exactly the pre-rebuild text for %s', (name) => {
       const { container } = renderActions(GOLDEN_PROFILES[name]);

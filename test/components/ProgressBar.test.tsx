@@ -4,13 +4,9 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { ProgressBar } from '@/components/ui/progress-bar';
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('ProgressBar', () => {
   it('is a named progressbar with its value range', () => {

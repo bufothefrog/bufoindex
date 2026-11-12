@@ -34,8 +34,6 @@ import {
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random'
 import { RetirementConstants } from '@/lib/constants/retirement'
 import type { FormulaMetadata } from '@/lib/formulas/types'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 
 /**
  * Feed boxMullerRandom a fixed pair of uniform draws instead of the seeded

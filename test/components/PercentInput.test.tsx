@@ -14,7 +14,7 @@
 import React from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import {
   PercentInput,
   formatPercent,
@@ -61,10 +61,6 @@ function ControlledPercent({
 }
 
 describe('PercentInput', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it('associates the label with the input and renders the % suffix', () => {
     render(
       <PercentInput name="rate" label="Return rate" value={0.07} onChange={vi.fn()} />,

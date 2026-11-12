@@ -5,14 +5,10 @@
  */
 
 import React from 'react';
-import { render, screen, within, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { StatTile, StatGrid } from '@/components/ui/results';
 import type { StatSpec } from '@/lib/design-system/stat';
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('StatTile', () => {
   it('is a group named by its label that shows the formatted figure', () => {

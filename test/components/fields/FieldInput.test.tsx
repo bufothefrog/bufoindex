@@ -9,7 +9,7 @@
 import React from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FieldInput } from '@/components/fields';
 import type { CustomRenderer, CustomRendererProps, FieldInputProps } from '@/components/fields';
 import type { FieldSpec } from '@/lib/fields/types';
@@ -21,10 +21,6 @@ beforeAll(() => {
 
 afterAll(() => {
   vi.unstubAllGlobals();
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 type Extra = Omit<FieldInputProps, 'spec' | 'get' | 'onWrite'>;

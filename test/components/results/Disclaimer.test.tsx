@@ -4,14 +4,10 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { Disclaimer } from '@/components/ui/results';
 import { DISCLAIMER, composeDisclaimer } from '@/lib/constants/disclaimers';
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('Disclaimer', () => {
   it('prefixes the composed text with a bold "Disclaimer:" label', () => {

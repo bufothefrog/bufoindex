@@ -14,8 +14,8 @@
  */
 
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
 import {
   dcaEffectSentence,
@@ -36,10 +36,6 @@ class ResizeObserverStub {
 
 beforeAll(() => {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 function atReturn(indexMeanReturn: number) {

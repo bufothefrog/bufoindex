@@ -12,9 +12,9 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EnhancedMoneyInput } from '@/components/ui/inputs/EnhancedMoneyInput';
 
 type MoneyProps = React.ComponentProps<typeof EnhancedMoneyInput>;
@@ -47,10 +47,6 @@ function ControlledMoney({
 }
 
 describe('EnhancedMoneyInput', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it('associates the visible label with the input', () => {
     render(
       <EnhancedMoneyInput name="amount" label="Amount" value={0} onChange={vi.fn()} />,

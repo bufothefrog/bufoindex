@@ -7,14 +7,10 @@
 import React, { useState } from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ChoiceGroup } from '@/components/fields';
 import type { ChoiceGroupProps } from '@/components/fields';
 import type { FieldOption } from '@/lib/fields/types';
-
-afterEach(() => {
-  cleanup();
-});
 
 const OPTIONS: readonly FieldOption[] = [
   { value: 'single', label: 'Single' },

@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import OverviewDashboard from '@/components/dashboard/OverviewDashboard';
 import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
@@ -54,10 +54,6 @@ class ResizeObserverStub {
 
 beforeAll(() => {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
-});
-
-afterEach(() => {
-  cleanup();
 });
 
 /** Renders the overview for a profile and waits for both simulations to finish. */

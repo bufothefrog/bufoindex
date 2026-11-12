@@ -10,8 +10,8 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { OpportunityCostCard } from '@/components/shared/cards/OpportunityCostCard';
 import type { SkippedItem } from '@/lib/types';
 
@@ -42,10 +42,6 @@ function renderCard(skippedItem: SkippedItem) {
 }
 
 describe('OpportunityCostCard', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   describe('horizon phrasing', () => {
     it('labels an annual-only cost as "annual cost", not "cost over annually"', () => {
       renderCard(
