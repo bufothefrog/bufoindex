@@ -6,7 +6,8 @@
  * - Every profile leaf and list has an input: a FieldSpec, or a custom
  *   renderer's `covers` entry. The one exception is the deprecated
  *   investing.newCashThisMonth, which no form asks (the accounts list holds
- *   the new cash) and which stays while the v1 profileCompleteness counts it.
+ *   the new cash) and which stays while the v1 profileFieldCompleteness
+ *   counts it.
  * - Every engine leaf is bound or listed in its calculator's ENGINE_ONLY.
  * - No FieldSpec is defined twice: a path appears once per form, and a path
  *   that several forms ask comes from one shared spec, the forms changing
@@ -34,7 +35,7 @@ const ALL_FORMS: readonly FormSpec[] = [CORE_FORM, ...Object.values(FORMS), PROF
 /** Profile paths no form asks, each with the reason. */
 const NO_INPUT: Readonly<Record<string, string>> = {
   'investing.newCashThisMonth':
-    'Deprecated: the accounts list asks the new cash; kept while the v1 profileCompleteness counts it.',
+    'Deprecated: the accounts list asks the new cash; kept while the v1 profileFieldCompleteness counts it.',
 };
 
 /** The FieldSpec keys a form may change on a shared spec: wording and tier only. */
@@ -130,6 +131,45 @@ describe('engine leaves and the bindings', () => {
   });
 });
 
+/** Every distinct spec object the forms use for each path. */
+function specsByPath(forms: readonly FormSpec[]): Map<string, Set<FieldSpec>> {
+  const byPath = new Map<string, Set<FieldSpec>>();
+  for (const form of forms) {
+    for (const spec of form.fields) {
+      const specs = byPath.get(spec.path) ?? new Set<FieldSpec>();
+      specs.add(spec);
+      byPath.set(spec.path, specs);
+    }
+  }
+  return byPath;
+}
+
+/**
+ * "path: key" for each key outside WORDING_KEYS where a form's spec differs
+ * from the shared spec of its path, or "path: no shared spec" for a path that
+ * several distinct specs define with no shared spec behind them. Every shared
+ * path is checked, however many forms ask it.
+ */
+function specDrift(forms: readonly FormSpec[]): string[] {
+  const drift: string[] = [];
+  for (const [path, specs] of specsByPath(forms)) {
+    const base = SHARED_SPECS.get(path);
+    if (!base) {
+      if (specs.size > 1) drift.push(`${path}: no shared spec`);
+      continue;
+    }
+    const baseFields: Record<string, unknown> = { ...base };
+    for (const variant of specs) {
+      const variantFields: Record<string, unknown> = { ...variant };
+      const keys = new Set([...Object.keys(baseFields), ...Object.keys(variantFields)]);
+      for (const key of keys) {
+        if (!WORDING_KEYS.has(key) && baseFields[key] !== variantFields[key]) drift.push(`${path}: ${key}`);
+      }
+    }
+  }
+  return drift;
+}
+
 describe('no FieldSpec is defined twice', () => {
   it('asks each path once per form, and each row field once per list', () => {
     for (const form of ALL_FORMS) {
@@ -143,30 +183,23 @@ describe('no FieldSpec is defined twice', () => {
   });
 
   it('takes a path several forms ask from one shared spec, changing only its wording', () => {
-    const byPath = new Map<string, Set<FieldSpec>>();
-    for (const form of ALL_FORMS) {
-      for (const spec of form.fields) {
-        const specs = byPath.get(spec.path) ?? new Set<FieldSpec>();
-        specs.add(spec);
-        byPath.set(spec.path, specs);
-      }
-    }
     // person.age is asked by the core and reworded by calculator forms.
-    expect(byPath.get('person.age')?.size).toBeGreaterThan(1);
-    for (const [path, specs] of byPath) {
-      if (specs.size === 1) continue;
-      const base = SHARED_SPECS.get(path);
-      expect(base, path).toBeDefined();
-      const baseFields: Record<string, unknown> = { ...base };
-      for (const variant of specs) {
-        const variantFields: Record<string, unknown> = { ...variant };
-        const keys = new Set([...Object.keys(baseFields), ...Object.keys(variantFields)]);
-        const changed = [...keys].filter((key) => baseFields[key] !== variantFields[key]);
-        expect(
-          changed.filter((key) => !WORDING_KEYS.has(key)),
-          path
-        ).toEqual([]);
-      }
-    }
+    expect(specsByPath(ALL_FORMS).get('person.age')?.size).toBeGreaterThan(1);
+    expect(specDrift(ALL_FORMS)).toEqual([]);
+  });
+
+  it('checks a shared path even when only one form asks it', () => {
+    // A form that redefines a shared spec beyond its wording is caught although
+    // no other form asks that path (one distinct spec object for the path).
+    const [path, base] = [...SHARED_SPECS].find(([key]) => specsByPath(ALL_FORMS).get(key)?.size === 1) ?? [];
+    expect(path).toBeDefined();
+    const form = ALL_FORMS.find((candidate) => candidate.fields.some((spec) => spec.path === path));
+    expect(form).toBeDefined();
+    if (!form || !base) return;
+    const diverged: FormSpec = {
+      ...form,
+      fields: form.fields.map((spec) => (spec.path === path ? { ...spec, min: -123 } : spec)),
+    };
+    expect(specDrift([diverged])).toEqual([`${path}: min`]);
   });
 });
