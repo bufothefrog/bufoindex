@@ -18,7 +18,7 @@ import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
 import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
@@ -260,7 +260,7 @@ describe('the definition', () => {
       { path: 'person.age', value: 60 },
       { path: 'person.retirementAge', value: 60 },
     ]);
-    expect(validateFor(RETIREMENT_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(RETIREMENT_CALCULATOR, profile).errors).toEqual({
       'person.retirementAge': 'The retirement age needs to be above your current age.',
     });
     // An engine-only rule reaches its field: a negative healthcare override.
@@ -270,7 +270,7 @@ describe('the definition', () => {
     expect(RETIREMENT_CALCULATOR.validate(engineInputsFor(RETIREMENT_CALCULATOR, negative))).toEqual({
       estimatedAnnualHealthcareCost: 'Estimated healthcare cost cannot be negative.',
     });
-    expect(validateFor(RETIREMENT_CALCULATOR, negative)).toEqual({
+    expect(prepareRun(RETIREMENT_CALCULATOR, negative).errors).toEqual({
       'retirementIncome.annualHealthcareCost': 'Annual healthcare cost must be at least $0.',
     });
   });

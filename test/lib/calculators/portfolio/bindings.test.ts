@@ -18,7 +18,7 @@ import {
   classTargetsFor,
 } from '@/lib/calculators/portfolio/bindings';
 import { PORTFOLIO_CALCULATOR, validateRebalanceInputs } from '@/lib/calculators/portfolio/definition';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
@@ -297,7 +297,7 @@ describe('portfolio definition', () => {
         ],
       },
     ]);
-    expect(validateFor(PORTFOLIO_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, profile).errors).toEqual({
       'portfolio.classTargets': 'Target allocations must sum to 100% (currently 130.00%).',
     });
   });
@@ -308,21 +308,21 @@ describe('portfolio definition', () => {
     const securities = base.portfolio.securities.map((s, i) => (i === 1 ? { ...s, price: -5 } : s));
     // The engine inputs are built from the profile directly, past the store's own checks.
     const broken: FinancialProfile = { ...base, portfolio: { ...base.portfolio, holdings, securities } };
-    expect(validateFor(PORTFOLIO_CALCULATOR, broken)).toEqual({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, broken).errors).toEqual({
       'portfolio.holdings': 'Price cannot be negative.',
     });
     const negative: FinancialProfile = {
       ...base,
       portfolio: { ...base.portfolio, accounts: base.portfolio.accounts.map((a, i) => (i === 2 ? { ...a, deposit: -1 } : a)) },
     };
-    expect(validateFor(PORTFOLIO_CALCULATOR, negative)).toEqual({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, negative).errors).toEqual({
       'portfolio.accounts.2.deposit': 'New cash must be at least $0.',
     });
   });
 
   it('needs at least one account', () => {
     const none: FinancialProfile = profileWith([{ path: 'portfolio.accounts', value: [] }]);
-    expect(validateFor(PORTFOLIO_CALCULATOR, none)).toMatchObject({
+    expect(prepareRun(PORTFOLIO_CALCULATOR, none).errors).toMatchObject({
       'portfolio.accounts': 'Accounts needs at least 1 entry.',
     });
   });

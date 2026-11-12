@@ -43,7 +43,6 @@ export interface FormulaRegistryEntry extends FormulaMetadata {
 
 export interface FormulaRegistry {
   formulas: Map<string, FormulaRegistryEntry>;
-  categories: Record<FormulaCategory, string[]>;
   byCalculator: Record<string, string[]>;
 }
 

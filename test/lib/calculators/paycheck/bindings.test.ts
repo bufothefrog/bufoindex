@@ -18,7 +18,7 @@ import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
 import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
 import { applyWrites, makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
@@ -455,11 +455,11 @@ describe('the definition and its relations', () => {
       { path: 'income.grossPerPaycheck', value: 2000 },
       { path: 'income.netPerPaycheck', value: 2600 },
     ]);
-    expect(validateFor(PAYCHECK_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(PAYCHECK_CALCULATOR, profile).errors).toEqual({
       'income.netPerPaycheck':
         'Take-home pay is above gross pay. Take-home is what is left after taxes and deductions, so it is usually lower.',
     });
-    expect(validateFor(PAYCHECK_CALCULATOR, withWrites([{ path: 'income.netPerPaycheck', value: 3500 }]))).toEqual({});
+    expect(prepareRun(PAYCHECK_CALCULATOR, withWrites([{ path: 'income.netPerPaycheck', value: 3500 }])).errors).toEqual({});
   });
 
   it('flags a fun-money minimum above the maximum', () => {
@@ -467,10 +467,10 @@ describe('the definition and its relations', () => {
       { path: 'spending.funMoneyMin', value: 700 },
       { path: 'spending.funMoneyMax', value: 600 },
     ]);
-    expect(validateFor(PAYCHECK_CALCULATOR, profile)).toEqual({
+    expect(prepareRun(PAYCHECK_CALCULATOR, profile).errors).toEqual({
       'spending.funMoneyMax': 'The minimum is above the maximum. Adjust one of them.',
     });
-    expect(validateFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile())).toEqual({});
+    expect(prepareRun(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()).errors).toEqual({});
   });
 });
 

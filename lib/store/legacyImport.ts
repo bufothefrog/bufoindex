@@ -18,7 +18,7 @@
  * group that differs from what the bindings write for the frozen old
  * defaults is the visitor's own: imported, its paths marked provided. A
  * group equal to the old defaults is imported unprovided, and only when an
- * old default differs from the shared profile's default (legacyDefaultGaps).
+ * old default differs from the shared profile's default (profileDefaultGaps).
  * A provided path is never written, and a group is skipped when one of its
  * provided paths holds another value than the group would write, or when it
  * would leave an answered take-home pay above the gross pay. After each key,
@@ -149,20 +149,6 @@ function importDisplayMode(payloads: readonly unknown[]): void {
  */
 function profileDefaultGaps(defaults: readonly Write[], profileDefaults: FinancialProfile): Write[] {
   return defaults.filter((write) => stableKey(getAt(profileDefaults, write.path)) !== stableKey(write.value));
-}
-
-/**
- * The profile paths where a calculator's frozen old default and the shared
- * profile's default disagree (in binding order). A visitor who left such a
- * value untouched saw the old default, so the import carries it over;
- * test/lib/store/legacyImport.test.ts pins the list for each legacy calculator.
- */
-export function legacyDefaultGaps<E>({ legacy, bindings }: LegacyImport<E>): string[] {
-  const defaults = legacy.storageDefaults();
-  const profileDefaults = getDefaultFinancialProfile();
-  return writeGroups(bindings, defaults, defaults, (path) => getAt(profileDefaults, path)).flatMap(([, writes]) =>
-    profileDefaultGaps(writes, profileDefaults).map((write) => write.path)
-  );
 }
 
 const GROSS_PATH = GROSS_PAY.path;

@@ -35,7 +35,7 @@ import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
 import { PORTFOLIO_CALCULATOR } from '@/lib/calculators/portfolio/definition';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
-import { engineInputsFor, validateFor } from '@/lib/calculators/runtime';
+import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import type { CalculatorDefinition, LegacyStorage } from '@/lib/calculators/types';
 import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import { stableKey } from '@/lib/fields/binding';
@@ -310,8 +310,8 @@ function expectInvariants(c: Case, before: FinancialProfile, after: FinancialPro
 
   // I1: take-home pay never above gross pay (every payload in the grid has net <= gross).
   expect(income.netPerPaycheck).toBeLessThanOrEqual(income.grossPerPaycheck);
-  expect(Object.values(validateFor(PAYCHECK_CALCULATOR, after))).not.toContain(NET_PAY_AT_MOST_GROSS.message);
-  expect(Object.values(validateFor(RETIREMENT_CALCULATOR, after))).not.toContain(NET_PAY_AT_MOST_GROSS.message);
+  expect(Object.values(prepareRun(PAYCHECK_CALCULATOR, after).errors)).not.toContain(NET_PAY_AT_MOST_GROSS.message);
+  expect(Object.values(prepareRun(RETIREMENT_CALCULATOR, after).errors)).not.toContain(NET_PAY_AT_MOST_GROSS.message);
 
   // I2: gross and frequency are one record's pair, or an annual income
   // written for the frequency the profile holds (to the cent).
