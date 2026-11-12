@@ -16,7 +16,7 @@ import {
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatShares } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 // Stable fallbacks, so the asset-class options memo holds when a caller passes
@@ -190,7 +190,7 @@ export function HoldingRow({
           data-testid={`holding-preview-${index}`}
         >
           {ticker || '—'} @ {formatCurrency(price)} ×{' '}
-          {holding.shares.toLocaleString('en-US', { maximumFractionDigits: 4 })} ={' '}
+          {formatShares(holding.shares)} ={' '}
           <span className="text-foreground">{formatCurrency(totalValue)}</span>
         </div>
       )}

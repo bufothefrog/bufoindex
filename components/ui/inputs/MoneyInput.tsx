@@ -1,6 +1,6 @@
 /**
- * Enhanced Money Input Component
- * Based on PaycheckAllocator's MoneyInput with design system integration
+ * Money Input Component
+ * A dollar amount input on the shared BaseInput chrome
  */
 
 import React from 'react';
@@ -10,12 +10,11 @@ import { BaseInput, type InputSize } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 import { DollarSign } from 'lucide-react';
 
-interface EnhancedMoneyInputProps extends BaseInputProps {
+interface MoneyInputProps extends BaseInputProps {
   value: number;
   onChange: (value: number) => void;
   placeholder?: string;
   allowDecimals?: boolean;
-  currency?: string;
   min?: number;
   max?: number;
   /** xl is the intake wizard's size. */
@@ -28,7 +27,7 @@ interface EnhancedMoneyInputProps extends BaseInputProps {
   ariaLabel?: string;
 }
 
-export function EnhancedMoneyInput({
+export function MoneyInput({
   name,
   label,
   value,
@@ -40,13 +39,12 @@ export function EnhancedMoneyInput({
   error,
   disabled = false,
   allowDecimals = false,
-  currency = '$',
   min = 0,
   max,
   size = 'md',
   testId,
   ariaLabel,
-}: EnhancedMoneyInputProps) {
+}: MoneyInputProps) {
   const [displayValue, setDisplayValue] = React.useState(
     value > 0 ? formatCurrency(value).replace('$', '') : ''
   );
@@ -204,7 +202,7 @@ export function EnhancedMoneyInput({
           "absolute top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10",
           iconSizes[size]
         )}>
-          {currency === '$' ? <DollarSign className="w-full h-full" /> : currency}
+          <DollarSign className="w-full h-full" />
         </span>
         <input
           type="text"
@@ -226,5 +224,3 @@ export function EnhancedMoneyInput({
     </BaseInput>
   );
 }
-
-export { EnhancedMoneyInput as MoneyInput };

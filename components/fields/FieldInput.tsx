@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { BaseInput, MoneyInput, NumberInput, PercentInput, SliderField, StateSelector } from '@/components/ui/inputs';
+import { BaseInput, MoneyInput, NumberInput, PercentInput, SliderField } from '@/components/ui/inputs';
+import { StateSelector } from '@/components/shared/inputs/StateSelector';
 import type { InputSize } from '@/components/ui/inputs';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';

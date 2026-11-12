@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { formatPercent } from '@/lib/format';
+import { clamp, cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { BaseInput, type InputSize } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
@@ -133,7 +134,7 @@ export function PercentInput({
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       const increment = e.key === 'ArrowUp' ? step : -step;
-      const newValue = Math.max(min, Math.min(max, value + increment));
+      const newValue = clamp(value + increment, min, max);
       onChange(newValue);
       return;
     }
@@ -269,26 +270,12 @@ export function PercentInput({
           aria-label={label || ariaLabel || undefined}
         />
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
-          <span>{formatPercent(min)}</span>
-          <span className="font-medium">{formatPercent(value)}</span>
-          <span>{formatPercent(max)}</span>
+          <span>{formatPercent(min, { digits: 1 })}</span>
+          <span className="font-medium">{formatPercent(value, { digits: 1 })}</span>
+          <span>{formatPercent(max, { digits: 1 })}</span>
         </div>
       </div>
     </div>
   );
 }
 
-/**
- * Helper function to format percentage for display
- */
-export function formatPercent(decimal: number, precision: number = 1): string {
-  return (decimal * 100).toFixed(precision) + '%';
-}
-
-/**
- * Helper function to parse percentage string to decimal
- */
-export function parsePercent(percentString: string): number {
-  const numeric = parseFloat(percentString.replace(/[^\d.-]/g, ''));
-  return (numeric || 0) / 100;
-}

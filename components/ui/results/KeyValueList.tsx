@@ -36,7 +36,7 @@ export interface KeyValueListProps {
   className?: string;
 }
 
-export interface KeyValueRowProps {
+interface KeyValueRowProps {
   label: string;
   subtitle?: string;
   value: React.ReactNode;
@@ -50,7 +50,7 @@ export interface KeyValueRowProps {
  * One bordered label and value row. Inside a KeyValueList it is a dt and dd
  * pair; the label column wraps and the value column never shrinks.
  */
-export function KeyValueRow({
+function KeyValueRow({
   label,
   subtitle,
   value,

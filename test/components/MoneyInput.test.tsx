@@ -1,5 +1,5 @@
 /**
- * EnhancedMoneyInput Component Test Suite
+ * MoneyInput Component Test Suite
  *
  * Covers accessible naming (visible label + ariaLabel fallback), comma-aware
  * parsing, min/max gating (out-of-range values are never committed), the
@@ -15,9 +15,9 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
-import { EnhancedMoneyInput } from '@/components/ui/inputs/EnhancedMoneyInput';
+import { MoneyInput } from '@/components/ui/inputs/MoneyInput';
 
-type MoneyProps = React.ComponentProps<typeof EnhancedMoneyInput>;
+type MoneyProps = React.ComponentProps<typeof MoneyInput>;
 
 /**
  * Controlled harness. In allowDecimals mode the component emits cents, so a
@@ -35,7 +35,7 @@ function ControlledMoney({
 }) {
   const [value, setValue] = React.useState(initial);
   return (
-    <EnhancedMoneyInput
+    <MoneyInput
       {...rest}
       value={value}
       onChange={(v) => {
@@ -46,10 +46,10 @@ function ControlledMoney({
   );
 }
 
-describe('EnhancedMoneyInput', () => {
+describe('MoneyInput', () => {
   it('associates the visible label with the input', () => {
     render(
-      <EnhancedMoneyInput name="amount" label="Amount" value={0} onChange={vi.fn()} />,
+      <MoneyInput name="amount" label="Amount" value={0} onChange={vi.fn()} />,
     );
     const input = screen.getByLabelText('Amount');
     expect(input).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe('EnhancedMoneyInput', () => {
 
   it('exposes ariaLabel as the accessible name when no visible label text exists', () => {
     render(
-      <EnhancedMoneyInput
+      <MoneyInput
         name="rent"
         label=""
         ariaLabel="Monthly rent"
@@ -71,12 +71,12 @@ describe('EnhancedMoneyInput', () => {
 
   it('requests a numeric keyboard on mobile, decimal-aware', () => {
     const { rerender } = render(
-      <EnhancedMoneyInput name="amount" label="Amount" value={0} onChange={vi.fn()} />,
+      <MoneyInput name="amount" label="Amount" value={0} onChange={vi.fn()} />,
     );
     expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'numeric');
 
     rerender(
-      <EnhancedMoneyInput
+      <MoneyInput
         name="amount"
         label="Amount"
         value={0}
@@ -89,7 +89,7 @@ describe('EnhancedMoneyInput', () => {
 
   it('renders an initial value formatted with thousands separators', () => {
     render(
-      <EnhancedMoneyInput name="amount" label="Amount" value={1234} onChange={vi.fn()} />,
+      <MoneyInput name="amount" label="Amount" value={1234} onChange={vi.fn()} />,
     );
     // formatCurrency(1234) = "$1,234" → "$" is rendered as an icon, not text.
     expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe('1,234');
@@ -204,7 +204,7 @@ describe('EnhancedMoneyInput', () => {
 
   it('renders the error as an alert and marks the input invalid', () => {
     render(
-      <EnhancedMoneyInput
+      <MoneyInput
         name="amount"
         label="Amount"
         value={0}
@@ -218,7 +218,7 @@ describe('EnhancedMoneyInput', () => {
 
   it('shows help text when there is no error, and hides it when an error appears', () => {
     const { rerender } = render(
-      <EnhancedMoneyInput
+      <MoneyInput
         name="amount"
         label="Amount"
         value={0}
@@ -229,7 +229,7 @@ describe('EnhancedMoneyInput', () => {
     expect(screen.getByText('Enter your gross monthly amount')).toBeInTheDocument();
 
     rerender(
-      <EnhancedMoneyInput
+      <MoneyInput
         name="amount"
         label="Amount"
         value={0}
@@ -244,7 +244,7 @@ describe('EnhancedMoneyInput', () => {
 
   it('respects a disabled state', () => {
     render(
-      <EnhancedMoneyInput
+      <MoneyInput
         name="amount"
         label="Amount"
         value={0}

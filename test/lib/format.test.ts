@@ -21,7 +21,6 @@ import {
   type FormatKind,
   type PercentFormatOptions,
 } from '@/lib/format';
-import { formatPercent as percentInputFormatPercent } from '@/components/ui/inputs/PercentInput';
 
 const MINUS = '\u2212';
 
@@ -146,7 +145,7 @@ describe('formatPercent', () => {
     [-0.1, { signed: true }, `${MINUS}10%`],
     [0.0004, { signed: true }, '0%'],
     [-0.0004, { signed: true }, '0%'],
-    // Fixed digits, no grouping (leverage formatPct, PercentInput formatPercent)
+    // Fixed digits, no grouping (leverage formatPct, the PercentInput slider labels)
     [0.434, { digits: 0 }, '43%'],
     [0.125, { digits: 0 }, '13%'],
     [0.0795, { digits: 2 }, '7.95%'],
@@ -323,7 +322,7 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
     }
   });
 
-  // formatPct and PercentInput formatPercent print "-0.0%" for small negatives;
+  // formatPct printed "-0.0%" for small negatives;
   // the new function prints that as "0.0%". Every other output is identical.
   const unsignedZero = (legacy: string) => (/^-0(\.0+)?%$/.test(legacy) ? legacy.slice(1) : legacy);
 
@@ -343,13 +342,6 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
         expect(formatPercent(f, { digits, signed: true })).toBe(formatSignedPct(f, digits));
       }
       expect(formatPercent(f, { digits: 1, signed: true })).toBe(formatSignedPct(f));
-    }
-  });
-
-  it('PercentInput formatPercent equals formatPercent(f, { digits }), negative zero aside', () => {
-    for (const f of FRACTIONS) {
-      expect(formatPercent(f, { digits: 1 })).toBe(unsignedZero(percentInputFormatPercent(f)));
-      expect(formatPercent(f, { digits: 2 })).toBe(unsignedZero(percentInputFormatPercent(f, 2)));
     }
   });
 

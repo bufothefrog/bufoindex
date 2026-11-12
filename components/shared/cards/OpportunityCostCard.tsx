@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '@/lib/format';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 import { SkippedItem } from '@/lib/types';
 import { ExpandableListCard } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
@@ -35,7 +36,7 @@ function riskTone(riskLevel: SkippedItem['riskLevel']): Tone {
  * is never worth rendering as a dollar figure.
  */
 function isMeaningfulCost(amount: number | undefined): amount is number {
-  return typeof amount === 'number' && Number.isFinite(amount) && amount !== 0;
+  return isFiniteNumber(amount) && amount !== 0;
 }
 
 interface HighlightedCost {

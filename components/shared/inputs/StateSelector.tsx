@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useId } from 'react';
 import { ChevronDown, MapPin } from 'lucide-react';
+import { formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import type { InputSize } from '@/components/ui/inputs/BaseInput';
@@ -338,7 +339,7 @@ export function StateSelector({
                     <span className="text-xs text-muted-foreground font-mono">({state.code})</span>
                   </span>
                   <span className="text-xs text-muted-foreground font-mono">
-                    {state.hasIncomeTax ? `${(state.rate * 100).toFixed(1)}%` : 'No tax'}
+                    {state.hasIncomeTax ? formatPercent(state.rate, { digits: 1 }) : 'No tax'}
                   </span>
                 </div>
               ))}
