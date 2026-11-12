@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { cn, formatCurrency, formatNumberWithCommas } from '@/lib/utils';
+import { formatCurrency } from '@/lib/format';
+import { cn, formatNumberWithCommas } from '@/lib/utils';
 import { BaseInput, type InputSize } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 import { DollarSign } from 'lucide-react';

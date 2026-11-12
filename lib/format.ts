@@ -7,9 +7,10 @@
  * (docs/production-audit.md, H7).
  *
  * Default outputs are byte-identical to the legacy formatters they replace:
- * formatCurrency / formatPercent in lib/utils and lib/calculations/core, and
- * the leverage comparison's components/format.ts. Signed and compact output
- * uses the U+2212 minus sign, as the leverage results always have.
+ * the formatCurrency / formatPercent copies in lib/utils and
+ * lib/calculations/core (core now re-exports these two), and the leverage
+ * comparison's components/format.ts. Signed and compact output uses the
+ * U+2212 minus sign, as the leverage results always have.
  *
  * Intentional deviations from legacy output (no option reproduces them):
  * - A percent that rounds to zero never prints a minus: leverage

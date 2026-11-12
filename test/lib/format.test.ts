@@ -21,15 +21,6 @@ import {
   type FormatKind,
   type PercentFormatOptions,
 } from '@/lib/format';
-import {
-  formatCurrency as utilsFormatCurrency,
-  formatPercent as utilsFormatPercent,
-  formatYearsAndMonths as utilsFormatYearsAndMonths,
-} from '@/lib/utils';
-import {
-  formatCurrency as coreFormatCurrency,
-  formatPercent as coreFormatPercent,
-} from '@/lib/calculations/core';
 import { formatPercent as percentInputFormatPercent } from '@/components/ui/inputs/PercentInput';
 
 const MINUS = '\u2212';
@@ -320,20 +311,6 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
   const FRACTIONS = [0, 0.0004, -0.0004, 0.003, -0.003, 0.07, 0.075, 0.0795, 0.095, -0.1, 0.12345, 0.125, 0.434, 1, 12.345];
   const RATIOS = [1, 1.5, 2, 2.25, 2.256, 2.999, 3];
 
-  it('lib/utils and lib/calculations/core formatCurrency equal formatCurrency(n)', () => {
-    for (const n of MONEY) {
-      expect(formatCurrency(n)).toBe(utilsFormatCurrency(n));
-      expect(formatCurrency(n)).toBe(coreFormatCurrency(n));
-    }
-  });
-
-  it('lib/utils and lib/calculations/core formatPercent equal formatPercent(f)', () => {
-    for (const f of [...FRACTIONS, NaN]) {
-      expect(formatPercent(f)).toBe(utilsFormatPercent(f));
-      expect(formatPercent(f)).toBe(coreFormatPercent(f));
-    }
-  });
-
   it('leverage formatCompactCurrency equals formatCurrency(n, { compact: true })', () => {
     for (const n of [...MONEY, -0.3]) {
       expect(formatCurrency(n, { compact: true })).toBe(formatCompactCurrency(n));
@@ -398,11 +375,5 @@ describe('parity with the legacy formatters (delete each case when its legacy fo
       '3.3 months',
       '12 months',
     ]);
-  });
-
-  it('lib/utils formatYearsAndMonths equals formatYearsAndMonths', () => {
-    for (const v of [-2, 0, 0.03, 0.25, 1 / 12, 0.99, 1, 1 + 1 / 12, 2, 2.5, 30.7]) {
-      expect(formatYearsAndMonths(v)).toBe(utilsFormatYearsAndMonths(v));
-    }
   });
 });

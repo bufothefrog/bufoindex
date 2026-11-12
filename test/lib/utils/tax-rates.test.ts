@@ -12,31 +12,34 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { getFICARate, getStateTaxRate, calculateHSATaxRate } from '@/lib/utils'
+import { getFICARate, calculateIncomeTaxRate, calculateHSATaxRate } from '@/lib/utils'
 import { STATE_TAX_RATES_2026 } from '@/lib/constants/states-2026'
 
-describe('getStateTaxRate (2026 state table)', () => {
+/** The state part of the income tax rate: calculateIncomeTaxRate with no federal rate. */
+const stateRate = (stateCode: string) => calculateIncomeTaxRate(0, stateCode)
+
+describe('state rates (2026 state table)', () => {
   it('returns the flat rate for flat-tax states', () => {
     // Illinois: 4.95% flat
-    expect(getStateTaxRate('IL')).toBe(0.0495)
+    expect(stateRate('IL')).toBe(0.0495)
     // Iowa: 3.8% flat since 2025 (SF 2442) — was stale at 6.48%
-    expect(getStateTaxRate('IA')).toBe(0.038)
+    expect(stateRate('IA')).toBe(0.038)
     // Kentucky: 3.5% flat for 2026 (2025 HB 1) — was stale at 4.5%
-    expect(getStateTaxRate('KY')).toBe(0.035)
+    expect(stateRate('KY')).toBe(0.035)
     // Louisiana: 3.0% flat since 2025 — was stale at 4.25%
-    expect(getStateTaxRate('LA')).toBe(0.03)
+    expect(stateRate('LA')).toBe(0.03)
   })
 
   it('returns 0 for no-income-tax states', () => {
-    expect(getStateTaxRate('TX')).toBe(0)
-    expect(getStateTaxRate('WA')).toBe(0)
-    expect(getStateTaxRate('NH')).toBe(0)
+    expect(stateRate('TX')).toBe(0)
+    expect(stateRate('WA')).toBe(0)
+    expect(stateRate('NH')).toBe(0)
     expect(STATE_TAX_RATES_2026.TX.hasStateTax).toBe(false)
   })
 
   it('returns 0 for empty or unknown state codes', () => {
-    expect(getStateTaxRate('')).toBe(0)
-    expect(getStateTaxRate('ZZ')).toBe(0)
+    expect(stateRate('')).toBe(0)
+    expect(stateRate('ZZ')).toBe(0)
   })
 
   it('covers all 50 states plus DC', () => {

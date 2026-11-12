@@ -1,5 +1,5 @@
 import { AllocationItem, DebtData, PaycheckProfile } from '@/lib/types';
-import { formatCurrency, formatPercent } from '@/lib/utils';
+import { formatCurrency, formatPercent } from '@/lib/format';
 import { FinancialStep, StepStatus, UrgencyLevel } from '@/lib/constants/financialSteps';
 import {
   HIGH_INTEREST_THRESHOLD,

@@ -16,7 +16,8 @@ import {
   getAssetClassLabel,
 } from '@/lib/calculations/portfolioRebalancing';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 // Stable fallbacks, so the asset-class options memo holds when a caller passes
 // neither list. Without targets the row offers the default profile's classes.

@@ -78,7 +78,3 @@ export const STATE_TAX_RATES_2026 = {
   WY: { rate: 0, hasStateTax: false, name: 'Wyoming' }           // no state income tax
 } as const satisfies Record<string, StateTaxInfo>;
 
-export type StateCode = keyof typeof STATE_TAX_RATES_2026;
-
-// Backward-compatible alias (previously exported from lib/types).
-export const STATE_TAX_RATES = STATE_TAX_RATES_2026;
