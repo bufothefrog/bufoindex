@@ -20,6 +20,8 @@ open questions.
 
 ## 1. Where the app is today
 
+Historical: this section is the original proposal. What was built is described in docs/architecture.md and docs/rebuild-plan.md.
+
 Facts that shape the redesign (file references are to the current tree):
 
 - Three calculators, three unrelated Zustand stores. Paycheck
@@ -231,6 +233,8 @@ Portfolio rebalancer
 | Assumptions | whole vs fractional shares, allow taxable selling, show placement advice |
 
 ### 2.5 Dashboard (`/overview`)
+
+Historical: this section is the original proposal. What was built is described in docs/architecture.md and docs/rebuild-plan.md.
 
 Available once a profile exists. A single scrollable column on mobile, a
 card grid on desktop. Every card is computed from the profile through the
@@ -580,6 +584,8 @@ Mostly a presentation change over existing output. `PayrollSetupGuide` and
   works if contributions are mechanical and continue through drawdowns.
 
 ## 6. Engineering plan
+
+Historical: this section is the original proposal. What was built is described in docs/architecture.md and docs/rebuild-plan.md.
 
 ### 6.1 New and changed files
 

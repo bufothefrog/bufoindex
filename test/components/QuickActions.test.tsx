@@ -18,6 +18,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { QuickActions } from '@/components/paycheck-allocator/QuickActions';
+import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 import {
   createPaycheckProfile,
   createBenefitsData,
@@ -448,6 +449,46 @@ describe('QuickActions', () => {
       } finally {
         section.remove();
       }
+    });
+
+    it('moves focus to the section it scrolls to', async () => {
+      const section = document.createElement('section');
+      section.setAttribute('aria-label', '401(k) or similar plan');
+      section.scrollIntoView = vi.fn();
+      document.body.appendChild(section);
+      try {
+        renderActions(matchOnlyProfile());
+        await userEvent.setup().click(screen.getByRole('button', { name: 'Increase 401k to 6%' }));
+        expect(section).toHaveFocus();
+      } finally {
+        section.remove();
+      }
+    });
+
+    it('on the phone layout with Results open, switches to Inputs, then focuses the section', async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      render(
+        <CalculatorLayout
+          title="Paycheck"
+          description="Quick action test."
+          inputSections={
+            <section aria-label="401(k) or similar plan" ref={(el) => { if (el) el.scrollIntoView = scrollIntoView; }}>
+              Plan inputs
+            </section>
+          }
+          resultSection={<QuickActions profile={matchOnlyProfile()} />}
+        />
+      );
+
+      await user.click(screen.getByRole('tab', { name: /Results/ }));
+      expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
+
+      await user.click(screen.getByRole('button', { name: 'Increase 401k to 6%' }));
+
+      expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('region', { name: '401(k) or similar plan' })).toHaveFocus();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
     });
   });
 

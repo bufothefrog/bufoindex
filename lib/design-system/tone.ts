@@ -22,7 +22,7 @@ export const TONE_TEXT: Readonly<Record<Tone, string>> = {
   neutral: 'text-foreground',
   positive: 'text-success',
   caution: 'text-warning',
-  negative: 'text-destructive',
+  negative: 'text-negative',
   info: 'text-info',
   brand: 'text-sage-700 dark:text-sage-300',
 };

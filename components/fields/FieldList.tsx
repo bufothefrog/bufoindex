@@ -152,7 +152,7 @@ export function FieldListBase({
     <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-3">
       <p
         id={labelId}
-        className={cn(large ? 'text-base' : 'text-sm', 'font-medium leading-none', error && 'text-destructive')}
+        className={cn(large ? 'text-base' : 'text-sm', 'font-medium leading-none', error && 'text-negative')}
       >
         {spec.label}
       </p>
@@ -197,7 +197,7 @@ export function FieldListBase({
                   onClick={() => remove(index)}
                   disabled={!canRemove}
                   aria-label={spec.removeLabel?.(row, index) ?? `Remove ${rowLabel}`}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-negative"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </Button>

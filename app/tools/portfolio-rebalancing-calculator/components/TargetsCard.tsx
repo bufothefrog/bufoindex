@@ -162,7 +162,7 @@ export function TargetsCard({
                 disabled={!isClassRemovable(cls)}
                 aria-label={`Remove ${getAssetClassLabel(cls, customAssetClasses)}`}
                 data-testid={`target-remove-${cls}`}
-                className="text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-negative"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -179,7 +179,7 @@ export function TargetsCard({
         <div
           className={cn(
             'flex items-center gap-2 text-sm font-medium tabular-nums pt-1',
-            isBalanced ? 'text-sage-600 dark:text-sage-300' : 'text-destructive',
+            isBalanced ? 'text-sage-600 dark:text-sage-300' : 'text-negative',
           )}
           data-testid="target-sum-portfolio"
         >

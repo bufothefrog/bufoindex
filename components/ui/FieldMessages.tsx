@@ -48,14 +48,14 @@ export function FieldMessages({ id, help, error, className, glyph = true }: Fiel
       )}
       {errorId &&
         (glyph ? (
-          <p id={errorId} role="alert" className="flex items-start space-x-1 text-xs text-destructive">
+          <p id={errorId} role="alert" className="flex items-start space-x-1 text-xs text-negative">
             <span className="font-bold" aria-hidden="true">
               {'\u26a0'}
             </span>
             <span>{error}</span>
           </p>
         ) : (
-          <p id={errorId} role="alert" className="text-xs text-destructive">
+          <p id={errorId} role="alert" className="text-xs text-negative">
             {error}
           </p>
         ))}

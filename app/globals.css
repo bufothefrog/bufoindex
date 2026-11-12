@@ -92,6 +92,10 @@
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
 
+  /* Negative text (text-negative): the red for words and figures. Fills and
+     badges keep --destructive with its foreground. */
+  --color-negative: hsl(var(--negative));
+
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
 
@@ -134,6 +138,7 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    --negative: 0 84.2% 60.2%; /* same as --destructive: light mode unchanged */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 106 29% 32%; /* sage-600 ring */
@@ -164,6 +169,9 @@
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
+    /* Text on dark surfaces: --destructive is ~1.8:1 on --background; this is
+       6.7:1 on --background, 6.4:1 on --card, 5.5:1 on --muted. */
+    --negative: 0 91% 71%;
     --border: 0 0% 20%;
     --input: 0 0% 15%;
     --ring: 106 29% 32%; /* sage-600 ring */

@@ -27,7 +27,7 @@ const TEXT_COLORS = [
   { className: 'text-foreground', text: 'Primary text' },
   { className: 'text-muted-foreground', text: 'Muted text' },
   { className: 'text-primary', text: 'Primary accent' },
-  { className: 'text-destructive', text: 'Error or destructive' },
+  { className: 'text-negative', text: 'Error or destructive' },
 ] as const;
 
 export function TypographySection() {

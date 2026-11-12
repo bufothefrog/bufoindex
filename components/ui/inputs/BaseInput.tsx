@@ -48,11 +48,11 @@ export function BaseInput({
           // Size first: tailwind-merge drops leading-none when a text-* class follows it.
           size === 'xl' ? "text-base" : "text-sm",
           "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-          hasError && "text-destructive"
+          hasError && "text-negative"
         )}
       >
         {label}
-        {required && <span className="text-destructive ml-1">*</span>}
+        {required && <span className="text-negative ml-1">*</span>}
       </label>
       
       {/* Input Container */}
