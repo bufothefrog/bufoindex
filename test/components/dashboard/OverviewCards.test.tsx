@@ -8,15 +8,17 @@
  */
 
 import React from 'react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import OverviewDashboard from '@/components/dashboard/OverviewDashboard';
 import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
 import { LEVERAGE_CALCULATOR } from '@/lib/calculators/leverage/definition';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { ASSUMED_PORTFOLIO_RETURN } from '@/lib/dashboard/derive';
 import { formatPercent } from '@/lib/format';
 import type { ProfilePatch } from '@/lib/profile/types';
+import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { resetProfileStore } from '@/test/utils/stores';
 
@@ -54,6 +56,12 @@ class ResizeObserverStub {
 
 beforeAll(() => {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+});
+
+// The one site-wide dollar mode starts at its default for every test.
+beforeEach(() => {
+  window.localStorage.removeItem('bufo-preferences');
+  usePreferencesStore.getState().setDisplayMode('today');
 });
 
 /** Renders the overview for a profile and waits for both simulations to finish. */
@@ -131,11 +139,11 @@ describe('PaycheckCard', () => {
 describe('RetirementOddsCard', () => {
   it.each<[ProfileName, string, string, string, string, string]>([
     ['basics', '5%', 'Share of 1,000 seeded paths with money left at age 85, retiring at 60', '$1,037,677', '$2,000,000',
-      'Saving $500 more per month moves the simulated success rate from 5% to 36.4% and the projected balance to $1,343,473 (same simulated markets).'],
+      "Saving $500 more per month moves the simulated success rate from 5% to 36.4% and the projected balance to $1,343,473 in today's dollars (same simulated markets)."],
     ['rich', '8.3%', 'Share of 1,000 seeded paths with money left at age 92, retiring at 60', '$1,350,387', '$2,250,000',
-      'Saving $500 more per month moves the simulated success rate from 8.3% to 18% and the projected balance to $1,495,138 (same simulated markets).'],
+      "Saving $500 more per month moves the simulated success rate from 8.3% to 18% and the projected balance to $1,495,138 in today's dollars (same simulated markets)."],
     ['lean', '0%', 'Share of 1,000 seeded paths with money left at age 85, retiring at 67', '$72,086', '$2,000,000',
-      'Saving $500 more per month moves the simulated success rate from 0% to 0% and the projected balance to $170,930 (same simulated markets).'],
+      "Saving $500 more per month moves the simulated success rate from 0% to 0% and the projected balance to $170,930 in today's dollars (same simulated markets)."],
   ])('%s: the calculator headline under the card labels, and the lever', async (name, success, hint, projected, required, lever) => {
     await renderOverview(name);
     const retirement = card('retirement');
@@ -206,9 +214,9 @@ describe('LeverageCard', () => {
       '$500/mo of taxable contributions for 30 years ($205,000 in total, starting from $25,000), into an index fund or a 2x daily-reset fund on the same dates. The cashflow-investor preset uses this comparison for taxable contributions.',
       [
         ['Metric', 'Index', '2x fund'],
-        ['Median ending balance', '$1,158,212', '$1,398,228'],
-        ['10th percentile', '$460,523', '$253,676'],
-        ['90th percentile', '$2,607,506', '$7,455,264'],
+        ['Median ending balance', '$477,168', '$576,052'],
+        ['10th percentile', '$189,729', '$104,511'],
+        ['90th percentile', '$1,074,258', '$3,071,470'],
         ['Median max drawdown', '36.8%', '70.1%'],
       ],
       'The 2x fund ended behind the index fund in 40% of 500 simulated paths. Estimated annual drag from volatility, financing, and fees: 8%.',
@@ -218,9 +226,9 @@ describe('LeverageCard', () => {
       '$700/mo of taxable contributions for 19 years ($409,600 in total, starting from $250,000), into an index fund or a 3x daily-reset fund on the same dates. The standard preset does not use leverage; the comparison is shown for reference.',
       [
         ['Metric', 'Index', '3x fund'],
-        ['Median ending balance', '$1,547,275', '$1,319,947'],
-        ['10th percentile', '$732,336', '$176,029'],
-        ['90th percentile', '$3,744,583', '$18,645,827'],
+        ['Median ending balance', '$882,389', '$752,747'],
+        ['10th percentile', '$417,641', '$100,387'],
+        ['90th percentile', '$2,135,483', '$10,633,454'],
         ['Median max drawdown', '33.1%', '83.8%'],
       ],
       'The 3x fund ended behind the index fund in 55% of 500 simulated paths. Estimated annual drag from volatility, financing, and fees: 17.6%.',
@@ -230,9 +238,9 @@ describe('LeverageCard', () => {
       '$0/mo of contributions for 15 years ($40,000 in total, starting from $40,000), into an index fund or a 1.5x daily-reset fund on the same dates. The cashflow-investor preset uses this comparison for taxable contributions.',
       [
         ['Metric', 'Index', '1.5x fund'],
-        ['Median ending balance', '$139,252', '$141,420'],
-        ['10th percentile', '$61,639', '$41,649'],
-        ['90th percentile', '$294,035', '$433,920'],
+        ['Median ending balance', '$89,380', '$90,772'],
+        ['10th percentile', '$39,564', '$26,733'],
+        ['90th percentile', '$188,730', '$278,517'],
         ['Median max drawdown', '30.8%', '47.6%'],
       ],
       'The 1.5x fund ended behind the index fund in 47% of 500 simulated paths. Estimated annual drag from volatility, financing, and fees: 4.1%.',
@@ -241,10 +249,12 @@ describe('LeverageCard', () => {
     await renderOverview(name);
     const leverage = card('leverage');
     expect(leverage).toHaveTextContent(setup);
-    expect(within(leverage).getByRole('table', { name: /simulated paths$/ })).toBeInTheDocument();
+    expect(within(leverage).getByRole('table', { name: /simulated paths, balances in today's dollars$/ })).toBeInTheDocument();
     expect(tableRows(leverage)).toEqual(rows);
     expect(leverage).toHaveTextContent(behind);
-    expect(leverage).toHaveTextContent('Assumes 10% mean index return, 16% volatility, and 4.5% financing, before taxes.');
+    expect(leverage).toHaveTextContent(
+      "Assumes 10% mean index return, 16% volatility, and 4.5% financing, before taxes. Adjusted to today's dollars (assumes 3% inflation). Contributions and the starting balance are shown as entered."
+    );
     expect(within(leverage).getByRole('link', { name: /Open the comparison/ })).toHaveAttribute(
       'href',
       '/tools/leverage-comparison?from=profile'
@@ -263,7 +273,7 @@ describe('LeverageCard', () => {
     const leveraged = screen.getByRole('group', { name: '3x fund, median ending balance' });
     expect(index).toHaveTextContent(median[1]);
     expect(leveraged).toHaveTextContent(median[2]);
-    expect(median.slice(1)).toEqual(['$1,547,275', '$1,319,947']);
+    expect(median.slice(1)).toEqual(['$882,389', '$752,747']);
   });
 
   it('says so instead of comparing when nothing is invested', () => {
@@ -322,5 +332,88 @@ describe('AutomationChecklistCard', () => {
     const boxes = within(automation).getAllByRole('checkbox');
     expect(boxes.map((box) => box.closest('label')?.textContent)).toEqual(rows);
     expect(automation).toHaveTextContent(count);
+  });
+});
+
+/** "$1,234,567" -> 1234567. */
+const dollars = (text: string) => Number(text.replace(/[$,]/g, ''));
+
+describe('the one dollar display mode on /overview', () => {
+  it('shows one toggle near the top, and both cards follow it: the same results in two modes, apart by the documented factor', async () => {
+    await renderOverview('rich');
+    const profile = useProfileStore.getState().profile;
+    const leverageInputs = engineInputsFor(LEVERAGE_CALCULATOR, profile);
+    const retirementInputs = engineInputsFor(RETIREMENT_CALCULATOR, profile);
+    const result = LEVERAGE_CALCULATOR.calculate(leverageInputs);
+
+    const toggles = screen.getAllByRole('radiogroup', { name: 'Dollar display mode' });
+    expect(toggles).toHaveLength(1);
+    expect(screen.getByTestId('overview-dollar-mode')).toHaveTextContent(
+      "Future balances on the retirement and leverage cards are shown in today's dollars."
+    );
+
+    // Today's dollars: leverage at the fixed 3% over 19 years (228 months).
+    const leverageFactor = 1.03 ** 19;
+    const [, todayMedian, todayP10, todayP90] = tableRows(card('leverage'));
+    expect(dollars(todayMedian[1])).toBeCloseTo(result.index.dca.p50 / leverageFactor, -1);
+    expect(dollars(todayMedian[2])).toBeCloseTo(result.leveraged.dca.p50 / leverageFactor, -1);
+    expect(dollars(todayP10[1])).toBeCloseTo(result.index.dca.p10 / leverageFactor, -1);
+    expect(dollars(todayP90[2])).toBeCloseTo(result.leveraged.dca.p90 / leverageFactor, -1);
+    const todayProjected = dollars(tile(card('retirement'), 'Projected at retirement').replace("Today's dollars", ''));
+    expect(todayProjected).toBe(1_350_387);
+
+    fireEvent.click(within(toggles[0]).getByRole('radio', { name: 'Future dollars' }));
+    expect(usePreferencesStore.getState().displayMode).toBe('nominal');
+    expect(screen.getByTestId('overview-dollar-mode')).toHaveTextContent(
+      'Future balances on the retirement and leverage cards are shown in future dollars.'
+    );
+
+    // Future dollars: the engine's own nominal figures.
+    const leverage = card('leverage');
+    expect(within(leverage).getByRole('table', { name: /simulated paths, balances in future dollars$/ })).toBeInTheDocument();
+    expect(tableRows(leverage).slice(1, 4)).toEqual([
+      ['Median ending balance', '$1,547,275', '$1,319,947'],
+      ['10th percentile', '$732,336', '$176,029'],
+      ['90th percentile', '$3,744,583', '$18,645,827'],
+    ]);
+    expect(leverage).toHaveTextContent('Shown in future dollars. Contributions and the starting balance are shown as entered.');
+    // Contributions are paid in and do not convert.
+    expect(leverage).toHaveTextContent('$700/mo of taxable contributions for 19 years ($409,600 in total, starting from $250,000)');
+
+    // Retirement: the profile's own inflation rate over the years to retirement.
+    const retirement = card('retirement');
+    const years = retirementInputs.retirementAge - retirementInputs.startingAge;
+    const retirementFactor = (1 + retirementInputs.inflationRate) ** years;
+    const futureText = tile(retirement, 'Projected at retirement');
+    expect(futureText.endsWith('Future dollars')).toBe(true);
+    const futureProjected = dollars(futureText.replace('Future dollars', ''));
+    expect(futureProjected / retirementFactor).toBeCloseTo(todayProjected, -1);
+    const lever = within(retirement).getByText(/same simulated markets/);
+    expect(lever).toHaveTextContent(/and the projected balance to \$[\d,]+ in future dollars \(same simulated markets\)\.$/);
+    const leverFuture = dollars(/to (\$[\d,]+) in future dollars/.exec(lever.textContent ?? '')?.[1] ?? '');
+    expect(leverFuture / retirementFactor).toBeCloseTo(1_495_138, -1);
+
+    // One stored preference: switching back here switches every page.
+    act(() => usePreferencesStore.getState().setDisplayMode('today'));
+    expect(tableRows(card('leverage'))[1]).toEqual(['Median ending balance', '$882,389', '$752,747']);
+  });
+
+  it('shows no toggle when no card shows a future dollar figure', () => {
+    resetProfileStore({
+      profile: {
+        person: { retirementAge: 70, lifeExpectancy: 65 },
+        investing: { investedBalance: 0, monthlyContribution: 0, taxableMonthlyContribution: 0 },
+      },
+    });
+    render(<OverviewDashboard />);
+    expect(screen.getByTestId('overview-paycheck')).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Dollar display mode' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('overview-dollar-mode')).not.toBeInTheDocument();
+  });
+
+  it('shows the toggle while only one of the two cards has figures', () => {
+    resetProfileStore({ profile: { investing: { investedBalance: 0, monthlyContribution: 0, taxableMonthlyContribution: 0 } } });
+    render(<OverviewDashboard />);
+    expect(screen.getByRole('radiogroup', { name: 'Dollar display mode' })).toBeInTheDocument();
   });
 });

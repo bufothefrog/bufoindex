@@ -6,16 +6,18 @@ import { Scale } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import { DataTable, type DataTableColumn } from '@/components/ui/results';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import type { DcaComparisonInputs, DcaComparisonResult } from '@/lib/calculations/leverageComparison';
 import { usesTaxableContribution } from '@/lib/calculators/leverage/bindings';
 import { LEVERAGE_CALCULATOR } from '@/lib/calculators/leverage/definition';
-import { leverageHeadline } from '@/lib/calculators/leverage/headline';
+import { leverageHeadline, leverageHorizonYears } from '@/lib/calculators/leverage/headline';
 import { calculatorHref } from '@/lib/calculators/registry';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { formatStatValue } from '@/lib/design-system/stat';
 import { makeGet } from '@/lib/fields/paths';
 import { formatCurrency, formatMultiple, formatPercent, type FormatKind } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
+import { DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
 import { CardLinkButton } from './CardLinkButton';
 import { SimulationRegion } from './SimulationRegion';
 import { useDeferredResult } from './useDeferredResult';
@@ -112,8 +114,12 @@ interface ComparisonFiguresProps {
 }
 
 function ComparisonFigures({ result, inputs, usesTaxable, standardPreset }: ComparisonFiguresProps) {
+  // Display only: ending balances follow the shared dollar mode at the fixed
+  // inflation assumption, as on the comparison page; contributions do not.
+  const dollars = useDollarDisplay(DISPLAY_INFLATION_ASSUMPTION, { basis: 'fixed' });
+  const atHorizon = (nominal: number) => dollars.fromNominal(nominal, leverageHorizonYears(inputs));
   const multiple = formatMultiple(inputs.leverageRatio);
-  const headline = leverageHeadline(result, inputs);
+  const headline = leverageHeadline(result, inputs, dollars.mode);
   const figure = (id: string) => headline.find((stat) => stat.id === id)?.value ?? null;
   const { years } = inputs;
 
@@ -125,8 +131,20 @@ function ComparisonFigures({ result, inputs, usesTaxable, standardPreset }: Comp
       index: figure('index-median'),
       leveraged: figure('leveraged-median'),
     },
-    { id: 'p10', label: '10th percentile', format: 'currency', index: result.index.dca.p10, leveraged: result.leveraged.dca.p10 },
-    { id: 'p90', label: '90th percentile', format: 'currency', index: result.index.dca.p90, leveraged: result.leveraged.dca.p90 },
+    {
+      id: 'p10',
+      label: '10th percentile',
+      format: 'currency',
+      index: atHorizon(result.index.dca.p10),
+      leveraged: atHorizon(result.leveraged.dca.p10),
+    },
+    {
+      id: 'p90',
+      label: '90th percentile',
+      format: 'currency',
+      index: atHorizon(result.index.dca.p90),
+      leveraged: atHorizon(result.leveraged.dca.p90),
+    },
     {
       id: 'drawdown',
       label: 'Median max drawdown',
@@ -150,7 +168,7 @@ function ComparisonFigures({ result, inputs, usesTaxable, standardPreset }: Comp
       </p>
 
       <DataTable
-        caption={`Index fund versus ${multiple} leveraged fund, ${inputs.paths} simulated paths`}
+        caption={`Index fund versus ${multiple} leveraged fund, ${inputs.paths} simulated paths, balances ${dollars.chartCaption}`}
         columns={comparisonColumns(multiple)}
         rows={rows}
         rowKey={(row) => row.id}
@@ -166,8 +184,9 @@ function ComparisonFigures({ result, inputs, usesTaxable, standardPreset }: Comp
 
       <p className="text-xs text-muted-foreground">
         Assumes {formatPercent(inputs.indexMeanReturn)} mean index return, {formatPercent(inputs.indexVolatility)}{' '}
-        volatility, and {formatPercent(inputs.financingRate)} financing, before taxes. Simulated outcomes, not
-        forecasts; a different random seed would move these figures by a few percentage points.
+        volatility, and {formatPercent(inputs.financingRate)} financing, before taxes. {dollars.caption}{' '}
+        Contributions and the starting balance are shown as entered. Simulated outcomes, not forecasts; a different
+        random seed would move these figures by a few percentage points.
       </p>
     </div>
   );

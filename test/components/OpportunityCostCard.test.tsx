@@ -11,8 +11,10 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { act } from '@testing-library/react';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { OpportunityCostCard } from '@/components/shared/cards/OpportunityCostCard';
+import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import type { SkippedItem } from '@/lib/types';
 
 function createSkippedItem(overrides: Partial<SkippedItem> = {}): SkippedItem {
@@ -41,6 +43,12 @@ function renderCard(skippedItem: SkippedItem) {
   );
 }
 
+// The one site-wide dollar mode starts at its default ('today') in every test.
+beforeEach(() => {
+  window.localStorage.removeItem('bufo-preferences');
+  usePreferencesStore.getState().setDisplayMode('today');
+});
+
 describe('OpportunityCostCard', () => {
   describe('horizon phrasing', () => {
     it('labels an annual-only cost as "annual cost", not "cost over annually"', () => {
@@ -59,8 +67,9 @@ describe('OpportunityCostCard', () => {
         })
       );
 
-      expect(screen.getByText('cost over 10 years')).toBeInTheDocument();
-      expect(screen.getByText('$4,200')).toBeInTheDocument();
+      expect(screen.getByText("cost over 10 years (today's $)")).toBeInTheDocument();
+      // 4,200 / 1.03^10 = 3,125.18
+      expect(screen.getByText('$3,125')).toBeInTheDocument();
     });
 
     it('labels a twenty-year cost as "cost over 20 years" and prefers it over shorter horizons', () => {
@@ -75,9 +84,10 @@ describe('OpportunityCostCard', () => {
         })
       );
 
-      expect(screen.getByText('cost over 20 years')).toBeInTheDocument();
-      expect(screen.getByText('$12,000')).toBeInTheDocument();
-      expect(screen.queryByText('cost over 10 years')).not.toBeInTheDocument();
+      expect(screen.getByText("cost over 20 years (today's $)")).toBeInTheDocument();
+      // 12,000 / 1.03^20 = 6,644.27
+      expect(screen.getByText('$6,644')).toBeInTheDocument();
+      expect(screen.queryByText(/cost over 10 years/)).not.toBeInTheDocument();
     });
   });
 
@@ -146,6 +156,41 @@ describe('OpportunityCostCard', () => {
 
       expect(screen.getByText(expected)).toBeInTheDocument();
       expect(screen.queryByText(/risk optimization/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('dollar display mode', () => {
+    /** The highlighted figure: the one dollar amount that is not the $25 monthly or $300 annual row. */
+    function highlighted(): number {
+      const amounts = screen
+        .getAllByText(/^\$[\d,]+$/)
+        .map((element) => Number((element.textContent ?? '').replace(/[$,]/g, '')))
+        .filter((amount) => amount !== 25 && amount !== 300);
+      expect(amounts).toHaveLength(1);
+      return amounts[0];
+    }
+
+    it.each([
+      ['10-year', { monthly: 25, annual: 300, tenYear: 4200 }, 4200, 10],
+      ['20-year', { monthly: 25, annual: 300, tenYear: 4200, twentyYear: 12000 }, 12000, 20],
+    ] as const)('shows the same %s cost deflated by 1.03 per year, or as computed in future dollars', (_, costs, nominal, years) => {
+      renderCard(createSkippedItem({ opportunityCost: { ...costs } }));
+      const today = highlighted();
+      expect(today).toBeCloseTo(nominal / 1.03 ** years, -1);
+
+      act(() => usePreferencesStore.getState().setDisplayMode('nominal'));
+      expect(highlighted()).toBe(nominal);
+      expect(screen.getByText(`cost over ${years} years (future $)`)).toBeInTheDocument();
+      expect(today).not.toBe(nominal);
+    });
+
+    it('leaves an annual cost and the monthly and annual rows as computed (current-year money)', () => {
+      renderCard(createSkippedItem({ opportunityCost: { monthly: 25, annual: 300 } }));
+      expect(screen.getAllByText('$300').length).toBeGreaterThan(0);
+      expect(screen.getByText('annual cost')).toBeInTheDocument();
+      act(() => usePreferencesStore.getState().setDisplayMode('nominal'));
+      expect(screen.getByText('annual cost')).toBeInTheDocument();
+      expect(screen.getAllByText('$300').length).toBeGreaterThan(0);
     });
   });
 });

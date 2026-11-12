@@ -4,7 +4,7 @@
  * Most simulations and projections run in nominal (future) dollars, and a few
  * figures (the scenario cards' monthly withdrawal) are already expressed in
  * today's dollars. These helpers convert either kind into whichever basis the
- * reader has selected. They must never feed back into calculations — display
+ * reader has selected. They must never feed back into calculations: display
  * only.
  */
 
@@ -13,10 +13,11 @@ export type DollarDisplayMode = 'today' | 'nominal';
 export const DEFAULT_DOLLAR_DISPLAY_MODE: DollarDisplayMode = 'today';
 
 /**
- * Inflation assumption used to deflate paycheck-allocator projections,
- * which have no user-supplied inflation input. Approximates the long-run
- * US CPI average (~3%/yr). The retirement calculator uses the user's own
- * inflationRate input instead.
+ * Inflation assumption used to deflate figures from calculators that have no
+ * user-supplied inflation input (registry dollarDisplay 'fixed'): the
+ * paycheck allocator's projections and opportunity costs, and the leverage
+ * comparison's balances. Approximates the long-run US CPI average (~3%/yr).
+ * The retirement calculator uses the user's own inflationRate input instead.
  */
 export const DISPLAY_INFLATION_ASSUMPTION = 0.03;
 
@@ -64,7 +65,7 @@ export function displayDollars(
 
 /**
  * Convert an amount that is already in today's dollars for display according
- * to the active mode — the mirror of displayDollars. In 'today' mode the value
+ * to the active mode, the mirror of displayDollars. In 'today' mode the value
  * passes through unchanged; in 'nominal' mode it is inflated to the year it
  * occurs, so both bases stay internally consistent on screen.
  */

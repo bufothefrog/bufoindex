@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import { AlertTriangle, Info, LineChart, Scale, TrendingDown } from 'lucide-react';
 import { ResultCard } from '@/components/ui/cards';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
+import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import { ChartFrame } from '@/components/ui/charts';
 import { DataTable, KeyValueList, StatGrid, type DataTableColumn } from '@/components/ui/results';
 import {
@@ -12,7 +14,7 @@ import {
   type DcaComparisonInputs,
   type DcaComparisonResult,
 } from '@/lib/calculations/leverageComparison';
-import { leverageHeadline } from '@/lib/calculators/leverage/headline';
+import { leverageHeadline, leverageHorizonYears } from '@/lib/calculators/leverage/headline';
 import {
   COMPACT,
   COMPACT_SIGNED,
@@ -23,6 +25,7 @@ import {
   relativeGap,
 } from '@/lib/calculators/leverage/narrative';
 import { formatCurrency, formatMultiple, formatPercent } from '@/lib/format';
+import { DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
 
 // Recharts loads only on the client and only once the chart frame nears the
 // viewport (audit H1).
@@ -66,7 +69,16 @@ function rowLabelColumn<T extends { label: string; sublabel: string }>(header: s
   return { id: 'label', header, rowHeader: true, cell: (row) => <RowLabel label={row.label} sublabel={row.sublabel} /> };
 }
 
+/** Shown beside converted balances: what was paid in is not converted. */
+const AS_ENTERED = 'Contributions and the starting balance are shown as entered.';
+
 export function LeverageResults({ result, inputs }: LeverageResultsProps) {
+  // Display-only conversion (CLAUDE.md display-dollar boundary): the engine
+  // runs in nominal dollars with no inflation input, so balances deflate at
+  // the fixed assumption the paycheck allocator uses (registry 'fixed').
+  const dollars = useDollarDisplay(DISPLAY_INFLATION_ASSUMPTION, { basis: 'fixed' });
+  const horizonYears = leverageHorizonYears(inputs);
+  const atHorizon = (nominal: number) => dollars.fromNominal(nominal, horizonYears);
   const L = formatMultiple(inputs.leverageRatio);
   const months = horizonMonths(inputs.years);
   const { index, leveraged } = result;
@@ -81,16 +93,16 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
     {
       label: 'Monthly',
       sublabel: `${formatCurrency(inputs.monthlyContribution, COMPACT)}/mo + ${formatCurrency(inputs.startingBalance, COMPACT)} start`,
-      index: index.dca.p50,
-      leveraged: leveraged.dca.p50,
-      gap: result.dcaEffect.dcaGap,
+      index: atHorizon(index.dca.p50),
+      leveraged: atHorizon(leveraged.dca.p50),
+      gap: atHorizon(result.dcaEffect.dcaGap),
     },
     {
       label: 'Lump sum',
       sublabel: `${formatCurrency(result.totalContributed, COMPACT)} at month 0`,
-      index: index.lumpSum.p50,
-      leveraged: leveraged.lumpSum.p50,
-      gap: result.dcaEffect.lumpSumGap,
+      index: atHorizon(index.lumpSum.p50),
+      leveraged: atHorizon(leveraged.lumpSum.p50),
+      gap: atHorizon(result.dcaEffect.lumpSumGap),
     },
   ];
   const framingColumns: DataTableColumn<FramingRow>[] = [
@@ -122,14 +134,14 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
     {
       label: '10th percentile',
       sublabel: 'Ending balance; 1 in 10 paths end lower',
-      index: formatCurrency(index.dca.p10, COMPACT),
-      leveraged: formatCurrency(leveraged.dca.p10, COMPACT),
+      index: formatCurrency(atHorizon(index.dca.p10), COMPACT),
+      leveraged: formatCurrency(atHorizon(leveraged.dca.p10), COMPACT),
     },
     {
       label: '90th percentile',
       sublabel: 'Ending balance; 1 in 10 paths end higher',
-      index: formatCurrency(index.dca.p90, COMPACT),
-      leveraged: formatCurrency(leveraged.dca.p90, COMPACT),
+      index: formatCurrency(atHorizon(index.dca.p90), COMPACT),
+      leveraged: formatCurrency(atHorizon(leveraged.dca.p90), COMPACT),
     },
   ];
   const measureColumns: DataTableColumn<MeasureRow>[] = [
@@ -140,11 +152,18 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {dollars.caption} {AS_ENTERED}
+        </p>
+        <DollarModeToggle value={dollars.mode} onChange={dollars.setMode} />
+      </div>
+
       {/* Results recalculate on every edit; screen readers hear the headline
           figures, not the whole comparison. */}
       <div aria-live="polite" data-testid="leverage-headline">
         <StatGrid
-          stats={leverageHeadline(result, inputs)}
+          stats={leverageHeadline(result, inputs, dollars.mode)}
           columns={1}
           fullWidth={['behind']}
           size="lg"
@@ -155,7 +174,7 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
       <ResultCard title="Balance over time" icon={LineChart}>
         <ChartFrame
           deferUntilVisible
-          caption={`Lines are the median balance across ${inputs.paths} simulated paths; shaded bands span the 10th to 90th percentile. Both funds receive the same contributions on the same dates.`}
+          caption={`Balances ${dollars.chartCaption}. Lines are the median balance across ${inputs.paths} simulated paths; shaded bands span the 10th to 90th percentile. Both funds receive the same contributions on the same dates.`}
         >
           <DcaPathChart points={result.medianPath} leverageRatio={inputs.leverageRatio} />
         </ChartFrame>
@@ -164,12 +183,12 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
       <ResultCard title="Cash flow vs lump sum" icon={Scale}>
         <div className="space-y-4">
           <DataTable
-            caption={`Median ending balances for the index fund and the ${L} fund under monthly contributions and a lump sum`}
+            caption={`Median ending balances ${dollars.chartCaption} for the index fund and the ${L} fund under monthly contributions and a lump sum; contributions as entered`}
             columns={framingColumns}
             rows={framingRows}
             rowKey={(row) => row.label}
           />
-          <p className="text-sm text-muted-foreground">{dcaEffectSentence(result, L, inputs)}</p>
+          <p className="text-sm text-muted-foreground">{dcaEffectSentence(result, L, inputs, atHorizon)}</p>
           <p className="text-sm text-muted-foreground">
             Paths where the {L} fund ends behind: {formatPercent(result.probLeveragedBehindDca, WHOLE)} with
             monthly contributions, {formatPercent(result.probLeveragedBehindLumpSum, WHOLE)} as a lump
@@ -181,7 +200,7 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
       <ResultCard title="Tail and drawdown" icon={TrendingDown}>
         <div className="space-y-4">
           <DataTable
-            caption={`Drawdown and low-percentile outcomes for the index fund and the ${L} fund`}
+            caption={`Drawdown and low-percentile outcomes for the index fund and the ${L} fund, balances ${dollars.chartCaption}`}
             columns={measureColumns}
             rows={measureRows}
             rowKey={(row) => row.label}

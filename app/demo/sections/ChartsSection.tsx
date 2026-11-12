@@ -33,8 +33,8 @@ export function ChartsSection() {
         >
           <ChartFrame
             deferUntilVisible
-            modeNote="Nominal dollars"
-            caption="Lines are the median balance; shaded bands span the 10th to 90th percentile. Fixture data: $500 a month for 20 years."
+            modeNote="Follows the site-wide dollar toggle"
+            caption="Balances in today's dollars or future dollars, per the site-wide toggle. Lines are the median balance; shaded bands span the 10th to 90th percentile. Fixture data: $500 a month for 20 years."
           >
             <DcaPathChart points={points} leverageRatio={2} />
           </ChartFrame>

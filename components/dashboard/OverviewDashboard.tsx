@@ -4,14 +4,18 @@ import React, { useCallback, useMemo } from 'react';
 import type { Route } from 'next';
 import { Disclaimer } from '@/components/ui/results';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
+import { LEVERAGE_CALCULATOR } from '@/lib/calculators/leverage/definition';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { calculatorHref } from '@/lib/calculators/registry';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { composeDisclaimer, DISCLAIMER } from '@/lib/constants/disclaimers';
 import { STRATEGY_PRESET_LABELS, STRATEGY_PRESET_OPTIONS, TARGET_MIX_LABELS } from '@/lib/constants/labels';
 import { strategyDescription } from '@/lib/dashboard/derive';
 import { PRESET_EMERGENCY_MONTHS } from '@/lib/profile/defaults';
 import type { FinancialProfile, ProfilePatch, StrategyPreset } from '@/lib/profile/types';
+import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import type { AllocationResult } from '@/lib/types';
 import { AutomationChecklistCard } from './AutomationChecklistCard';
@@ -111,8 +115,20 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
     }
   }, [paycheckInputs]);
 
+  // The retirement and leverage cards show balances that lie in the future;
+  // each follows the one site-wide dollar mode. The toggle shows while at
+  // least one of them has inputs its calculator accepts.
+  const showsFutureDollars = useMemo(
+    () =>
+      Object.keys(RETIREMENT_CALCULATOR.validate(engineInputsFor(RETIREMENT_CALCULATOR, profile))).length === 0 ||
+      Object.keys(LEVERAGE_CALCULATOR.validate(engineInputsFor(LEVERAGE_CALCULATOR, profile))).length === 0,
+    [profile]
+  );
+
   return (
     <div className="space-y-4 md:space-y-6">
+      {showsFutureDollars && <OverviewDollarMode />}
+
       <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
         <span className="font-medium text-foreground">{STRATEGY_PRESET_LABELS[profile.strategy.preset]}:</span>{' '}
         {strategyDescription(profile.strategy.preset, profile.strategy.leverageRatio)} Switch the preset above to see
@@ -135,6 +151,23 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
         </p>
         <CardLinkButton href={calculatorHref('portfolio', { fromProfile: true }) as Route}>Open the rebalancer</CardLinkButton>
       </div>
+    </div>
+  );
+}
+
+const DOLLAR_MODE_NOTE = {
+  today: "Future balances on the retirement and leverage cards are shown in today's dollars.",
+  nominal: 'Future balances on the retirement and leverage cards are shown in future dollars.',
+} as const;
+
+/** The one dollar display toggle on /overview; the same stored preference as every calculator page. */
+function OverviewDollarMode() {
+  const mode = usePreferencesStore((s) => s.displayMode);
+  const setMode = usePreferencesStore((s) => s.setDisplayMode);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2" data-testid="overview-dollar-mode">
+      <p className="text-sm text-muted-foreground">{DOLLAR_MODE_NOTE[mode]}</p>
+      <DollarModeToggle value={mode} onChange={setMode} />
     </div>
   );
 }

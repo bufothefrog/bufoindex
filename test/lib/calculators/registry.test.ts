@@ -145,7 +145,8 @@ describe('calculator registry', () => {
       'fixed',
       'inflation-input',
       'none',
-      'none',
+      // The leverage engine has no inflation input: its balances use the fixed 3%.
+      'fixed',
     ]);
   });
 });

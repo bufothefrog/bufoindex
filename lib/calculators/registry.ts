@@ -94,7 +94,7 @@ export const CALCULATORS: Readonly<Record<CalculatorId, CalculatorEntry>> = {
       'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the lump-sum framing shown side by side.',
     disclaimer: [DISCLAIMER.base, DISCLAIMER.simulated, DISCLAIMER.leveragedEtfs, DISCLAIMER.advice],
     liveResultsLabel: 'Leverage comparison results',
-    dollarDisplay: 'none',
+    dollarDisplay: 'fixed',
     card: {
       title: 'Leverage Comparison',
       summary:

@@ -1,5 +1,9 @@
+'use client';
+
 import React from 'react';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import { formatCurrency } from '@/lib/format';
+import { DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
 import { isFiniteNumber } from '@/lib/fields/runtime';
 import { SkippedItem } from '@/lib/types';
 import { ExpandableListCard } from '@/components/calculators/shared/ExpandableListCard';
@@ -43,6 +47,11 @@ interface HighlightedCost {
   amount: number;
   /** Reads under the figure, so it has to be grammatical on its own. */
   subtext: string;
+  /**
+   * How far out the figure lies: 10 or 20 for a compounded cost (nominal,
+   * converted for display), 0 for an annual cost (current-year money).
+   */
+  years: number;
 }
 
 /**
@@ -54,13 +63,13 @@ function getHighestOpportunityCost(
   costs: SkippedItem['opportunityCost']
 ): HighlightedCost | null {
   if (isMeaningfulCost(costs.twentyYear)) {
-    return { amount: costs.twentyYear, subtext: 'cost over 20 years' };
+    return { amount: costs.twentyYear, subtext: 'cost over 20 years', years: 20 };
   }
   if (isMeaningfulCost(costs.tenYear)) {
-    return { amount: costs.tenYear, subtext: 'cost over 10 years' };
+    return { amount: costs.tenYear, subtext: 'cost over 10 years', years: 10 };
   }
   if (isMeaningfulCost(costs.annual)) {
-    return { amount: costs.annual, subtext: 'annual cost' };
+    return { amount: costs.annual, subtext: 'annual cost', years: 0 };
   }
   return null;
 }
@@ -71,8 +80,15 @@ export const OpportunityCostCard = React.memo(function OpportunityCostCard({
   onToggleDetails,
   className,
 }: OpportunityCostCardProps) {
+  // Display only: the 10- and 20-year costs are nominal and follow the shared
+  // dollar mode at the paycheck allocator's fixed inflation assumption.
+  const dollars = useDollarDisplay(DISPLAY_INFLATION_ASSUMPTION, { basis: 'fixed' });
   const RiskIcon = riskLevelIcons[skippedItem.riskLevel];
   const highestCost = getHighestOpportunityCost(skippedItem.opportunityCost);
+  const highlighted = highestCost && {
+    value: formatCurrency(dollars.fromNominal(highestCost.amount, highestCost.years)),
+    subtext: highestCost.years > 0 ? `${highestCost.subtext}${dollars.axisSuffix}` : highestCost.subtext,
+  };
 
   const costRows = [
     { label: 'Monthly', amount: skippedItem.opportunityCost.monthly },
@@ -84,8 +100,8 @@ export const OpportunityCostCard = React.memo(function OpportunityCostCard({
       icon={RiskIcon}
       title={`Deprioritized: ${skippedItem.item}`}
       subtitle={`Risk level: ${riskLevelLabels[skippedItem.riskLevel]}`}
-      value={highestCost ? formatCurrency(highestCost.amount) : undefined}
-      valueSubtext={highestCost?.subtext}
+      value={highlighted?.value}
+      valueSubtext={highlighted?.subtext}
       tone={riskTone(skippedItem.riskLevel)}
       expanded={showDetails}
       onToggle={onToggleDetails}

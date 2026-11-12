@@ -11,16 +11,18 @@ import {
   thinPoints,
   useChartTheme,
 } from '@/components/ui/charts';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import type { MedianPathPoint } from '@/lib/calculations/leverageComparison';
 import { COMPACT } from '@/lib/calculators/leverage/narrative';
 import { formatCurrency, formatMultiple } from '@/lib/format';
+import { DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
 
 export interface DcaPathChartProps {
   points: readonly MedianPathPoint[];
   leverageRatio: number;
 }
 
-interface ChartRow {
+export interface ChartRow {
   years: number;
   indexBand: [number, number];
   leveragedBand: [number, number];
@@ -31,14 +33,19 @@ interface ChartRow {
 /** Keep the chart light on phones: about 120 steps plus the last point. */
 const MAX_POINTS = 121;
 
-
-function toRow(p: MedianPathPoint): ChartRow {
+/**
+ * One chart row per path point, every balance converted for display by
+ * `convert(nominal, yearsFromNow)` at that point's own month. Display only.
+ */
+export function toChartRow(p: MedianPathPoint, convert: (nominal: number, yearsFromNow: number) => number): ChartRow {
+  const years = p.month / 12;
+  const c = (value: number) => convert(value, years);
   return {
-    years: p.month / 12,
-    indexBand: [p.indexDcaP10, p.indexDcaP90],
-    leveragedBand: [p.leveragedDcaP10, p.leveragedDcaP90],
-    indexMedian: p.indexDca,
-    leveragedMedian: p.leveragedDca,
+    years,
+    indexBand: [c(p.indexDcaP10), c(p.indexDcaP90)],
+    leveragedBand: [c(p.leveragedDcaP10), c(p.leveragedDcaP90)],
+    indexMedian: c(p.indexDca),
+    leveragedMedian: c(p.leveragedDca),
   };
 }
 
@@ -58,11 +65,13 @@ interface PathTooltipProps {
   active?: boolean;
   payload?: ReadonlyArray<{ payload: ChartRow }>;
   leverageLabel: string;
+  /** " (today's $)" or " (future $)", from the shared display mode. */
+  suffix: string;
   indexColor: string;
   leveragedColor: string;
 }
 
-function PathTooltip({ active, payload, leverageLabel, indexColor, leveragedColor }: PathTooltipProps) {
+function PathTooltip({ active, payload, leverageLabel, suffix, indexColor, leveragedColor }: PathTooltipProps) {
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   const month = Math.round(row.years * 12);
@@ -71,9 +80,9 @@ function PathTooltip({ active, payload, leverageLabel, indexColor, leveragedColo
     <ChartTooltipCard
       title={title}
       rows={[
-        { label: 'Index fund median', value: formatCurrency(row.indexMedian), color: indexColor },
+        { label: `Index fund median${suffix}`, value: formatCurrency(row.indexMedian), color: indexColor },
         { label: '10th to 90th', value: band(row.indexBand), muted: true },
-        { label: `${leverageLabel} fund median`, value: formatCurrency(row.leveragedMedian), color: leveragedColor },
+        { label: `${leverageLabel} fund median${suffix}`, value: formatCurrency(row.leveragedMedian), color: leveragedColor },
         { label: '10th to 90th', value: band(row.leveragedBand), muted: true },
       ]}
     />
@@ -83,10 +92,17 @@ function PathTooltip({ active, payload, leverageLabel, indexColor, leveragedColo
 /**
  * Median balance paths with 10th to 90th percentile bands for the index fund
  * and the leveraged fund. Rendered inside a ChartFrame, which sizes it.
+ * Balances follow the shared dollar display mode at the fixed inflation
+ * assumption (the engine has no inflation input); the caller's caption
+ * names the basis.
  */
 function DcaPathChart({ points, leverageRatio }: DcaPathChartProps) {
   const theme = useChartTheme();
-  const rows = useMemo(() => thinPoints(points, MAX_POINTS).map(toRow), [points]);
+  const { fromNominal, axisSuffix } = useDollarDisplay(DISPLAY_INFLATION_ASSUMPTION, { basis: 'fixed' });
+  const rows = useMemo(
+    () => thinPoints(points, MAX_POINTS).map((p) => toChartRow(p, fromNominal)),
+    [points, fromNominal]
+  );
   const maxYears = rows.length > 0 ? rows[rows.length - 1].years : 1;
   const ticks = useMemo(() => yearTicks(maxYears), [maxYears]);
   const leverageLabel = formatMultiple(leverageRatio);
@@ -109,7 +125,10 @@ function DcaPathChart({ points, leverageRatio }: DcaPathChartProps) {
       <YAxis {...axis} width={56} tickFormatter={(value: number) => formatCurrency(value, COMPACT)} />
       <Tooltip
         content={
-          <PathTooltip leverageLabel={leverageLabel} indexColor={indexColor} leveragedColor={leveragedColor} />
+          <PathTooltip
+            leverageLabel={leverageLabel}
+            suffix={axisSuffix}
+            indexColor={indexColor} leveragedColor={leveragedColor} />
         }
       />
       <Legend
@@ -143,7 +162,7 @@ function DcaPathChart({ points, leverageRatio }: DcaPathChartProps) {
         stroke={indexColor}
         strokeWidth={2}
         dot={false}
-        name="Index fund (median)"
+        name={`Index fund (median)${axisSuffix}`}
       />
       <Line
         {...CHART_SERIES_DEFAULTS}
@@ -152,11 +171,14 @@ function DcaPathChart({ points, leverageRatio }: DcaPathChartProps) {
         strokeWidth={2.5}
         strokeDasharray="6 3"
         dot={false}
-        name={`${leverageLabel} fund (median)`}
+        name={`${leverageLabel} fund (median)${axisSuffix}`}
       />
     </ComposedChart>
   );
 }
 
-/** Memoized: the chart re-renders only when its points or the ratio change (audit H3). */
+/**
+ * Memoized: the chart re-renders only when its points, the ratio or the
+ * shared dollar display mode change (audit H3).
+ */
 export default React.memo(DcaPathChart);
