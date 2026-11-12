@@ -61,7 +61,7 @@ function ThemePanel({ theme, section }: { theme: 'light' | 'dark'; section: Sect
           <Icon className="h-5 w-5" aria-hidden="true" />
           {theme === 'light' ? 'Light theme' : 'Dark theme'}
         </p>
-        <div className="p-3 sm:p-4 lg:p-6">
+        <div className="p-2 sm:p-4 lg:p-6">
           <Section section={section} idPrefix={theme} />
         </div>
       </div>

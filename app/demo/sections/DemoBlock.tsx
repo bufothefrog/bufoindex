@@ -29,10 +29,20 @@ export interface DemoBlockProps {
   className?: string;
 }
 
-/** A card that groups the entries for one component family. */
+/**
+ * A card that groups the entries for one component family. Below sm its
+ * sides are narrower, so a full calculator card nested inside it (a
+ * FieldSection with Restore defaults) still fits a 360px screen.
+ */
 export function DemoBlock({ title, icon, children, className }: DemoBlockProps) {
   return (
-    <BaseCard title={title} icon={icon} className={cn('min-w-0', className)} contentClassName="space-y-8">
+    <BaseCard
+      title={title}
+      icon={icon}
+      className={cn('min-w-0', className)}
+      headerClassName="px-2 sm:px-6"
+      contentClassName="space-y-8 px-2 pb-3 sm:px-6 sm:pb-6"
+    >
       {children}
     </BaseCard>
   );
