@@ -623,21 +623,6 @@ export function normalizeProfile(
 // Writes
 // ---------------------------------------------------------------------------
 
-/**
- * The write that puts `amount` of one-off new cash on the Brokerage account
- * (the account with BROKERAGE_ACCOUNT_ID, else the first taxable account) as
- * its deposit. Negative or non-finite amounts deposit 0. No write when the
- * profile has no such account.
- */
-export function newCashDepositWrites(profile: FinancialProfile, amount: number): Write[] {
-  const { accounts } = profile.portfolio;
-  let index = accounts.findIndex((account) => account.id === BROKERAGE_ACCOUNT_ID);
-  if (index < 0) index = accounts.findIndex((account) => account.accountType === 'taxable');
-  if (index < 0) return [];
-  const deposit = Number.isFinite(amount) && amount > 0 ? amount : 0;
-  return [{ path: `portfolio.accounts.${index}.deposit`, value: deposit }];
-}
-
 /** True when a row other than the one at `index` already has this id. */
 function takenId(rows: readonly unknown[], index: number, id: unknown): boolean {
   return rows.some((row, i) => i !== index && isRecord(row) && row.id === id);

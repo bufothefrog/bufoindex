@@ -9,7 +9,8 @@
  * 2026-11-11, before slice c7 deleted
  * app/tools/leverage-comparison/components/queryParams.ts, as
  * inputsFromQuery(new URLSearchParams(query)) for the query of
- * leverageLink(migrateProfile(v1, 1)); that query is kept as `link`.
+ * leverageLink(migrateProfile(v1, 1)); that query is kept as `link`. The
+ * payloads now load through normalizeProfile, as any stored profile does.
  *
  * Documented exceptions (no v1 fixture hits them): a derived contribution or
  * balance is no longer rounded to whole dollars (the calculator never
@@ -33,8 +34,7 @@ import { LEVERAGE_CALCULATOR, validateDcaComparisonInputs } from '@/lib/calculat
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
-import { applyProfileWrites, getDefaultFinancialProfile, patchWrites } from '@/lib/profile/defaults';
-import { migrateProfile } from '@/lib/profile/migrate';
+import { applyProfileWrites, getDefaultFinancialProfile, normalizeProfile, patchWrites } from '@/lib/profile/defaults';
 import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 
 const V1_DEFAULT = {
@@ -134,7 +134,7 @@ const withPatch = (patch: ProfilePatch): FinancialProfile =>
 
 describe('golden: engineInputsFor equals the old profile link, read by the old query reader', () => {
   it.each(GOLDEN)('$name', ({ edits, inputs }) => {
-    expect(engineInputsFor(LEVERAGE_CALCULATOR, migrateProfile(v1(edits), 1))).toEqual(inputs);
+    expect(engineInputsFor(LEVERAGE_CALCULATOR, normalizeProfile(v1(edits)))).toEqual(inputs);
   });
 });
 
@@ -232,7 +232,7 @@ describe('validateDcaComparisonInputs', () => {
   });
 
   it('shows that error with the results, whether the contribution is derived or an override', () => {
-    const derived = migrateProfile(v1(GOLDEN[5].edits), 1);
+    const derived = normalizeProfile(v1(GOLDEN[5].edits));
     expect(prepareRun(LEVERAGE_CALCULATOR, derived).errors).toEqual({
       calculation: 'Enter a monthly contribution or a starting balance.',
     });

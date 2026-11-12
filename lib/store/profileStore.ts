@@ -10,9 +10,10 @@
  * hasHydrated false), so server and client markup match. Gate any
  * profile-dependent UI on `hasHydrated`.
  *
- * Persisted data under an older version goes through migrateProfile, then
- * every payload is normalized, so a hand-edited value can never break the
- * engine bindings. A payload saved under a later version is read
+ * Persisted data saved under another version goes through migrateProfile
+ * (today a normalize only: an older payload keeps every leaf that still
+ * exists), and every payload is normalized, so a hand-edited value can never
+ * break the engine bindings. A payload saved under a later version is read
  * (normalized to v2) but never overwritten in that session, so a rollback
  * cannot delete the fields the later version added.
  */

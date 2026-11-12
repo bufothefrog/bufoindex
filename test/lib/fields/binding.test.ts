@@ -1,18 +1,11 @@
 /**
- * Tests for profile <-> engine bindings: the forward mapping, the reverse
- * mapping used by the legacy storage import, the round trip for 1:1 and
- * derived bindings, engine-error mapping, and stableKey.
+ * Tests for profile -> engine bindings: the mapping, engine-error mapping,
+ * and stableKey.
  */
 
 import { describe, expect, it } from 'vitest';
 import { applyWrites, makeGet } from '@/lib/fields/paths';
-import {
-  engineErrorsToFields,
-  fromEngineInputs,
-  isDerivedBinding,
-  stableKey,
-  toEngineInputs,
-} from '@/lib/fields/binding';
+import { engineErrorsToFields, isDerivedBinding, stableKey, toEngineInputs } from '@/lib/fields/binding';
 import type { Binding } from '@/lib/fields/binding';
 
 interface Engine {
@@ -49,7 +42,6 @@ const YEARS: Binding<Engine> = {
     const span = Math.round((get('person.retirementAge') as number) - (get('person.age') as number));
     return Math.min(60, Math.max(1, span));
   },
-  write: (value) => [{ path: 'leverage.years', value }],
   errorPath: 'leverage.years',
 };
 
@@ -109,62 +101,6 @@ describe('toEngineInputs', () => {
       { engine: 'age', read: () => 99 },
     ];
     expect(toEngineInputs(bindings, engineBase(), makeGet(profile)).age).toBe(99);
-  });
-});
-
-describe('fromEngineInputs', () => {
-  it('produces 1:1 writes and derived writes, skipping one-way bindings', () => {
-    const engine: Engine = { ...engineBase(), age: 52, taxes: { state: 'NY', federalBracket: 0.22 }, years: 12 };
-    expect(fromEngineInputs(BINDINGS, engine, makeGet(profile))).toEqual([
-      { path: 'person.age', value: 52 },
-      { path: 'person.state', value: 'NY' },
-      { path: 'debts', value: [] },
-      { path: 'leverage.years', value: 12 },
-    ]);
-  });
-
-  it('skips 1:1 bindings whose engine value is undefined', () => {
-    const partial = { age: 33 } as unknown as Engine;
-    expect(fromEngineInputs([BINDINGS[0], BINDINGS[1]], partial, makeGet(profile))).toEqual([{ path: 'person.age', value: 33 }]);
-  });
-
-  it('passes the whole engine and the target profile to a derived write', () => {
-    const binding: Binding<Engine> = {
-      engine: 'years',
-      read: () => 0,
-      write: (value, engine, get) => [{ path: 'note', value: `${String(value)} for ${engine.label} at ${String(get('person.age'))}` }],
-    };
-    expect(fromEngineInputs([binding], { ...engineBase(), years: 3 }, makeGet(profile))).toEqual([
-      { path: 'note', value: `3 for base at ${profile.person.age}` },
-    ]);
-  });
-});
-
-describe('round trip', () => {
-  it('1:1 bindings: engine -> profile writes -> engine reproduces the bound values', () => {
-    const direct = BINDINGS.filter((binding) => !isDerivedBinding(binding));
-    const engine: Engine = {
-      ...engineBase(),
-      age: 47,
-      taxes: { state: 'WA', federalBracket: 0.22 },
-      debts: [{ balance: 10 }, { balance: 20 }],
-    };
-    const next = applyWrites(profile, fromEngineInputs(direct, engine, makeGet(profile)));
-    expect(next.person).toEqual({ age: 47, state: 'WA', retirementAge: 65 });
-    expect(toEngineInputs(direct, engineBase(), makeGet(next))).toEqual(engine);
-  });
-
-  it('derived binding with write: the engine value survives the trip through the profile', () => {
-    const engine: Engine = { ...engineBase(), years: 18 };
-    const next = applyWrites(profile, fromEngineInputs([YEARS], engine, makeGet(profile)));
-    expect(next.leverage.years).toBe(18);
-    expect(toEngineInputs([YEARS], engineBase(), makeGet(next)).years).toBe(18);
-  });
-
-  it('profile -> engine -> profile writes leaves the profile unchanged for 1:1 bindings', () => {
-    const direct = BINDINGS.filter((binding) => !isDerivedBinding(binding));
-    const engine = toEngineInputs(direct, engineBase(), makeGet(profile));
-    expect(applyWrites(profile, fromEngineInputs(direct, engine, makeGet(profile)))).toBe(profile);
   });
 });
 

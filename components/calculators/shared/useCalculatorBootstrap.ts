@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { PROFILE_HANDOFF_PARAM, PROFILE_HANDOFF_VALUE } from '@/lib/calculators/registry';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
-import { importLegacyStorage } from '@/lib/store/legacyImport';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 export interface CalculatorBootstrap {
@@ -24,15 +22,12 @@ const NOT_READY: CalculatorBootstrap = { ready: false, arrivedFromProfile: false
  * StrictMode double effect):
  *
  * 1. Strip the query and the hash with history.replaceState. `?from=profile`
- *    is reported as arrivedFromProfile; any other query or hash (an old
- *    share link) is dropped unread, so the page always shows the visitor's
- *    own profile and a reload reads the profile too.
- * 2. Import every old calculator localStorage key once (O7), on every
- *    calculator page (those with no old key of their own too), so the
- *    result does not depend on which page opens first and the first run
- *    already sees the imported values.
- * 3. Submit the profile to the run store immediately (no debounce).
- * 4. Report ready.
+ *    is reported as arrivedFromProfile and then removed, so a reload does
+ *    not count as a new arrival. Any other query or hash is dropped unread:
+ *    the page always shows the visitor's own profile, never values from the
+ *    address bar.
+ * 2. Submit the profile to the run store immediately (no debounce).
+ * 3. Report ready.
  *
  * window is read only inside the effect, so server and hydration renders
  * agree.
@@ -54,7 +49,6 @@ export function useCalculatorBootstrap<E, R>(
       new URLSearchParams(search).get(PROFILE_HANDOFF_PARAM) === PROFILE_HANDOFF_VALUE;
     if (search !== '' || hash !== '') window.history.replaceState(null, '', pathname);
 
-    importLegacyStorage(LEGACY_IMPORTS);
     store.getState().submit(useProfileStore.getState().profile, { immediate: true });
     setBootstrap({ ready: true, arrivedFromProfile });
   }, [hasHydrated, def, store]);

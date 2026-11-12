@@ -17,7 +17,6 @@ import {
   getProfileValue,
   isProfilePath,
   isValidProfileValue,
-  newCashDepositWrites,
   normalizeProfile,
   normalizeProvided,
   presetClassTargets,
@@ -30,7 +29,6 @@ import {
   TARGET_MIX_PRESETS,
   TARGET_MIX_WEIGHTS,
 } from '@/lib/profile/defaults';
-import type { FinancialProfile } from '@/lib/profile/types';
 import type { PresetTargetMix } from '@/lib/profile/defaults';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
 import { RetirementConstants } from '@/lib/constants/retirement';
@@ -191,7 +189,7 @@ describe('target mix', () => {
 });
 
 describe('v1 leaves, sections and preset constants', () => {
-  it('keeps every v1 leaf but the one-off new cash, which v2 holds as the Brokerage deposit', () => {
+  it('keeps every v1 leaf but the one-off new cash, which is no v2 path', () => {
     expect(V1_LEAF_PATHS).toHaveLength(25);
     expect(V1_LEAF_PATHS.filter((path) => !PROFILE_LEAF_PATHS.includes(path))).toEqual(['investing.newCashThisMonth']);
     expect(isProfilePath('investing.newCashThisMonth')).toBe(false);
@@ -534,32 +532,6 @@ describe('normalizeProfile', () => {
     it('has a row default for every list', () => {
       expect(Object.keys(PROFILE_LIST_ROW_DEFAULTS).sort()).toEqual([...PROFILE_LIST_PATHS].sort());
     });
-  });
-});
-
-describe('newCashDepositWrites', () => {
-  const profile = getDefaultFinancialProfile();
-
-  it('targets the Brokerage account and clamps negative or non-finite amounts to 0', () => {
-    expect(newCashDepositWrites(profile, 2400)).toEqual([{ path: 'portfolio.accounts.1.deposit', value: 2400 }]);
-    expect(newCashDepositWrites(profile, -50)).toEqual([{ path: 'portfolio.accounts.1.deposit', value: 0 }]);
-    expect(newCashDepositWrites(profile, Number.NaN)).toEqual([{ path: 'portfolio.accounts.1.deposit', value: 0 }]);
-  });
-
-  it('falls back to the first taxable account, and writes nothing without one', () => {
-    const renamed: FinancialProfile = {
-      ...profile,
-      portfolio: {
-        ...profile.portfolio,
-        accounts: [
-          { id: 'x', name: 'IRA', accountType: 'tax-deferred', deposit: 0 },
-          { id: 'y', name: 'Taxable', accountType: 'taxable', deposit: 0 },
-        ],
-      },
-    };
-    expect(newCashDepositWrites(renamed, 300)).toEqual([{ path: 'portfolio.accounts.1.deposit', value: 300 }]);
-    const none = { ...profile, portfolio: { ...profile.portfolio, accounts: [renamed.portfolio.accounts[0]] } };
-    expect(newCashDepositWrites(none, 300)).toEqual([]);
   });
 });
 

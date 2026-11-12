@@ -2,8 +2,7 @@
  * Calculator contracts (docs/rebuild-plan.md section 2.6, as amended by
  * section 0). A CalculatorMeta is what the registry, the shell and the
  * metadata need; a CalculatorDefinition is what the run store and
- * validation need; a LegacyImport is what the one-time import of an old
- * calculator's localStorage key needs. Pure types, no runtime.
+ * validation need. Pure types, no runtime.
  */
 
 import type { DisclaimerFragment } from '@/lib/constants/disclaimers';
@@ -27,26 +26,6 @@ export interface CalculatorMeta {
    * input; 'fixed': they use DISPLAY_INFLATION_ASSUMPTION; 'none': no toggle.
    */
   dollarDisplay: 'inflation-input' | 'fixed' | 'none';
-}
-
-/** The one-time import of a calculator's old localStorage key (O7). */
-export interface LegacyStorage<E> {
-  /** The key the old hand-written store persisted under. */
-  storageKey: string;
-  /**
-   * Engine inputs from the parsed JSON stored under storageKey (the whole
-   * zustand persist envelope, `{ state, version }`), or null when the payload
-   * is not one this calculator wrote.
-   */
-  readStorage(raw: unknown): E | null;
-  /** The old store's frozen defaults; only values that differ are imported. */
-  storageDefaults(): E;
-}
-
-/** What the one-time import reads of a calculator: its old storage and its bindings. */
-export interface LegacyImport<E> {
-  legacy: LegacyStorage<E>;
-  bindings: readonly Binding<E>[];
 }
 
 export interface CalculatorDefinition<E, R> {
