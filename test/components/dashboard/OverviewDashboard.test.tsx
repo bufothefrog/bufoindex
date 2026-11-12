@@ -39,6 +39,7 @@ describe('without a saved profile', () => {
     render(<OverviewDashboard />);
     expect(screen.getByTestId('overview-empty')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Start with the basics/ })).toHaveAttribute('href', '/start');
+    expect(screen.getByRole('link', { name: /^Leverage Comparison/ })).toHaveAttribute('href', '/tools/leverage-comparison');
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
     expect(screen.queryByTestId('overview-paycheck')).not.toBeInTheDocument();
   });

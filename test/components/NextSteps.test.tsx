@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { intakePaths } from '@/test/utils/intakeFixture';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
@@ -14,6 +14,21 @@ beforeEach(() => {
 
 function linkNamed(name: RegExp) {
   return screen.getByRole('link', { name });
+}
+
+/**
+ * The "Try another calculator" list: [name, href] for each link, in order.
+ * Each link's name starts with the calculator name, then its description.
+ */
+function otherCalculators() {
+  const list = screen.getByRole('list', { name: 'Try another calculator' });
+  const names = ['Paycheck Allocator', 'Retirement Calculator', 'Portfolio Rebalancer', 'Leverage Comparison'];
+  return within(list)
+    .getAllByRole('link')
+    .map((link) => [
+      names.find((name) => (link.textContent ?? '').startsWith(name)) ?? link.textContent,
+      link.getAttribute('href'),
+    ]);
 }
 
 describe('NextSteps', () => {
@@ -31,7 +46,7 @@ describe('NextSteps', () => {
     expect(linkNamed(/Answer a few quick questions/)).toHaveAttribute('href', '/start?next=retirement');
 
     expect(screen.queryByText('Your answers are saved in this browser.')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Try another calculator/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Try another calculator' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Finish your profile/ })).not.toBeInTheDocument();
   });
 
@@ -54,7 +69,7 @@ describe('NextSteps', () => {
     }
   });
 
-  it('offers to finish the profile and try another calculator when a partial profile exists', () => {
+  it('offers to finish the profile and links the other calculators directly when a partial profile exists', () => {
     useProfileStore
       .getState()
       .setFields({ person: { age: 41, state: 'CA' } }, ['person.age', 'person.state', 'person.filingStatus']);
@@ -69,7 +84,14 @@ describe('NextSteps', () => {
     expect(finish).toHaveTextContent('1 of 17 topics answered.');
     expect(finish).toHaveTextContent('Answer the rest once; every calculator and your overview use it.');
 
-    expect(linkNamed(/Try another calculator/)).toHaveAttribute('href', '/start/choose');
+    expect(screen.getByText('Try another calculator')).toBeInTheDocument();
+    expect(otherCalculators()).toEqual([
+      ['Retirement Calculator', '/tools/retirement-calculator'],
+      ['Portfolio Rebalancer', '/tools/portfolio-rebalancing-calculator'],
+      ['Leverage Comparison', '/tools/leverage-comparison'],
+    ]);
+    expect(screen.queryByRole('link', { name: /Paycheck Allocator/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Try another calculator/ })).not.toBeInTheDocument();
 
     expect(screen.queryByRole('link', { name: /See your overview/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Answer a few quick questions/ })).not.toBeInTheDocument();
@@ -85,7 +107,11 @@ describe('NextSteps', () => {
     render(<NextSteps intent="retirement" />);
 
     expect(linkNamed(/See your overview/)).toHaveAttribute('href', '/overview');
-    expect(linkNamed(/Try another calculator/)).toHaveAttribute('href', '/start/choose');
+    expect(otherCalculators()).toEqual([
+      ['Paycheck Allocator', '/tools/paycheck-allocator'],
+      ['Portfolio Rebalancer', '/tools/portfolio-rebalancing-calculator'],
+      ['Leverage Comparison', '/tools/leverage-comparison'],
+    ]);
     expect(screen.queryByRole('link', { name: /Finish your profile/ })).not.toBeInTheDocument();
   });
 
@@ -95,7 +121,11 @@ describe('NextSteps', () => {
     render(<NextSteps intent="portfolio" />);
 
     expect(linkNamed(/See your overview/)).toHaveAttribute('href', '/overview');
-    expect(linkNamed(/Try another calculator/)).toHaveAttribute('href', '/start/choose');
+    expect(otherCalculators()).toEqual([
+      ['Paycheck Allocator', '/tools/paycheck-allocator'],
+      ['Retirement Calculator', '/tools/retirement-calculator'],
+      ['Leverage Comparison', '/tools/leverage-comparison'],
+    ]);
     expect(screen.queryByRole('link', { name: /Finish your profile/ })).not.toBeInTheDocument();
   });
 

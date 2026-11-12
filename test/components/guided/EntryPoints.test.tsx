@@ -12,8 +12,9 @@ import { intakePaths } from '@/test/utils/intakeFixture';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
-// The ways into the guided flow: every path answers the shared core at
-// /start first, and returning visitors go to the /start/choose chooser.
+// The ways in: "Get started" answers the shared core at /start first,
+// returning visitors go to the /start/choose chooser, and the calculator
+// previews and the empty overview link straight to each calculator.
 
 beforeEach(() => {
   localStorage.clear();
@@ -31,20 +32,22 @@ describe('landing page', () => {
     expect(started[0]).toHaveAttribute('href', '/start');
   });
 
-  it('previews each calculator and routes it through the core first, the portfolio straight to its intake (O5)', () => {
+  it('previews each calculator and links straight to it, not into the guided questions', () => {
     render(<HomePage />);
     const section = screen.getByRole('region', { name: 'What you can learn' });
     const hrefs = within(section)
       .getAllByRole('link')
       .map((link) => link.getAttribute('href'));
     expect(hrefs).toEqual([
-      '/start?next=paycheck',
-      '/start?next=retirement',
-      '/start/portfolio',
-      '/start?next=leverage',
+      '/tools/paycheck-allocator',
+      '/tools/retirement-calculator',
+      '/tools/portfolio-rebalancing-calculator',
+      '/tools/leverage-comparison',
       '/tools',
     ]);
     expect(within(section).getByRole('heading', { name: 'Where should each paycheck go?' })).toBeInTheDocument();
+    expect(within(section).getAllByText('Open the calculator')).toHaveLength(4);
+    expect(within(section).queryByText('Start with the basics')).not.toBeInTheDocument();
     expect(within(section).getByRole('link', { name: /Just show me the tools/ })).toHaveAttribute('href', '/tools');
   });
 
@@ -103,16 +106,32 @@ describe('ContinueProfileCard', () => {
 });
 
 describe('EmptyOverview', () => {
-  it('starts with the basics, then offers each calculator through the core, the portfolio straight to its intake (O5)', () => {
+  it('starts with the basics, then links each calculator directly', () => {
     render(<EmptyOverview />);
     expect(screen.getByRole('link', { name: /Start with the basics/ })).toHaveAttribute('href', '/start');
-    expect(screen.getByRole('link', { name: /Then a paycheck/ })).toHaveAttribute('href', '/start?next=paycheck');
-    expect(screen.getByRole('link', { name: /Then retirement/ })).toHaveAttribute('href', '/start?next=retirement');
-    expect(screen.getByRole('link', { name: /Then a portfolio/ })).toHaveAttribute('href', '/start/portfolio');
-    expect(screen.getByRole('link', { name: /Then the leverage comparison/ })).toHaveAttribute(
+    expect(screen.getByText('Or open a calculator directly')).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: 'Or open a calculator directly' });
+    expect(within(list).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/tools/paycheck-allocator',
+      '/tools/retirement-calculator',
+      '/tools/portfolio-rebalancing-calculator',
+      '/tools/leverage-comparison',
+    ]);
+    expect(within(list).getByRole('link', { name: /^Paycheck Allocator/ })).toHaveAttribute('href', '/tools/paycheck-allocator');
+    expect(within(list).getByRole('link', { name: /^Retirement Calculator/ })).toHaveAttribute(
       'href',
-      '/start?next=leverage'
+      '/tools/retirement-calculator'
     );
+    expect(within(list).getByRole('link', { name: /^Portfolio Rebalancer/ })).toHaveAttribute(
+      'href',
+      '/tools/portfolio-rebalancing-calculator'
+    );
+    expect(within(list).getByRole('link', { name: /^Leverage Comparison/ })).toHaveAttribute(
+      'href',
+      '/tools/leverage-comparison'
+    );
+    expect(screen.queryByText('Or answer the basics, then go straight to one calculator')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Then a paycheck/ })).not.toBeInTheDocument();
   });
 });
 

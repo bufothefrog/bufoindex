@@ -5,21 +5,15 @@ import { ArrowRight, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { buttonVariants } from '@/components/ui/button';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
-import { CORE_START_PATH, coreStartLink } from '@/lib/constants/intake';
+import { CalculatorLinks } from '@/components/shared/CalculatorLinks';
+import { CORE_START_PATH } from '@/lib/constants/intake';
 import { cn } from '@/lib/utils';
 
-// Each entry starts with the shared basics and `next` picks the calculator the
-// intake continues to once they are answered, except the portfolio entry: the
-// rebalancer reads no core field, so coreStartLink sends it straight to
-// /start/portfolio (O5).
-const INTAKES: ReadonlyArray<{ href: Route; label: string; description: string }> = [
-  { href: coreStartLink('paycheck') as Route, label: 'Then a paycheck', description: 'Where the next paycheck goes' },
-  { href: coreStartLink('retirement') as Route, label: 'Then retirement', description: 'Simulated odds for a retirement age' },
-  { href: coreStartLink('portfolio') as Route, label: 'Then a portfolio', description: 'What to buy to reach a target mix' },
-  { href: coreStartLink('leverage') as Route, label: 'Then the leverage comparison', description: 'A 2x fund next to a plain index fund' },
-];
-
-/** Shown when no profile has been saved in this browser yet. */
+/**
+ * Shown when no profile has been saved in this browser yet: the shared basics
+ * as the primary action, and each calculator linked directly below it (a
+ * calculator page reads the saved profile, or the defaults, without asking).
+ */
 export function EmptyOverview() {
   return (
     <div className="mx-auto max-w-xl">
@@ -37,27 +31,7 @@ export function EmptyOverview() {
             Start with the basics
             <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
           </Link>
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">
-              Or answer the basics, then go straight to one calculator
-            </p>
-            <ul className="space-y-2">
-              {INTAKES.map((intake) => (
-                <li key={intake.href}>
-                  <Link
-                    href={intake.href}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-sage-400 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring dark:hover:border-sage-500"
-                  >
-                    <span className="min-w-0">
-                      <span className="block font-medium text-foreground">{intake.label}</span>
-                      <span className="block text-xs text-muted-foreground">{intake.description}</span>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <CalculatorLinks label="Or open a calculator directly" />
         </div>
       </BaseCard>
     </div>
