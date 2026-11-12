@@ -19,6 +19,12 @@ unchanged.
 | 5 | x2-demo-and-docs | delete demo-only components and legacy aliases |
 | 5 | x2-demo-and-docs | render methodology formulas on the server |
 | 5 | docs | bring CLAUDE.md, README and design docs up to date with the rebuild |
+| 5 | x1-dead-code-cleanup (fix) | test-only exports were kept in lib |
+| 5 | x1-dead-code-cleanup (fix) | the Calculate mode and unused primitive props survived O8 |
+| 5 | x1-dead-code-cleanup (fix) | duplicate formatters and compatibility exports remained |
+| 5 | x1-dead-code-cleanup (fix) | calculator paths lived outside the registry and two completeness counts shared a name |
+| 5 | x1-dead-code-cleanup (fix) | the spec integrity check skipped shared paths one form asks |
+| 5 | x2-demo-and-docs (fix) | the demo theme columns did not switch tokens and Fields scrolled at 360px |
 
 ## What was removed
 
@@ -33,6 +39,19 @@ unchanged.
   the `variant` aliases on StatusAlert and ExpandableListCard (OpportunityCostCard moved to
   `tone`); toneFromLegacy, LegacyTone and LEGACY_TONES; KeyValueRow `standalone`; CardVariant and
   ComponentSize in lib/design-system/types.ts; the mock chart generators in lib/demo.
+- Review fixes: validateFor (tests read `prepareRun(...).errors`), legacyDefaultGaps,
+  createFormulaRegistry and the registry's test-only lookup, search and validation methods;
+  CalculatorLayout's Calculate mode (onCalculate, the Calculate card, CALCULATE_EMPTY_STATE,
+  emptyStateConfig, the stacked mobile mode, reveal-on-settle, isCalculating) and `liveResults`;
+  the props no caller passes (BaseInput `state` and ComponentState, NumberInput
+  formatDisplay/parseValue, MoneyInput `currency`, CoreSummary editHref, BaseCard titleClassName,
+  ResponsiveGrid and Container sizing props, the empty-state feature dots); BaseCard's
+  ComponentColor and its two class maps (BaseCard and ResultCard take `tone`); PercentInput's
+  formatPercent and parsePercent; the EnhancedMoneyInput name (the file is MoneyInput.tsx); the
+  StateSelector compatibility re-export and the unused barrel exports (KeyValueRow,
+  SectionToggle, screenHasError, BaseInputProps); lib/profile/links.ts (paths are in the
+  registry entries, the handoff marker next to calculatorHref). The v1 profileCompleteness in
+  lib/profile/mappers.ts is renamed profileFieldCompleteness.
 - Each deletion was grepped across app, components, lib, contexts, test, docs and config first.
   Nothing listed for deletion still had a live caller.
 
@@ -49,6 +68,12 @@ unchanged.
 - Methodology page: formulas arrive as server-rendered KaTeX HTML; the page is static and no
   KaTeX JavaScript ships. Formula text is identical (checked for every formula and variable
   symbol); display formulas lose a stray literal "undefined" class.
+- /demo after the review fixes: the "Light theme" and "Dark theme" columns now show their own
+  theme on either page theme (the semantic colors are `@theme inline` in app/globals.css; live
+  pages render the same colors as before). Below sm the gallery cards have narrower sides, so the
+  Fields tab no longer scrolls sideways at 360 px. The ResultCard entry names `tone`.
+- A PercentInput slider label for a negative fraction that rounds to zero prints "0.0%" instead
+  of "-0.0%" (the lib/format deviation); the sliders' ranges are not negative, so no page shows it.
 - Portfolio, unnamed account remove button: "Remove Account 3" -> "Remove account 3".
 - Portfolio holdings, accessible names: "Price / share" -> "Price / share, Roth IRA holding 1"
   (same for Ticker, Asset class, Shares). Visible labels unchanged.
@@ -61,8 +86,12 @@ unchanged.
 
 ## Tests and coverage
 
-- 109 files, 2660 tests on Node 22 and Node 24. Coverage: statements 98.44%, branches 94.42%;
-  thresholds in vitest.config.ts hold.
+- 109 files, 2648 tests on Node 22 and Node 24 after the review fixes. Coverage: statements
+  98.42%, branches 94.31%; thresholds in vitest.config.ts hold.
+- Review fixes: integrity.test.ts checks every shared path however many forms ask it, with a test
+  that fails under the old shortcut. Deleted with their subjects: the legacyDefaultGaps block,
+  the registry bookkeeping block, the PercentInput helper block and its lib/format equivalence
+  test, the Calculate-button layout tests and the emptyStateConfig override test.
 - New in x2: the a1 case in FieldList.test.tsx (fails without the NumberInput fix), removeLabel
   in FieldList and portfolio form tests, holding-input names in HoldingRow and
   PortfolioRebalancingCalculator tests, trimmed-screen wording in forms.test.ts and intake.test.ts.
@@ -78,18 +107,20 @@ unchanged.
 - docs/redesign-guided-flow.md: only sections 2.1, 2.3, 2.4, 3.4 and 9.1 were rewritten (O20); its
   status line now says which sections match the code. docs/agents.md had one stale reference fixed.
 - docs/rebuild-plan.md keeps its original status line under the new one.
-- No browser pass at 390 px and 360 px was run in this phase; the /demo layout was reasoned from
-  the primitives (break-all code, min-w-0 blocks, one column below lg).
+- Browser pass (review fixes): /demo at 360, 390 and 1280 px, light and dark page, both views,
+  every tab, has no sideways scroll and each theme column reads its own tokens; the home page,
+  /start, /overview, the four calculators and the methodology page have none at 360 px.
 
 ## Deliberately left
 
 - The "owner" and "owner, then x2" rows of the phase 3 table: c1-calculator-copy-replaced,
   c3-card-help-copy-dropped, b-debt-badge-threshold, c4-quickactions-scroll-unplanned.
 - The unused retirement insight modules (O13, second item).
-- CalculatorLayout's non-live Calculate mode (CALCULATE_EMPTY_STATE, onCalculate): every page uses
-  liveResults, and only test/components/CalculatorLayout.test.tsx reaches it.
 - `investing.newCashThisMonth` (marked deprecated in lib/profile/types.ts) still has callers in
-  defaults, migrate and the v1 profileCompleteness, which the guided cards still use.
+  defaults, migrate and the v1 profileFieldCompleteness, which NextSteps, ContinueProfileCard and
+  LearnChooser use ("N of 25 details answered"). Moving them to the topic-screen count changes
+  that copy, so it waits for the site owner; then mappers.ts, PROFILE_FIELDS, ProfileFieldMeta
+  and the leaf can go.
 
 ## Questions for the site owner
 
@@ -112,7 +143,8 @@ From all five phases:
   "answer the basics"; new wording?
 - (p4) Move the dashboard simulations off the main thread? The retirement card always shows
   today's dollars and ignores the saved display mode.
-- (p5) Delete CalculatorLayout's non-live Calculate mode and its tests?
+- (p5) Move the guided cards (NextSteps, ContinueProfileCard, LearnChooser) to the topic-screen
+  completeness count, with the copy change that brings?
 - (p5) Update the remaining sections of docs/redesign-guided-flow.md (1, 2.5, 6) or leave them as
   the historical proposal?
 - (p5) Delete the unused retirement insight modules now (O13 follow-up)?
