@@ -25,6 +25,8 @@ unchanged.
 | 5 | x1-dead-code-cleanup (fix) | calculator paths lived outside the registry and two completeness counts shared a name |
 | 5 | x1-dead-code-cleanup (fix) | the spec integrity check skipped shared paths one form asks |
 | 5 | x2-demo-and-docs (fix) | the demo theme columns did not switch tokens and Fields scrolled at 360px |
+| 5 | x1-dead-code-cleanup (fix) | the run store kept a field nothing reads |
+| 5 | x1-dead-code-cleanup (fix) | the guided cards still counted v1 profile fields |
 
 ## What was removed
 
@@ -50,8 +52,14 @@ unchanged.
   formatPercent and parsePercent; the EnhancedMoneyInput name (the file is MoneyInput.tsx); the
   StateSelector compatibility re-export and the unused barrel exports (KeyValueRow,
   SectionToggle, screenHasError, BaseInputProps); lib/profile/links.ts (paths are in the
-  registry entries, the handoff marker next to calculatorHref). The v1 profileCompleteness in
-  lib/profile/mappers.ts is renamed profileFieldCompleteness.
+  registry entries, the handoff marker next to calculatorHref).
+- Re-check fixes: the run store's `isCalculating` (no reader after the Calculate mode went);
+  profileFieldCompleteness and lib/profile/mappers.ts, PROFILE_FIELDS and ProfileFieldMeta (the
+  guided cards count by topic screen now); the deprecated `investing.newCashThisMonth` leaf and
+  the write side effect that mirrored it into the Brokerage deposit. The profile stays version 2:
+  normalizing drops the leaf from any stored payload (provided entries for it go too), and
+  migrateProfile reads a v1 answer from the raw payload and still moves it into the Brokerage
+  deposit. A provided v1 new cash still does not mark `portfolio.accounts`.
 - Each deletion was grepped across app, components, lib, contexts, test, docs and config first.
   Nothing listed for deletion still had a live caller.
 
@@ -83,11 +91,27 @@ unchanged.
   comparison?" -> "Leverage ratio" / "Which leverage ratio should the comparison use?" with "The
   leverage comparison runs a leveraged fund against a plain index fund that receives the same
   contributions." /start/leverage is unchanged.
+- Calculator results, "What next?" card, "Finish your profile": "N of 25 details answered." ->
+  "N of 17 topics answered." (counted by topic screen, O14, as on /overview; the rest of the
+  sentence is unchanged).
+- Home page, "Continue with my profile": "N of 25 details saved in this browser." -> "N of 17
+  topics answered, saved in this browser."
+- /start/choose, "See your overview" (once no profile question is left): "Every detail is saved."
+  -> "Every topic is saved."; "lists the N detail(s) that still use(s) a typical value" -> "lists
+  the N topic(s) that still use(s) a typical value". Answering every intake topic now reads
+  "Every topic is saved." where it used to list the never-asked emergency-fund target months.
+- The counts are smaller (a topic holds several fields), so the same answers read differently:
+  the three basics screens answered give "3 of 17" where they gave "7 of 25".
 
 ## Tests and coverage
 
-- 109 files, 2648 tests on Node 22 and Node 24 after the review fixes. Coverage: statements
-  98.42%, branches 94.31%; thresholds in vitest.config.ts hold.
+- 108 files, 2646 tests on Node 22 and Node 24 after the re-check fixes. Coverage: statements
+  98.42%, branches 94.3%; thresholds in vitest.config.ts hold.
+- Re-check fixes: the run store tests assert results and stale instead of isCalculating;
+  mappers.test.ts and the PROFILE_FIELDS block are deleted with their subjects; integrity.test.ts
+  passes with no named exception; migrate.test.ts and profileStore.test.ts load a stored v2
+  profile that still holds the new-cash leaf, and a v1 profile whose new cash lands in the
+  Brokerage deposit; the guided-card pins are literals ("1 of 17 topics answered.").
 - Review fixes: integrity.test.ts checks every shared path however many forms ask it, with a test
   that fails under the old shortcut. Deleted with their subjects: the legacyDefaultGaps block,
   the registry bookkeeping block, the PercentInput helper block and its lib/format equivalence
@@ -116,11 +140,6 @@ unchanged.
 - The "owner" and "owner, then x2" rows of the phase 3 table: c1-calculator-copy-replaced,
   c3-card-help-copy-dropped, b-debt-badge-threshold, c4-quickactions-scroll-unplanned.
 - The unused retirement insight modules (O13, second item).
-- `investing.newCashThisMonth` (marked deprecated in lib/profile/types.ts) still has callers in
-  defaults, migrate and the v1 profileFieldCompleteness, which NextSteps, ContinueProfileCard and
-  LearnChooser use ("N of 25 details answered"). Moving them to the topic-screen count changes
-  that copy, so it waits for the site owner; then mappers.ts, PROFILE_FIELDS, ProfileFieldMeta
-  and the leaf can go.
 
 ## Questions for the site owner
 
@@ -143,8 +162,6 @@ From all five phases:
   "answer the basics"; new wording?
 - (p4) Move the dashboard simulations off the main thread? The retirement card always shows
   today's dollars and ignores the saved display mode.
-- (p5) Move the guided cards (NextSteps, ContinueProfileCard, LearnChooser) to the topic-screen
-  completeness count, with the copy change that brings?
 - (p5) Update the remaining sections of docs/redesign-guided-flow.md (1, 2.5, 6) or leave them as
   the historical proposal?
 - (p5) Delete the unused retirement insight modules now (O13 follow-up)?

@@ -48,7 +48,7 @@ lib/
   calculators/           # registry.ts, forms.ts, runtime.ts, types.ts, legacyImports.ts,
                          #   <id>/{form,fields,bindings,definition,headline}.ts per calculator
   fields/                # Field schema: types, paths, runtime (validation), binding, shared
-  profile/               # The shared profile: types, defaults, migrate, mappers
+  profile/               # The shared profile: types, defaults, migrate
   store/                 # profileStore, preferencesStore, createCalculatorStore + one run
                          #   store per calculator, legacyImport
   workers/               # createWorkerRunner, exposeCalculation, retirementWorker
