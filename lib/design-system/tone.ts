@@ -2,9 +2,10 @@
  * The one tone scale for results, alerts and tiles.
  *
  * Results, alerts, tiles, progress bars and list cards take a `tone` from
- * this scale; the older alert and card variants are gone. BaseCard's
- * `color`, ResultCard's `status` and OptionCard's `tone` keep their own
- * small vocabularies for card borders, titles and option surfaces.
+ * this scale; the older alert and card variants are gone. BaseCard and
+ * ResultCard take a `tone` from it too (four of the six; no tone is the sage
+ * card chrome). OptionCard's `tone` keeps its own small vocabulary for option
+ * surfaces.
  *
  * Every class below is a semantic token (or the sage brand scale with its
  * dark-mode pair), so each map works in light and dark mode. The strings are

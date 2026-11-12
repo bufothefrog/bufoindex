@@ -8,7 +8,6 @@ const baseProps = {
   title: 'Test calculator',
   description: 'A layout test.',
   inputSections: <div>Inputs here</div>,
-  onCalculate: () => {},
 };
 
 describe('CalculatorLayout resultFooter', () => {
@@ -36,42 +35,15 @@ describe('CalculatorLayout resultFooter', () => {
     render(<CalculatorLayout {...baseProps} resultFooter={<div data-testid="footer">What next?</div>} />);
     expect(screen.queryByTestId('footer')).not.toBeInTheDocument();
     // The empty state still shows in its place.
-    expect(screen.getByText('Ready to Calculate?')).toBeInTheDocument();
+    expect(screen.getByText('No results yet')).toBeInTheDocument();
   });
 });
 
-describe('CalculatorLayout with a Calculate button', () => {
-  it('keeps the Calculate card and the mobile Calculate action', () => {
-    render(<CalculatorLayout {...baseProps} calculateButtonText="Rebalance" />);
-    // The desktop card button and the mobile bar button (full and compact labels).
-    expect(screen.getAllByRole('button', { name: /Rebalance/ })).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: /See results/ })).not.toBeInTheDocument();
-  });
-
-  it('shows the Calculate empty state', () => {
-    render(<CalculatorLayout {...baseProps} />);
-    expect(screen.getByRole('heading', { name: 'Ready to Calculate?' })).toBeInTheDocument();
-    expect(
-      screen.getByText('Fill in your information and click Calculate to see your personalized results.')
-    ).toBeInTheDocument();
-  });
-
-  it('switches the mobile view to Results when a run settles', () => {
-    const { rerender } = render(
-      <CalculatorLayout {...baseProps} isCalculating resultSection={<div>Results here</div>} />
-    );
-    expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-selected', 'true');
-    rerender(<CalculatorLayout {...baseProps} isCalculating={false} resultSection={<div>Results here</div>} />);
-    expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
-  });
-});
-
-describe('CalculatorLayout liveResults', () => {
+describe('CalculatorLayout live results', () => {
   const liveProps = {
     title: 'Live calculator',
     description: 'Results follow the inputs.',
     inputSections: <div>Inputs here</div>,
-    liveResults: true,
   };
 
   it('has no Calculate button; the mobile bar offers See results, then Edit inputs', async () => {
@@ -91,22 +63,19 @@ describe('CalculatorLayout liveResults', () => {
     expect(screen.getByRole('button', { name: /See results/ })).toBeInTheDocument();
   });
 
-  it('shows the live empty state, and emptyStateConfig still overrides it field by field', () => {
-    const { rerender } = render(<CalculatorLayout {...liveProps} />);
+  it('shows the live empty state', () => {
+    render(<CalculatorLayout {...liveProps} />);
     expect(screen.getByRole('heading', { name: 'No results yet' })).toBeInTheDocument();
-    expect(screen.getByText('Results appear here as soon as every field holds a valid value.')).toBeInTheDocument();
-
-    rerender(<CalculatorLayout {...liveProps} emptyStateConfig={{ title: 'Nothing to show' }} />);
-    expect(screen.getByRole('heading', { name: 'Nothing to show' })).toBeInTheDocument();
     expect(screen.getByText('Results appear here as soon as every field holds a valid value.')).toBeInTheDocument();
   });
 
-  it('stays on Inputs when a run settles, and switches on showResultsKey', () => {
-    const results = <div>Results here</div>;
-    const { rerender } = render(<CalculatorLayout {...liveProps} isCalculating resultSection={results} />);
-    rerender(<CalculatorLayout {...liveProps} isCalculating={false} resultSection={results} />);
+  it('stays on Inputs when results arrive or change, and switches on showResultsKey', () => {
+    const { rerender } = render(<CalculatorLayout {...liveProps} />);
+    rerender(<CalculatorLayout {...liveProps} resultSection={<div>First results</div>} />);
+    rerender(<CalculatorLayout {...liveProps} resultSection={<div>Results here</div>} />);
     expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-selected', 'true');
 
+    const results = <div>Results here</div>;
     rerender(<CalculatorLayout {...liveProps} resultSection={results} showResultsKey="profile" />);
     expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
   });

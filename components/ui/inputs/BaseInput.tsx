@@ -6,7 +6,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
-import { BaseInputProps, ComponentState, AccessibilityProps } from '@/lib/design-system/types';
+import { BaseInputProps, AccessibilityProps } from '@/lib/design-system/types';
 
 /**
  * Input sizes shared by the input primitives. sm, md and lg size the control
@@ -17,7 +17,6 @@ export type InputSize = 'sm' | 'md' | 'lg' | 'xl';
 
 export interface BaseInputConfig extends BaseInputProps, AccessibilityProps {
   children: React.ReactNode;
-  state?: ComponentState;
   /** Only xl changes the chrome: the label grows to text-base. */
   size?: InputSize;
 }
@@ -32,13 +31,12 @@ export function BaseInput({
   className,
   testId,
   children,
-  state,
   size = 'md',
   ...ariaProps
 }: BaseInputConfig) {
   const inputId = `input-${name}`;
-  const hasError = !!(error || (state && !state.isValid && state.error));
-  const errorMessage = hasError ? error || state?.error : undefined;
+  const hasError = !!error;
+  const errorMessage = error || undefined;
   const { describedBy } = fieldMessageIds(inputId, help, errorMessage);
   
   return (

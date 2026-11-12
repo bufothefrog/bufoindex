@@ -207,19 +207,19 @@ export function ResultsSection() {
             </BaseCard>
           </div>
         </DemoEntry>
-        <DemoEntry name="ResultCard" description="A results panel with a 2px border; status colors the border, title and icon (sage without one).">
+        <DemoEntry name="ResultCard" description={<>A results panel with a 2px border; <Code>tone</Code> colors the border, title and icon (sage without one).</>}>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <ResultCard title="Portfolio projections" icon={TrendingUp}>
-              <p className="text-sm text-muted-foreground">No status: the sage brand border.</p>
+              <p className="text-sm text-muted-foreground">No tone: the sage brand border.</p>
             </ResultCard>
-            <ResultCard title="Tax-efficient placement" icon={Info} status="info">
-              <p className="text-sm text-muted-foreground">status=&quot;info&quot;</p>
+            <ResultCard title="Tax-efficient placement" icon={Info} tone="info">
+              <p className="text-sm text-muted-foreground">tone=&quot;info&quot;</p>
             </ResultCard>
-            <ResultCard title="Account plan" icon={TrendingUp} status="success">
-              <p className="text-sm text-muted-foreground">status=&quot;success&quot;</p>
+            <ResultCard title="Account plan" icon={TrendingUp} tone="positive">
+              <p className="text-sm text-muted-foreground">tone=&quot;positive&quot;</p>
             </ResultCard>
-            <ResultCard title="Shortfall" icon={AlertTriangle} status="warning">
-              <p className="text-sm text-muted-foreground">status=&quot;warning&quot;</p>
+            <ResultCard title="Shortfall" icon={AlertTriangle} tone="caution">
+              <p className="text-sm text-muted-foreground">tone=&quot;caution&quot;</p>
             </ResultCard>
           </div>
         </DemoEntry>

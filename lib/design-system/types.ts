@@ -17,21 +17,6 @@ export interface BaseInputProps {
 }
 
 /**
- * Color variants for components
- */
-export type ComponentColor = 'sage' | 'success' | 'warning' | 'error' | 'info';
-
-/**
- * Component state types
- */
-export interface ComponentState {
-  isValid: boolean;
-  error?: string;
-  isDirty: boolean;
-  isTouched: boolean;
-}
-
-/**
  * Accessibility props
  */
 export interface AccessibilityProps {

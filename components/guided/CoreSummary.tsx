@@ -1,6 +1,5 @@
 import React from 'react';
 import Link from 'next/link';
-import type { Route } from 'next';
 import { Pencil } from 'lucide-react';
 import { coreSummary } from '@/lib/constants/intake';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -8,17 +7,16 @@ import { cn } from '@/lib/utils';
 
 export interface CoreSummaryProps {
   profile: FinancialProfile;
-  /** Where "Edit the basics" leads; defaults to the shared core intake. */
-  editHref?: Route;
   className?: string;
 }
 
 /**
  * One-line recap of the saved core answers ("30, TX, single, $3,500 every 2
- * weeks, $3,000/mo must-pay") with an "Edit the basics" link. Pure and
- * server-renderable; client parents pass the hydrated profile.
+ * weeks, $3,000/mo must-pay") with an "Edit the basics" link to the core
+ * intake (/start). Pure and server-renderable; client parents pass the
+ * hydrated profile.
  */
-export function CoreSummary({ profile, editHref = '/start', className }: CoreSummaryProps) {
+export function CoreSummary({ profile, className }: CoreSummaryProps) {
   const summary = coreSummary(profile);
 
   return (
@@ -33,7 +31,7 @@ export function CoreSummary({ profile, editHref = '/start', className }: CoreSum
         {summary || 'none saved yet, so the calculators use typical values.'}
       </p>
       <Link
-        href={editHref}
+        href="/start"
         className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-sage-600 underline underline-offset-4 hover:text-sage-700 dark:text-sage-300 dark:hover:text-sage-200"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />

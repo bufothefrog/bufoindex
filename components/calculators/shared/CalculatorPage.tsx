@@ -114,7 +114,6 @@ export default function CalculatorPage<E, R>({
   const inputs = store((state) => state.inputs);
   const errors = store((state) => state.errors);
   const stale = store((state) => state.stale);
-  const isCalculating = store((state) => state.isCalculating);
   const provided = values.provided;
 
   // The bootstrap's immediate submit already covers the first ready render;
@@ -169,7 +168,6 @@ export default function CalculatorPage<E, R>({
       <CalculatorLayout
         title={meta.title}
         description={meta.description}
-        liveResults
         resultsLabel={meta.liveResultsLabel}
         showResultsKey={arrivedFromProfile ? 'profile' : undefined}
         inputSections={
@@ -185,7 +183,6 @@ export default function CalculatorPage<E, R>({
         }
         resultSection={resultSection}
         resultFooter={<NextSteps intent={definition.id} />}
-        isCalculating={isCalculating}
         errors={fieldErrors}
         disclaimer={calculatorDisclaimer(definition.id)}
       />

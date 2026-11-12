@@ -1,6 +1,6 @@
 /**
  * Number Input Component
- * Flexible number input with customizable formatting and validation
+ * Number input with grouped display, decimals, prefix and suffix
  */
 
 import React from 'react';
@@ -18,8 +18,6 @@ interface NumberInputProps extends BaseInputProps {
   step?: number;
   allowDecimals?: boolean;
   precision?: number; // Decimal places when allowDecimals is true
-  formatDisplay?: (value: number) => string;
-  parseValue?: (displayValue: string) => number;
   prefix?: string;
   suffix?: string;
   /** xl is the intake wizard's size. */
@@ -45,8 +43,6 @@ export function NumberInput({
   step = 1,
   allowDecimals = true,
   precision = 2,
-  formatDisplay,
-  parseValue,
   prefix,
   suffix,
   size = 'md',
@@ -54,8 +50,7 @@ export function NumberInput({
   testId,
   ariaLabel,
 }: NumberInputProps) {
-  // Default formatters
-  const defaultFormatDisplay = (val: number): string => {
+  const format = (val: number): string => {
     if (val === 0) return '';
     if (allowDecimals) {
       return val.toLocaleString('en-US', {
@@ -66,13 +61,10 @@ export function NumberInput({
     return val.toLocaleString('en-US');
   };
   
-  const defaultParseValue = (displayVal: string): number => {
+  const parse = (displayVal: string): number => {
     const cleaned = displayVal.replace(/[^\d.-]/g, '');
     return parseFloat(cleaned) || 0;
   };
-  
-  const format = formatDisplay || defaultFormatDisplay;
-  const parse = parseValue || defaultParseValue;
   
   const [displayValue, setDisplayValue] = React.useState(
     value !== 0 ? format(value) : ''

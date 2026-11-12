@@ -34,13 +34,12 @@ export function LayoutsSection({ idPrefix }: LayoutsSectionProps) {
       <DemoBlock title="CalculatorLayout" icon={LayoutTemplate}>
         <DemoEntry
           name="Live results"
-          description={<>With <Code>liveResults</Code> the results follow the inputs (no Calculate button). Below lg the layout shows an Inputs | Results tab bar and a sticky bar whose one action is See results / Edit inputs; <Code>resultFooter</Code> closes the results.</>}
+          description={<>The results follow the inputs (no Calculate button). Below lg the layout shows an Inputs | Results tab bar and a sticky bar whose one action is See results / Edit inputs; <Code>resultFooter</Code> closes the results.</>}
         >
           <div className="rounded-lg bg-muted/30 p-2 sm:p-4">
             <CalculatorLayout
               title="Live layout"
               description="Results recalculate as the inputs change."
-              liveResults
               resultsLabel="Live layout results"
               inputSections={inputs('live-income')}
               resultSection={<StatGrid stats={RESULTS} />}
@@ -57,7 +56,6 @@ export function LayoutsSection({ idPrefix }: LayoutsSectionProps) {
             <CalculatorLayout
               title="Empty layout"
               description="No valid inputs yet."
-              liveResults
               inputSections={inputs('empty-income')}
             />
           </div>
