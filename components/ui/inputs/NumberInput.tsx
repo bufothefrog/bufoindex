@@ -25,6 +25,8 @@ interface NumberInputProps extends BaseInputProps {
   /** xl is the intake wizard's size. */
   size?: InputSize;
   textAlign?: 'left' | 'center' | 'right';
+  /** Replaces the visible label as the input's accessible name (start it with the label). */
+  ariaLabel?: string;
 }
 
 export function NumberInput({
@@ -50,6 +52,7 @@ export function NumberInput({
   size = 'md',
   textAlign = 'right',
   testId,
+  ariaLabel,
 }: NumberInputProps) {
   // Default formatters
   const defaultFormatDisplay = (val: number): string => {
@@ -75,6 +78,16 @@ export function NumberInput({
     value !== 0 ? format(value) : ''
   );
   const [isFocused, setIsFocused] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  // Set on focus when the whole formatted text was selected (a keyboard
+  // focus, or a select-then-focus fill), so the raw text that replaces it is
+  // selected again and typing replaces it instead of appending to it.
+  const reselectOnFocus = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (!isFocused || !reselectOnFocus.current) return;
+    reselectOnFocus.current = false;
+    inputRef.current?.select();
+  }, [isFocused]);
 
   // The rendered text is derived instead of synced in an effect
   // (https://react.dev/learn/you-might-not-need-an-effect): while the field
@@ -166,7 +179,9 @@ export function NumberInput({
     }
   };
   
-  const handleFocus = () => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { selectionStart, selectionEnd, value: text } = e.currentTarget;
+    reselectOnFocus.current = text !== '' && selectionStart === 0 && selectionEnd === text.length;
     setIsFocused(true);
     // Show raw value for easier editing
     if (value !== 0) {
@@ -215,6 +230,7 @@ export function NumberInput({
       testId={testId}
       size={size}
       {...(describedBy ? { 'aria-describedby': describedBy } : {})}
+      {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
     >
       <div className={cn('relative w-full', wordUnit && 'flex items-center gap-2')}>
         {prefix && (
@@ -227,6 +243,7 @@ export function NumberInput({
         )}
 
         <input
+          ref={inputRef}
           type="text"
           inputMode={allowDecimals ? 'decimal' : 'numeric'}
           value={shownValue}

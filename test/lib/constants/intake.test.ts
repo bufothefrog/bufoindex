@@ -123,10 +123,23 @@ const FORM_SECTIONS: Record<(typeof PROFILE_FORM_ORDER)[number], string> = {
 };
 
 /**
+ * The profile form's own wording for a screen it trims (TRIMMED_SCREEN_COPY
+ * in lib/calculators/forms.ts), keyed '<form>:<screen>'.
+ */
+const TRIMMED_COPY: Readonly<Record<string, Pick<AskedScreen, 'title' | 'description'>>> = {
+  'leverage:facts': {
+    title: 'Leverage ratio',
+    description:
+      'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
+  },
+};
+
+/**
  * What the profile intake should ask, built from what each flow asks: the
  * core, then each calculator's own intake screens in profile order, then the
  * old profile-only screens. A question is asked once, on the first screen
- * that asks it; a screen left with no question is dropped.
+ * that asks it; a screen left with no question is dropped. A trimmed
+ * screen takes its TRIMMED_COPY wording.
  */
 function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: string }[] {
   const seen = new Set<string>();
@@ -138,7 +151,8 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
     for (const question of questions) seen.add(question.path);
     const id = ids.has(screen.id) ? `${source}-${screen.id}` : screen.id;
     ids.add(id);
-    out.push({ screen: { ...screen, id, questions }, section });
+    const copy = questions.length < screen.questions.length ? TRIMMED_COPY[`${source}:${screen.id}`] : undefined;
+    out.push({ screen: { ...screen, ...copy, id, questions }, section });
   };
   for (const screen of askedScreens('core', get)) take('core', screen, 'core');
   for (const id of PROFILE_FORM_ORDER) {

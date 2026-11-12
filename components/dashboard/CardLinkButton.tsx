@@ -6,7 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export interface CardLinkButtonProps<T extends string = string> {
-  /** Hash or query-string links are built as strings; cast them with `as Route`. */
+  /** Query-string links (`?from=profile`) are built as strings; cast them with `as Route`. */
   href: Route<T>;
   children: React.ReactNode;
   variant?: 'default' | 'outline';

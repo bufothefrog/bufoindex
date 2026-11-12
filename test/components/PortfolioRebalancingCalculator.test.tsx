@@ -112,6 +112,12 @@ describe('PortfolioRebalancingCalculator page', () => {
     expect(inputIn('holding-price-3').value).toBe('60');
   });
 
+  it('names each holding input with its account', () => {
+    render(<PortfolioRebalancingCalculatorPage />);
+    expect(screen.getByRole('textbox', { name: 'Price / share, Roth IRA holding 1' })).toBe(inputIn('holding-price-0'));
+    expect(screen.getByRole('textbox', { name: 'Shares, Brokerage holding 2' })).toBe(inputIn('holding-shares-3'));
+  });
+
   it('writes new cash through to the profile and rebalances it', () => {
     render(<PortfolioRebalancingCalculatorPage />);
     const roth = within(section('Accounts')).getByRole('group', { name: 'Roth IRA' });

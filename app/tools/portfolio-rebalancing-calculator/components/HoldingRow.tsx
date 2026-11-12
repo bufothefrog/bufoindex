@@ -40,6 +40,11 @@ export interface HoldingRowProps {
   classTargets?: ClassTarget[];
   /** Registered custom classes, offered and labelled in the Asset class dropdown. */
   customAssetClasses?: CustomAssetClass[];
+  /**
+   * Which row this is ("Roth IRA holding 1"). It follows each input's label
+   * in the accessible name, so rows in different accounts stay distinct.
+   */
+  context?: string;
   className?: string;
 }
 
@@ -56,8 +61,11 @@ export function HoldingRow({
   onRemove,
   classTargets = DEFAULT_CLASS_TARGETS,
   customAssetClasses = NO_CUSTOM_ASSET_CLASSES,
+  context,
   className,
 }: HoldingRowProps) {
+  /** An input's accessible name: its label, then the row's context. */
+  const nameFor = (label: string) => (context ? `${label}, ${context}` : undefined);
 
   const ticker = security?.ticker ?? '';
   const price = security?.price ?? 0;
@@ -111,6 +119,7 @@ export function HoldingRow({
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`holding-ticker-${holding.id}`}>
           Ticker
+          {context && <span className="sr-only">, {context}</span>}
         </label>
         <TickerCombobox
           id={`holding-ticker-${holding.id}`}
@@ -126,6 +135,7 @@ export function HoldingRow({
       <NumberInput
         name={`holding-price-${holding.id}`}
         label="Price / share"
+        ariaLabel={nameFor('Price / share')}
         value={price}
         onChange={value => onChangeSecurity({ price: value })}
         min={0}
@@ -140,6 +150,7 @@ export function HoldingRow({
         <SelectInput
           name={`holding-class-select-${holding.id}`}
           label="Asset class"
+          ariaLabel={nameFor('Asset class')}
           value={assetClass}
           onChange={value => onChangeSecurity({ assetClass: value as AssetClass })}
           options={assetClassOptions}
@@ -149,6 +160,7 @@ export function HoldingRow({
       <NumberInput
         name={`holding-shares-${holding.id}`}
         label="Shares"
+        ariaLabel={nameFor('Shares')}
         value={holding.shares}
         onChange={value => onChangeHolding({ shares: value })}
         min={0}

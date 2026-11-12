@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { FieldInput, FieldList } from '@/components/fields';
@@ -146,6 +146,26 @@ describe('FieldList', () => {
     expect(screen.getByRole('group', { name: 'Taxable' })).toBeInTheDocument();
   });
 
+  it('replaces a selected decimal money value when the row field is filled (select, then focus, then type)', async () => {
+    const user = userEvent.setup();
+    const { onWrite } = renderList();
+    const brokerage = screen.getByRole('group', { name: 'Brokerage' });
+    const cash = within(brokerage).getByRole('textbox', { name: 'New cash' }) as HTMLInputElement;
+    expect(cash.value).toBe('1,000');
+    // A programmatic fill selects the text before focusing; the focus swaps
+    // in the raw text, which must stay selected so the typing replaces it.
+    cash.select();
+    act(() => cash.focus());
+    expect(cash.value).toBe('1000');
+    expect([cash.selectionStart, cash.selectionEnd]).toEqual([0, 4]);
+    await user.keyboard('250');
+    expect(cash.value).toBe('250');
+    expect(onWrite).toHaveBeenLastCalledWith([
+      { path: 'portfolio.accounts.1.deposit', value: 250 },
+      { path: 'portfolio.accounts.1.touched', value: true },
+    ]);
+  });
+
   it('appends newRow at the next index', async () => {
     const user = userEvent.setup();
     const { onWrite, values } = renderList();
@@ -204,6 +224,17 @@ describe('FieldList', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Roth IRA' }));
     expect(confirm).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Remove Brokerage' })).toBeDisabled();
+  });
+
+  it('names the remove button with removeLabel when the spec has one', () => {
+    const unnamed = { id: 'acc-3', name: '', accountType: 'taxable', deposit: 0 };
+    renderList(
+      { ...ACCOUNTS, removeLabel: (row, index) => `Remove ${String(row.name || `account ${index + 1}`)}` },
+      { portfolio: { ...INITIAL.portfolio, accounts: [...INITIAL.portfolio.accounts, unnamed] } }
+    );
+    expect(screen.getByRole('group', { name: 'Account 3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove account 3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Roth IRA' })).toBeInTheDocument();
   });
 
   it('shows the empty text and a default add label with no rows', async () => {

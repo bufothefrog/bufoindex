@@ -196,7 +196,7 @@ export function FieldListBase({
                   size="icon"
                   onClick={() => remove(index)}
                   disabled={!canRemove}
-                  aria-label={`Remove ${rowLabel}`}
+                  aria-label={spec.removeLabel?.(row, index) ?? `Remove ${rowLabel}`}
                   className="text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />

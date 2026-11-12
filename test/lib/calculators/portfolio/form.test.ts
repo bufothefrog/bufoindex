@@ -260,6 +260,9 @@ describe('portfolio form: the fields', () => {
     const accounts = spec('portfolio.accounts');
     expect(accounts.confirmRemove!({ name: 'Roth IRA' }, 0)).toBe('Delete Roth IRA? Its holdings will be removed too.');
     expect(accounts.confirmRemove!({ name: '' }, 1)).toBe('Delete account 2? Its holdings will be removed too.');
+    // The remove button names the account as the prompt does.
+    expect(accounts.removeLabel!({ name: 'Roth IRA' }, 0)).toBe('Remove Roth IRA');
+    expect(accounts.removeLabel!({ name: '' }, 2)).toBe('Remove account 3');
     const defaults = getDefaultFinancialProfile().portfolio;
     expect(accounts.removeRow!(fromDefaults(), 0)).toEqual([
       { path: 'portfolio.securities', value: [defaults.securities[0], defaults.securities[1]] },

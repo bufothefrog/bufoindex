@@ -632,7 +632,7 @@ function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
  * client markup match), and on finish writes the answered screens and the
  * form's derived values to the profile. The core flow then continues to the chosen intent or the
  * "What do you want to learn?" chooser; an intent opens the matching
- * calculator through its URL-hash deep link (or the overview for 'profile'),
+ * calculator at its `?from=profile` handoff link (or the overview for 'profile'),
  * replacing its own history entry so Back returns to the chooser.
  */
 export function Wizard({ flow, mode, next }: WizardProps) {

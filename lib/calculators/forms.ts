@@ -8,9 +8,10 @@
  * PROFILE_FORM_ORDER, then PROFILE_EXTRA_SCREENS. Fields are deduplicated by
  * path across all of them: the first screen that asks a path keeps it (with
  * that form's spec), later screens drop it, and a screen left with no field
- * is dropped. Relations are the union of every form's (one per lower, upper
- * and checkOn), and onSubmit runs each distinct form onSubmit, the first
- * write to a path winning.
+ * is dropped; a trimmed screen takes the wording in TRIMMED_SCREEN_COPY when
+ * it has an entry there. Relations are the union of every form's (one per
+ * lower, upper and checkOn), and onSubmit runs each distinct form onSubmit,
+ * the first write to a path winning.
  */
 
 import {
@@ -75,6 +76,27 @@ const FORM_SECTION: Readonly<Record<CalculatorId, ProfileFormSection>> = {
   leverage: 'portfolio',
 };
 
+/** The wording of a screen: what the wizard heading and the topic lists show. */
+type ScreenCopy = Pick<ScreenSpec, 'title' | 'question' | 'description'>;
+
+/**
+ * Wording for a calculator screen the profile form trims, where the
+ * screen's own title and description speak of the fields it lost. The
+ * leverage 'facts' screen keeps only the leverage ratio: the age, the
+ * retirement age, the invested balance and the taxable contribution are
+ * asked earlier.
+ */
+const TRIMMED_SCREEN_COPY: Partial<Record<CalculatorId, Readonly<Record<string, ScreenCopy>>>> = {
+  leverage: {
+    facts: {
+      title: 'Leverage ratio',
+      question: 'Which leverage ratio should the comparison use?',
+      description:
+        'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
+    },
+  },
+};
+
 function relationKey(rule: CrossFieldRule): string {
   return `${rule.lower}|${rule.upper}|${rule.checkOn}`;
 }
@@ -83,6 +105,8 @@ function relationKey(rule: CrossFieldRule): string {
 export interface ProfileFormPart {
   form: FormSpec;
   section: ProfileFormSection;
+  /** Replaces the wording of a screen of this form, by screen id, when the profile form trims its fields. */
+  trimmedCopy?: Readonly<Record<string, ScreenCopy>>;
 }
 
 export interface ProfileFormBuild {
@@ -105,23 +129,29 @@ export function composeProfileForm(
   const screens: ScreenSpec[] = [];
   const sections = new Map<string, ProfileFormSection>();
 
-  const take = (source: FormSpec, screen: ScreenSpec, section: ProfileFormSection) => {
+  const take = (
+    source: FormSpec,
+    screen: ScreenSpec,
+    section: ProfileFormSection,
+    trimmedCopy?: Readonly<Record<string, ScreenCopy>>
+  ) => {
     const specs = fieldMap(source);
     const kept = screen.fields.filter((path) => !fields.has(path));
     if (kept.length === 0) return;
     for (const path of kept) fields.set(path, specs.get(path) as FieldSpec);
     // Screen ids are unique per form; prefix one that another form already used.
     const id = sections.has(screen.id) ? `${source.id}-${screen.id}` : screen.id;
-    screens.push({ ...screen, id, fields: kept });
+    const copy = kept.length < screen.fields.length ? trimmedCopy?.[screen.id] : undefined;
+    screens.push({ ...screen, ...copy, id, fields: kept });
     sections.set(id, section);
   };
 
   for (const screen of core.screens) take(core, screen, 'core');
-  for (const { form, section } of parts) {
+  for (const { form, section, trimmedCopy } of parts) {
     for (const screen of form.screens) {
       const surface = screen.surface ?? 'both';
       if (screen.tier === 'core' || screen.tier === 'assumption' || surface === 'calculator') continue;
-      take(form, screen, section);
+      take(form, screen, section, trimmedCopy);
     }
   }
   for (const screen of extra.screens) take(extra, screen, 'cash');
@@ -154,7 +184,7 @@ export function composeProfileForm(
 
 const PROFILE = composeProfileForm(
   CORE_FORM,
-  PROFILE_FORM_ORDER.map((id) => ({ form: FORMS[id], section: FORM_SECTION[id] })),
+  PROFILE_FORM_ORDER.map((id) => ({ form: FORMS[id], section: FORM_SECTION[id], trimmedCopy: TRIMMED_SCREEN_COPY[id] })),
   { id: 'profile-extra', fields: PROFILE_EXTRA_FIELDS, screens: PROFILE_EXTRA_SCREENS }
 );
 

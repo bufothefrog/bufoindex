@@ -250,10 +250,10 @@ export function remainingIntakeScreens(intent: IntakeIntent, profile: FinancialP
 /**
  * Whether "Finish your profile" has nothing left to do, so the guided flow
  * offers the overview in its place: the profile intake has no screen left.
- * A few profile fields (target retirement income, your 401(k) contribution
- * rate, the emergency-fund target months, the leverage ratio) are not asked
- * by any intake yet, and the match terms are not asked without a 401(k), so
- * /start/profile would only redirect to the overview.
+ * Fields on a calculator-only screen are never asked by an intake, and
+ * fields behind an unmet condition (the match terms without a 401(k)) are
+ * not asked, so /start/profile can have nothing left to ask while some
+ * fields are unanswered; it would then only redirect to the overview.
  */
 export function isProfileFinished(profile: FinancialProfile): boolean {
   return remainingIntakeScreens('profile', profile).length === 0;

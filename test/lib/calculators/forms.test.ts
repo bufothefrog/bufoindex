@@ -125,6 +125,25 @@ describe('PROFILE_FORM', () => {
     expect(PROFILE_FORM.screens.find((screen) => screen.id === 'facts')?.fields).toEqual(['strategy.leverageRatio']);
   });
 
+  it('gives a trimmed screen its own wording: the leverage facts screen speaks of the ratio alone', () => {
+    const facts = PROFILE_FORM.screens.find((screen) => screen.id === 'facts')!;
+    expect(facts).toMatchObject({
+      title: 'Leverage ratio',
+      question: 'Which leverage ratio should the comparison use?',
+      description:
+        'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
+    });
+    // The leverage intake asks the whole screen, with its own wording.
+    expect(FORMS.leverage.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
+    // A screen that keeps every field keeps its wording even with copy for it.
+    const whole = composeProfileForm(
+      { id: 'core', fields: [], screens: [] },
+      [{ form: FORMS.leverage, section: 'portfolio', trimmedCopy: { facts: { title: 'Trimmed' } } }],
+      { id: 'extra', fields: [], screens: [] }
+    );
+    expect(whole.form.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
+  });
+
   it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {
     expect(PROFILE_FORM_ORDER).toEqual(['retirement', 'paycheck', 'portfolio', 'leverage']);
   });
