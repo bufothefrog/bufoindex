@@ -17,19 +17,9 @@ export interface BaseInputProps {
 }
 
 /**
- * Size variants for components
- */
-export type ComponentSize = 'sm' | 'md' | 'lg';
-
-/**
  * Color variants for components
  */
 export type ComponentColor = 'sage' | 'success' | 'warning' | 'error' | 'info';
-
-/**
- * Card variants
- */
-export type CardVariant = 'default' | 'gradient' | 'bordered' | 'elevated';
 
 /**
  * Component state types

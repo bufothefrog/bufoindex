@@ -25,18 +25,6 @@ import { ArrowLeft, ArrowRight, Calculator, Loader2 } from 'lucide-react';
 import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Container, type FeatureDotColor } from './ResponsiveGrid';
 import { BaseCard } from '../cards/BaseCard';
 
-/**
- * @deprecated Share links are gone; the layout ignores onShare. Kept until
- * the last shell stops passing a share handler (x2).
- */
-export type ShareResult =
-  | { status: 'shared' }
-  | { status: 'copied' }
-  | { status: 'error'; url: string };
-
-/** @deprecated See ShareResult. */
-export type ShareHandler = () => void | ShareResult | Promise<void | ShareResult>;
-
 /** Which panel the mobile (below lg) view shows. */
 export type CalculatorMobileTab = 'inputs' | 'results';
 
@@ -79,8 +67,6 @@ export interface CalculatorLayoutProps {
   resultFooter?: React.ReactNode;
   isCalculating?: boolean;
   onCalculate?: () => void;
-  /** @deprecated Ignored: the share UI is gone. Kept so unmigrated shells compile until x2. */
-  onShare?: ShareHandler;
   calculateButtonText?: string;
   calculatingText?: string;
   errors?: Record<string, string>;
@@ -116,7 +102,7 @@ export interface CalculatorLayoutProps {
    * are no errors). The layout already does this on its own when
    * isCalculating goes true -> false, when resultSection first appears, and
    * after the mobile Calculate button runs a synchronous calculation; use
-   * this for anything else (e.g. results seeded from query params).
+   * this for anything else (e.g. the `?from=profile` handoff from the intake).
    */
   showResultsKey?: string | number;
   /**
@@ -593,59 +579,6 @@ export function MobileActionBar({
         )}
       </div>
     </div>
-  );
-}
-
-/**
- * Disclaimer footer: the shared Disclaimer line from the results vocabulary.
- * @deprecated Import Disclaimer from '@/components/ui/results'.
- */
-export { Disclaimer as DisclaimerFooter } from '@/components/ui/results';
-
-/**
- * Pre-configured Calculator Layouts
- */
-
-/**
- * Simple Calculator Layout - For basic calculators
- * @deprecated Use CalculatorLayout (or CalculatorPage); kept for /demo until x2.
- */
-export function SimpleCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emptyStateConfig'>) {
-  return (
-    <CalculatorLayout
-      {...props}
-      emptyStateConfig={{
-        title: "Ready to Calculate?",
-        description: "Enter your information and click Calculate to see your results.",
-        features: [
-          { color: 'success', text: 'Instant calculations' },
-          { color: 'info', text: 'Educational insights' },
-          { color: 'warning', text: 'Personalized results' }
-        ]
-      }}
-    />
-  );
-}
-
-/**
- * Advanced Calculator Layout - For complex calculators with multiple features
- * @deprecated Use CalculatorLayout (or CalculatorPage); kept for /demo until x2.
- */
-export function AdvancedCalculatorLayout(props: Omit<CalculatorLayoutProps, 'emptyStateConfig'>) {
-  return (
-    <CalculatorLayout
-      {...props}
-      emptyStateConfig={{
-        title: "Ready to Optimize?",
-        description: "Complete your financial profile to get mathematically optimized recommendations.",
-        features: [
-          { color: 'success', text: 'Mathematical optimization' },
-          { color: 'info', text: 'Tax efficiency analysis' },
-          { color: 'warning', text: 'Opportunity analysis' },
-          { color: 'destructive', text: 'Risk assessment' }
-        ]
-      }}
-    />
   );
 }
 

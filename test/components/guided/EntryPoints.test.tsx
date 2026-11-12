@@ -6,7 +6,6 @@ import sitemap from '@/app/sitemap';
 import { EmptyOverview } from '@/components/dashboard/EmptyOverview';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
-import { IntentPicker } from '@/components/guided/IntentPicker';
 import { profileCompleteness } from '@/lib/calculators/forms';
 import { CORE_PATHS } from '@/lib/constants/intake';
 import { intakePaths } from '@/test/utils/intakeFixture';
@@ -110,28 +109,6 @@ describe('EmptyOverview', () => {
     expect(screen.getByRole('link', { name: /Then retirement/ })).toHaveAttribute('href', '/start?next=retirement');
     expect(screen.getByRole('link', { name: /Then a portfolio/ })).toHaveAttribute('href', '/start/portfolio');
     expect(screen.getByRole('link', { name: /Then the leverage comparison/ })).toHaveAttribute(
-      'href',
-      '/start?next=leverage'
-    );
-  });
-});
-
-describe('IntentPicker', () => {
-  it('routes each calculator through the core, the portfolio straight to its intake (O5)', () => {
-    render(<IntentPicker />);
-    expect.soft(screen.getByRole('link', { name: /Rebalance my accounts with new cash/ })).toHaveAttribute(
-      'href',
-      '/start/portfolio'
-    );
-    expect.soft(screen.getByRole('link', { name: /See if I am on track to retire/ })).toHaveAttribute(
-      'href',
-      '/start?next=retirement'
-    );
-    expect.soft(screen.getByRole('link', { name: /Figure out where each paycheck should go/ })).toHaveAttribute(
-      'href',
-      '/start?next=paycheck'
-    );
-    expect.soft(screen.getByRole('link', { name: /Compare leveraged vs plain index investing/ })).toHaveAttribute(
       'href',
       '/start?next=leverage'
     );

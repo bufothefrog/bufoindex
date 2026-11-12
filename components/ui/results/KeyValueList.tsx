@@ -43,11 +43,6 @@ export interface KeyValueRowProps {
   prefix?: KeyValuePrefix;
   tone?: Tone;
   icon?: LucideIcon;
-  /**
-   * Renders div elements instead of dt and dd, for a row that sits outside a
-   * KeyValueList (the BreakdownRow alias).
-   */
-  standalone?: boolean;
   className?: string;
 }
 
@@ -62,11 +57,8 @@ export function KeyValueRow({
   prefix = '',
   tone = 'neutral',
   icon: Icon,
-  standalone = false,
   className,
 }: KeyValueRowProps) {
-  const Term = standalone ? 'div' : 'dt';
-  const Detail = standalone ? 'div' : 'dd';
   return (
     <div
       className={cn(
@@ -74,7 +66,7 @@ export function KeyValueRow({
         className
       )}
     >
-      <Term className="flex items-center space-x-2 min-w-0">
+      <dt className="flex items-center space-x-2 min-w-0">
         {Icon && (
           <div className="w-5 h-5 bg-muted rounded-full flex items-center justify-center shrink-0">
             <Icon className="w-3 h-3 text-muted-foreground" />
@@ -86,15 +78,15 @@ export function KeyValueRow({
             <div className="text-xs text-muted-foreground">{subtitle}</div>
           )}
         </div>
-      </Term>
-      <Detail
+      </dt>
+      <dd
         className={cn(
           'text-base font-semibold font-mono tabular-nums shrink-0',
           TONE_TEXT[tone]
         )}
       >
         {prefix}{value}
-      </Detail>
+      </dd>
     </div>
   );
 }

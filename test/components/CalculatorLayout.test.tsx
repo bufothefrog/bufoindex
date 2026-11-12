@@ -1,8 +1,8 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { CalculatorLayout, DisclaimerFooter, SimpleCalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 
 const baseProps = {
   title: 'Test calculator',
@@ -37,32 +37,6 @@ describe('CalculatorLayout resultFooter', () => {
     expect(screen.queryByTestId('footer')).not.toBeInTheDocument();
     // The empty state still shows in its place.
     expect(screen.getByText('Ready to Calculate?')).toBeInTheDocument();
-  });
-
-  it('passes the footer through SimpleCalculatorLayout', () => {
-    const { rerender } = render(
-      <SimpleCalculatorLayout
-        {...baseProps}
-        resultSection={<div data-testid="results">Results here</div>}
-        resultFooter={<div data-testid="footer">What next?</div>}
-      />
-    );
-    expect(screen.getByTestId('results').nextElementSibling).toBe(screen.getByTestId('footer'));
-
-    rerender(
-      <SimpleCalculatorLayout {...baseProps} resultFooter={<div data-testid="footer">What next?</div>} />
-    );
-    expect(screen.queryByTestId('footer')).not.toBeInTheDocument();
-  });
-});
-
-describe('CalculatorLayout share UI', () => {
-  it('ignores the deprecated onShare: no Share button and no link copy', () => {
-    const onShare = vi.fn();
-    render(<CalculatorLayout {...baseProps} onShare={onShare} resultSection={<div>Results here</div>} />);
-    expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Shareable link' })).not.toBeInTheDocument();
-    expect(onShare).not.toHaveBeenCalled();
   });
 });
 
@@ -152,9 +126,9 @@ describe('CalculatorLayout liveResults', () => {
   });
 });
 
-describe('DisclaimerFooter', () => {
+describe('CalculatorLayout disclaimer', () => {
   it('renders the shared disclaimer line', () => {
-    render(<DisclaimerFooter text="Not advice." />);
+    render(<CalculatorLayout {...baseProps} disclaimer="Not advice." />);
     expect(screen.getByText('Not advice.')).toBeInTheDocument();
     expect(screen.getByText('Disclaimer:')).toBeInTheDocument();
   });

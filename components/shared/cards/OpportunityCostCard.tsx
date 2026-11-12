@@ -1,9 +1,10 @@
 import React from 'react';
 import { formatCurrency } from '@/lib/format';
 import { SkippedItem } from '@/lib/types';
-import { ExpandableListCard, CardVariant } from '@/components/calculators/shared/ExpandableListCard';
+import { ExpandableListCard } from '@/components/calculators/shared/ExpandableListCard';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { AlertTriangle, Info } from 'lucide-react';
+import type { Tone } from '@/lib/design-system/tone';
 
 interface OpportunityCostCardProps {
   skippedItem: SkippedItem;
@@ -24,9 +25,9 @@ const riskLevelLabels: Record<SkippedItem['riskLevel'], string> = {
   high: 'High',
 };
 
-function mapRiskToVariant(riskLevel: SkippedItem['riskLevel']): CardVariant {
-  if (riskLevel === 'high') return 'danger';
-  return 'warning';
+function riskTone(riskLevel: SkippedItem['riskLevel']): Tone {
+  if (riskLevel === 'high') return 'negative';
+  return 'caution';
 }
 
 /**
@@ -84,16 +85,16 @@ export const OpportunityCostCard = React.memo(function OpportunityCostCard({
       subtitle={`Risk level: ${riskLevelLabels[skippedItem.riskLevel]}`}
       value={highestCost ? formatCurrency(highestCost.amount) : undefined}
       valueSubtext={highestCost?.subtext}
-      variant={mapRiskToVariant(skippedItem.riskLevel)}
+      tone={riskTone(skippedItem.riskLevel)}
       expanded={showDetails}
       onToggle={onToggleDetails}
       className={className}
     >
-      <StatusAlert variant="warning" icon={AlertTriangle} title="Why skip this">
+      <StatusAlert tone="caution" icon={AlertTriangle} title="Why skip this">
         {skippedItem.reason}
       </StatusAlert>
 
-      <StatusAlert variant="success" icon={Info} title="Do this instead">
+      <StatusAlert tone="positive" icon={Info} title="Do this instead">
         {skippedItem.alternative}
       </StatusAlert>
 
@@ -113,7 +114,7 @@ export const OpportunityCostCard = React.memo(function OpportunityCostCard({
       )}
 
       {skippedItem.education && (
-        <StatusAlert variant="info" icon={Info} title="Why This Matters">
+        <StatusAlert tone="info" icon={Info} title="Why This Matters">
           {skippedItem.education}
         </StatusAlert>
       )}
