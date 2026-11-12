@@ -7,16 +7,17 @@
 
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Copy, BookOpen } from 'lucide-react';
-import { FormulaRegistryEntry, ExampleData } from '@/lib/formulas/types';
+import type { ExampleData } from '@/lib/formulas/types';
 import { DisplayLatex, InlineLatex } from './LatexRenderer';
+import type { RenderedFormula } from './renderLatex';
 
 export interface FormulaDisplayProps {
-  formula: FormulaRegistryEntry;
+  formula: RenderedFormula;
   showExample?: boolean;
   showSources?: boolean;
   showAssumptions?: boolean;
   compact?: boolean;
-  onMiniCalculatorOpen?: (formula: FormulaRegistryEntry) => void;
+  onMiniCalculatorOpen?: (formula: RenderedFormula) => void;
 }
 
 export function FormulaDisplay({
@@ -75,7 +76,7 @@ export function FormulaDisplay({
           </div>
         </div>
         
-        <DisplayLatex latex={formula.latex} className="mb-2" />
+        <DisplayLatex latex={formula.latex} html={formula.latexHtml} className="mb-2" />
         
         <p className="text-sm text-muted-foreground">{formula.description}</p>
       </div>
@@ -123,7 +124,7 @@ export function FormulaDisplay({
         {/* Formula */}
         <div>
           <h4 className="font-semibold mb-2">Formula</h4>
-          <DisplayLatex latex={formula.latex} />
+          <DisplayLatex latex={formula.latex} html={formula.latexHtml} />
         </div>
 
         {/* Purpose */}
@@ -150,8 +151,9 @@ export function FormulaDisplay({
             <div className="mt-2 space-y-2">
               {Object.entries(formula.variables).map(([symbol, variable]) => (
                 <div key={symbol} className="flex items-center space-x-3 text-sm">
-                  <InlineLatex 
-                    latex={variable.symbol} 
+                  <InlineLatex
+                    latex={variable.symbol}
+                    html={formula.variableHtml[symbol] ?? null}
                     className="font-mono bg-muted px-1 rounded"
                   />
                   <span className="text-muted-foreground">=</span>

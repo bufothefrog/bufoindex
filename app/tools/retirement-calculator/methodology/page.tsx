@@ -3,13 +3,16 @@
  * Displays the mathematical formulas and assumptions used in retirement calculations
  */
 
+import 'katex/dist/katex.min.css';
 import { MethodologyLayout } from '@/components/methodology/MethodologyLayout';
+import { renderFormula } from '@/components/methodology/renderLatex';
 import { formulaRegistry } from '@/lib/formulas/registry';
 import '@/lib/formulas/retirement-formulas'; // Ensure formulas are registered
 
 export default function RetirementMethodologyPage() {
-  // Get retirement formulas from the registry
-  const retirementFormulas = formulaRegistry.getFormulasByCalculator('retirement');
+  // Get retirement formulas from the registry, with their LaTeX rendered
+  // here on the server so the browser gets no KaTeX code (audit H8).
+  const retirementFormulas = formulaRegistry.getFormulasByCalculator('retirement').map(renderFormula);
   
   // Group formulas by category
   const groupedFormulas = {

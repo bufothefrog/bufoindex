@@ -1,75 +1,46 @@
 /**
  * LaTeX Renderer Component
- * Renders mathematical formulas using KaTeX
+ * Shows a formula that renderLatex already turned into KaTeX markup on the
+ * server, so no KaTeX code runs in the browser.
  */
 
-'use client';
-
-import React, { useEffect, useRef } from 'react';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
+import React from 'react';
 
 export interface LatexRendererProps {
+  /** The LaTeX source; the accessible name, and the fallback text when html is null. */
   latex: string;
+  /** renderLatex output for latex. */
+  html: string | null;
   inline?: boolean;
   className?: string;
-  onRenderError?: (error: Error) => void;
 }
 
-export function LatexRenderer({ 
-  latex, 
-  inline = false, 
-  className = '', 
-  onRenderError 
+export function LatexRenderer({
+  latex,
+  html,
+  inline = false,
+  className = '',
 }: LatexRendererProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current || !latex) return;
-
-    try {
-      // Clear previous content
-      containerRef.current.innerHTML = '';
-
-      // Render the LaTeX
-      katex.render(latex, containerRef.current, {
-        displayMode: !inline,
-        throwOnError: false,
-        strict: false,
-        trust: false, // Security: don't allow arbitrary commands
-        macros: {
-          // Common financial math macros
-          '\\FV': '\\text{FV}',
-          '\\PV': '\\text{PV}',
-          '\\PMT': '\\text{PMT}',
-          '\\rate': 'r',
-          '\\periods': 't',
-          '\\dollars': '\\$',
-        }
-      });
-    } catch (error) {
-      console.warn('KaTeX rendering error:', error);
-      
-      // Fallback to plain text
-      if (containerRef.current) {
-        containerRef.current.textContent = latex;
-        containerRef.current.classList.add('text-destructive', 'font-mono');
-      }
-
-      onRenderError?.(error as Error);
-    }
-  }, [latex, inline, onRenderError]);
-
-  const baseClasses = inline 
-    ? 'inline-block' 
+  const baseClasses = inline
+    ? 'inline-block'
     : 'block text-center my-4 overflow-x-auto';
+  const label = `Mathematical formula: ${latex}`;
+
+  if (html === null) {
+    // KaTeX failed on the server: show the source as plain text.
+    return (
+      <div className={`${baseClasses} ${className} text-destructive font-mono`} role="img" aria-label={label}>
+        {latex}
+      </div>
+    );
+  }
 
   return (
     <div
-      ref={containerRef}
       className={`${baseClasses} ${className}`}
       role="img"
-      aria-label={`Mathematical formula: ${latex}`}
+      aria-label={label}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }
@@ -77,27 +48,20 @@ export function LatexRenderer({
 /**
  * Inline LaTeX component for text
  */
-export function InlineLatex({ latex, className, onRenderError }: Omit<LatexRendererProps, 'inline'>) {
-  return (
-    <LatexRenderer
-      latex={latex}
-      inline={true}
-      className={className}
-      onRenderError={onRenderError}
-    />
-  );
+export function InlineLatex({ latex, html, className }: Omit<LatexRendererProps, 'inline'>) {
+  return <LatexRenderer latex={latex} html={html} inline={true} className={className} />;
 }
 
 /**
  * Display LaTeX component for standalone formulas
  */
-export function DisplayLatex({ latex, className, onRenderError }: Omit<LatexRendererProps, 'inline'>) {
+export function DisplayLatex({ latex, html, className = '' }: Omit<LatexRendererProps, 'inline'>) {
   return (
     <LatexRenderer
       latex={latex}
+      html={html}
       inline={false}
       className={`p-4 bg-muted/30 rounded-lg border ${className}`}
-      onRenderError={onRenderError}
     />
   );
 }
