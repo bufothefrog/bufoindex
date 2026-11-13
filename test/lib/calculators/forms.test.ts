@@ -379,6 +379,22 @@ describe('profileCompleteness (by topic screen)', () => {
     expect(empty.missing.map((s) => s.id)).toEqual(REQUIRED.map((s) => s.id));
   });
 
+  it('does not change the count when a calculator-only new cash figure is set on the rebalancer', () => {
+    // One stored empty brokerage, no 401(k), no taxable money: the rebalancer works on no account,
+    // so the targets screen is hidden. A custom new cash of 300 would make the rebalancer work on it.
+    const profile = getDefaultFinancialProfile();
+    profile.workplace.has401k = false;
+    profile.investing.taxableMonthlyContribution = 0;
+    profile.portfolio.accounts = [{ id: 'acc-b', kind: 'brokerage', name: '', balance: 0, holdsEmergencyFund: false }];
+    profile.portfolio.holdings = [];
+    profile.portfolio.securities = [];
+    profile.provided = ['workplace.has401k', 'investing.taxableMonthlyContribution', 'portfolio.accounts'];
+    const before = profileCompleteness(profile);
+    const after = profileCompleteness({ ...profile, portfolio: { ...profile.portfolio, newCash: [{ id: 'acc-b', amount: 300 }] } });
+    expect(after).toEqual(before);
+    expect(before.missing.map((s) => s.id)).not.toContain('targets');
+  });
+
   it('leaves the optional screens out of the count, answered or not', () => {
     const optionalPaths = PROFILE_FORM.screens.filter((s) => s.optional).flatMap((s) => s.fields);
     const rest = REQUIRED.flatMap((s) => s.fields);

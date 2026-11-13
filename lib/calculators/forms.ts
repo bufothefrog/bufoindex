@@ -215,13 +215,26 @@ export interface ProfileCompleteness {
 }
 
 /**
+ * Calculator-only values: set for one run on a calculator page and never
+ * asked by the profile. Completeness reads them as unset, so a figure typed
+ * on the rebalancer (this month's new cash) never changes which topics the
+ * profile counts.
+ */
+const CALCULATOR_ONLY_PATHS: readonly string[] = ['portfolio.newCash'];
+
+function withoutCalculatorOnly(get: Get): Get {
+  return (path) =>
+    CALCULATOR_ONLY_PATHS.some((only) => path === only || path.startsWith(`${only}.`)) ? undefined : get(path);
+}
+
+/**
  * Profile completeness counted by topic screen (O14): a PROFILE_FORM screen
  * counts once every fact visible on it is in profile.provided. A screen with
  * no visible fact (the employer match without a 401(k)) is left out, and so
  * is every optional screen, answered or not.
  */
 export function profileCompleteness(profile: FinancialProfile): ProfileCompleteness {
-  const get = makeGet(profile);
+  const get = withoutCalculatorOnly(makeGet(profile));
   const total = requiredScreens(screensFor(PROFILE_FORM, get, { mode: 'all', surface: 'intake' })).length;
   const missing = requiredScreens(
     screensFor(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided, surface: 'intake' })
