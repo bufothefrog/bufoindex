@@ -15,7 +15,8 @@
  * cash.emergencyFundBalance (as the derived get of the accounts renderer
  * reads it) into its balance, but only when no account held the emergency
  * fund before the change. Unticking an account with no holdings whose
- * balance still equals that leaf sets its balance back to 0.
+ * balance still equals that leaf sets its balance back to 0, and so does a
+ * kind change that makes such an account stop holding the fund.
  *
  * Holdings and securities go through readPortfolio and addHolding of
  * ./reducers; the accounts and newCash lists are read only through
@@ -30,6 +31,7 @@ import {
   emergencyFundAccounts,
   hasHoldings,
   isAnswered,
+  isEmergencyFundAccount,
   type AccountKind,
   type AccountRow,
 } from '@/lib/profile/accounts';
@@ -140,7 +142,10 @@ export function setAccountBalance(get: Get, accountId: string, balance: number):
  * when the account has holdings; a kind change never touches holdings and,
  * away from 'brokerage', clears the tick. A change to 'cash' on a row with
  * balance 0 and no holdings copies the typed emergency fund when no account
- * held it before.
+ * held it before. A change that makes an account stop holding the fund (a
+ * 'cash' row or a ticked brokerage moved to another kind) applies the
+ * untick rule: no holdings and a balance equal to the typed emergency fund
+ * gives balance 0, so the copied fund does not count as invested too.
  */
 export function setAccountField(
   get: Get,
@@ -157,6 +162,9 @@ export function setAccountField(
     next.kind = patch.kind;
     if (patch.kind !== 'brokerage') next.holdsEmergencyFund = false;
     if (patch.kind === 'cash' && row.balance === 0 && !held && noFundAccountYet(get)) next.balance = typedFund(get);
+    if (isEmergencyFundAccount(row) && !isEmergencyFundAccount(next) && !held && row.balance === typedFund(get)) {
+      next.balance = 0;
+    }
   }
   return materializeRow(get, next);
 }

@@ -172,6 +172,36 @@ describe('the emergency fund copy rule', () => {
     expect(rowOf(cash, 'acc-3')).toMatchObject({ kind: 'cash', balance: 9000 });
   });
 
+  it('a cash row holding the copied 9,000 changed to brokerage gets balance 0; nothing counts twice', () => {
+    const added = addAccountRow(getOf(v3DefaultRaw()), 'cash');
+    const withCash = applyWrites(v3DefaultRaw(), added.writes);
+    expect(investedBalance(getOf(withCash))).toBe(25000);
+    const moved = run(withCash, (get) => setAccountField(get, added.id, { kind: 'brokerage' }));
+    expect(rowOf(moved, added.id)).toMatchObject({ kind: 'brokerage', balance: 0, holdsEmergencyFund: false });
+    expect(emergencyFundBalance(getOf(moved))).toBe(9000);
+    expect(investedBalance(getOf(moved))).toBe(25000);
+  });
+
+  it('a ticked brokerage holding the copied 9,000 changed to 401(k) gets balance 0', () => {
+    const withRow = applyWrites(v3DefaultRaw(), addAccountRow(getOf(v3DefaultRaw()), 'brokerage').writes);
+    const ticked = run(withRow, (get) => setHoldsEmergencyFund(get, 'acc-3', true));
+    const moved = run(ticked, (get) => setAccountField(get, 'acc-3', { kind: '401k' }));
+    expect(rowOf(moved, 'acc-3')).toMatchObject({ kind: '401k', balance: 0, holdsEmergencyFund: false });
+    expect(emergencyFundBalance(getOf(moved))).toBe(9000);
+    expect(investedBalance(getOf(moved))).toBe(25000);
+  });
+
+  it('a kind change away from the fund keeps a balance the visitor changed, and a rename keeps the copy', () => {
+    const added = addAccountRow(getOf(v3DefaultRaw()), 'cash');
+    const changed = run(applyWrites(v3DefaultRaw(), added.writes), (get) => setAccountBalance(get, added.id, 9500));
+    const renamed = run(changed, (get) => setAccountField(get, added.id, { name: 'Savings' }));
+    expect(rowOf(renamed, added.id).balance).toBe(9500);
+    const moved = run(renamed, (get) => setAccountField(get, added.id, { kind: 'brokerage' }));
+    expect(rowOf(moved, added.id).balance).toBe(9500);
+    // 25,000 + 9,500 = 34,500 invested; the typed 9,000 is the fund again.
+    expect(investedBalance(getOf(moved))).toBe(34500);
+  });
+
   it('refuses cash on an account with holdings, and clears the tick on a change away from brokerage', () => {
     const get = getOf(v3DefaultRaw());
     expect(setAccountField(get, 'acc-brok', { kind: 'cash' })).toEqual([]);
