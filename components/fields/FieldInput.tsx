@@ -39,7 +39,7 @@ export interface FieldDisplay {
   blank: boolean;
   /** The value Next would accept for the field (the placeholder of a blank input). */
   typical?: unknown;
-  /** Tag the typical option of a choice ("Typical"). */
+  /** Tag the typical option of a choice ("Typical") or a select ("(typical)" after its label). */
   typicalTag?: boolean;
   /** The visitor emptied an input: the caller makes the field blank again. */
   onClear?(): void;
@@ -54,6 +54,9 @@ export type FieldInputDisplayProps = FieldInputProps & {
 
 /** The empty option of a blank select or state field. */
 export const BLANK_SELECT_LABEL = 'Select';
+
+/** Added to the label of a select's typical option in the wizard: "Individual (typical)". */
+export const TYPICAL_OPTION_SUFFIX = '(typical)';
 
 /** The wizard's lg is the primitives' xl; md renders them exactly as before. */
 const INPUT_SIZE: Record<FieldSize, InputSize> = { md: 'md', lg: 'xl' };
@@ -253,6 +256,7 @@ export function FieldInput({
         );
       case 'select': {
         const options = resolveOptions(spec, get);
+        const typicalOption = display?.typicalTag && isOptionValue(typical) ? typical : undefined;
         return (
           <TestIdBox testId={testId}>
             <SelectInput
@@ -264,7 +268,12 @@ export function FieldInput({
               // The select hands back a string; write the option's own value
               // so numeric and boolean options keep their type.
               onChange={(text) => write(options.find((option) => String(option.value) === text)?.value ?? text)}
-              options={options.map((option) => ({ value: String(option.value), label: option.label }))}
+              // The option Next would accept is marked in its label, as a
+              // choice tags it "Typical" (a select has no room for a tag).
+              options={options.map((option) => ({
+                value: String(option.value),
+                label: typicalOption === option.value ? `${option.label} ${TYPICAL_OPTION_SUFFIX}` : option.label,
+              }))}
               placeholder={blank ? (spec.placeholder ?? BLANK_SELECT_LABEL) : spec.placeholder}
               size={inputSize}
             />

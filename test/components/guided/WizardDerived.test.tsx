@@ -112,6 +112,26 @@ describe('Wizard, derived typical values', () => {
     );
   });
 
+  it('marks the typical option of a select in its label, and Next saves it', async () => {
+    // The real HSA coverage field is a select, which has no room for a "Typical" tag.
+    injected.form = {
+      ...FORM,
+      fields: FORM.fields.map((spec) => (spec.path === 'hsa.coverage' ? { ...spec, kind: 'select' as const } : spec)),
+    };
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    await user.click(screen.getByRole('radio', { name: 'Married filing jointly' }));
+    await next(user);
+
+    const select = screen.getByRole('combobox', { name: 'Coverage' });
+    expect(select).toHaveValue('');
+    expect(within(select).getByRole('option', { name: 'Family (typical)' })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'Individual' })).toBeInTheDocument();
+
+    await next(user);
+    expect(useProfileStore.getState().profile.hsa.coverage).toBe('family');
+  });
+
   it('derives from the typical values when the earlier screen is skipped', async () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);

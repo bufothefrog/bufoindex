@@ -20,6 +20,7 @@ import {
   type ClassTarget,
 } from '@/lib/calculations/portfolioRebalancing';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
+import { EXAMPLE_FUND_PRICES } from '@/lib/constants/example-prices';
 import { PAY_FREQUENCY_OPTIONS } from '@/lib/constants/frequency';
 import {
   ACCOUNT_TYPE_OPTIONS,
@@ -190,21 +191,16 @@ export function getDefaultFinancialProfile(): FinancialProfile {
     debts: [],
     // The rebalancer's three-fund worked example (Roth IRA plus a taxable
     // brokerage). The ids are stable so server and client render the same.
-    // Prices: the closing price on 2026-11-12, read on 2026-11-13 from two
-    // market data pages that agreed to the cent or within 0.02%: Yahoo
-    // Finance chart data (query1.finance.yahoo.com/v8/finance/chart/<ticker>:
-    // VTI 372.62, VXUS 82.66, BND 70.65) and the Nasdaq quote page
-    // (api.nasdaq.com/api/quote/<ticker>/info: VTI 372.57, VXUS 82.66, BND
-    // 70.65), each rounded to the nearest 5 dollars.
+    // Prices and their source: lib/constants/example-prices.ts.
     portfolio: {
       accounts: [
         { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
         { id: BROKERAGE_ACCOUNT_ID, name: 'Brokerage', accountType: 'taxable', deposit: DEFAULT_NEW_CASH },
       ],
       securities: [
-        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 375, assetClass: 'us-stock' },
-        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 85, assetClass: 'intl-stock' },
-        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 70, assetClass: 'bonds' },
+        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: EXAMPLE_FUND_PRICES.VTI, assetClass: 'us-stock' },
+        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: EXAMPLE_FUND_PRICES.VXUS, assetClass: 'intl-stock' },
+        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: EXAMPLE_FUND_PRICES.BND, assetClass: 'bonds' },
       ],
       holdings: [
         { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },

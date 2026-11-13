@@ -44,7 +44,6 @@ export const TARGET_RETIREMENT_INCOME: FieldSpec = {
     const future = num(get, 'spending.targetRetirementIncome') * Math.pow(1 + inflation, years);
     return `That's ${formatCurrency(Math.round(future))} in future dollars`;
   },
-  placeholder: '41,000',
   min: 0,
   tier: 'details',
   summary: (value) => `${formatCurrency(value as number)}/yr target`,
