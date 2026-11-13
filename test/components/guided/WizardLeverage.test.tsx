@@ -1,6 +1,7 @@
 /**
  * The leverage intent in the wizard (slice c7's LEVERAGE_FORM): the facts
- * screen, then the market assumptions, then the comparison at
+ * screen alone (the leverage ratio is calculator-only and the market
+ * assumptions stay on the page), then the comparison at
  * /tools/leverage-comparison?from=profile, which reads the saved profile
  * itself (no hash, no c/y/b/l query). The wizard mechanics are tested apart
  * in Wizard.test.tsx.
@@ -25,7 +26,6 @@ const { push, replace } = routerMock;
 
 const DESTINATION = '/tools/leverage-comparison?from=profile';
 const FACTS = 'What goes into the comparison?';
-const MARKET = 'Which market assumptions should the comparison use?';
 
 beforeEach(() => {
   resetRouterMock();
@@ -34,32 +34,27 @@ beforeEach(() => {
 });
 
 describe('Wizard, leverage intent', () => {
-  it('asks the facts, then the market assumptions, and opens the comparison from the profile', async () => {
+  it('asks the facts, then opens the comparison from the profile', async () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);
 
     expect(screen.getByRole('heading', { name: FACTS })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Your age')).toHaveValue('');
     expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '30');
     expect(screen.getByLabelText('Age you plan to stop contributing')).toBeInTheDocument();
     expect(screen.getByLabelText('Monthly taxable contribution')).toBeInTheDocument();
-    // The comparison's own overrides are calculator-only.
+    // The comparison's own overrides and the leverage ratio are calculator-only.
     expect(screen.queryByLabelText('Monthly contribution')).not.toBeInTheDocument();
     expect(screen.queryByText('Years')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Leverage ratio')).not.toBeInTheDocument();
 
     await typeInto('Your age', '28');
     await typeInto('Starting balance', '40000');
-    await user.selectOptions(screen.getByLabelText('Leverage ratio'), '3x (UPRO-like daily-reset fund)');
-    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
 
-    expect(screen.getByRole('heading', { name: MARKET })).toBeInTheDocument();
-    expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
-    // The path count and seed are stated with the results, not on the form.
-    expect(screen.queryByText(/simulated paths/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Good enough to start/)).not.toBeInTheDocument();
-    await skip(user);
-
+    // No market assumptions screen follows.
+    expect(screen.queryByRole('heading', { name: 'Which market assumptions should the comparison use?' })).not.toBeInTheDocument();
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
     expect(push).not.toHaveBeenCalled();
@@ -68,42 +63,23 @@ describe('Wizard, leverage intent', () => {
     expect(hasProfile).toBe(true);
     expect(profile.person.age).toBe(28);
     expect(profile.investing.investedBalance).toBe(40000);
-    expect(profile.strategy.leverageRatio).toBe(3);
-    // The facts screen was answered whole; the kept assumptions stay unanswered.
+    expect(profile.strategy.leverageRatio).toBe(2);
+    // The facts screen was answered whole; the ratio and the assumptions stay unanswered.
     expect(profile.provided).toEqual([
       'person.age',
       'person.retirementAge',
       'investing.taxableMonthlyContribution',
       'investing.investedBalance',
-      'strategy.leverageRatio',
     ]);
     expect(profile.assumptions.leverage).toEqual(getDefaultFinancialProfile().assumptions.leverage);
-    // The intake never asked for a cash target, so it follows the active
-    // cashflow-investor preset (1 month) instead of the 3-month placeholder.
-    expect(profile.cash.targetMonths).toBe(1);
+    // The intake never asked for a cash target and derives none: the stored 3 months stay.
+    expect(profile.cash.targetMonths).toBe(3);
     expect(profile.provided).not.toContain('cash.targetMonths');
   });
 
-  it('saves the market assumptions it is given', async () => {
-    const user = userEvent.setup();
-    answer(CORE_PATHS);
+  it('goes straight to the comparison when only the ratio and the market assumptions are unanswered', () => {
+    answer([...CORE_PATHS, 'person.retirementAge', 'investing.taxableMonthlyContribution', 'investing.investedBalance']);
     render(<Wizard flow="leverage" />);
-
-    await skip(user);
-    expect(screen.getByRole('heading', { name: MARKET })).toBeInTheDocument();
-    await typeInto('Index expected annual return', '6');
-    await user.click(screen.getByRole('button', { name: /Finish/ }));
-
-    const { profile } = useProfileStore.getState();
-    expect(profile.assumptions.leverage.indexMeanReturn).toBeCloseTo(0.06, 10);
-    expect(profile.provided).toEqual([
-      ...CORE_PATHS,
-      'assumptions.leverage.indexMeanReturn',
-      'assumptions.leverage.indexVolatility',
-      'assumptions.leverage.financingRate',
-      'assumptions.leverage.expenseRatio',
-      'assumptions.leverage.indexExpenseRatio',
-    ]);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
   });
 
@@ -112,7 +88,7 @@ describe('Wizard, leverage intent', () => {
     render(<Wizard flow="leverage" mode="all" />);
 
     await typeInto('Your age', '65');
-    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Finish/ }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('The retirement age needs to be above your current age.');
     expect(screen.getByRole('heading', { name: FACTS })).toBeInTheDocument();
@@ -136,7 +112,7 @@ describe('Wizard, leverage intent', () => {
     const second = render(<Wizard flow="leverage" />);
     expect(replace).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: FACTS })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 1')).toBeInTheDocument();
     // Age is a core question, so the facts screen asks only the end age.
     expect(screen.queryByLabelText('Your age')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Age you plan to stop contributing')).toBeInTheDocument();
@@ -153,7 +129,7 @@ describe('Wizard, leverage intent', () => {
     answer(CORE_PATHS);
     render(<Wizard flow="leverage" />);
 
-    expect(await skipToEnd(user)).toBe(2);
+    expect(await skipToEnd(user)).toBe(1);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);

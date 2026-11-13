@@ -2,6 +2,8 @@
 
 Status: all five phases have landed. Hand-off notes are in docs/agents/agent-communication/rebuild-1-foundations.md through rebuild-5-cleanup.md. The original status line below is kept as a record.
 
+Later change (next-3 follow-up stack, slice c1-profile-versus-calculator): strategy.preset and its screen, labels and cash-buffer rule were removed; the leverage ratio and the Social Security claiming age became calculator-only questions (surface 'calculator'); cash.targetMonths moved to the emergency fund screen. The tables and lists below that name them describe the plan as written at the time.
+
 Status: design, ready for an implementation workflow. Repo at HEAD 0e8f421, worktree clean.
 Inputs: the three analyzer reports (stores-codecs-shells, fields-inputs-intake,
 results-charts-tests), docs/redesign-guided-flow.md (sections 2, 3, 9), and a

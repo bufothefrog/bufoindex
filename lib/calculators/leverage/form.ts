@@ -4,10 +4,12 @@
  *
  * - comparison (calculator only): the contribution, the horizon and the
  *   starting balance as nullable overrides whose auto values come from the
- *   profile, and the leverage ratio.
- * - facts (intake only): the profile facts those overrides derive from, and
- *   the leverage ratio. It also asks the age, which the intake drops in
- *   'remaining' mode because the core asked it.
+ *   profile, and the leverage ratio. The leverage ratio is a parameter of
+ *   one comparison run, not a fact about the person, so this is the only
+ *   screen that asks it.
+ * - facts (intake only): the profile facts those overrides derive from. It
+ *   also asks the age, which the intake drops in 'remaining' mode because
+ *   the core asked it.
  * - market (assumptions): the five rates, with Restore defaults.
  */
 
@@ -64,7 +66,7 @@ export const LEVERAGE_FORM: FormSpec = {
       title: 'What goes into the comparison?',
       tier: 'details',
       surface: 'intake',
-      fields: [AGE.path, STOP_AGE.path, TAXABLE_MONTHLY.path, INVESTED.path, LEVERAGE_RATIO.path],
+      fields: [AGE.path, STOP_AGE.path, TAXABLE_MONTHLY.path, INVESTED.path],
     },
     {
       id: 'market',

@@ -3,9 +3,11 @@
  * run each flow's FormSpec (lib/calculators/forms.ts) as wizard screens and
  * turn the answers into profile writes.
  *
- * Each intent asks everything its calculator uses, a few related questions
- * per screen (docs/rebuild-plan.md section 2.12), with the facts every
- * calculator shares asked once, in the core. Questions come in the user's
+ * Each intent asks its calculator's profile questions, a few related
+ * questions per screen (docs/rebuild-plan.md section 2.12), with the facts
+ * every calculator shares asked once, in the core. Assumptions, optional
+ * screens and calculator-only screens stay on the calculator page
+ * (intentAsksScreen). Questions come in the user's
  * own units (per paycheck, not per month). A skipped screen keeps its
  * values on arrival and is not marked as provided, so the calculators can
  * surface it later as a detail worth looking up.
@@ -262,13 +264,23 @@ const REMAINING_FORMS = new WeakMap<FormSpec, FormSpec>();
 const INTENT_FORMS = new WeakMap<FormSpec, FormSpec>();
 
 /**
- * A calculator intent's form without its optional screens: /start/<intent>
- * does not ask them (the calculator page and the profile form do).
+ * Whether /start/<intent> asks a screen of its calculator's form. It asks
+ * only the calculator's profile questions: never an optional screen (the
+ * profile form asks those, last) and never an assumption screen (tier
+ * 'assumption': a collapsed card on the calculator page only). Calculator-only
+ * screens (surface 'calculator') are left out by getIntakeScreens, which asks
+ * the intake surface only. The one place that says which calculator screens
+ * an intent intake asks.
  */
-function withoutOptional(form: FormSpec): FormSpec {
+export function intentAsksScreen(screen: ScreenSpec): boolean {
+  return !screen.optional && screen.tier !== 'assumption';
+}
+
+/** A calculator intent's form with only the screens intentAsksScreen keeps. */
+function intentScreensOnly(form: FormSpec): FormSpec {
   const cached = INTENT_FORMS.get(form);
   if (cached) return cached;
-  const intent = { ...form, screens: requiredScreens(form.screens) };
+  const intent = { ...form, screens: form.screens.filter(intentAsksScreen) };
   INTENT_FORMS.set(form, intent);
   return intent;
 }
@@ -288,12 +300,12 @@ function withoutCore(form: FormSpec): FormSpec {
 
 /**
  * The form whose screens a flow asks in `mode` (shares its field specs with
- * formForFlow). A calculator intent leaves out its optional screens; the
- * profile flow asks them, last.
+ * formForFlow). A calculator intent leaves out its optional and assumption
+ * screens (intentAsksScreen); the profile flow asks the optional ones, last.
  */
 export function intakeForm(flow: IntakeFlow, mode: IntakeMode = 'all'): FormSpec {
   if (flow === 'core') return formForFlow(flow);
-  const form = flow === 'profile' ? formForFlow(flow) : withoutOptional(formForFlow(flow));
+  const form = flow === 'profile' ? formForFlow(flow) : intentScreensOnly(formForFlow(flow));
   return mode === 'all' ? form : withoutCore(form);
 }
 
@@ -376,9 +388,8 @@ export interface IntakeSubmission {
  * - Answered (provided) paths are written whole, a list by its list path;
  *   skipped screens keep the profile's existing values and are not marked
  *   as provided. Unknown paths are dropped.
- * - Then the form's onSubmit writes (the strategy preset's emergency-fund
- *   months unless target months were entered now or earlier, and a
- *   retirement age raised above the current age), read from `values`.
+ * - Then the form's onSubmit writes (a retirement age raised above the
+ *   current age), read from `values`.
  */
 export function buildIntakeSubmission(
   flow: IntakeFlow,

@@ -46,9 +46,10 @@ describe('LearnChooser', () => {
       '/start/leverage',
     ]);
     expect(links[0]).toHaveTextContent('Finish your profile');
-    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 13 more questions.');
+    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 11 more questions.');
     expect(links[2]).toHaveTextContent('See if I am on track to retire');
-    expect(links[2]).toHaveTextContent('3 more questions.');
+    // Savings and target; the assumptions stay on the calculator page.
+    expect(links[2]).toHaveTextContent('2 more questions.');
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -66,17 +67,17 @@ describe('LearnChooser', () => {
 
     const links = optionLinks();
     expect(links[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
-    // The deprecated new cash answers no portfolio screen: targets, accounts, holdings and settings are left.
-    expect(links[3]).toHaveTextContent('4 more questions.');
-    // Retirement covered the leverage horizon and balance; the taxable contribution and the
-    // ratio are left, then the market assumptions.
-    expect(links[4]).toHaveTextContent('2 more questions.');
+    // The deprecated new cash answers no portfolio screen: targets, accounts and holdings are left.
+    expect(links[3]).toHaveTextContent('3 more questions.');
+    // Retirement covered the leverage horizon and balance; the taxable contribution is left. The ratio
+    // (calculator-only) and the market assumptions are asked on the comparison page.
+    expect(links[4]).toHaveTextContent('1 more question.');
   });
 
   it('points the profile option at the overview once the intake questions run out', () => {
     // Every topic the profile intake asks is answered, though the intake never
-    // asks the emergency-fund target months; /start/profile would only
-    // redirect, so link the overview.
+    // asks the calculator-only leaves or the assumptions; /start/profile would
+    // only redirect, so link the overview.
     answer(intakePaths('profile'));
     render(<LearnChooser />);
 
@@ -88,17 +89,13 @@ describe('LearnChooser', () => {
   });
 
   it('does not wait for the optional screen: the overview is offered with it unanswered', () => {
-    const optional = [
-      'retirementIncome.socialSecurityBenefit',
-      'retirementIncome.socialSecurityAge',
-      'retirementIncome.annualHealthcareCost',
-    ];
+    const optional = ['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost'];
     answer(intakePaths('profile').filter((path) => !optional.includes(path)));
     render(<LearnChooser />);
 
     expect(optionLinks()[0]).toHaveAttribute('href', '/overview');
-    // The retirement intent does not ask it either: only its assumptions are left.
-    expect(optionLinks()[2]).toHaveTextContent('1 more question.');
+    // The retirement intent does not ask it either, nor its assumptions: nothing is left.
+    expect(optionLinks()[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
   });
 
   it('counts the topics still on typical values when a skipped basic is all that is left', () => {

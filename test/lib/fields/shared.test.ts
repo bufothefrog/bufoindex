@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
-import { FILING_STATUS_META, STRATEGY_PRESET_OPTIONS } from '@/lib/constants/labels';
+import { FILING_STATUS_META } from '@/lib/constants/labels';
 import {
   AGE,
   CORE_FIELDS,
   CORE_SCREENS,
   EMERGENCY_FUND_APY,
   EMERGENCY_FUND_BALANCE,
+  EMERGENCY_FUND_MONTHS,
   FILING_STATUS,
   GROSS_PAY,
   INVESTED_BALANCE,
@@ -20,7 +21,6 @@ import {
   RETIREMENT_AFTER_AGE,
   RETIREMENT_AGE,
   STATE,
-  STRATEGY_PRESET,
   TAXABLE_MONTHLY,
   ageSummary,
   filingStatusSummary,
@@ -50,7 +50,7 @@ const SHARED = [
   TAXABLE_MONTHLY,
   EMERGENCY_FUND_BALANCE,
   EMERGENCY_FUND_APY,
-  STRATEGY_PRESET,
+  EMERGENCY_FUND_MONTHS,
 ];
 
 const getFrom =
@@ -66,7 +66,7 @@ describe('shared field specs', () => {
   });
 
   it('only offers values the profile accepts', () => {
-    for (const spec of [FILING_STATUS, PAY_FREQUENCY, STRATEGY_PRESET]) {
+    for (const spec of [FILING_STATUS, PAY_FREQUENCY]) {
       for (const option of resolveOptions(spec, getFrom({}))) {
         expect(PROFILE_ENUM_VALUES[spec.path]).toContain(option.value);
       }
@@ -86,12 +86,19 @@ describe('shared field specs', () => {
     expect(FILING_STATUS_META.marriedJoint.phrase).toBe('married filing jointly');
   });
 
-  it('reuses the strategy preset options, Standard first', () => {
-    expect(STRATEGY_PRESET.options).toEqual([STRATEGY_PRESET_OPTIONS[1], STRATEGY_PRESET_OPTIONS[0]]);
-    expect((STRATEGY_PRESET.options as readonly { label: string }[]).map((o) => o.label)).toEqual([
-      'Standard',
-      'Cash-flow investor',
-    ]);
+  it('asks the emergency fund target in whole months from 0 to 60, with one help line', () => {
+    expect(EMERGENCY_FUND_MONTHS).toMatchObject({
+      path: 'cash.targetMonths',
+      kind: 'number',
+      label: 'Emergency fund target',
+      help: '3 to 6 months is common.',
+      min: 0,
+      max: 60,
+      step: 1,
+      precision: 0,
+      tier: 'details',
+    });
+    expect(EMERGENCY_FUND_MONTHS.summary?.(6, getFrom({}))).toBe('6-month emergency fund');
   });
 
   it('offers every pay frequency in the profile order, in the intake wording', () => {
@@ -143,10 +150,9 @@ describe('CORE_SCREENS and PROFILE_EXTRA_SCREENS', () => {
     expect(CORE_SCREENS.flatMap((s) => s.fields)).toEqual(CORE_FIELDS.map((spec) => spec.path));
   });
 
-  it('asks the emergency fund and the strategy preset on the profile-only screens', () => {
+  it('asks the emergency fund, its target months included, on the one profile-only screen', () => {
     expect(PROFILE_EXTRA_SCREENS.map((s) => [s.id, s.fields])).toEqual([
-      ['cash-buffer', ['cash.emergencyFundBalance', 'cash.emergencyFundApy']],
-      ['strategy', ['strategy.preset']],
+      ['cash-buffer', ['cash.emergencyFundBalance', 'cash.emergencyFundApy', 'cash.targetMonths']],
     ]);
     expect(PROFILE_EXTRA_SCREENS.flatMap((s) => s.fields)).toEqual(PROFILE_EXTRA_FIELDS.map((spec) => spec.path));
   });
@@ -176,15 +182,9 @@ describe('shared cross-field rules', () => {
 });
 
 describe('intakeDerivedWrites', () => {
-  it('sets the target months from the preset unless they were entered', () => {
-    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'standard' }), new Set())).toEqual([
-      { path: 'cash.targetMonths', value: 3 },
-    ]);
-    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'cashflow-investor' }), new Set())).toEqual([
-      { path: 'cash.targetMonths', value: 1 },
-    ]);
-    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'standard' }), new Set(['cash.targetMonths']))).toEqual([]);
-    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'yolo' }), new Set())).toEqual([]);
+  it('never derives the target months, whatever an old stored preset says', () => {
+    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'standard' }), new Set())).toEqual([]);
+    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'cashflow-investor', 'cash.targetMonths': 1 }), new Set())).toEqual([]);
   });
 
   it('raises a retirement age at or below the age to age + 1', () => {

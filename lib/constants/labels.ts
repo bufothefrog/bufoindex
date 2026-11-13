@@ -3,8 +3,7 @@
  * summary and result line spells a value the same way. Pay frequency lives
  * in ./frequency.ts next to its multipliers.
  *
- * Where older copies disagreed, the wording on the calculator page wins;
- * the strategy preset is spelled "Cash-flow investor" everywhere.
+ * Where older copies disagreed, the wording on the calculator page wins.
  */
 
 import { formatMultiple } from '@/lib/format';
@@ -17,7 +16,6 @@ import type {
   HsaCoverage,
   OptimizationGoal,
   RiskTolerance,
-  StrategyPreset,
   TargetMixPreset,
 } from '@/lib/profile/types';
 
@@ -88,29 +86,6 @@ export const ACCOUNT_TYPE_OPTIONS = optionsFrom<AccountType>(
   ['taxable', 'tax-deferred', 'tax-free'],
   ACCOUNT_TYPE_LABELS,
 );
-
-// ---------------------------------------------------------------------------
-// Strategy preset
-// ---------------------------------------------------------------------------
-
-export const STRATEGY_PRESET_LABELS: Readonly<Record<StrategyPreset, string>> = {
-  'cashflow-investor': 'Cash-flow investor',
-  standard: 'Standard',
-};
-
-/** The site's preset first, then the alternative; neither is presented as the answer. */
-export const STRATEGY_PRESET_OPTIONS: readonly LabelOption<StrategyPreset>[] = [
-  {
-    value: 'cashflow-investor',
-    label: STRATEGY_PRESET_LABELS['cashflow-investor'],
-    description: 'About 1 month of must-pay costs in cash.',
-  },
-  {
-    value: 'standard',
-    label: STRATEGY_PRESET_LABELS.standard,
-    description: 'About 3 months of must-pay costs in cash.',
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Target mix

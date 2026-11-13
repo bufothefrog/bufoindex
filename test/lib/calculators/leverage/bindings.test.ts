@@ -52,7 +52,7 @@ const V1_DEFAULT = {
     targetMix: '80-20',
     newCashThisMonth: 1000,
   },
-  strategy: { preset: 'cashflow-investor', leverageRatio: 2 },
+  strategy: { leverageRatio: 2 },
   provided: [] as string[],
 };
 
@@ -94,7 +94,7 @@ const GOLDEN: { name: string; edits: V1Edits; link: string; inputs: DcaCompariso
     edits: {
       person: { age: 38, retirementAge: 58 },
       investing: { investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900 },
-      strategy: { preset: 'standard', leverageRatio: 1.5 },
+      strategy: { leverageRatio: 1.5 },
     },
     link: '/tools/leverage-comparison?c=900&y=20&b=140000&l=1.5&from=profile',
     inputs: { monthlyContribution: 900, years: 20, startingBalance: 140000, leverageRatio: 1.5, ...MARKET },

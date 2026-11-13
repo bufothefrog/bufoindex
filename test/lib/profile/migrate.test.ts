@@ -80,7 +80,7 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(migrateProfile(V1_DEFAULT, 1)).toEqual(getDefaultFinancialProfile());
   });
 
-  it('loads a v1 payload: every v2 leaf it holds is kept, the unknown v1 new-cash leaf is dropped', () => {
+  it('loads a v1 payload: every v2 leaf it holds is kept, the unknown new-cash and preset leaves are dropped', () => {
     let p: ReturnType<typeof migrateProfile> | undefined;
     expect(() => {
       p = migrateProfile(V1_ALL_PROVIDED, 1);
@@ -96,8 +96,10 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
     expect(p.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(p.investing).not.toHaveProperty('newCashThisMonth');
-    expect(p.strategy).toEqual(V1_ALL_PROVIDED.strategy);
-    expect(p.provided).toEqual(V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth'));
+    expect(p.strategy).toEqual({ leverageRatio: 1.5 });
+    expect(p.provided).toEqual(
+      V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth' && path !== 'strategy.preset')
+    );
     // The v1 new cash is not moved anywhere: the portfolio keeps its defaults,
     // the Brokerage deposit included.
     for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'portfolio', 'assumptions'] as const) {
@@ -117,11 +119,33 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.cash).toEqual(defaults.cash);
     expect(p.workplace).toEqual(defaults.workplace);
     expect(p.investing).toEqual(defaults.investing);
-    expect(p.strategy).toEqual({ preset: 'cashflow-investor', leverageRatio: 3 });
+    expect(p.strategy).toEqual({ leverageRatio: 3 });
     expect(p).not.toHaveProperty('extras');
     expect(p.portfolio).toEqual(defaults.portfolio);
     // Junk paths are dropped, and so is a row path whose row does not exist
     // (v1 had no debts list, so 'debts.0.balance' was never a real answer).
+    expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
+  });
+
+  it('loads a v2 profile saved with the removed strategy preset: the leaf and its answer go, the months stay', () => {
+    // As saved at 3bb0132: the preset answered, and 1 month written by the cash-flow investor preset
+    // without being marked provided.
+    const saved = {
+      ...getDefaultFinancialProfile(),
+      updatedAt: 1762000000000,
+      cash: { emergencyFundBalance: 4000, emergencyFundApy: 0.04, targetMonths: 1 },
+      strategy: { preset: 'cashflow-investor', leverageRatio: 3 },
+      provided: ['person.age', 'strategy.preset', 'strategy.leverageRatio'],
+    };
+    let p: ReturnType<typeof migrateProfile> | undefined;
+    expect(() => {
+      p = migrateProfile(saved, 2);
+    }).not.toThrow();
+    if (!p) throw new Error('no profile');
+    expect(p.version).toBe(PROFILE_VERSION);
+    expect(p.strategy).toEqual({ leverageRatio: 3 });
+    expect(p.strategy).not.toHaveProperty('preset');
+    expect(p.cash.targetMonths).toBe(1);
     expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
   });
 

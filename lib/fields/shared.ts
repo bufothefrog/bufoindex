@@ -15,10 +15,10 @@
  */
 
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
-import { FILING_STATUS_META, FILING_STATUS_OPTIONS, STRATEGY_PRESET_OPTIONS } from '@/lib/constants/labels';
+import { FILING_STATUS_META, FILING_STATUS_OPTIONS } from '@/lib/constants/labels';
 import { formatCurrency } from '@/lib/format';
-import { PAY_FREQUENCIES, PRESET_EMERGENCY_MONTHS, STRATEGY_PRESETS } from '@/lib/profile/defaults';
-import type { FilingStatus, PayFrequency, StrategyPreset } from '@/lib/profile/types';
+import { PAY_FREQUENCIES } from '@/lib/profile/defaults';
+import type { FilingStatus, PayFrequency } from '@/lib/profile/types';
 import { isFiniteNumber } from './runtime';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, ScreenSpec, Write } from './types';
 
@@ -39,9 +39,6 @@ const FILING_OPTIONS: readonly FieldOption[] = FILING_STATUS_OPTIONS.map(({ valu
   value,
   label: sentenceCase(FILING_STATUS_META[value].phrase),
 }));
-
-/** Standard first, as the intake has always listed them. */
-const INTAKE_STRATEGY_ORDER: readonly StrategyPreset[] = ['standard', 'cashflow-investor'];
 
 // ---------------------------------------------------------------------------
 // Summary pieces of the core facts
@@ -234,12 +231,24 @@ export const EMERGENCY_FUND_APY: FieldSpec = {
   tier: 'details',
 };
 
-export const STRATEGY_PRESET: FieldSpec = {
-  path: 'strategy.preset',
-  kind: 'choice',
-  label: 'Strategy preset',
-  options: INTAKE_STRATEGY_ORDER.flatMap((value) => STRATEGY_PRESET_OPTIONS.filter((option) => option.value === value)),
+/**
+ * How many months of must-pay costs the emergency fund should hold: a lasting
+ * preference, asked on the emergency fund screen. The paycheck allocator and
+ * the overview's cash buffer card read it. Whole months from 0 to 60; the
+ * typical value is the profile default.
+ */
+export const EMERGENCY_FUND_MONTHS: FieldSpec = {
+  path: 'cash.targetMonths',
+  kind: 'number',
+  label: 'Emergency fund target',
+  help: '3 to 6 months is common.',
+  min: 0,
+  max: 60,
+  step: 1,
+  precision: 0,
+  unit: { suffix: ' months' },
   tier: 'details',
+  summary: (value) => `${value as number}-month emergency fund`,
 };
 
 // ---------------------------------------------------------------------------
@@ -279,8 +288,17 @@ export const CORE_SCREENS: readonly ScreenSpec[] = [
   },
 ];
 
-/** Facts only the profile asks (no calculator form asks them yet). */
-export const PROFILE_EXTRA_FIELDS: readonly FieldSpec[] = [EMERGENCY_FUND_BALANCE, EMERGENCY_FUND_APY, STRATEGY_PRESET];
+/**
+ * The profile's own facts: the emergency fund. The paycheck form asks the
+ * same three first, so the profile form asks them on that form's emergency
+ * fund screen; this screen comes into play only if no calculator form asks
+ * them.
+ */
+export const PROFILE_EXTRA_FIELDS: readonly FieldSpec[] = [
+  EMERGENCY_FUND_BALANCE,
+  EMERGENCY_FUND_APY,
+  EMERGENCY_FUND_MONTHS,
+];
 
 /** The profile's own screens, asked after every calculator's screens. */
 export const PROFILE_EXTRA_SCREENS: readonly ScreenSpec[] = [
@@ -288,13 +306,7 @@ export const PROFILE_EXTRA_SCREENS: readonly ScreenSpec[] = [
     id: 'cash-buffer',
     title: 'What does your emergency fund look like today?',
     tier: 'details',
-    fields: [EMERGENCY_FUND_BALANCE.path, EMERGENCY_FUND_APY.path],
-  },
-  {
-    id: 'strategy',
-    title: 'Which starting point should the calculators use?',
-    tier: 'details',
-    fields: [STRATEGY_PRESET.path],
+    fields: [EMERGENCY_FUND_BALANCE.path, EMERGENCY_FUND_APY.path, EMERGENCY_FUND_MONTHS.path],
   },
 ];
 
@@ -320,28 +332,20 @@ export const RETIREMENT_AFTER_AGE: CrossFieldRule = {
   message: 'The retirement age needs to be above your current age.',
 };
 
-function isStrategyPreset(value: unknown): value is StrategyPreset {
-  return (STRATEGY_PRESETS as readonly unknown[]).includes(value);
-}
-
 /**
  * The writes every intake derives on finish, from the values in effect
- * (answers over the saved profile). Neither is marked provided.
+ * (answers over the saved profile). None is marked provided.
  *
- * - The emergency-fund target months follow the strategy preset in effect
- *   (PRESET_EMERGENCY_MONTHS) unless the visitor has entered target months
- *   (`provided` holds this intake's and the saved answers). This runs for
- *   every intake, so a target never drifts from the preset shown as active.
  * - A retirement age at or below the current age (for example, age answered
  *   and retirement age skipped) is raised to age + 1, so every calculator
  *   gets a positive horizon.
+ *
+ * The emergency-fund months are never derived: they are the visitor's own
+ * answer or the stored value.
  */
 export function intakeDerivedWrites(get: Get, provided: ReadonlySet<string>): Write[] {
+  void provided;
   const writes: Write[] = [];
-  const preset = get(STRATEGY_PRESET.path);
-  if (isStrategyPreset(preset) && !provided.has('cash.targetMonths')) {
-    writes.push({ path: 'cash.targetMonths', value: PRESET_EMERGENCY_MONTHS[preset] });
-  }
   const age = get(AGE.path);
   const retirementAge = get(RETIREMENT_AGE.path);
   if (typeof age === 'number' && typeof retirementAge === 'number' && retirementAge <= age) {

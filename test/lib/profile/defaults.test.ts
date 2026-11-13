@@ -20,7 +20,6 @@ import {
   normalizeProfile,
   normalizeProvided,
   presetClassTargets,
-  PRESET_EMERGENCY_MONTHS,
   PROFILE_LEAF_PATHS,
   PROFILE_LIST_PATHS,
   PROFILE_LIST_ROW_DEFAULTS,
@@ -104,7 +103,7 @@ describe('getDefaultFinancialProfile', () => {
         ],
         customAssetClasses: [],
       },
-      strategy: { preset: 'cashflow-investor', leverageRatio: 2 },
+      strategy: { leverageRatio: 2 },
       leverage: { monthlyContribution: null, years: null, startingBalance: null },
       assumptions: {
         retirement: {
@@ -189,10 +188,14 @@ describe('target mix', () => {
 });
 
 describe('v1 leaves, sections and preset constants', () => {
-  it('keeps every v1 leaf but the one-off new cash, which is no v2 path', () => {
+  it('keeps every v1 leaf but the one-off new cash and the removed strategy preset, which are no v2 paths', () => {
     expect(V1_LEAF_PATHS).toHaveLength(25);
-    expect(V1_LEAF_PATHS.filter((path) => !PROFILE_LEAF_PATHS.includes(path))).toEqual(['investing.newCashThisMonth']);
+    expect(V1_LEAF_PATHS.filter((path) => !PROFILE_LEAF_PATHS.includes(path))).toEqual([
+      'investing.newCashThisMonth',
+      'strategy.preset',
+    ]);
     expect(isProfilePath('investing.newCashThisMonth')).toBe(false);
+    expect(isProfilePath('strategy.preset')).toBe(false);
   });
 
   it('excludes version, updatedAt and provided from the leaf paths', () => {
@@ -209,14 +212,15 @@ describe('v1 leaves, sections and preset constants', () => {
     expect([...PROFILE_SECTIONS].sort()).toEqual(keys.sort());
   });
 
-  it('maps each strategy preset to its starting emergency-fund months', () => {
-    expect(PRESET_EMERGENCY_MONTHS).toEqual({ standard: 3, 'cashflow-investor': 1 });
+  it('has no strategy preset any more: the strategy section holds the leverage ratio alone', () => {
+    expect(getDefaultFinancialProfile().strategy).toEqual({ leverageRatio: 2 });
+    expect(PROFILE_LEAF_PATHS.filter((path) => path.startsWith('strategy.'))).toEqual(['strategy.leverageRatio']);
   });
 });
 
 describe('path registry', () => {
   it('lists every leaf of the default profile once, in section order', () => {
-    expect(PROFILE_LEAF_PATHS).toHaveLength(66);
+    expect(PROFILE_LEAF_PATHS).toHaveLength(65);
     expect(new Set(PROFILE_LEAF_PATHS).size).toBe(PROFILE_LEAF_PATHS.length);
     expect(PROFILE_LEAF_PATHS.slice(0, 5)).toEqual([
       'person.age',
@@ -311,8 +315,7 @@ describe('isValidProfileValue', () => {
     expect(isValidProfileValue('income.frequency', 'semi-monthly')).toBe(true);
     expect(isValidProfileValue('income.frequency', 'daily')).toBe(false);
     expect(isValidProfileValue('investing.targetMix', '60-40')).toBe(true);
-    expect(isValidProfileValue('strategy.preset', 'standard')).toBe(true);
-    expect(isValidProfileValue('strategy.preset', 3)).toBe(false);
+    expect(isValidProfileValue('strategy.preset', 'standard')).toBe(false);
     expect(isValidProfileValue('person.state', 'CA')).toBe(true);
     expect(isValidProfileValue('person.state', '  ')).toBe(false);
     expect(isValidProfileValue('person.nickname', 'x')).toBe(false);
@@ -389,7 +392,8 @@ describe('normalizeProfile', () => {
     expect(p.person).toEqual({ age: 45, state: 'NY', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 });
     expect(p.income).toEqual(getDefaultFinancialProfile().income);
     expect(p.cash).toEqual({ emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 6 });
-    expect(p.strategy).toEqual({ preset: 'standard', leverageRatio: 3 });
+    // The removed strategy preset is an unknown key now and is dropped.
+    expect(p.strategy).toEqual({ leverageRatio: 3 });
     expect(p.assumptions.retirement).toEqual({ ...getDefaultFinancialProfile().assumptions.retirement, volatility: 0.2 });
     expect(p.assumptions.paycheck).toEqual(getDefaultFinancialProfile().assumptions.paycheck);
     expect(p).not.toHaveProperty('nickname');

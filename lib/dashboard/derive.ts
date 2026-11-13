@@ -3,9 +3,9 @@
  *
  * The cards run each calculator through its definition (engineInputsFor and
  * the calculator's headline function); what is here is only what the
- * dashboard shows and no calculator page does: the strategy summary, the cash
- * buffer under both presets, the automation checklist and the retirement
- * "save more" lever. Nothing here feeds back into a calculation or a store.
+ * dashboard shows and no calculator page does: the cash buffer against the
+ * emergency fund target, the automation checklist and the retirement "save
+ * more" lever. Nothing here feeds back into a calculation or a store.
  * No React or DOM imports.
  */
 
@@ -18,21 +18,9 @@ import {
 } from '@/lib/calculations/retirement';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RetirementConstants } from '@/lib/constants/retirement';
-import { formatMultiple, formatPercent } from '@/lib/format';
-import { PRESET_EMERGENCY_MONTHS, STRATEGY_PRESETS } from '@/lib/profile/defaults';
-import type { FinancialProfile, StrategyPreset } from '@/lib/profile/types';
+import { formatPercent } from '@/lib/format';
+import type { FinancialProfile } from '@/lib/profile/types';
 import type { AllocationItem } from '@/lib/types';
-
-/* ------------------------------------------------------------------ */
-/* Strategy                                                           */
-/* ------------------------------------------------------------------ */
-
-export function strategyDescription(preset: StrategyPreset, leverageRatio: number): string {
-  if (preset === 'standard') {
-    return `${PRESET_EMERGENCY_MONTHS.standard} months of necessary expenses in cash and unleveraged index funds for every contribution.`;
-  }
-  return `${PRESET_EMERGENCY_MONTHS['cashflow-investor']} month of necessary expenses in cash, with steady income as the backstop, and a ${formatMultiple(leverageRatio)} daily-reset fund compared for taxable contributions.`;
-}
 
 /* ------------------------------------------------------------------ */
 /* Cash buffer                                                        */
@@ -45,28 +33,15 @@ export function strategyDescription(preset: StrategyPreset, leverageRatio: numbe
  */
 export const ASSUMED_PORTFOLIO_RETURN = 0.07;
 
-export interface PresetTarget {
-  preset: StrategyPreset;
-  months: number;
-  target: number;
-}
-
 export interface CashBufferSummary {
   balance: number;
   necessaryMonthly: number;
   /** null when necessary expenses are not set (months on hand is undefined). */
   monthsOnHand: number | null;
-  presets: PresetTarget[];
-  activePreset: StrategyPreset;
-  /** The months target the excess is measured against (profile.cash.targetMonths). */
-  activeMonths: number;
-  activeTarget: number;
-  /**
-   * True only when the user entered cash.targetMonths themselves and it
-   * differs from the active preset's months. A target the user never entered
-   * follows the preset (see intakeDerivedWrites and the strategy control).
-   */
-  usesCustomTarget: boolean;
+  /** The months target the excess is measured against (profile.cash.targetMonths, floored at 0). */
+  targetMonths: number;
+  /** targetMonths times the necessary monthly expenses. */
+  target: number;
   excess: number;
   shortfall: number;
   /** Assumed return minus the cash APY, floored at 0. */
@@ -77,27 +52,18 @@ export interface CashBufferSummary {
 export function summarizeCashBuffer(profile: FinancialProfile): CashBufferSummary {
   const necessaryMonthly = Math.max(0, profile.spending.necessaryMonthly);
   const balance = Math.max(0, profile.cash.emergencyFundBalance);
-  const activePreset = profile.strategy.preset;
-  const activeMonths = Math.max(0, profile.cash.targetMonths);
-  const activeTarget = activeMonths * necessaryMonthly;
-  const excess = Math.max(0, balance - activeTarget);
-  const shortfall = Math.max(0, activeTarget - balance);
+  const targetMonths = Math.max(0, profile.cash.targetMonths);
+  const target = targetMonths * necessaryMonthly;
+  const excess = Math.max(0, balance - target);
+  const shortfall = Math.max(0, target - balance);
   const costSpread = Math.max(0, ASSUMED_PORTFOLIO_RETURN - profile.cash.emergencyFundApy);
 
   return {
     balance,
     necessaryMonthly,
     monthsOnHand: necessaryMonthly > 0 ? balance / necessaryMonthly : null,
-    presets: STRATEGY_PRESETS.map((preset) => ({
-      preset,
-      months: PRESET_EMERGENCY_MONTHS[preset],
-      target: PRESET_EMERGENCY_MONTHS[preset] * necessaryMonthly,
-    })),
-    activePreset,
-    activeMonths,
-    activeTarget,
-    usesCustomTarget:
-      profile.provided.includes('cash.targetMonths') && activeMonths !== PRESET_EMERGENCY_MONTHS[activePreset],
+    targetMonths,
+    target,
     excess,
     shortfall,
     costSpread,

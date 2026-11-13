@@ -334,7 +334,8 @@ const FIXTURE: FormSpec = {
       fields: ['cash.emergencyFundBalance'],
       notes: [{ text: 'A fixture note.', tone: 'caution' }],
     },
-    { id: 'assume', title: 'Fixture assumptions?', tier: 'assumption', fields: ['assumptions.retirement.inflationRate'] },
+    // A details screen: an intent intake never asks an assumption screen (intentAsksScreen).
+    { id: 'rates', title: 'Fixture rates?', tier: 'details', fields: ['assumptions.retirement.inflationRate'] },
   ],
   relations: [
     { lower: 'person.age', upper: 'person.retirementAge', strict: true, checkOn: 'person.retirementAge', message: 'Stop after now.' },
@@ -436,7 +437,7 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(heading('Fixture cash?')).toHaveFocus();
 
     await user.keyboard('{Enter}');
-    expect(heading('Fixture assumptions?')).toBeInTheDocument();
+    expect(heading('Fixture rates?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
     expect(useProfileStore.getState().profile.investing.targetMix).toBe('60-40');
   });
@@ -587,12 +588,12 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(screen.getByText('A fixture note.')).toBeInTheDocument();
   });
 
-  it('skips the assumption screen like any other: its values stay as they were, unanswered', async () => {
+  it('skips the last screen like any other: its values stay as they were, unanswered', async () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);
     for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
 
-    expect(heading('Fixture assumptions?')).toBeInTheDocument();
+    expect(heading('Fixture rates?')).toBeInTheDocument();
     await typeInto('Inflation', '5');
     await skip(user);
 
@@ -642,6 +643,23 @@ describe('Wizard mechanics (fixture form)', () => {
     // Leaving now (the site header) loses nothing: the store already holds it all.
     expect(replace).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('never asks an assumption screen of an intent form: it stays on the calculator page', async () => {
+    injected.form = {
+      ...FIXTURE,
+      screens: FIXTURE.screens.map((s) => (s.id === 'rates' ? { ...s, tier: 'assumption' as const } : s)),
+    };
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+    await skip(user);
+    await skip(user);
+    expect(heading('Fixture cash?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Finish/ })).toBeInTheDocument();
+    await skip(user);
+    expect(screen.queryByRole('heading', { name: 'Fixture rates?' })).not.toBeInTheDocument();
+    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?from=profile');
   });
 
   it('takes the typical value for each blank field on Next and marks it answered', async () => {

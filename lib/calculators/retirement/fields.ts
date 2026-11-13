@@ -21,6 +21,7 @@ import { AGE, FILING_STATUS, RETIREMENT_AGE } from '@/lib/fields/shared';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 import { retirementFilingStatus } from './bindings';
+import { SOCIAL_SECURITY_AGE_PATH, claimingAgeLabel } from './claiming';
 
 const RISK_PROFILE_PATH = 'assumptions.retirement.riskProfile';
 
@@ -82,19 +83,27 @@ export const SOCIAL_SECURITY_BENEFIT: FieldSpec = {
   placeholder: '30,000',
   min: 0,
   tier: 'details',
-  summary: (value, get) =>
-    `Social Security ${formatCurrency(value as number)}/yr at ${num(get, 'retirementIncome.socialSecurityAge')}`,
+  summary: (value) => `Social Security ${formatCurrency(value as number)}/yr`,
 };
 
+/** Renderer id of the claiming-age control (components/calculators/renderers/retirement.tsx). */
+export const CLAIMING_AGE_RENDERER = 'socialSecurityClaiming';
+
+/**
+ * The claiming age, a calculator-only control: three choices (62, 67, 70)
+ * next to a table of the yearly benefit at each (./claiming.ts). The stored
+ * age may be any whole age in the bounds; the control shows the nearest
+ * choice.
+ */
 export const SOCIAL_SECURITY_AGE: FieldSpec = {
-  path: 'retirementIncome.socialSecurityAge',
-  kind: 'number',
-  label: 'Social Security age',
-  help: `Between ${RetirementConstants.SS_MIN_AGE} and ${RetirementConstants.SS_MAX_AGE}.`,
+  path: SOCIAL_SECURITY_AGE_PATH,
+  kind: 'custom',
+  renderer: CLAIMING_AGE_RENDERER,
+  label: 'Social Security claiming age',
   min: RetirementConstants.SS_MIN_AGE,
   max: RetirementConstants.SS_MAX_AGE,
-  step: 1,
   tier: 'details',
+  summary: (value) => `claim at ${claimingAgeLabel(value)}`,
 };
 
 export const ANNUAL_HEALTHCARE_COST: FieldSpec = {

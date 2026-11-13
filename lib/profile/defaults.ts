@@ -29,7 +29,6 @@ import {
   HSA_COVERAGE_OPTIONS,
   OPTIMIZATION_GOAL_OPTIONS,
   RISK_TOLERANCE_OPTIONS,
-  STRATEGY_PRESET_OPTIONS,
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
@@ -50,7 +49,6 @@ import type {
   ProfileSection,
   RiskProfile,
   SecurityRow,
-  StrategyPreset,
   TargetMixPreset,
 } from './types';
 
@@ -179,7 +177,6 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       customAssetClasses: [],
     },
     strategy: {
-      preset: 'cashflow-investor',
       leverageRatio: 2,
     },
     leverage: {
@@ -260,22 +257,12 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
   'assumptions',
 ];
 
-/**
- * Emergency-fund months each strategy preset starts from. The intake shows
- * both; a user-entered cash.targetMonths always wins over the preset.
- */
-export const PRESET_EMERGENCY_MONTHS: Record<StrategyPreset, number> = {
-  standard: 3,
-  'cashflow-investor': 1,
-};
-
 const optionValues = <V extends string | number>(options: readonly { value: V }[]): readonly V[] =>
   options.map((option) => option.value);
 
 // Vocabularies with a label table take their values from it (one table per vocabulary).
 export const PAY_FREQUENCIES: readonly PayFrequency[] = optionValues(PAY_FREQUENCY_OPTIONS);
 export const PROFILE_FILING_STATUSES: readonly FilingStatus[] = optionValues(FILING_STATUS_OPTIONS);
-export const STRATEGY_PRESETS: readonly StrategyPreset[] = optionValues(STRATEGY_PRESET_OPTIONS);
 export const TARGET_MIX_PRESETS: readonly TargetMixPreset[] = optionValues(TARGET_MIX_OPTIONS);
 const RISK_PROFILES: readonly RiskProfile[] = ['tdf', 'custom'];
 
@@ -290,7 +277,6 @@ export const PROFILE_ENUM_VALUES: Readonly<Record<string, readonly string[]>> = 
   'workplace.contributionType': optionValues(CONTRIBUTION_TYPE_OPTIONS),
   'hsa.coverage': optionValues(HSA_COVERAGE_OPTIONS),
   'investing.targetMix': TARGET_MIX_PRESETS,
-  'strategy.preset': STRATEGY_PRESETS,
   'assumptions.retirement.riskProfile': RISK_PROFILES,
   'assumptions.paycheck.riskTolerance': optionValues(RISK_TOLERANCE_OPTIONS),
   'assumptions.paycheck.optimizationGoal': optionValues(OPTIMIZATION_GOAL_OPTIONS),

@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RetirementCalculator } from '@/app/tools/retirement-calculator/components/RetirementCalculator';
@@ -49,6 +49,7 @@ describe('RetirementCalculator', () => {
       'What are you investing today?',
       'When would you like to retire?',
       'Social Security and healthcare',
+      'When to claim Social Security',
       'Assumptions',
     ]) {
       expect(screen.getByRole('region', { name: title })).toBeInTheDocument();
@@ -195,5 +196,82 @@ describe('RetirementCalculator', () => {
     expect(usePreferencesStore.getState().displayMode).toBe('nominal');
     expect(screen.getByText('Amounts in future dollars, as of the year they occur')).toBeInTheDocument();
     expect(screen.getByText('in future dollars')).toBeInTheDocument();
+  });
+});
+
+describe('RetirementCalculator: the Social Security claiming age', () => {
+  const claiming = () => screen.getByRole('radiogroup', { name: 'Social Security claiming age' });
+  const radios = () =>
+    within(claiming())
+      .getAllByRole('radio')
+      .map((radio) => [radio.textContent, radio.getAttribute('aria-checked')]);
+  const tableRows = () =>
+    within(screen.getByRole('table', { name: 'Yearly Social Security benefit at each claiming age' }))
+      .getAllByRole('row')
+      .map((row) => Array.from(row.querySelectorAll('th, td')).map((cell) => cell.textContent));
+
+  it('offers 62 (early), 67 (full) and 70 (late) next to the yearly benefit at each', async () => {
+    renderWithProfile(<RetirementCalculator />);
+    await findResults();
+
+    expect(radios()).toEqual([
+      ['62 (early)', 'false'],
+      ['67 (full)', 'true'],
+      ['70 (late)', 'false'],
+    ]);
+    // $30,000 at 67: 30% less at 62, 24% more at 70 (the engine's adjustment).
+    expect(tableRows()).toEqual([
+      ['Claiming age', 'Yearly benefit'],
+      ['62 (early)', '$21,000'],
+      ['67 (full)', '$30,000'],
+      ['70 (late)', '$37,200'],
+    ]);
+  });
+
+  it('reruns the calculator with the chosen age, as any input does', async () => {
+    renderWithProfile(<RetirementCalculator />);
+    await findResults();
+    expect(useRetirementStore.getState().inputs?.socialSecurityAge).toBe(67);
+
+    await userEvent.setup().click(within(claiming()).getByRole('radio', { name: '70 (late)' }));
+
+    const { profile } = useProfileStore.getState();
+    expect(profile.retirementIncome.socialSecurityAge).toBe(70);
+    expect(profile.provided).toContain('retirementIncome.socialSecurityAge');
+    expect(radios()[2]).toEqual(['70 (late)', 'true']);
+    await waitFor(() => expect(useRetirementStore.getState().inputs?.socialSecurityAge).toBe(70));
+  });
+
+  it('shows a stored age between the choices as the nearest one, without rewriting it', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { retirementIncome: { socialSecurityAge: 65 } } });
+    await findResults();
+
+    expect(radios()).toEqual([
+      ['62 (early)', 'false'],
+      ['67 (full)', 'true'],
+      ['70 (late)', 'false'],
+    ]);
+    // Storage and the run keep 65 until the visitor picks a choice.
+    expect(useProfileStore.getState().profile.retirementIncome.socialSecurityAge).toBe(65);
+    expect(useRetirementStore.getState().inputs?.socialSecurityAge).toBe(65);
+  });
+
+  it('follows the entered benefit in the table', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { retirementIncome: { socialSecurityBenefit: 20000 } } });
+    await findResults();
+    // $20,000 at 67: $14,000 at 62, $24,800 at 70.
+    expect(tableRows().slice(1)).toEqual([
+      ['62 (early)', '$14,000'],
+      ['67 (full)', '$20,000'],
+      ['70 (late)', '$24,800'],
+    ]);
+  });
+
+  it('is not part of the Social Security and healthcare card any more', async () => {
+    renderWithProfile(<RetirementCalculator />);
+    await findResults();
+    const card = screen.getByRole('region', { name: 'Social Security and healthcare' });
+    expect(within(card).queryByRole('radiogroup', { name: 'Social Security claiming age' })).not.toBeInTheDocument();
+    expect(within(card).queryByRole('textbox', { name: 'Social Security age' })).not.toBeInTheDocument();
   });
 });

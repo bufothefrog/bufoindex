@@ -1,6 +1,6 @@
 /**
- * The dashboard's pure derivations: the cash buffer under each strategy
- * preset, the automation checklist rows and the retirement summary with its
+ * The dashboard's pure derivations: the cash buffer against the emergency
+ * fund target, the automation checklist rows and the retirement summary with its
  * "save more" lever. Every expected figure is worked out by hand from the
  * profile below (or, for the seeded Monte Carlo figures, pinned once from the
  * engine and compared with a tolerance, since Node 22 and 24 can differ in
@@ -12,7 +12,6 @@ import {
   ASSUMED_PORTFOLIO_RETURN,
   buildChecklistRows,
   sortAllocations,
-  strategyDescription,
   summarizeCashBuffer,
   summarizeRetirement,
 } from '@/lib/dashboard/derive';
@@ -60,18 +59,6 @@ describe('ASSUMED_PORTFOLIO_RETURN', () => {
   });
 });
 
-describe('strategyDescription', () => {
-  it('describes each preset with its cash months, and the leverage ratio for the cash-flow investor', () => {
-    expect(strategyDescription('standard', 2)).toBe(
-      '3 months of necessary expenses in cash and unleveraged index funds for every contribution.'
-    );
-    expect(strategyDescription('cashflow-investor', 2)).toBe(
-      '1 month of necessary expenses in cash, with steady income as the backstop, and a 2x daily-reset fund compared for taxable contributions.'
-    );
-    expect(strategyDescription('cashflow-investor', 1.5)).toContain('a 1.5x daily-reset fund');
-  });
-});
-
 describe('summarizeCashBuffer', () => {
   it('measures the default profile against its 3-month target: a $4,000 shortfall', () => {
     // $5,000 on hand, $3,000 a month of necessary expenses, 3 target months, 4% APY.
@@ -79,14 +66,9 @@ describe('summarizeCashBuffer', () => {
     expect(cash.balance).toBe(5000);
     expect(cash.necessaryMonthly).toBe(3000);
     expect(cash.monthsOnHand).toBeCloseTo(5 / 3, 12);
-    expect(cash.presets).toEqual([
-      { preset: 'cashflow-investor', months: 1, target: 3000 },
-      { preset: 'standard', months: 3, target: 9000 },
-    ]);
-    expect(cash.activePreset).toBe('cashflow-investor');
-    expect(cash.activeMonths).toBe(3);
-    expect(cash.activeTarget).toBe(9000);
-    expect(cash.usesCustomTarget).toBe(false);
+    expect(cash.targetMonths).toBe(3);
+    expect(cash.target).toBe(9000);
+    expect(cash).not.toHaveProperty('presets');
     expect(cash.excess).toBe(0);
     expect(cash.shortfall).toBe(4000);
     expect(cash.costSpread).toBeCloseTo(0.03, 12);
@@ -100,11 +82,10 @@ describe('summarizeCashBuffer', () => {
       profileWith({
         spending: { necessaryMonthly: 4200 },
         cash: { emergencyFundBalance: 30000, emergencyFundApy: 0.04, targetMonths: 3 },
-        strategy: { preset: 'standard' },
       })
     );
     expect(cash.monthsOnHand).toBeCloseTo(30000 / 4200, 12);
-    expect(cash.activeTarget).toBe(12600);
+    expect(cash.target).toBe(12600);
     expect(cash.excess).toBe(17400);
     expect(cash.shortfall).toBe(0);
     expect(cash.costSpread).toBeCloseTo(0.03, 12);
@@ -128,24 +109,19 @@ describe('summarizeCashBuffer', () => {
     expect(cash.necessaryMonthly).toBe(0);
     expect(cash.balance).toBe(0);
     expect(cash.monthsOnHand).toBeNull();
-    expect(cash.activeMonths).toBe(0);
-    expect(cash.activeTarget).toBe(0);
-    expect(cash.presets.map((p) => p.target)).toEqual([0, 0]);
+    expect(cash.targetMonths).toBe(0);
+    expect(cash.target).toBe(0);
     expect(cash.excess).toBe(0);
     expect(cash.shortfall).toBe(0);
   });
 
-  it('uses a custom target only when the visitor entered months that differ from the preset', () => {
-    const entered = (targetMonths: number, preset: FinancialProfile['strategy']['preset']) =>
-      summarizeCashBuffer({
-        ...profileWith({ cash: { targetMonths }, strategy: { preset } }),
-        provided: ['cash.targetMonths'],
-      }).usesCustomTarget;
-    expect(entered(2, 'cashflow-investor')).toBe(true);
-    expect(entered(1, 'cashflow-investor')).toBe(false);
-    expect(entered(3, 'standard')).toBe(false);
-    // Not entered: a target that differs from the preset still follows it.
-    expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 2 } })).usesCustomTarget).toBe(false);
+  it('measures against the stored months whether or not the visitor entered them, up to 60', () => {
+    // A target written by the removed preset (1 month, never marked provided) is kept and used: $3,000.
+    expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 1 } })).target).toBe(3000);
+    const entered = summarizeCashBuffer({ ...profileWith({ cash: { targetMonths: 6 } }), provided: ['cash.targetMonths'] });
+    expect([entered.targetMonths, entered.target, entered.shortfall]).toEqual([6, 18000, 13000]);
+    // 60 months of $3,000 is $180,000.
+    expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 60 } })).target).toBe(180000);
   });
 });
 

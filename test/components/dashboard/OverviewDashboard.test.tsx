@@ -1,13 +1,13 @@
 /**
  * The overview page around the cards: nothing profile-dependent before the
- * profile store has hydrated, the empty state, the strategy control (a radio
- * group over the shared preset labels), the strategy summary, the rebalancer
- * line, the completeness card counted by topic (O14) and the disclaimer.
+ * profile store has hydrated, the empty state, no strategy preset (removed in
+ * slice c1), the rebalancer line, the completeness card counted by topic
+ * (O14) and the disclaimer.
  */
 
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import OverviewDashboard from '@/components/dashboard/OverviewDashboard';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { profileCompleteness } from '@/lib/calculators/forms';
@@ -17,7 +17,7 @@ import { resetProfileStore } from '@/test/utils/stores';
 
 describe('before the profile store has hydrated', () => {
   it('shows only the loading skeleton, even with answers in the store', () => {
-    resetProfileStore({ hydrated: false, profile: { person: { age: 41 }, strategy: { preset: 'standard' } } });
+    resetProfileStore({ hydrated: false, profile: { person: { age: 41 }, strategy: { leverageRatio: 3 } } });
     render(<OverviewDashboard />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Your overview' })).toBeInTheDocument();
@@ -28,7 +28,6 @@ describe('before the profile store has hydrated', () => {
     for (const id of ['paycheck', 'retirement', 'cash', 'leverage', 'automation', 'completeness']) {
       expect(screen.queryByTestId(`overview-${id}`)).not.toBeInTheDocument();
     }
-    expect(screen.queryByText(/Standard:/)).not.toBeInTheDocument();
     expect(screen.queryAllByRole('link')).toEqual([]);
   });
 });
@@ -46,44 +45,23 @@ describe('without a saved profile', () => {
 });
 
 describe('with a saved profile', () => {
-  it('summarizes the active preset with the shared label', () => {
+  it('has no strategy switch and no preset summary: nothing names a starting point or a 1-month fund', () => {
     resetProfileStore({ profile: { person: { age: 30 } } });
     render(<OverviewDashboard />);
-    expect(
-      screen.getByText((_, element) =>
-        element?.tagName === 'P' && (element.textContent ?? '').startsWith('Cash-flow investor:')
-      )
-    ).toHaveTextContent(
-      'Cash-flow investor: 1 month of necessary expenses in cash, with steady income as the backstop, and a 2x daily-reset fund compared for taxable contributions. Switch the preset above to see the alternative; the cash buffer card shows both targets either way.'
-    );
+    expect(screen.queryByRole('radiogroup', { name: 'Strategy' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cash-flow investor/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Standard/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/preset/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1 month/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reset profile/ })).toBeInTheDocument();
   });
 
-  it('switches the preset in a radio group; the cash target follows it unless the visitor set one', () => {
-    resetProfileStore({ profile: { person: { age: 30 } } });
+  it('measures the cash buffer against the stored months, also when an old preset wrote them', () => {
+    // A profile saved before slice c1 whose 1 month came from the cash-flow investor preset keeps it.
+    resetProfileStore({ profile: { person: { age: 30 }, cash: { targetMonths: 1 } } });
     render(<OverviewDashboard />);
-    const strategy = screen.getByRole('radiogroup', { name: 'Strategy' });
-    const radios = within(strategy).getAllByRole('radio');
-    expect(radios.map((radio) => [radio.textContent, radio.getAttribute('aria-checked')])).toEqual([
-      ['Cash-flow investor', 'true'],
-      ['Standard', 'false'],
-    ]);
-
-    fireEvent.click(within(strategy).getByRole('radio', { name: 'Standard' }));
-    let { profile } = useProfileStore.getState();
-    expect(profile.strategy.preset).toBe('standard');
-    expect(profile.cash.targetMonths).toBe(3);
-    expect(profile.provided).toContain('strategy.preset');
-    expect(profile.provided).not.toContain('cash.targetMonths');
-    expect(within(strategy).getByRole('radio', { name: 'Standard' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText(/^Standard:/)).toBeInTheDocument();
-
-    cleanup();
-    resetProfileStore({ profile: { cash: { targetMonths: 2 } } });
-    render(<OverviewDashboard />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Standard' }));
-    ({ profile } = useProfileStore.getState());
-    expect(profile.strategy.preset).toBe('standard');
-    expect(profile.cash.targetMonths).toBe(2);
+    expect(useProfileStore.getState().profile.cash.targetMonths).toBe(1);
+    expect(within(screen.getByTestId('overview-cash')).getByText('$3,000')).toBeInTheDocument();
   });
 
   it.each([
@@ -134,11 +112,7 @@ describe('ProfileCompletenessCard', () => {
   });
 
   it('leaves the optional Social Security and healthcare screen out of the count, answered or not', () => {
-    const optional = [
-      'retirementIncome.socialSecurityBenefit',
-      'retirementIncome.socialSecurityAge',
-      'retirementIncome.annualHealthcareCost',
-    ];
+    const optional = ['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost'];
     const rest = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => !optional.includes(path));
     const { total } = profileCompleteness(withProvided([]));
     for (const provided of [rest, [...rest, ...optional]]) {

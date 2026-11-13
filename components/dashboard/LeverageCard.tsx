@@ -96,7 +96,6 @@ export function LeverageCard({ profile }: LeverageCardProps) {
             result={result}
             inputs={inputs}
             usesTaxable={usesTaxable}
-            standardPreset={profile.strategy.preset === 'standard'}
           />
         )}
       </SimulationRegion>
@@ -110,10 +109,9 @@ interface ComparisonFiguresProps {
   result: DcaComparisonResult;
   inputs: DcaComparisonInputs;
   usesTaxable: boolean;
-  standardPreset: boolean;
 }
 
-function ComparisonFigures({ result, inputs, usesTaxable, standardPreset }: ComparisonFiguresProps) {
+function ComparisonFigures({ result, inputs, usesTaxable }: ComparisonFiguresProps) {
   // Display only: ending balances follow the shared dollar mode at the fixed
   // inflation assumption, as on the comparison page; contributions do not.
   const dollars = useDollarDisplay(DISPLAY_INFLATION_ASSUMPTION, { basis: 'fixed' });
@@ -161,10 +159,7 @@ function ComparisonFigures({ result, inputs, usesTaxable, standardPreset }: Comp
         {usesTaxable ? ' of taxable contributions' : ' of contributions'} for {years} {years === 1 ? 'year' : 'years'} (
         <span className="tabular-nums">{formatCurrency(result.totalContributed)}</span> in total, starting from{' '}
         <span className="tabular-nums">{formatCurrency(inputs.startingBalance)}</span>), into an index fund or a{' '}
-        {multiple} daily-reset fund on the same dates.{' '}
-        {standardPreset
-          ? 'The standard preset does not use leverage; the comparison is shown for reference.'
-          : 'The cashflow-investor preset uses this comparison for taxable contributions.'}
+        {multiple} daily-reset fund on the same dates.
       </p>
 
       <DataTable

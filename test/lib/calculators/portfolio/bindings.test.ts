@@ -42,7 +42,7 @@ const V1_DEFAULT = {
     targetMix: '80-20',
     newCashThisMonth: 1000,
   },
-  strategy: { preset: 'cashflow-investor', leverageRatio: 2 },
+  strategy: { leverageRatio: 2 },
   provided: [] as string[],
 };
 

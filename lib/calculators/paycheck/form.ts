@@ -1,8 +1,9 @@
 /**
  * Paycheck allocator form (docs/rebuild-plan.md sections 2.12 and 2.14):
  * every field the allocator uses, in topic screens. The calculator page
- * shows them all; the paycheck intake asks the seven screens after the
- * core, debts included (O4) and the assumptions last (O3).
+ * shows them all; the paycheck intake asks the six profile screens after
+ * the core, debts included (O4). The assumptions are a collapsed card on the
+ * page only (the intakes do not ask tier 'assumption' screens).
  */
 
 import {
@@ -11,6 +12,7 @@ import {
   CORE_SCREENS,
   EMERGENCY_FUND_APY,
   EMERGENCY_FUND_BALANCE,
+  EMERGENCY_FUND_MONTHS,
   GROSS_PAY,
   NECESSARY_MONTHLY,
   NET_PAY,
@@ -51,7 +53,6 @@ import {
   OPTIMIZATION_GOAL,
   RISK_TOLERANCE,
   ROTH_CONTRIBUTION_PERCENT,
-  TARGET_MONTHS,
   TAX_NOTE,
 } from './fields';
 
@@ -97,6 +98,7 @@ export const PAYCHECK_FORM: FormSpec = {
     BONUS_FREQUENCY,
     EMERGENCY_BALANCE,
     EMERGENCY_APY,
+    EMERGENCY_FUND_MONTHS,
     HAS_401K,
     MATCH_PERCENT,
     MATCH_LIMIT,
@@ -117,7 +119,6 @@ export const PAYCHECK_FORM: FormSpec = {
     IRA_ROTH_BALANCE,
     TAXABLE,
     DEBTS,
-    TARGET_MONTHS,
     RISK_TOLERANCE,
     OPTIMIZATION_GOAL,
     EXPECTED_RETIREMENT_BRACKET,
@@ -137,7 +138,7 @@ export const PAYCHECK_FORM: FormSpec = {
       title: 'Emergency fund',
       question: 'What does your emergency fund look like today?',
       tier: 'details',
-      fields: [EMERGENCY_BALANCE.path, EMERGENCY_APY.path],
+      fields: [EMERGENCY_BALANCE.path, EMERGENCY_APY.path, EMERGENCY_FUND_MONTHS.path],
     },
     {
       id: '401k',
@@ -194,7 +195,7 @@ export const PAYCHECK_FORM: FormSpec = {
       title: 'Assumptions',
       question: 'Which assumptions should the allocation use?',
       tier: 'assumption',
-      fields: [TARGET_MONTHS.path, RISK_TOLERANCE.path, OPTIMIZATION_GOAL.path, EXPECTED_RETIREMENT_BRACKET.path],
+      fields: [RISK_TOLERANCE.path, OPTIMIZATION_GOAL.path, EXPECTED_RETIREMENT_BRACKET.path],
     },
   ],
   relations: [NET_PAY_AT_MOST_GROSS, FUN_MONEY_RANGE],

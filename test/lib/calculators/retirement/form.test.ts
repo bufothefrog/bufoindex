@@ -1,7 +1,9 @@
 /**
- * The retirement form (slice c1): the four topic screens after the core
- * (plan sections 2.12 and 2.14), of which the intent intake asks three (the
- * Social Security and healthcare screen is optional), what each asks, its visibility rules,
+ * The retirement form (slice c1): the five screens after the core (plan
+ * sections 2.12 and 2.14), of which the intent intake asks two (the Social
+ * Security and healthcare screen is optional, the claiming age is a
+ * calculator-only control, and the assumptions stay on the page), what each
+ * asks, its visibility rules,
  * validation and 'remaining' mode, the nullable overrides, and proof that
  * every question the old intake asked is still asked.
  */
@@ -54,8 +56,8 @@ const profileWith = (provided: string[]): FinancialProfile => ({ ...getDefaultFi
 const CUSTOM = { 'assumptions.retirement.riskProfile': 'custom' };
 
 describe('retirement form: screens', () => {
-  it('asks the core, then savings, target and the assumptions; the Social Security and healthcare screen is optional', () => {
-    expect(ids()).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'assumptions']);
+  it('asks the core, then savings and target; Social Security and healthcare is optional, claiming is page-only', () => {
+    expect(ids()).toEqual(['about', 'pay', 'must-pay', 'savings', 'target']);
     expect(RETIREMENT_FORM.screens.map((s) => [s.id, s.tier, s.surface, s.optional])).toEqual([
       ['about', 'core', undefined, undefined],
       ['pay', 'core', undefined, undefined],
@@ -63,17 +65,18 @@ describe('retirement form: screens', () => {
       ['savings', 'details', undefined, undefined],
       ['target', 'details', undefined, undefined],
       ['ss-healthcare', 'details', undefined, true],
+      ['claiming', 'details', 'calculator', undefined],
       ['assumptions', 'assumption', undefined, undefined],
     ]);
   });
 
-  it('asks 3 screens after the core in the intent intake (plan section 2.12, less the optional one)', () => {
-    expect(remainingIds([...CORE_PATHS])).toEqual(['savings', 'target', 'assumptions']);
+  it('asks 2 screens after the core in the intent intake (plan section 2.12, less the optional, claiming and assumptions)', () => {
+    expect(remainingIds([...CORE_PATHS])).toEqual(['savings', 'target']);
   });
 
-  it('keeps the optional screen on the calculator page, where it was', () => {
+  it('keeps the optional screen on the calculator page, and adds the claiming-age control after it', () => {
     const page = screensFor(RETIREMENT_FORM, fromDefaults(), { mode: 'all', surface: 'calculator' }).map((s) => s.id);
-    expect(page).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'ss-healthcare', 'assumptions']);
+    expect(page).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'ss-healthcare', 'claiming', 'assumptions']);
   });
 
   it('asks the optional screen at the end of the profile form, in the section "Optional"', () => {
@@ -101,6 +104,12 @@ describe('retirement form: screens', () => {
         description: "Amounts are in today's dollars.",
       },
       {
+        id: 'claiming',
+        title: 'When to claim Social Security',
+        question: undefined,
+        description: "Amounts are in today's dollars.",
+      },
+      {
         id: 'assumptions',
         title: 'Assumptions',
         question: 'Which assumptions should the projection use?',
@@ -117,11 +126,8 @@ describe('retirement form: screens', () => {
       'must-pay': ['spending.necessaryMonthly'],
       savings: ['investing.monthlyContribution', 'investing.investedBalance'],
       target: ['person.retirementAge', 'spending.targetRetirementIncome', 'person.lifeExpectancy'],
-      'ss-healthcare': [
-        'retirementIncome.socialSecurityBenefit',
-        'retirementIncome.socialSecurityAge',
-        'retirementIncome.annualHealthcareCost',
-      ],
+      'ss-healthcare': ['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost'],
+      claiming: ['retirementIncome.socialSecurityAge'],
       assumptions: [
         'assumptions.retirement.riskProfile',
         'assumptions.retirement.inflationRate',
@@ -152,7 +158,7 @@ describe('retirement form: screens', () => {
     expect(pick('spending.targetRetirementIncome')).toEqual({ label: 'Target annual income in retirement', kind: 'money', min: 0, max: undefined, step: undefined });
     expect(pick('person.lifeExpectancy')).toEqual({ label: 'Life expectancy', kind: 'number', min: 50, max: 110, step: 1 });
     expect(pick('retirementIncome.socialSecurityBenefit')).toEqual({ label: 'Social Security benefit', kind: 'money', min: 0, max: undefined, step: undefined });
-    expect(pick('retirementIncome.socialSecurityAge')).toEqual({ label: 'Social Security age', kind: 'number', min: 62, max: 70, step: 1 });
+    expect(pick('retirementIncome.socialSecurityAge')).toEqual({ label: 'Social Security claiming age', kind: 'custom', min: 62, max: 70, step: undefined });
     expect(pick('retirementIncome.annualHealthcareCost')).toEqual({ label: 'Annual healthcare cost', kind: 'money', min: 0, max: undefined, step: undefined });
     expect(pick('assumptions.retirement.riskProfile')).toEqual({ label: 'Risk profile', kind: 'choice', min: undefined, max: undefined, step: undefined });
     expect(pick('assumptions.retirement.accumulationReturn')).toEqual({ label: 'Accumulation return', kind: 'percent', min: 0, max: 0.25, step: 0.001 });
@@ -219,8 +225,13 @@ describe('retirement form: screens', () => {
     expect(summarizeScreen(RETIREMENT_FORM, screen('savings'), fromDefaults())).toBe('saving $1,500/mo, $25,000 invested');
     expect(summarizeScreen(RETIREMENT_FORM, screen('target'), fromDefaults())).toBe('retire at 60, $80,000/yr target, plan to age 85');
     expect(summarizeScreen(RETIREMENT_FORM, screen('ss-healthcare'), fromDefaults())).toBe(
-      'Social Security $30,000/yr at 67, typical healthcare cost'
+      'Social Security $30,000/yr, typical healthcare cost'
     );
+    expect(summarizeScreen(RETIREMENT_FORM, screen('claiming'), fromDefaults())).toBe('claim at 67 (full)');
+    // A stored age between the choices reads as the nearest choice.
+    expect(
+      summarizeScreen(RETIREMENT_FORM, screen('claiming'), fromDefaults({ 'retirementIncome.socialSecurityAge': 64 }))
+    ).toBe('claim at 62 (early)');
   });
 
   it('takes the typical values on Next on the topic screens and the assumptions', () => {
@@ -281,10 +292,11 @@ describe('retirement form: validation', () => {
     });
   });
 
-  it('keeps Social Security between 62 and 70', () => {
-    expect(validate('ss-healthcare', { 'retirementIncome.socialSecurityAge': 61 })).toEqual({
-      'retirementIncome.socialSecurityAge': 'Social Security age must be between 62 and 70.',
+  it('keeps the claiming age between 62 and 70, and accepts a stored age between the three choices', () => {
+    expect(validate('claiming', { 'retirementIncome.socialSecurityAge': 61 })).toEqual({
+      'retirementIncome.socialSecurityAge': 'Social Security claiming age must be between 62 and 70.',
     });
+    expect(validate('claiming', { 'retirementIncome.socialSecurityAge': 65 })).toEqual({});
   });
 
   it('checks the custom return inputs only while they are shown', () => {
@@ -302,29 +314,22 @@ describe('retirement form: validation', () => {
 
 describe("retirement form: 'remaining' mode", () => {
   it('drops the core and the fully answered screens, and keeps a partly answered one whole', () => {
-    expect(remainingIds([])).toEqual(['savings', 'target', 'assumptions']);
-    expect(remainingIds([...CORE_PATHS, 'investing.investedBalance'])).toEqual(['savings', 'target', 'assumptions']);
+    expect(remainingIds([])).toEqual(['savings', 'target']);
+    expect(remainingIds([...CORE_PATHS, 'investing.investedBalance'])).toEqual(['savings', 'target']);
     expect(remainingIds(['investing.investedBalance', 'investing.monthlyContribution', 'person.retirementAge'])).toEqual([
       'target',
-      'assumptions',
     ]);
     expect(remainingIds(intakePaths('retirement'))).toEqual([]);
   });
 
-  it('counts the assumptions answered by their visible fields', () => {
-    const tdfAnswers = [
-      'assumptions.retirement.riskProfile',
-      'assumptions.retirement.inflationRate',
-      'assumptions.retirement.effectiveTaxRate',
-      'assumptions.retirement.healthcareCostMultiplier',
-    ];
-    expect(remainingIds(tdfAnswers)).toEqual(['savings', 'target']);
-    expect(remainingIds(tdfAnswers, CUSTOM)).toEqual(['savings', 'target', 'assumptions']);
+  it('never asks the assumptions or the claiming age, answered or not', () => {
+    expect(remainingIds([], CUSTOM)).toEqual(['savings', 'target']);
+    expect(remainingIds(['retirementIncome.socialSecurityAge'])).toEqual(['savings', 'target']);
   });
 
   it('matches what /start/retirement asks on arrival, from the saved profile', () => {
     const profile = profileWith([...CORE_PATHS, 'investing.investedBalance', 'investing.monthlyContribution']);
-    expect(remainingIntakeScreens('retirement', profile).map((s) => s.id)).toEqual(['target', 'assumptions']);
+    expect(remainingIntakeScreens('retirement', profile).map((s) => s.id)).toEqual(['target']);
   });
 
   it('asks the same screens whether or not the optional facts were saved earlier', () => {

@@ -5,8 +5,8 @@
  * lib/fields/shared.ts. Pure.
  *
  * Bounds follow plan section 2.3: the match rate 0-200% and its limit 0-25%
- * of pay, the 401(k) contribution 0-100%, target months 0-24 in half
- * months, and debt rates 0-50%. The old engine-side checks (validateProfile,
+ * of pay, the 401(k) contribution 0-100%, and debt rates 0-50%. The
+ * emergency fund target months are a shared fact (lib/fields/shared.ts). The old engine-side checks (validateProfile,
  * O18) live on as these bounds and the fun-money relation.
  */
 
@@ -377,20 +377,6 @@ export const DEBTS: FieldSpec = {
 // ---------------------------------------------------------------------------
 // Assumptions
 // ---------------------------------------------------------------------------
-
-export const TARGET_MONTHS: FieldSpec = {
-  path: 'cash.targetMonths',
-  kind: 'number',
-  label: 'Emergency fund target',
-  help: 'Months of expenses to hold in cash.',
-  min: 0,
-  max: 24,
-  step: 0.5,
-  precision: 1,
-  unit: { suffix: ' months' },
-  tier: 'assumption',
-  summary: (value) => `${value as number}-month emergency fund`,
-};
 
 export const RISK_TOLERANCE: FieldSpec = {
   path: 'assumptions.paycheck.riskTolerance',

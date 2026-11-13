@@ -1,8 +1,9 @@
 /**
  * The portfolio form (slice c5): every field the rebalancer uses, on the
  * four screens of docs/rebuild-plan.md sections 2.12 and 2.14 (targets,
- * accounts, holdings, settings). The calculator page shows all four and the
- * portfolio intake asks all four, with no core screen before them (O5).
+ * accounts, holdings, settings). The calculator page shows all four; the
+ * portfolio intake asks the first three, with no core screen before them
+ * (O5). The settings are an assumption screen, a collapsed card on the page.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -75,7 +76,7 @@ describe('portfolio form: screens', () => {
     ]);
   });
 
-  it('asks 4 screens in the intake, with no core screen before them', () => {
+  it('asks 3 screens in the intake, with no core screen before them, and not the settings', () => {
     expect(intentNeedsCore('portfolio')).toBe(false);
     expect(intentNeedsCore('retirement')).toBe(true);
     expect(intentNeedsCore('profile')).toBe(true);
@@ -117,28 +118,6 @@ describe('portfolio form: screens', () => {
           { path: 'portfolio.holdings', label: 'Holdings', kind: 'custom', help: undefined, options: undefined, min: undefined, max: undefined, step: undefined },
         ],
       },
-      {
-        id: 'settings',
-        title: 'Settings',
-        description: undefined,
-        questions: [
-          {
-            path: 'assumptions.portfolio.mode',
-            label: 'Purchase mode',
-            kind: 'choice',
-            help: undefined,
-            options: [
-              { value: 'whole', label: 'Whole shares', description: 'Rounds down; leftover stays as cash.' },
-              { value: 'fractional', label: 'Fractional', description: 'Exact amounts; your broker must allow fractions.' },
-            ],
-            min: undefined,
-            max: undefined,
-            step: undefined,
-          },
-          { path: 'assumptions.portfolio.allowTaxableSelling', label: 'Allow selling in taxable accounts', kind: 'boolean', help: undefined, options: undefined, min: undefined, max: undefined, step: undefined },
-          { path: 'assumptions.portfolio.showPlacementAdvice', label: 'Show tax-efficient placement advice', kind: 'boolean', help: undefined, options: undefined, min: undefined, max: undefined, step: undefined },
-        ],
-      },
     ]);
   });
 
@@ -149,7 +128,6 @@ describe('portfolio form: screens', () => {
       'portfolio.classTargets',
       'portfolio.accounts',
       'portfolio.holdings',
-      ...SETTINGS_PATHS,
     ]);
     expect(asked).toContain(OLD_QUESTIONS['investing.targetMix'].path);
     // The v1 investing.newCashThisMonth is no profile path now: its one home is
@@ -160,8 +138,8 @@ describe('portfolio form: screens', () => {
     expect(deposit.label).toBe('New cash');
   });
 
-  it('takes the typical values on Next on every screen, the settings included', () => {
-    expect(getIntakeScreens('portfolio', fromDefaults()).map((s) => nextNeedsOwnAnswer(s))).toEqual([false, false, false, false]);
+  it('takes the typical values on Next on every screen it asks', () => {
+    expect(getIntakeScreens('portfolio', fromDefaults()).map((s) => nextNeedsOwnAnswer(s))).toEqual([false, false, false]);
   });
 
   it('notes the capital gains risk only while taxable selling is on', () => {
@@ -330,7 +308,8 @@ describe('portfolio intake: validation', () => {
 
   it('accepts only the listed mixes and purchase modes', () => {
     const get = fromDefaults({ 'investing.targetMix': '90-10', 'assumptions.portfolio.mode': 'odd-lots' });
-    const [targets, , , settings] = getIntakeScreens('portfolio', get);
+    const [targets] = getIntakeScreens('portfolio', get);
+    const settings = PORTFOLIO_FORM.screens[3];
     expect(validateIntakeScreen('portfolio', targets, get)).toEqual({
       'investing.targetMix': 'Target mix must be one of the listed options.',
     });
@@ -341,21 +320,18 @@ describe('portfolio intake: validation', () => {
 });
 
 describe("portfolio intake: 'remaining' mode", () => {
-  it('asks all 4 screens with or without the basics', () => {
-    expect(remainingIds([])).toEqual(['targets', 'accounts', 'holdings', 'settings']);
-    expect(remainingIds([...CORE_PATHS])).toEqual(['targets', 'accounts', 'holdings', 'settings']);
+  it('asks all 3 profile screens with or without the basics', () => {
+    expect(remainingIds([])).toEqual(['targets', 'accounts', 'holdings']);
+    expect(remainingIds([...CORE_PATHS])).toEqual(['targets', 'accounts', 'holdings']);
   });
 
   it('drops a screen once every visible fact on it is answered', () => {
-    expect(remainingIds(['investing.targetMix', 'portfolio.accounts'])).toEqual(['holdings', 'settings']);
+    expect(remainingIds(['investing.targetMix', 'portfolio.accounts'])).toEqual(['holdings']);
     // With the custom mix the targets screen also needs the class targets.
-    expect(remainingIds(['investing.targetMix'], custom)).toEqual(['targets', 'accounts', 'holdings', 'settings']);
-    expect(remainingIds(['investing.targetMix', 'portfolio.classTargets'], custom)).toEqual([
-      'accounts',
-      'holdings',
-      'settings',
-    ]);
-    expect(remainingIds(['investing.targetMix', 'portfolio.accounts', 'portfolio.holdings', ...SETTINGS_PATHS])).toEqual([]);
+    expect(remainingIds(['investing.targetMix'], custom)).toEqual(['targets', 'accounts', 'holdings']);
+    expect(remainingIds(['investing.targetMix', 'portfolio.classTargets'], custom)).toEqual(['accounts', 'holdings']);
+    // The settings never hold the intake back.
+    expect(remainingIds(['investing.targetMix', 'portfolio.accounts', 'portfolio.holdings'])).toEqual([]);
   });
 
   it('asks the accounts while the list is unanswered, even with a deposit already set', () => {
@@ -368,8 +344,8 @@ describe("portfolio intake: 'remaining' mode", () => {
       portfolio: { ...base.portfolio, accounts },
       provided: [...CORE_PATHS, 'investing.targetMix'],
     };
-    expect(ids(remainingIntakeScreens('portfolio', profile))).toEqual(['accounts', 'holdings', 'settings']);
+    expect(ids(remainingIntakeScreens('portfolio', profile))).toEqual(['accounts', 'holdings']);
     const answered = { ...profile, provided: [...profile.provided, 'portfolio.accounts'] };
-    expect(ids(remainingIntakeScreens('portfolio', answered))).toEqual(['holdings', 'settings']);
+    expect(ids(remainingIntakeScreens('portfolio', answered))).toEqual(['holdings']);
   });
 });

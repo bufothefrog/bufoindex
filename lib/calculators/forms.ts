@@ -4,14 +4,16 @@
  * profile completeness counted by topic screen (O14). Pure.
  *
  * PROFILE_FORM is the core screens, then the union of every calculator
- * form's non-core, non-assumption, intake-surface screens in
- * PROFILE_FORM_ORDER, then PROFILE_EXTRA_SCREENS, then every optional screen
- * (ScreenSpec.optional) of those forms, in the same order, in the section
- * "Optional". Fields are deduplicated by
+ * form's non-core, non-assumption screens in PROFILE_FORM_ORDER, then
+ * PROFILE_EXTRA_SCREENS, then every optional screen (ScreenSpec.optional) of
+ * those forms, in the same order, in the section "Optional". A
+ * calculator-only screen (surface 'calculator', see Surface in
+ * lib/fields/types.ts) is never taken: this is the one place that keeps it
+ * out of the profile form, and so out of the profile wizard, the review page
+ * and completeness. Fields are deduplicated by
  * path across all of them: the first screen that asks a path keeps it (with
  * that form's spec), later screens drop it, and a screen left with no field
- * is dropped; a trimmed screen takes the wording in TRIMMED_SCREEN_COPY when
- * it has an entry there. Relations are the union of every form's (one per
+ * is dropped. Relations are the union of every form's (one per
  * lower, upper and checkOn), and onSubmit runs each distinct form onSubmit,
  * the first write to a path winning.
  *
@@ -70,7 +72,7 @@ export const PROFILE_FORM_SECTION_LABELS: Readonly<Record<ProfileFormSection, st
   retirement: 'Retirement',
   paycheck: 'Paycheck',
   portfolio: 'Portfolio',
-  cash: 'Cash and strategy',
+  cash: 'Cash',
   optional: 'Optional',
 };
 
@@ -81,25 +83,6 @@ const FORM_SECTION: Readonly<Record<CalculatorId, ProfileFormSection>> = {
   leverage: 'portfolio',
 };
 
-/** The wording of a screen: what the wizard heading and the topic lists show. */
-type ScreenCopy = Pick<ScreenSpec, 'title' | 'question' | 'description'>;
-
-/**
- * Wording for a calculator screen the profile form trims, where the
- * screen's own title and description speak of the fields it lost. The
- * leverage 'facts' screen keeps only the leverage ratio: the age, the
- * retirement age, the invested balance and the taxable contribution are
- * asked earlier.
- */
-const TRIMMED_SCREEN_COPY: Partial<Record<CalculatorId, Readonly<Record<string, ScreenCopy>>>> = {
-  leverage: {
-    facts: {
-      title: 'Leverage ratio',
-      question: 'Which leverage ratio should the comparison use?',
-    },
-  },
-};
-
 function relationKey(rule: CrossFieldRule): string {
   return `${rule.lower}|${rule.upper}|${rule.checkOn}`;
 }
@@ -108,8 +91,6 @@ function relationKey(rule: CrossFieldRule): string {
 export interface ProfileFormPart {
   form: FormSpec;
   section: ProfileFormSection;
-  /** Replaces the wording of a screen of this form, by screen id, when the profile form trims its fields. */
-  trimmedCopy?: Readonly<Record<string, ScreenCopy>>;
 }
 
 export interface ProfileFormBuild {
@@ -132,40 +113,35 @@ export function composeProfileForm(
   const screens: ScreenSpec[] = [];
   const sections = new Map<string, ProfileFormSection>();
 
-  const take = (
-    source: FormSpec,
-    screen: ScreenSpec,
-    section: ProfileFormSection,
-    trimmedCopy?: Readonly<Record<string, ScreenCopy>>
-  ) => {
+  const take = (source: FormSpec, screen: ScreenSpec, section: ProfileFormSection) => {
     const specs = fieldMap(source);
     const kept = screen.fields.filter((path) => !fields.has(path));
     if (kept.length === 0) return;
     for (const path of kept) fields.set(path, specs.get(path) as FieldSpec);
     // Screen ids are unique per form; prefix one that another form already used.
     const id = sections.has(screen.id) ? `${source.id}-${screen.id}` : screen.id;
-    const copy = kept.length < screen.fields.length ? trimmedCopy?.[screen.id] : undefined;
-    screens.push({ ...screen, ...copy, id, fields: kept });
+    screens.push({ ...screen, id, fields: kept });
     sections.set(id, section);
   };
 
   // Optional screens wait until every other screen is taken, then come last.
-  const optional: { form: FormSpec; screen: ScreenSpec; trimmedCopy?: Readonly<Record<string, ScreenCopy>> }[] = [];
+  const optional: { form: FormSpec; screen: ScreenSpec }[] = [];
 
   for (const screen of core.screens) take(core, screen, 'core');
-  for (const { form, section, trimmedCopy } of parts) {
+  for (const { form, section } of parts) {
     for (const screen of form.screens) {
       const surface = screen.surface ?? 'both';
+      // Calculator-only screens (surface 'calculator') stay on their page.
       if (screen.tier === 'core' || screen.tier === 'assumption' || surface === 'calculator') continue;
-      if (screen.optional) optional.push({ form, screen, trimmedCopy });
-      else take(form, screen, section, trimmedCopy);
+      if (screen.optional) optional.push({ form, screen });
+      else take(form, screen, section);
     }
   }
   for (const screen of extra.screens) {
     if (screen.optional) optional.push({ form: extra, screen });
     else take(extra, screen, 'cash');
   }
-  for (const { form, screen, trimmedCopy } of optional) take(form, screen, 'optional', trimmedCopy);
+  for (const { form, screen } of optional) take(form, screen, 'optional');
 
   const sources = [core, ...parts.map((part) => part.form), extra];
   const relations = new Map<string, CrossFieldRule>();
@@ -195,7 +171,7 @@ export function composeProfileForm(
 
 const PROFILE = composeProfileForm(
   CORE_FORM,
-  PROFILE_FORM_ORDER.map((id) => ({ form: FORMS[id], section: FORM_SECTION[id], trimmedCopy: TRIMMED_SCREEN_COPY[id] })),
+  PROFILE_FORM_ORDER.map((id) => ({ form: FORMS[id], section: FORM_SECTION[id] })),
   { id: 'profile-extra', fields: PROFILE_EXTRA_FIELDS, screens: PROFILE_EXTRA_SCREENS }
 );
 

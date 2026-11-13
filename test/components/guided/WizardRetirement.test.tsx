@@ -1,15 +1,16 @@
 /**
- * The retirement intent in the wizard, with the grown RETIREMENT_FORM: three
- * screens after the core (savings, target, assumptions; the optional Social
- * Security and healthcare screen is left to the calculator page and the
- * profile form), the skip affordances, and the finish on the calculator path
+ * The retirement intent in the wizard, with the grown RETIREMENT_FORM: two
+ * screens after the core (savings, target; the optional Social Security and
+ * healthcare screen is left to the calculator page and the profile form, and
+ * the claiming age and the assumptions to the calculator page), the skip
+ * affordances, and the finish on the calculator path
  * with from=profile and no hash. The wizard mechanics are tested apart in
  * Wizard.test.tsx.
  */
 
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { INTAKE_PREWARM } from '@/components/calculators/renderers';
 import { RETIREMENT_INTAKE_PREWARM } from '@/components/calculators/renderers/retirement';
@@ -43,7 +44,7 @@ afterEach(() => {
 const next = () => userEvent.setup().click(screen.getByRole('button', { name: /Next/ }));
 
 describe('Wizard, retirement intent', () => {
-  it('asks the three retirement screens after the core and opens the calculator', async () => {
+  it('asks the two retirement screens after the core and opens the calculator', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="retirement" />);
@@ -53,7 +54,7 @@ describe('Wizard, retirement intent', () => {
 
     // 1. Savings.
     expect(screen.getByRole('heading', { name: 'What are you investing today?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
     expect(screen.getByLabelText('Monthly investing contribution')).toBeInTheDocument();
     expect(screen.getByLabelText('Invested balance')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
@@ -65,36 +66,24 @@ describe('Wizard, retirement intent', () => {
     // 2. Target.
     expect(screen.getByRole('heading', { name: 'When would you like to retire?' })).toBeInTheDocument();
     expect(screen.getByText("Your target income is in today's dollars.")).toBeInTheDocument();
-    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
     await typeInto('Target retirement age', '62');
     await typeInto('Target annual income in retirement', '70000');
     await typeInto('Life expectancy', '90');
-    await next();
-
-    // 3. Assumptions, last: Skip and Finish; the custom inputs follow the risk profile.
-    // The optional Social Security and healthcare screen is not asked, so its typical values stay.
-    expect(screen.queryByRole('heading', { name: 'What will Social Security and healthcare look like?' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Social Security benefit')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Which assumptions should the projection use?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-    expect(screen.queryByText(/Good enough to start/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Accumulation return' })).not.toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Inflation rate' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Effective tax rate' })).toBeInTheDocument();
-    expect(screen.getByRole('slider', { name: 'Healthcare cost multiplier' })).toBeInTheDocument();
-    await user.click(within(screen.getByRole('radiogroup', { name: 'Risk profile' })).getByRole('radio', { name: /Custom/ }));
-    expect(screen.getByRole('textbox', { name: 'Accumulation return' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Retirement return' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Portfolio volatility' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    // Nothing else is asked: not the optional Social Security and healthcare screen, not the claiming
+    // age (calculator-only) and not the assumptions (a card on the calculator page).
+    expect(screen.queryByRole('heading', { name: 'What will Social Security and healthcare look like?' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Which assumptions should the projection use?' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Social Security claiming age' })).not.toBeInTheDocument();
 
     const { profile } = useProfileStore.getState();
     expect(profile.investing.monthlyContribution).toBe(900);
     expect(profile.person.retirementAge).toBe(62);
     expect(profile.spending.targetRetirementIncome).toBe(70000);
     expect(profile.person.lifeExpectancy).toBe(90);
-    expect(profile.assumptions.retirement.riskProfile).toBe('custom');
+    expect(profile.assumptions.retirement.riskProfile).toBe('tdf');
     expect(profile.retirementIncome).toEqual({ socialSecurityBenefit: 30000, socialSecurityAge: 67, annualHealthcareCost: null });
     expect(profile.provided).toEqual([
       ...CORE_PATHS,
@@ -103,30 +92,23 @@ describe('Wizard, retirement intent', () => {
       'person.retirementAge',
       'spending.targetRetirementIncome',
       'person.lifeExpectancy',
-      'assumptions.retirement.riskProfile',
-      'assumptions.retirement.accumulationReturn',
-      'assumptions.retirement.retirementReturn',
-      'assumptions.retirement.volatility',
-      'assumptions.retirement.inflationRate',
-      'assumptions.retirement.effectiveTaxRate',
-      'assumptions.retirement.healthcareCostMultiplier',
     ]);
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith(CALCULATOR);
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('asks the core first in "all" mode, then the same three screens', () => {
+  it('asks the core first in "all" mode, then the same two screens', () => {
     render(<Wizard flow="retirement" mode="all" />);
     expect(screen.getByRole('heading', { name: 'A little about you' })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
   });
 
   it('skips a fully answered screen in "remaining" mode', () => {
     answer([...CORE_PATHS, 'investing.monthlyContribution', 'investing.investedBalance']);
     render(<Wizard flow="retirement" />);
     expect(screen.getByRole('heading', { name: 'When would you like to retire?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 1')).toBeInTheDocument();
   });
 
   it('shows a broken relation as the screen alert and stays on the screen', async () => {
@@ -135,7 +117,7 @@ describe('Wizard, retirement intent', () => {
 
     await typeInto('Target retirement age', '70');
     await typeInto('Life expectancy', '65');
-    await next();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Finish/ }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Life expectancy needs to be at least your retirement age.');
     expect(screen.getByRole('heading', { name: 'When would you like to retire?' })).toBeInTheDocument();
@@ -158,7 +140,7 @@ describe('Wizard, retirement intent', () => {
     answer(CORE_PATHS);
     render(<Wizard flow="retirement" />);
 
-    expect(await skipToEnd(user)).toBe(3);
+    expect(await skipToEnd(user)).toBe(2);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);

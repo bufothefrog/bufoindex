@@ -187,7 +187,10 @@ function returning(): FinancialProfile {
 
 const CASES: readonly [IntakeFlow, IntakeMode, string, () => FinancialProfile][] = [
   ['core', 'all', 'a new visitor', getDefaultFinancialProfile],
-  ['leverage', 'all', 'a new visitor', getDefaultFinancialProfile],
+  // The leverage intake has one screen since slice c1 (the ratio and the market assumptions stay on
+  // the page), so every run would end at its first save; the paycheck intake in 'all' mode, nine
+  // screens from the core on, takes its place here. WizardLeverage.test.tsx covers its one screen.
+  ['paycheck', 'all', 'a new visitor', getDefaultFinancialProfile],
   ['retirement', 'all', 'a new visitor', getDefaultFinancialProfile],
   ['paycheck', 'remaining', 'a returning visitor', returning],
   ['retirement', 'remaining', 'a returning visitor', returning],
