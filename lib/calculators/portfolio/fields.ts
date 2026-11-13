@@ -194,7 +194,7 @@ export const HOLDINGS: FieldSpec = {
 
 const MODE_OPTIONS: readonly (FieldOption & { value: RebalanceMode })[] = [
   { value: 'whole', label: 'Whole shares', description: 'Rounds down; leftover stays as cash.' },
-  { value: 'fractional', label: 'Fractional', description: 'Exact amounts to the penny.' },
+  { value: 'fractional', label: 'Fractional', description: 'Exact amounts; your broker must allow fractions.' },
 ];
 
 export const MODE: FieldSpec = {

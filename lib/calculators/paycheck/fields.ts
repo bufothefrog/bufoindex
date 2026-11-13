@@ -177,7 +177,7 @@ export const ROTH_CONTRIBUTION_PERCENT: FieldSpec = {
   path: ROTH_PART_PATH,
   kind: 'percent',
   label: 'Roth part of your contribution',
-  help: 'Share of the total; the rest is traditional.',
+  help: 'Percent of pay; the rest is traditional.',
   min: 0,
   max: 1,
   step: 0.01,
@@ -234,7 +234,7 @@ export const HSA_MONTHLY_CONTRIBUTION: FieldSpec = {
   kind: 'money',
   label: 'Current monthly HSA contribution',
   // The one place the yearly limit is stated (not on the coverage options).
-  help: (get) => `Up to ${formatCurrency(hsaLimit(get))} a year (${formatCurrency(hsaLimit(get) / 12)} a month).`,
+  help: (get) => `Up to ${formatCurrency(hsaLimit(get))} a year with employer money (${formatCurrency(hsaLimit(get) / 12)} a month).`,
   placeholder: '0',
   min: 0,
   tier: 'details',

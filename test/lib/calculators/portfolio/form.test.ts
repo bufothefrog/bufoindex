@@ -129,7 +129,7 @@ describe('portfolio form: screens', () => {
             help: undefined,
             options: [
               { value: 'whole', label: 'Whole shares', description: 'Rounds down; leftover stays as cash.' },
-              { value: 'fractional', label: 'Fractional', description: 'Exact amounts to the penny.' },
+              { value: 'fractional', label: 'Fractional', description: 'Exact amounts; your broker must allow fractions.' },
             ],
             min: undefined,
             max: undefined,

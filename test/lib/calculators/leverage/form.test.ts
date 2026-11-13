@@ -24,7 +24,7 @@ const OLD_QUESTIONS: Record<string, OldQuestion> = {
   'person.age': { path: 'person.age', label: 'Your age', kind: 'number', min: 16, max: 100, step: 1 },
   'leverage:person.retirementAge': { path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', min: 30, max: 85, step: 1 },
   'investing.taxableMonthlyContribution': { path: 'investing.taxableMonthlyContribution', label: 'Monthly taxable contribution', kind: 'money', help: 'Money you invest each month outside 401(k) and IRA accounts.', min: 0 },
-  'leverage:investing.investedBalance': { path: 'investing.investedBalance', label: 'Starting balance', kind: 'money', help: 'Total across 401(k), IRA and brokerage, not your emergency fund.', min: 0 },
+  'leverage:investing.investedBalance': { path: 'investing.investedBalance', label: 'Starting balance', kind: 'money', help: 'Money already invested; 0 compares contributions only.', min: 0 },
 };
 
 const spec = (path: string): FieldSpec => LEVERAGE_FORM.fields.find((field) => field.path === path)!;

@@ -278,12 +278,17 @@ describe('paycheck form: visibility', () => {
     const spec = FORM.fields.find((field) => field.path === 'hsa.monthlyContribution')!;
     const limitHelp = (overrides: Record<string, unknown>) =>
       resolveText(spec.help, fromDefaults({ 'hsa.eligible': true, ...overrides }));
-    expect(limitHelp({ 'person.age': 54 })).toBe('Up to $4,400 a year ($367 a month).');
-    expect(limitHelp({ 'person.age': 55 })).toBe('Up to $5,400 a year ($450 a month).');
-    expect(limitHelp({ 'person.age': 58, 'hsa.coverage': 'family' })).toBe('Up to $9,750 a year ($813 a month).');
+    expect(limitHelp({ 'person.age': 54 })).toBe('Up to $4,400 a year with employer money ($367 a month).');
+    expect(limitHelp({ 'person.age': 55 })).toBe('Up to $5,400 a year with employer money ($450 a month).');
+    expect(limitHelp({ 'person.age': 58, 'hsa.coverage': 'family' })).toBe('Up to $9,750 a year with employer money ($813 a month).');
     // The coverage options name the tier only; the limit is not repeated there.
     const coverage = FORM.fields.find((field) => field.path === 'hsa.coverage')!;
     expect(resolveOptions(coverage, fromDefaults()).map((option) => option.label)).toEqual(['Individual', 'Family']);
+  });
+
+  it('states the Roth part in the same unit as the total, a percent of pay, as split401k reads it', () => {
+    const spec = FORM.fields.find((field) => field.path === 'workplace.rothContributionPercent')!;
+    expect(resolveText(spec.help, fromDefaults())).toBe('Percent of pay; the rest is traditional.');
   });
 
   it('shows each IRA amount only with that IRA, and no note on the screen', () => {

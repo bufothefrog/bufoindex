@@ -31,7 +31,12 @@ import {
 
 const STOP_AGE: FieldSpec = withOverrides(RETIREMENT_AGE, { label: 'Age you plan to stop contributing' });
 
-const INVESTED: FieldSpec = withOverrides(INVESTED_BALANCE, { label: 'Starting balance' });
+// The shared help names 401(k) and IRA money; this comparison is about
+// taxable money, so the leverage intake keeps the calculator's own wording.
+const INVESTED: FieldSpec = withOverrides(INVESTED_BALANCE, {
+  label: 'Starting balance',
+  help: 'Money already invested; 0 compares contributions only.',
+});
 
 export const LEVERAGE_FORM: FormSpec = {
   id: 'leverage',
