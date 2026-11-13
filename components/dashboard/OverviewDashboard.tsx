@@ -106,7 +106,7 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
     <div className="space-y-4 md:space-y-6">
       {showsFutureDollars && <OverviewDollarMode />}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 md:*:last:odd:col-span-2">
         <PaycheckCard inputs={paycheckInputs} allocation={allocation} />
         <RetirementOddsCard profile={profile} />
         <CashBufferCard profile={profile} />

@@ -11,7 +11,7 @@ export interface DisclaimerProps {
 export function Disclaimer({ text, className }: DisclaimerProps) {
   return (
     <div className={cn('mt-8 text-center lg:mt-12', className)}>
-      <p className="text-sm text-muted-foreground max-w-4xl mx-auto">
+      <p className="text-sm text-muted-foreground max-w-prose mx-auto">
         <strong>Disclaimer:</strong> {text}
       </p>
     </div>

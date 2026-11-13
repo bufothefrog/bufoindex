@@ -104,7 +104,7 @@ export function FormulaCategory({
           </div>
         </button>
         
-        <p className="mt-2 text-sm opacity-90">
+        <p className="mt-2 max-w-prose text-sm opacity-90">
           {CATEGORY_DESCRIPTIONS[category]}
         </p>
 

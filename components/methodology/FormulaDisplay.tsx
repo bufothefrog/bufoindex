@@ -78,7 +78,7 @@ export function FormulaDisplay({
         
         <DisplayLatex latex={formula.latex} html={formula.latexHtml} className="mb-2" />
         
-        <p className="text-sm text-muted-foreground">{formula.description}</p>
+        <p className="max-w-prose text-sm text-muted-foreground">{formula.description}</p>
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function FormulaDisplay({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h3 className="text-xl font-bold mb-1">{formula.name}</h3>
-            <p className="text-muted-foreground mb-2">{formula.description}</p>
+            <p className="max-w-prose text-muted-foreground mb-2">{formula.description}</p>
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <span className="px-2 py-1 bg-background rounded-full border">
                 {formula.category}
@@ -130,7 +130,7 @@ export function FormulaDisplay({
         {/* Purpose */}
         <div>
           <h4 className="font-semibold mb-2">Purpose</h4>
-          <p className="text-sm">{formula.purpose}</p>
+          <p className="max-w-prose text-sm">{formula.purpose}</p>
         </div>
 
         {/* Variables */}
@@ -240,7 +240,7 @@ export function FormulaDisplay({
             
             {expandedSections.assumptions && (
               <div className="mt-2">
-                <ul className="space-y-1 text-sm text-muted-foreground">
+                <ul className="max-w-prose space-y-1 text-sm text-muted-foreground">
                   {formula.assumptions.map((assumption, index) => (
                     <li key={index} className="flex items-start">
                       <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground mt-1.5 mr-2 shrink-0"></span>
@@ -270,7 +270,7 @@ export function FormulaDisplay({
             
             {expandedSections.limitations && (
               <div className="mt-2">
-                <ul className="space-y-1 text-sm text-warning">
+                <ul className="max-w-prose space-y-1 text-sm text-warning">
                   {formula.limitations.map((limitation, index) => (
                     <li key={index} className="flex items-start">
                       <span className="inline-block w-2 h-2 rounded-full bg-warning mt-1.5 mr-2 shrink-0"></span>
@@ -314,13 +314,13 @@ function ExampleDisplay({ example }: { example: ExampleData }) {
       
       <div>
         <h5 className="font-medium mb-2">Explanation:</h5>
-        <p className="text-sm text-muted-foreground">{example.explanation}</p>
+        <p className="max-w-prose text-sm text-muted-foreground">{example.explanation}</p>
       </div>
 
       {example.stepByStep && (
         <div>
           <h5 className="font-medium mb-2">Step by Step:</h5>
-          <ol className="text-sm space-y-1 text-muted-foreground">
+          <ol className="max-w-prose text-sm space-y-1 text-muted-foreground">
             {example.stepByStep.map((step, index) => (
               <li key={index} className="flex">
                 <span className="mr-2 font-medium">{index + 1}.</span>

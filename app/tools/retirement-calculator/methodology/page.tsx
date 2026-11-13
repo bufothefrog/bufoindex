@@ -4,6 +4,7 @@
  */
 
 import 'katex/dist/katex.min.css';
+import { Container } from '@/components/ui/layouts/ResponsiveGrid';
 import { MethodologyLayout } from '@/components/methodology/MethodologyLayout';
 import { renderFormula } from '@/components/methodology/renderLatex';
 import { formulaRegistry } from '@/lib/formulas/registry';
@@ -28,7 +29,9 @@ export default function RetirementMethodologyPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    // The shared Container, padded like a calculator page from sm up, so the
+    // content's left edge lines up with the calculator grid; phones keep px-4.
+    <Container className="px-4 py-8 sm:px-6">
       <MethodologyLayout
         calculatorName="retirement-calculator"
         title="Retirement Calculator Methodology"
@@ -36,7 +39,7 @@ export default function RetirementMethodologyPage() {
         formulas={groupedFormulas}
         metadata={metadata}
       />
-    </div>
+    </Container>
   );
 }
 
