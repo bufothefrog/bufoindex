@@ -35,6 +35,7 @@ import { STATE_TAX_RATES_2026 } from '@/lib/constants/states-2026';
 import { DEFAULT_FINANCING_RATE, SHORT_RATE_ASSUMPTION, SWAP_FINANCING_SPREAD } from '@/lib/constants/leverage';
 import { withDerivedValues } from '@/lib/profile/derived';
 import { getFICARate } from '@/lib/utils';
+import { rawWith, v3DefaultRaw } from '@/test/factories/accountsFixtures';
 
 /** The 25 leaves of the v1 profile, as v1 listed them. */
 const V1_LEAF_PATHS = [
@@ -122,10 +123,18 @@ describe('getDefaultFinancialProfile', () => {
         afterTaxAvailable: false,
       },
       hsa: { eligible: false, coverage: 'individual', monthlyContribution: 0, employerAnnualContribution: 0, investing: false },
-      ira: { traditional: false, roth: false, traditionalMonthly: 0, rothMonthly: 0 },
+      ira: {
+        traditional: false,
+        roth: false,
+        traditionalMonthly: 0,
+        rothMonthly: 0,
+        traditionalTiming: 'monthly',
+        rothTiming: 'monthly',
+      },
       investing: {
         monthlyContribution: null,
         taxableMonthlyContribution: 500,
+        taxableTiming: 'monthly',
         targetMix: '80-20',
       },
       retirementIncome: { socialSecurityBenefit: null, socialSecurityAge: 67, annualHealthcareCost: null },
@@ -283,7 +292,8 @@ describe('v1 leaves, sections and preset constants', () => {
 
 describe('path registry', () => {
   it('lists every leaf of the default profile once, in section order', () => {
-    expect(PROFILE_LEAF_PATHS).toHaveLength(62);
+    // 62 at ec300fd; PR 5 adds the three contribution timing leaves.
+    expect(PROFILE_LEAF_PATHS).toHaveLength(65);
     expect(new Set(PROFILE_LEAF_PATHS).size).toBe(PROFILE_LEAF_PATHS.length);
     expect(PROFILE_LEAF_PATHS.slice(0, 5)).toEqual([
       'person.age',
@@ -823,5 +833,40 @@ describe('applyProfileWrites', () => {
       balance: 0,
       holdsEmergencyFund: false,
     });
+  });
+});
+
+describe('contribution timing leaves (PR 5)', () => {
+  it('fills the three leaves with monthly on an ec300fd payload, keeping version 3 and provided', () => {
+    const raw = v3DefaultRaw();
+    expect(raw.ira).not.toHaveProperty('rothTiming');
+    expect(raw.investing).not.toHaveProperty('taxableTiming');
+    const answered = { ...raw, provided: ['person.age'] };
+    const loaded = normalizeProfile(answered);
+    expect(loaded.version).toBe(3);
+    expect(loaded.ira.traditionalTiming).toBe('monthly');
+    expect(loaded.ira.rothTiming).toBe('monthly');
+    expect(loaded.investing.taxableTiming).toBe('monthly');
+    expect(loaded.provided).toEqual(['person.age']);
+    expect(normalizeProfile(raw).provided).toEqual([]);
+  });
+
+  it('reads an invalid stored value as monthly', () => {
+    const raw = rawWith({ 'ira.rothTiming': 'weekly', 'investing.taxableTiming': 3 });
+    const loaded = normalizeProfile(raw);
+    expect(loaded.ira.rothTiming).toBe('monthly');
+    expect(loaded.investing.taxableTiming).toBe('monthly');
+    expect(isValidProfileValue('ira.rothTiming', 'weekly')).toBe(false);
+    expect(isValidProfileValue('ira.traditionalTiming', 'yearStart')).toBe(true);
+  });
+
+  it('round-trips an answered yearStart', () => {
+    const loaded = normalizeProfile(rawWith({ 'ira.rothTiming': 'yearStart' }));
+    expect(loaded.ira.rothTiming).toBe('yearStart');
+    expect(loaded.provided).toContain('ira.rothTiming');
+    expect(normalizeProfile(JSON.parse(JSON.stringify(loaded)))).toEqual(loaded);
+    const written = applyProfileWrites(getDefaultFinancialProfile(), [{ path: 'investing.taxableTiming', value: 'yearStart' }]);
+    expect(written.accepted).toEqual(['investing.taxableTiming']);
+    expect(written.profile.investing.taxableTiming).toBe('yearStart');
   });
 });

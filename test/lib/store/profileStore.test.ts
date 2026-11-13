@@ -404,7 +404,13 @@ describe('rehydration from localStorage', () => {
     // The v1 new cash is no leaf: it is dropped and not moved anywhere. The
     // invested balance and the monthly contribution were not answered, so
     // they give way to the example accounts and to Auto.
-    expect(profile.investing).toEqual({ monthlyContribution: null, taxableMonthlyContribution: 900, targetMix: '60-40' });
+    // Normalization fills the timing leaf (new in PR 5) with its default.
+    expect(profile.investing).toEqual({
+      monthlyContribution: null,
+      taxableMonthlyContribution: 900,
+      taxableTiming: 'monthly',
+      targetMix: '60-40',
+    });
     expect(profile.portfolio).toEqual(getDefaultFinancialProfile().portfolio);
     expect(profile.assumptions).toEqual(getDefaultFinancialProfile().assumptions);
     expect(profile.provided).toEqual(['person.age']);

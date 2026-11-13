@@ -118,7 +118,13 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.cash).toEqual({ ...V1_ALL_PROVIDED.cash, targetMonths: 3 });
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
     // The answered monthly contribution is the Custom monthly investing figure.
-    expect(p.investing).toEqual({ monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
+    // Normalization fills the timing leaf (new in PR 5) with its default.
+    expect(p.investing).toEqual({
+      monthlyContribution: 2200,
+      taxableMonthlyContribution: 900,
+      taxableTiming: 'monthly',
+      targetMix: '60-40',
+    });
     expect(p.investing).not.toHaveProperty('newCashThisMonth');
     expect(p.investing).not.toHaveProperty('investedBalance');
     expect(p.strategy).toEqual({ leverageRatio: 1.5 });

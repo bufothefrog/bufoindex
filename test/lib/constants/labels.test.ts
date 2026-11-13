@@ -17,6 +17,8 @@ import {
   ACCOUNT_TYPE_OPTIONS,
   BONUS_FREQUENCY_LABELS,
   BONUS_FREQUENCY_OPTIONS,
+  CONTRIBUTION_TIMING_LABELS,
+  CONTRIBUTION_TIMING_OPTIONS,
   CONTRIBUTION_TYPE_LABELS,
   CONTRIBUTION_TYPE_OPTIONS,
   FILING_STATUS_META,
@@ -75,6 +77,7 @@ const VOCABULARIES: Array<{
   },
   { name: 'HSA coverage', values: ['individual', 'family'], labels: HSA_COVERAGE_LABELS, options: HSA_COVERAGE_OPTIONS },
   { name: 'contribution type', values: ['traditional', 'roth', 'split'], labels: CONTRIBUTION_TYPE_LABELS, options: CONTRIBUTION_TYPE_OPTIONS },
+  { name: 'contribution timing', values: ['monthly', 'yearStart'], labels: CONTRIBUTION_TIMING_LABELS, options: CONTRIBUTION_TIMING_OPTIONS },
   { name: 'leverage ratio', values: LEVERAGE_RATIO_OPTIONS, labels: LEVERAGE_RATIO_LABELS, options: leverageRatioOptions() },
 ];
 

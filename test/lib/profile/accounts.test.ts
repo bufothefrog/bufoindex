@@ -10,6 +10,7 @@ import { setNewCash } from '@/lib/calculators/portfolio/accountWrites';
 import { engineAccounts } from '@/lib/calculators/portfolio/bindings';
 import { emergencyFundHeldText } from '@/lib/fields/shared';
 import { ACCOUNT_KIND_LABELS, ACCOUNT_KIND_OPTIONS } from '@/lib/constants/labels';
+import { normalizeProfile } from '@/lib/profile/defaults';
 import {
   ACCOUNT_KINDS,
   ACCOUNT_PATHS,
@@ -42,6 +43,7 @@ import {
   rebalanceCandidates,
   rebalancedAccounts,
   split401k,
+  yearStartInvesting,
   yearlyRegularPay,
   type AccountRow,
 } from '@/lib/profile/accounts';
@@ -51,6 +53,7 @@ import {
   capsRaw,
   getOf,
   ownerRaw,
+  ownerYearStartRaw,
   rawWith,
   v3DefaultRaw,
 } from '@/test/factories/accountsFixtures';
@@ -602,5 +605,58 @@ describe('not rebalanced reasons', () => {
     const zero = rawWith({ 'portfolio.newCash': [{ id: 'acc-z', amount: 0 }] }, [], raw);
     expect(newCashFor(getOf(zero), 'acc-z')).toBe(0);
     expect(rebalancedAccounts(getOf(zero))).toEqual([]);
+  });
+});
+
+describe('yearStartInvesting: the parts paid once a year at the start', () => {
+  it('is 0 for the default (every part monthly; the ec300fd payload has no timing leaves)', () => {
+    expect(yearStartInvesting(getOf(v3DefaultRaw()))).toBe(0);
+    expect(yearStartInvesting(getOf(normalizeProfile(v3DefaultRaw())))).toBe(0);
+  });
+
+  it('is 12 x 625 = 7,500 for the owner with the Roth IRA once a year; the monthly total stays 3,195', () => {
+    const get = getOf(ownerYearStartRaw());
+    expect(yearStartInvesting(get)).toBe(7500);
+    expect(monthlyInvestingAuto(get)).toBe(3195);
+    expect(monthlyInvestingAuto(getOf(v3DefaultRaw()))).toBe(1540);
+  });
+
+  it('is 12 x 500 = 6,000 for the default with taxable once a year', () => {
+    expect(yearStartInvesting(getOf(rawWith({ 'investing.taxableTiming': 'yearStart' })))).toBe(6000);
+  });
+
+  it('sums the yearly parts: traditional 100 and Roth 625 and taxable 400 once a year gives 12 x 1,125 = 13,500', () => {
+    const raw = rawWith(
+      {
+        'ira.traditional': true,
+        'ira.traditionalMonthly': 100,
+        'ira.traditionalTiming': 'yearStart',
+        'investing.taxableTiming': 'yearStart',
+      },
+      undefined,
+      ownerYearStartRaw()
+    );
+    expect(yearStartInvesting(getOf(raw))).toBe(13500);
+  });
+
+  it('is 0 under a Custom monthly investing figure (all monthly)', () => {
+    const raw = rawWith({ 'investing.monthlyContribution': 300 }, undefined, ownerYearStartRaw());
+    expect(yearStartInvesting(getOf(raw))).toBe(0);
+  });
+
+  it('is 0 for a part that is off, and counts any other leaf value as monthly', () => {
+    expect(yearStartInvesting(getOf(rawWith({ 'ira.roth': false }, undefined, ownerYearStartRaw())))).toBe(0);
+    expect(yearStartInvesting(getOf(rawWith({ 'ira.rothTiming': 'weekly' }, undefined, ownerRaw())))).toBe(0);
+  });
+
+  it('reads all three timing leaves under the default profile, where both IRAs are off', () => {
+    const read: string[] = [];
+    const base = getOf(v3DefaultRaw());
+    yearStartInvesting((path) => {
+      read.push(path);
+      return base(path);
+    });
+    expect(read[0]).toBe('investing.monthlyContribution');
+    expect(read).toEqual(expect.arrayContaining(['ira.traditionalTiming', 'ira.rothTiming', 'investing.taxableTiming']));
   });
 });

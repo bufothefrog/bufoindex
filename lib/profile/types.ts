@@ -30,6 +30,7 @@ import type {
   RebalanceMode,
   Security,
 } from '@/lib/calculations/portfolioRebalancing';
+import type { ContributionTiming } from '@/lib/calculations/contributionSchedule';
 import type { RetirementInputs } from '@/lib/calculations/retirement';
 import type { AccountRow, NewCashRow } from './accountTypes';
 import type {
@@ -39,6 +40,8 @@ import type {
   IncomeData,
   UserPreferences,
 } from '@/lib/types';
+
+export type { ContributionTiming };
 
 export type PayFrequency = 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly';
 
@@ -135,8 +138,14 @@ export interface FinancialProfile {
   ira: {
     traditional: boolean;
     roth: boolean;
+    /** Monthly-equivalent dollars (625 = 7,500 a year). */
     traditionalMonthly: number;
+    /** Monthly-equivalent dollars (625 = 7,500 a year). */
     rothMonthly: number;
+    /** Calculator-only. 'yearStart': 12 x traditionalMonthly at the start of each simulated year. Default 'monthly'. */
+    traditionalTiming: ContributionTiming;
+    /** Calculator-only. 'yearStart': 12 x rothMonthly at the start of each simulated year. Default 'monthly'. */
+    rothTiming: ContributionTiming;
   };
   investing: {
     /**
@@ -146,6 +155,12 @@ export interface FinancialProfile {
     monthlyContribution: number | null;
     /** Portion of the monthly contribution going to a taxable brokerage. */
     taxableMonthlyContribution: number;
+    /**
+     * Calculator-only. 'yearStart': 12 x taxableMonthlyContribution at the
+     * start of each simulated year. Default 'monthly'. A Custom
+     * monthlyContribution is always all monthly.
+     */
+    taxableTiming: ContributionTiming;
     targetMix: TargetMixPreset;
   };
   retirementIncome: {

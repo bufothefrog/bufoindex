@@ -11,7 +11,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { RetirementInputs } from '@/lib/calculations/retirement';
+import { calculateProjectedBalance, type RetirementInputs } from '@/lib/calculations/retirement';
+import { yearStartInvesting } from '@/lib/profile/accounts';
 import { RETIREMENT_BINDINGS, RETIREMENT_ENGINE_ONLY, filingStatusNote, retirementFilingStatus } from '@/lib/calculators/retirement/bindings';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
@@ -22,7 +23,7 @@ import { resolveSocialSecurityBenefit } from '@/lib/calculators/retirement/socia
 import type { Write } from '@/lib/fields/types';
 import type { FilingStatus, FinancialProfile, PayFrequency, ProfilePatch } from '@/lib/profile/types';
 import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
-import { ownerRaw } from '@/test/factories/accountsFixtures';
+import { ownerRaw, ownerYearStartRaw, rawWith } from '@/test/factories/accountsFixtures';
 import { retirementHeadline } from '@/lib/calculators/retirement/headline';
 
 /**
@@ -60,6 +61,7 @@ const LEAVES: Readonly<Record<keyof RetirementInputs, true>> = {
   riskProfile: true,
   effectiveTaxRate: true,
   estimatedAnnualHealthcareCost: true,
+  yearStartSavings: true,
 };
 
 const CUSTOM_V1: ProfilePatch = {
@@ -98,6 +100,8 @@ const DEFAULT_INPUTS: RetirementInputs = {
   riskProfile: 'tdf',
   effectiveTaxRate: null,
   estimatedAnnualHealthcareCost: null,
+  // New in PR 5, not from the old mapper: the yearly parts of Auto monthly investing (none here).
+  yearStartSavings: 0,
 };
 
 describe('golden: engineInputsFor equals the old mapper output for v1-shaped profiles', () => {
@@ -165,6 +169,8 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       riskProfile: 'tdf',
       effectiveTaxRate: null,
       estimatedAnnualHealthcareCost: null,
+      // Every part monthly (the timing leaves default to 'monthly').
+      yearStartSavings: 0,
     });
   });
 
@@ -300,6 +306,7 @@ describe('every RetirementInputs leaf is bound or engine-only', () => {
       'incomePeriod',
       'monthlySavings',
       'startingBalance',
+      'yearStartSavings',
     ]);
     for (const [leaf, reason] of Object.entries(RETIREMENT_ENGINE_ONLY)) {
       expect(reason.length, leaf).toBeGreaterThan(0);
@@ -403,5 +410,77 @@ describe('profile v3: the account list and monthly investing feed the projection
     expect(scenario('coast-mode').name).toBe('Coast: Save only $770/month (enjoy extra $770/month now)');
     expect(scenario('coast-mode').projectedBalance).toBeCloseTo(3215351.5697522396, 4);
     expect(scenario('coast-mode').successProbability).toBeCloseTo(0.973, 10);
+  });
+});
+
+describe('PR 5: contribution timing reaches the engine through yearStartSavings', () => {
+  const ownerYearly = () => engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerYearStartRaw()));
+
+  it('binds yearStartSavings once, from yearStartInvesting', () => {
+    const read = RETIREMENT_BINDINGS.filter((binding) => binding.engine === 'yearStartSavings');
+    expect(read).toHaveLength(1);
+    expect(isDerivedBinding(read[0]) && read[0].read).toBe(yearStartInvesting);
+  });
+
+  it('the owner with the Roth IRA once a year: 3,195 a month in total, 7,500 of it at the start of each year', () => {
+    const inputs = ownerYearly();
+    expect(inputs.monthlySavings).toBe(3195);
+    expect(inputs.yearStartSavings).toBe(7500);
+    // Untouched timing: 0, as for the default.
+    expect(engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerRaw())).yearStartSavings).toBe(0);
+  });
+
+  it('pins the owner yearly figures (13,394,066.77 and 0.9985% with every part monthly)', () => {
+    const inputs = ownerYearly();
+    const results = RETIREMENT_CALCULATOR.calculate(inputs);
+    const headline = Object.fromEntries(retirementHeadline(results, inputs, 'nominal').map((stat) => [stat.id, stat.value]));
+    expect(headline.success).toBe(1);
+    expect(headline.projected).toBeCloseTo(13494440.92, 1);
+    expect(results.initialWithdrawalRate).toBeCloseTo(0.009911010780006283, 10);
+    const scenario = (id: string) => results.scenarios.find((each) => each.id === id)!;
+    expect(scenario('early-retirement').projectedBalance).toBeCloseTo(9566204.34, 1);
+    // Half of 3,195 is 1,597.50; the yearly part keeps its share: 7,500 x 1,597.5 / 3,195 = 3,750.
+    expect(scenario('coast-mode').name).toBe('Coast: Save only $1,598/month (enjoy extra $1,598/month now)');
+    expect(scenario('coast-mode').projectedBalance).toBeCloseTo(8089940.96, 1);
+    const conservative = scenario('conservative-wealth-building');
+    expect(conservative.name).toBe('Conservative: $2,700/month, leave $25,126,000 legacy');
+    expect(conservative.title).toHaveLength(5);
+    const [lead, income, middle, legacy, tail] = conservative.title!;
+    expect([lead, middle, tail]).toEqual(['Conservative: ', '/month, leave ', ' legacy']);
+    expect(income).toMatchObject({ basis: 'today', yearsFromNow: 40, roundTo: 100 });
+    // 41,000 x 0.8 / 12.
+    expect((income as { amount: number }).amount).toBeCloseTo(2733.3333333333335, 9);
+    expect(legacy).toMatchObject({ basis: 'nominal', yearsFromNow: 65, roundTo: 1000 });
+    expect((legacy as { amount: number }).amount).toBeCloseTo(25126020.89, 1);
+  });
+
+  it('the default with a Roth IRA of 625 once a year (2,165 a month in total, 7,500 yearly)', () => {
+    const profile = normalizeProfile(
+      rawWith({ 'ira.roth': true, 'ira.rothMonthly': 625, 'ira.rothTiming': 'yearStart' })
+    );
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, profile);
+    expect(inputs.monthlySavings).toBe(2165);
+    expect(inputs.yearStartSavings).toBe(7500);
+    expect(calculateProjectedBalance(inputs)).toBeCloseTo(7991322.893346089, 6);
+    // Age 25 to 26 at 9.4%: (25,000 + 7,500) x 1.094 + 1,540 x (1.094 - 1) / (1.094^(1/12) - 1).
+    expect(RETIREMENT_CALCULATOR.calculate(inputs).netWorthByAge[26]).toBeCloseTo(54818.27, 1);
+    // The same plan paid monthly (measured at ec300fd): 7,890,948.734314326.
+    expect(calculateProjectedBalance({ ...inputs, yearStartSavings: 0 })).toBeCloseTo(7890948.734314326, 6);
+  });
+
+  it('the default projection stays bit-identical', () => {
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile());
+    expect(inputs.yearStartSavings).toBe(0);
+    expect(calculateProjectedBalance(inputs)).toBe(5796147.137288305);
+  });
+
+  it('falling short (default inputs, no balance, 300 a month, 60,000 target): the full solution is unchanged', () => {
+    const base = engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile());
+    const inputs = { ...base, startingBalance: 0, monthlySavings: 300, targetIncome: 60000 };
+    const scenarios = RETIREMENT_CALCULATOR.calculate(inputs).scenarios;
+    expect(scenarios.find((each) => each.id === 'full-solution')?.name).toBe('Save extra $1,219/month \u2192 Meet goal');
+    const without: RetirementInputs = { ...inputs };
+    delete without.yearStartSavings;
+    expect(RETIREMENT_CALCULATOR.calculate(without).scenarios).toEqual(scenarios);
   });
 });

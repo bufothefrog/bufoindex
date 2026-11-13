@@ -4,7 +4,8 @@
  * page shows them all; the retirement intake asks the profile screens after
  * the core (the shared accounts screen and the target). Monthly investing
  * is a calculator-only control: Auto is the sum of the normal
- * contributions, Custom one run's own figure. The optional Social Security and healthcare
+ * contributions, Custom one run's own figure; on Auto, the IRA and taxable
+ * parts may each be paid once a year at the start instead of monthly. The optional Social Security and healthcare
  * screen is asked by the profile form only, the claiming age is a
  * calculator-only control, and the assumptions are a collapsed card on the
  * page. The basics are the core facts the
@@ -39,6 +40,8 @@ import {
   EFFECTIVE_TAX_RATE,
   HEALTHCARE_COST_MULTIPLIER,
   INFLATION_RATE,
+  IRA_ROTH_TIMING,
+  IRA_TRADITIONAL_TIMING,
   LIFE_EXPECTANCY,
   LIFE_EXPECTANCY_AFTER_RETIREMENT,
   RETIREMENT_RETURN,
@@ -46,6 +49,7 @@ import {
   SOCIAL_SECURITY_AGE,
   SOCIAL_SECURITY_BENEFIT,
   TARGET_RETIREMENT_INCOME,
+  TAXABLE_TIMING,
   VOLATILITY,
 } from './fields';
 
@@ -103,6 +107,9 @@ export const RETIREMENT_FORM: FormSpec = {
     ...BASICS,
     ACCOUNTS,
     MONTHLY_SAVINGS,
+    IRA_TRADITIONAL_TIMING,
+    IRA_ROTH_TIMING,
+    TAXABLE_TIMING,
     RETIRE_AT,
     TARGET_RETIREMENT_INCOME,
     LIFE_EXPECTANCY,
@@ -122,12 +129,13 @@ export const RETIREMENT_FORM: FormSpec = {
     ACCOUNTS_SCREEN,
     {
       // Calculator-only: Auto follows the contribution answers, so the
-      // profile does not ask it (Surface in lib/fields/types.ts).
+      // profile does not ask it (Surface in lib/fields/types.ts). The timing
+      // choices show for the IRA and taxable parts in use while Auto is on.
       id: 'monthly-investing',
       title: 'Monthly investing',
       tier: 'details',
       surface: 'calculator',
-      fields: [MONTHLY_SAVINGS.path],
+      fields: [MONTHLY_SAVINGS.path, IRA_TRADITIONAL_TIMING.path, IRA_ROTH_TIMING.path, TAXABLE_TIMING.path],
     },
     {
       id: 'target',
