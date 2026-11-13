@@ -109,8 +109,8 @@ const toCents = (value: number) => Math.round(value * 100) / 100;
  * income falls in for their filing status. Taxable income is yearly gross
  * pay (paychecks plus a regular bonus) minus the pre-tax payroll
  * contributions the profile describes (the traditional share of the 401(k)
- * election on regular pay, and HSA payroll contributions, each capped at its
- * 2026 limit) minus the standard deduction. The arithmetic is lib/calculations/taxBracket.ts.
+ * election on regular pay, after the whole election is capped at the 2026
+ * deferral limit, and HSA payroll contributions capped at their 2026 limit) minus the standard deduction. The arithmetic is lib/calculations/taxBracket.ts.
  */
 export function currentBracketFrom(get: Get): number {
   const income = incomeFrom(get);
@@ -118,10 +118,16 @@ export function currentBracketFrom(get: Get): number {
   const yearlyGross = yearlyPay + income.bonusExpected * 12;
   const age = get(AGE.path) as number;
   // Each deduction is capped at its 2026 limit for the age, as the engine
-  // applies them: the 402(g) deferral limit for the traditional share, and
-  // the HSA limit for the coverage less the employer's money for the HSA.
+  // applies them. The 402(g) deferral limit covers traditional and Roth
+  // deferrals together: the whole election is capped first and the
+  // traditional share of the capped total is pre-tax (the engine's
+  // preTaxDeferralShare pro-rates a split election the same way). The HSA is
+  // capped at the limit for the coverage less the employer's money.
+  const election = electionFrom(get);
+  const electedShare = election.traditional + election.roth;
+  const deferral = Math.min(yearlyPay * electedShare, limit401k(age));
   const traditional401k =
-    get('workplace.has401k') === true ? Math.min(yearlyPay * electionFrom(get).traditional, limit401k(age)) : 0;
+    get('workplace.has401k') === true && electedShare > 0 ? (deferral * election.traditional) / electedShare : 0;
   const hsaRoom = Math.max(
     0,
     limitHsa(get('hsa.coverage') as HSABenefits['coverageType'], age) - (get('hsa.employerAnnualContribution') as number)

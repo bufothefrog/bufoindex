@@ -505,6 +505,25 @@ describe('the computed federal bracket', () => {
     expect(bracketOf(9500, [...election, { path: 'person.age', value: 55 }])).toBe(0.24);
   });
 
+  it('caps a split election as a whole before taking its traditional share', () => {
+    // The reviewer's probe, which sits on the two sides of the single 24% / 32% edge (201,775):
+    // single, age 30, 9,100 every two weeks: 9,100 x 26 = 236,600 of pay.
+    // 30% elected, 15% of it Roth: 70,980 elected, capped at the 24,500 limit (traditional and
+    // Roth together); traditional share 15 / 30 = 0.5 of it: 12,250 pre-tax.
+    // 236,600 - 12,250 - 16,100 = 208,250: 32%.
+    // (Capping the traditional 15% alone, 35,490 to 24,500, gives 236,600 - 24,500 - 16,100 = 196,000: 24%.)
+    const split: Write[] = [
+      { path: 'workplace.contributionType', value: 'split' },
+      { path: 'workplace.contributionPercent', value: 0.3 },
+      { path: 'workplace.rothContributionPercent', value: 0.15 },
+    ];
+    expect(bracketOf(9100, split)).toBe(0.32);
+    // All traditional, the same 30%: 24,500 pre-tax, 196,000: 24%.
+    expect(bracketOf(9100, [...split, { path: 'workplace.contributionType', value: 'traditional' }])).toBe(0.24);
+    // All Roth: nothing pre-tax, 236,600 - 16,100 = 220,500: 32%.
+    expect(bracketOf(9100, [...split, { path: 'workplace.contributionType', value: 'roth' }])).toBe(0.32);
+  });
+
   it('caps the HSA deduction at the coverage limit less the employer money', () => {
     const hsa = (employer: number): Write[] => [
       { path: 'hsa.eligible', value: true },
