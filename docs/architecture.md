@@ -76,6 +76,9 @@ There is no backend and no URL-hash sharing: links into a calculator carry only 
 
 `CalculatorPage` (`components/calculators/shared/CalculatorPage.tsx`) is the one calculator shell: it reads the registry entry (`lib/calculators/registry.ts`), renders the form's sections and the results inside `CalculatorLayout`, and submits each profile change to the run store.
 
+- **Inputs placement.** `CalculatorLayout`, `CalculatorPage` and `ResponsiveGrid` take a developer prop `inputsPlacement` (`'beside'` by default: inputs and results in two columns from `lg`; `'above'`: from `lg` the input sections sit in one row above full-width results, and they start collapsed to their summary line). Only the leverage comparison passes `'above'`; it is fixed in code per calculator, not a visitor setting.
+- **`useMediaQuery`** (`components/ui/layouts/useMediaQuery.ts`) reads a CSS media query through `useSyncExternalStore`; `LG_MEDIA_QUERY` mirrors Tailwind's `lg` (`(min-width: 64rem)`). The server and the first client render see `false`, so an `'above'` page folds its cards right after hydration on desktop.
+
 ## Accounts: one list of what the visitor owns
 
 `portfolio.accounts` is the single record of the visitor's money. Every balance a calculator needs (the invested total, the IRA balances, the emergency fund when an account holds it) and the monthly investing total are computed from it and from the contribution answers; none of them is asked a second time.

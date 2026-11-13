@@ -218,7 +218,9 @@ render as one `FieldSection` card each, in three tiers (`Tier` in
 Results follow the inputs live (O8): there is no Calculate button. On
 invalid inputs the last results stay on screen, marked stale (O17). Below
 `lg` the layout shows an Inputs | Results tab bar and a sticky bar whose one
-action is See results / Edit inputs; on desktop the two-column layout stays.
+action is See results / Edit inputs; on desktop the two-column layout stays,
+except on the leverage comparison, whose few inputs sit as a row of collapsed
+cards (each showing its one-line summary) above full-width results.
 
 Field tiering per calculator (current fields, grouped):
 
