@@ -4,7 +4,8 @@ Branch claude/next-1-cleanup-and-fixes, base 87e8bfb, target branch "next".
 The site owner asked for the stack on 2026-11-12: "this was a lot of info at
 once. create a stack for the PRs and we can merge to next and develop against
 that for now", and said "we do not need to preserve any functionality from old
-version of website." Old-site parity is not a goal. Calculator numbers for a
+version of website." This PR reads that sentence as: old-site parity is not a
+goal. Calculator numbers for a
 given profile do not change in this PR; lib/calculations/**,
 test/lib/calculations/**, package.json and package-lock.json are untouched.
 
@@ -16,6 +17,8 @@ Commits (git log --oneline 87e8bfb..HEAD):
 - df80630 a6-agreed-decisions
 - 883ec03 a7-compact-summaries
 - review fixes: one fix(next) commit per slice touched (a2, a4, a5, a6, a7)
+- recheck fixes: the planned-age label on the savings chart (a2), this note,
+  and the CI triggers for "next"
 
 ## What changed per slice
 
@@ -38,6 +41,12 @@ Commits (git log --oneline 87e8bfb..HEAD):
   sit on opposite sides of the dashed line, the dot's label on the far side
   of the dot (savingsRateLabelPositions), so neither crosses the line or the
   other label.
+- Recheck fix: at late retirement ages the dot sits low and at the right edge,
+  and "Retire at 70" ran into the x-axis and was clipped ("Retire at 7C").
+  savingsRateLabelPositions now works in chart pixels: the label goes above
+  the dot when there is no room below, beside it or over the line when
+  neither fits, and is anchored inward near the SVG edges. A test sweeps every
+  plotted age at 326, 296 and 900 px wide; at age 60 the labels are as before.
 
 ### a4-one-dollar-mode
 - Leverage comparison, the /overview retirement and leverage cards and
@@ -118,7 +127,7 @@ Commits (git log --oneline 87e8bfb..HEAD):
 
 ## Deferred and why
 - Light-mode contrast of red text (3.76:1 on white), red on light muted (3.43:1)
-  and the filled light destructive button (3.59:1): the decision covered dark
+  and the filled light destructive button (3.59:1): the a6 task covered dark
   mode only.
 - Wizard error box and the layout's "fields need attention" line keep their
   dark:text-foreground override; dropping it is a separate visual choice.
@@ -137,7 +146,10 @@ Commits (git log --oneline 87e8bfb..HEAD):
   with "New cash must be at least $0." (mention in the PR description).
 - Old site keys ('retirement-calculator', 'paycheck-allocator-storage') stay in
   localStorage unread; a v1 'bufo-profile' is rewritten as v2 and loses its
-  new-cash value and old displayMode. Covered by the owner's sentence.
+  new-cash value and old displayMode. The owner wrote "we do not need to
+  preserve any functionality from old version of website"; treating the
+  orphaned keys and the dropped v1 new-cash value as covered by that sentence
+  is this PR's reading of it, not a separate decision by the owner.
 - Not done (nits): the Calculators list does not close when focus tabs past
   it; the home link sits outside the Site nav landmark; the header is tight
   at 320 px; the /demo tooltip fixture has no dollar suffix.
@@ -159,5 +171,7 @@ Commits (git log --oneline 87e8bfb..HEAD):
   components/ui/layouts/CalculatorLayout.tsx.
 - Components that scroll to an input on the phone layout should use the
   topInset that revealInputs passes to onShown.
+- CI: .github/workflows/test.yml now runs on pushes to main and next and on
+  pull requests into main, next and claude/**, so PRs into next get checks.
 - Gates on this tree: type-check, lint --max-warnings=0, test:coverage, Node 24
   suite and build all pass.
