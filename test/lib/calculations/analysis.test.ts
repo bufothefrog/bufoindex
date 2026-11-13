@@ -132,6 +132,21 @@ describe('identifySkippedOptimizations', () => {
       const items = identifySkippedOptimizations(profile)
       expect(findItem(items, 'large-emergency-fund-target')).toBeUndefined()
       expect(findItem(items, 'no-emergency-fund')).toBeDefined()
+      // When the allocation funds the emergency step, it is not listed as deprioritized.
+      const funded = identifySkippedOptimizations(profile, [
+        {
+          id: 'emergency-fund-completion',
+          account: 'Emergency Fund',
+          amount: 500,
+          percentage: 0.2,
+          priority: 4,
+          reasoning: '',
+          taxImpact: 0,
+          category: 'emergency_fund',
+          implementation: '',
+        },
+      ])
+      expect(findItem(funded, 'no-emergency-fund')).toBeUndefined()
     })
 
     it('flags a low emergency fund APY with simple (non-compounded) ten-year cost', () => {

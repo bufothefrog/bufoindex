@@ -1,16 +1,24 @@
-import { PaycheckProfile, SkippedItem } from '../types';
+import { AllocationItem, PaycheckProfile, SkippedItem } from '../types';
 import { formatCurrency, formatPercent, calculateOpportunityCost } from './core';
 import { calculateIncomeTaxRate } from '../utils';
 import { monthlyRateOf } from './contributionSchedule';
 
 /**
- * Identify optimization opportunities and surface deprioritized items
+ * Identify optimization opportunities and surface deprioritized items.
+ * `allocations` is the allocator's own list: an emergency-fund step funded
+ * there is not reported as deprioritized.
  */
-export function identifySkippedOptimizations(profile: PaycheckProfile): SkippedItem[] {
+export function identifySkippedOptimizations(
+  profile: PaycheckProfile,
+  allocations: readonly AllocationItem[] = []
+): SkippedItem[] {
   const skippedItems: SkippedItem[] = [];
   
   // Check emergency fund optimization
-  const emergencyFundOptimization = analyzeEmergencyFund(profile);
+  const emergencyFundOptimization = analyzeEmergencyFund(
+    profile,
+    allocations.some((allocation) => allocation.category === 'emergency_fund')
+  );
   if (emergencyFundOptimization) {
     skippedItems.push(emergencyFundOptimization);
   }
@@ -99,7 +107,7 @@ function cashHoldingEducation(subject: string, apy: number, cost: CashHoldingCos
 /**
  * Analyze emergency fund with enhanced opportunity cost calculations
  */
-function analyzeEmergencyFund(profile: PaycheckProfile): SkippedItem | null {
+function analyzeEmergencyFund(profile: PaycheckProfile, emergencyStepFunded = false): SkippedItem | null {
   const monthlyExpenses = profile.preferences.necessaryExpenses;
   const targetMonths = profile.preferences.emergencyFundMonths;
   const currentEmergencyFund = profile.preferences.currentEmergencyFund;
@@ -188,8 +196,14 @@ function analyzeEmergencyFund(profile: PaycheckProfile): SkippedItem | null {
   
   // Case 4: Zero emergency fund with conservative/moderate risk tolerance.
   // A risk note, not a priced trade-off: the costs stay at zero and the copy
-  // carries no dollar framing for the card to render.
-  if (monthsCovered !== null && monthsCovered < 1 && profile.preferences.riskTolerance !== 'optimizer') {
+  // carries no dollar framing for the card to render. Not reported when the
+  // allocation already funds the emergency step: it is not deprioritized then.
+  if (
+    !emergencyStepFunded &&
+    monthsCovered !== null &&
+    monthsCovered < 1 &&
+    profile.preferences.riskTolerance !== 'optimizer'
+  ) {
     return {
       id: 'no-emergency-fund',
       item: 'Insufficient Emergency Fund',

@@ -921,6 +921,8 @@ describe('the single emergency step on the site default profile', () => {
     expect(card.allocation).toBe(emergency)
     expect(card.urgencyLevel).toBe('important')
     expect(card.recommendation).toBe('Building emergency fund')
+    // The funded emergency step is not also listed as deprioritized.
+    expect(result.skippedItems.map((item) => item.id)).not.toContain('no-emergency-fund')
   })
 
   it('fund 1,000: 6,973 more needed', () => {
@@ -950,6 +952,35 @@ describe('the single emergency step on the site default profile', () => {
     expect(result.allocations[1].implementation).toBe(
       'Save $92 per paycheck toward the 3-month emergency fund ($8,908 more needed)'
     )
+  })
+
+  it('below one month with a 6-month target: the one step can take everything the later steps used to get', () => {
+    // Monthly pay 10,000 net, 2,000 necessary, no fun money, no match, no HSA, no debt:
+    // available = 10,000 - 2,000 = 8,000. Target 6 x 2,000 = 12,000, cash 0, so the step
+    // takes min(12,000, 8,000) = 8,000 and nothing flows to the IRA or taxable steps
+    // (at ec300fd the one-month step took 2,000 and the rest flowed down).
+    const profile = createPaycheckProfile({
+      income: { ...createPaycheckProfile().income, frequency: 'monthly', netPaycheck: 10000, grossPaycheck: 12000 },
+      debts: [],
+      benefits: {
+        ...createPaycheckProfile().benefits,
+        employer401k: { ...createPaycheckProfile().benefits.employer401k, available: false },
+        hsa: { ...createPaycheckProfile().benefits.hsa, eligible: false },
+      },
+      preferences: {
+        ...createPaycheckProfile().preferences,
+        necessaryExpenses: 2000,
+        currentEmergencyFund: 0,
+        emergencyFundMonths: 6,
+        funMoney: { min: 0, max: 0, current: 0 },
+      },
+    })
+    const result = calculateOptimalAllocation(profile)
+    expect(result.allocations.map((a) => [a.account, a.amount])).toEqual([['Emergency Fund', 8000]])
+    expect(result.allocations[0].implementation).toBe(
+      'Save $8,000 per paycheck toward the 6-month emergency fund ($4,000 more needed)'
+    )
+    expect(result.remainingAmount).toBe(0)
   })
 
   it('a fund above target (20,000): unchanged amounts', () => {

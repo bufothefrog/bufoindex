@@ -163,7 +163,7 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   }
 
   // Step 3: Identify optimization opportunities and deprioritized items
-  const skippedItems = identifySkippedOptimizations(updatedProfile);
+  const skippedItems = identifySkippedOptimizations(updatedProfile, allocations);
 
   // Step 4: Calculate future projections
   const projections = calculateProjections(updatedProfile, allocations);
