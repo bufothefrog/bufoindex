@@ -10,7 +10,7 @@ labels: calculation
 
 ## Inputs that reproduce it
 
-<!-- Paste a share URL if possible; otherwise list the input values. -->
+<!-- List the input values, one per field. -->
 
 ## Value shown vs. value expected
 

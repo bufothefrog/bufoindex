@@ -10,7 +10,7 @@ labels: bug
 
 ## Steps to reproduce
 
-<!-- A share URL from the calculator is the fastest way to reproduce state. -->
+<!-- Include the input values that reproduce it, one per field. -->
 
 1.
 2.
