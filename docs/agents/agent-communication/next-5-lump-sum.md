@@ -25,6 +25,11 @@ Fixes after the second review:
     703b21b methodology: the timing formula in four rows; display formulas scroll in their box and take a tab stop
     182996a allocator step card: no transfer line for a complete fund or a 0-month target
 
+Fixes after the browser check of the second round:
+
+    1df7d4d leverage card: the timing sentence states the difference of the two printed gaps, not the unrounded one
+    f5591bf list card layout: the chevron stays inside the card at 360 px
+
 package.json and package-lock.json are unchanged; no new dependency. The stored profile version stays 3: a profile stored at ec300fd loads
 with three 'monthly' timing leaves and the same provided list. docs/architecture.md, sections "Contribution timing" and "Paycheck
 allocator", describe the model; the methodology page has a "Contribution Timing" entry.
@@ -119,11 +124,40 @@ only the monthly part is subtracted and the yearly part adds nothing (a seeded c
 Review fixes with wording only: on the leverage card, a monthly contribution of 0 gives one sentence that the two timings are the same, and
 a difference under 0.05 points is not attributed to timing: when the two printed gaps are the same it says they are the same to one
 decimal place, and when they print one step apart (for example -6.0% and -6.1% at 1x, $100 a month, 10 years) it says they differ by about
-0.1 percentage points and the timing barely changes the comparison. A complete
-1-month fund reads '(1 month)'. The step and opportunity cards' header row wraps at narrow widths, so the figures drop below the title.
+0.1 percentage points and the timing barely changes the comparison (the table below has every wording). A complete
+1-month fund reads '(1 month)'. The step and opportunity cards' header row wraps at narrow widths, so the figures drop below the title;
+the figures wrap inside the card and the chevron sits at the right of the row, outside the wrapping block (at 360 px the Roth IRA and
+401k step cards had put it past the card's right edge). At 1280 px the header positions are unchanged.
 The methodology Contribution Timing formula is four rows (the annuity factor A on its own row, with a variable entry) and fits the
 194 px formula box at 360 px. Every display formula block scrolls sideways inside its box and takes a tab stop named by its LaTeX
 source, so the wider older formulas are reachable by touch, mouse and arrow keys; the page itself does not scroll sideways.
+
+## Leverage timing sentence
+
+dcaEffectSentence (lib/calculators/leverage/narrative.ts) states only what the two printed relative gaps show. Each gap is rounded
+once to one decimal and both its printed text and the stated difference come from that rounded value. Which branch applies is still
+decided from the engine's unrounded values: the sampling-error branch when the unrounded difference is under the noise threshold
+(relativeGapNoisePoints, 0 at 1x), the near-zero branch when it is under 0.05 points, the attribution branch otherwise. A
+stated difference, and its sign, is the difference of the two printed gaps; two gaps that print the same are called the same to one
+decimal place in every branch, so no sentence says "0.0 percentage points"; attribution to timing needs a printed difference of at
+least 0.1.
+
+Examples at the form's default seed and 500 paths (the relative gaps and the last sentence; before = 56094f8):
+
+| Branch | Inputs | Printed gaps | Before | After |
+|---|---|---|---|---|
+| Sampling error, gaps differ | default 2x ($900 a month, 20 years, $5,000 start) | +9.5%, +10.2% | 'differ by 0.7 percentage points, which is within the sampling error of 500 simulated paths, so at these settings this run does not separate the two timings.' | unchanged |
+| Sampling error, gaps differ | 3x, $1,450 a month, 19 years, $19,000 start, return 9%, volatility 15% | -6.7%, -6.8% | 'differ by 0.0 percentage points, which is within ...' | 'differ by 0.1 percentage points, which is within ...' |
+| Sampling error, gaps the same | 3x, $200 a month, 30 years, $5,000 start, return 10% | +5.9%, +5.9% | 'differ by 0.0 percentage points, which is within ...' | 'The two relative gaps are the same to one decimal place; with the sampling error of 500 simulated paths, this run does not separate the two timings.' |
+| Near zero, gaps the same | 1x, $100 a month, 5 years, $5,000 start, return 10%, volatility 16% | -3.3%, -3.3% | 'are the same to one decimal place, so at these settings the timing does not change the comparison.' | unchanged |
+| Near zero, one step apart | 1x, $100 a month, 10 years, $5,000 start, return 10%, volatility 16% | -6.0%, -6.1% | 'differ by about 0.1 percentage points, so at these settings the timing barely changes the comparison.' | unchanged |
+| Attribution | 1x, $200 a month, 5 years, $5,000 start, return 7%, volatility 16% | -2.8%, -3.2% | '... the difference between the two relative gaps (+0.3 percentage points) comes from when the money goes in ...' | '(+0.4 percentage points)' |
+
+An unrounded difference of 0.05 points or more whose gaps print the same now reads "the same to one decimal place, so at these settings
+the timing does not change the comparison" instead of attributing a difference to timing. The table, the headline, the
+engine and the other texts are unchanged. Tests (test/components/LeverageResults.test.tsx): the 1x and 3x cases above, and a seeded loop
+of 330 inputs at 1x, 2x and 3x (200 paths each) that checks every stated figure, sign and "the same" against the printed gaps, checks
+the printed gaps against the table's figures and reaches all five wordings; at 56094f8 it catches 83 of the 330 sentences.
 
 Pinned in test/lib/calculators/contributionTiming.test.ts (the end-to-end test): an ec300fd payload builds the ec300fd engine inputs of
 every calculator, plus yearStartSavings 0 (retirement) and preferences.investedBalance 25,000 (paycheck); the default projection is
@@ -162,6 +196,9 @@ the minimum payment already needs. Fixing it would move allocations for every vi
 8. Recalibrate the leverage noise threshold for monthly against start of year? Default: unchanged.
 9. Remember calculator-only answers (now the timing choices) between visits? Default (from PR 3): remembered.
 10. Show the timing controls to every visitor or only on request? Default: shown, one radio group per part in use.
+11. What does an emergency target of 0 months mean: does the step not apply, or is it complete? Today the card says 'Complete 0-month
+    emergency fund', the step is not counted done in the progress bar, and the card carries the 'High impact' note with nothing
+    allocated. Default: as it is today.
 
 ## Left in the docs on purpose
 
