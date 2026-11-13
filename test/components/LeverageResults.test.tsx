@@ -207,19 +207,23 @@ describe('dcaEffectSentence', () => {
   });
 
   it('attributes a difference above the noise to when the money goes in, with a sampling caveat (3x)', () => {
-    // At 3x the seeded run's two gaps differ by only 0.4 points, so this case
-    // sets the start-of-year gap to -20% of its index median: monthly +2.2%
-    // against -20.0% is 22.2 points, above the 8-point threshold at 3x.
-    const { inputs, result } = atLeverage(3);
-    const wide: DcaComparisonResult = {
-      ...result,
-      dcaEffect: { ...result.dcaEffect, yearStartGap: -0.2 * result.index.yearStart.p50 },
+    // A real form input reaches this branch: 3x, 30 years, index return 10%, volatility 5%,
+    // $500 a month, $25,000 start. The two relative gaps differ by 16.4 points, above the
+    // 3x noise threshold.
+    const inputs = {
+      ...DEFAULT_DCA_COMPARISON_INPUTS,
+      leverageRatio: 3,
+      years: 30,
+      indexVolatility: 0.05,
+      indexMeanReturn: 0.1,
+      monthlyContribution: 500,
+      startingBalance: 25000,
     };
-    const sentence = dcaEffectSentence(wide, '3x', inputs);
-    expect(sentence).toContain('gives a gap of \u2212$119k (\u221220.0%).');
+    const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '3x', inputs);
+    expect(relativeGapNoisePoints(inputs)).toBeLessThan(16.4);
     expect(sentence).toContain(
       'Both timings use the same simulated markets, so the difference between the two relative gaps ' +
-        "(+22.2 percentage points) comes from when the money goes in, interacting with the funds' different growth rates."
+        "(\u221216.4 percentage points) comes from when the money goes in, interacting with the funds' different growth rates."
     );
     expect(sentence).toContain('With 500 paths that figure still carries sampling error');
   });
@@ -232,6 +236,31 @@ describe('dcaEffectSentence', () => {
     expect(sentence).toContain('gives a gap of \u2212$63.7k (\u221210.7%)');
     expect(sentence).toContain('(+0.4 percentage points) comes from when the money goes in, interacting');
     expect(sentence).not.toMatch(/sampling error/);
+  });
+
+  it('does not attribute a difference that prints as 0.0 points to timing', () => {
+    // 1x has no noise threshold. A start-of-year gap with the same relative size as the
+    // monthly one leaves a difference of 0.0 points.
+    const { inputs, result } = atLeverage(1);
+    const dcaRel = result.dcaEffect.dcaGap / result.index.dca.p50;
+    const same: DcaComparisonResult = {
+      ...result,
+      dcaEffect: { ...result.dcaEffect, yearStartGap: dcaRel * result.index.yearStart.p50 },
+    };
+    const sentence = dcaEffectSentence(same, '1x', inputs);
+    expect(sentence).toContain(
+      'The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.'
+    );
+    expect(sentence).not.toMatch(/0\.0 percentage points|comes from when the money goes in/);
+  });
+
+  it('says the two timings are the same when the monthly contribution is 0', () => {
+    const inputs = { ...DEFAULT_DCA_COMPARISON_INPUTS, leverageRatio: 1, years: 4, monthlyContribution: 0 };
+    const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '1x', inputs);
+    expect(sentence).toMatch(
+      /^With no monthly contribution the two timings are the same: under both, the 1x fund's median ends (above|below) the index fund's median by /
+    );
+    expect(sentence).not.toMatch(/\$0 a year|comes from when the money goes in|percentage points/);
   });
 
   it('says the funds produce the same balances under both timings when both gaps are zero', () => {

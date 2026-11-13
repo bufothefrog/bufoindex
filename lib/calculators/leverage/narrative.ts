@@ -91,6 +91,14 @@ export function dcaEffectSentence(
     return `At these settings the ${L} fund and the index fund produce the same balances under both timings.`;
   }
   const dcaRel = relativeGap(dcaGap, result.index.dca.p50);
+  if (!(inputs.monthlyContribution > 0)) {
+    // No yearly amount: both rows hold only the starting balance, so there is no timing to compare.
+    return (
+      `With no monthly contribution the two timings are the same: under both, the ${L} fund's median ends ` +
+      `${direction(dcaGap)} the index fund's median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} ` +
+      `(${formatPercent(dcaRel, SIGNED_ONE_DECIMAL)} of the index median).`
+    );
+  }
   const yearStartRel = relativeGap(yearStartGap, result.index.yearStart.p50);
   const diffPoints = (dcaRel - yearStartRel) * 100;
   const pointsText = `${Math.abs(diffPoints).toFixed(1)} percentage points`;
@@ -106,6 +114,10 @@ export function dcaEffectSentence(
       `${gaps} The two relative gaps differ by ${pointsText}, which is within the sampling error of ` +
       `${inputs.paths} simulated paths, so at these settings this run does not separate the two timings.`
     );
+  }
+  if (Math.abs(diffPoints) < 0.05) {
+    // The difference prints as 0.0 points: nothing to attribute to timing.
+    return `${gaps} The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.`;
   }
   const sign = diffPoints >= 0 ? '+' : MINUS;
   const noiseNote =
