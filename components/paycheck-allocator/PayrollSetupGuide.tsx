@@ -5,6 +5,7 @@ import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/s
 import { StatGrid } from '@/components/ui/results';
 import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { paycheckFlow, paycheckHeadline, type PaycheckFlow } from '@/lib/calculators/paycheck/headline';
+import { allocationDisplayLabel } from '@/lib/constants/financialSteps';
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { TONE_BORDER, TONE_SURFACE, TONE_TEXT } from '@/lib/design-system/tone';
 import { formatCurrency } from '@/lib/format';
@@ -72,7 +73,7 @@ function setupInstructions(tier: AutomationTier, { flow, allocations, remaining,
           `Amount per paycheck: ${formatCurrency(flow.takeHome)}`,
           '',
           'Then set up automatic transfers:',
-          ...allocations.map((allocation) => `${BULLET} ${allocation.account}: ${formatCurrency(allocation.amount)} ${phrase}`),
+          ...allocations.map((allocation) => `${BULLET} ${allocationDisplayLabel(allocation.account)}: ${formatCurrency(allocation.amount)} ${phrase}`),
           ...(remaining > 0 ? [`${BULLET} Investment account: ${formatCurrency(remaining)} ${phrase}`] : []),
         ],
         pros: ['Simple to set up', 'Works with any employer'],
@@ -87,7 +88,7 @@ function setupInstructions(tier: AutomationTier, { flow, allocations, remaining,
           `Account 2 - Primary Investment/Savings: ${formatCurrency(flow.priority)}`,
           '',
           'Then manually allocate the investment portion:',
-          ...allocations.map((allocation) => `${BULLET} ${allocation.account}: ${formatCurrency(allocation.amount)}`),
+          ...allocations.map((allocation) => `${BULLET} ${allocationDisplayLabel(allocation.account)}: ${formatCurrency(allocation.amount)}`),
         ],
         pros: ['Automates savings', 'Keeps spending money separate'],
         cons: ['Still requires some manual allocation'],
@@ -100,7 +101,7 @@ function setupInstructions(tier: AutomationTier, { flow, allocations, remaining,
           `Account 1 - Checking: ${formatCurrency(flow.spending)}`,
           ...allocations
             .slice(0, 3)
-            .map((allocation, index) => `Account ${index + 2} - ${allocation.account}: ${formatCurrency(allocation.amount)}`),
+            .map((allocation, index) => `Account ${index + 2} - ${allocationDisplayLabel(allocation.account)}: ${formatCurrency(allocation.amount)}`),
           ...(remaining > 0 ? [`Account ${allocations.length + 2} - Investment: ${formatCurrency(remaining)}`] : []),
           '',
           'Note: Most payroll systems support 3-4 account splits maximum',

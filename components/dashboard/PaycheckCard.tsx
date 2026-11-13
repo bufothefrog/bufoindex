@@ -10,7 +10,7 @@ import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import { KeyValueList } from '@/components/ui/results';
 import { paycheckFlow } from '@/lib/calculators/paycheck/headline';
 import { calculatorHref } from '@/lib/calculators/registry';
-import { FINANCIAL_STEPS } from '@/lib/constants/financialSteps';
+import { FINANCIAL_STEPS, allocationDisplayText } from '@/lib/constants/financialSteps';
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { sortAllocations } from '@/lib/dashboard/derive';
 import { formatCurrency } from '@/lib/format';
@@ -78,13 +78,16 @@ export function PaycheckCard({ inputs, allocation }: PaycheckCardProps) {
 
           {shown.length > 0 ? (
             <KeyValueList
-              items={shown.map((item) => ({
-                id: item.id,
-                label: item.account,
-                subtitle: item.reasoning,
-                value: item.amount,
-                format: 'currency',
-              }))}
+              items={shown.map((item) => {
+                const text = allocationDisplayText(item);
+                return {
+                  id: item.id,
+                  label: text.account,
+                  subtitle: text.reasoning,
+                  value: item.amount,
+                  format: 'currency',
+                };
+              })}
             />
           ) : (
             <p className="text-sm text-muted-foreground">

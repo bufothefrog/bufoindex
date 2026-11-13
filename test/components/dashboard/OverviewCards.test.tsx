@@ -141,7 +141,7 @@ describe('PaycheckCard', () => {
       'Take-home $3,900 per monthly paycheck: $3,500 necessary expenses, $300 fun money (the minimum), and $100 to allocate.',
       [
         [
-          '1-Month Emergency FundBuild basic financial security before optimization. One month of expenses provides essential protection.',
+          'Starter Emergency FundA first cash buffer for small surprises, built before the steps below and before the full emergency fund target.',
           '$100',
         ],
       ],
@@ -387,7 +387,7 @@ describe('AutomationChecklistCard', () => {
       'lean',
       [
         '401(k) payroll deferral$3126% of grossPayroll election at 6% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
-        '1-Month Emergency Fund$100Save $100 per paycheck toward emergency fund ($1,900 more needed)',
+        'Starter Emergency Fund$100Save $100 per paycheck toward emergency fund ($1,900 more needed)',
       ],
       '0 of 2 set up.',
     ],
