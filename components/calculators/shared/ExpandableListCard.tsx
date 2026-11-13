@@ -62,10 +62,14 @@ export function ExpandableListCard({
       )}
     >
       <CardContent className="p-4">
-        {/* flex-wrap with a 12rem basis on the title column: on a narrow screen the
-            right column drops below the title instead of squeezing it under the figures. */}
+        {/* The chevron sits outside the wrapping block, so it stays at the right
+            edge of the first row's block at every width. Inside the block,
+            flex-wrap with a 12rem basis on the title column drops the figures
+            below the title on a narrow screen instead of squeezing the title
+            under them, and min-w-0 lets the figures wrap instead of
+            overflowing the card. */}
         <div
-          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
+          className="flex items-center gap-3"
           onClick={onToggle}
           role={isExpandable ? 'button' : undefined}
           tabIndex={isExpandable ? 0 : undefined}
@@ -76,32 +80,35 @@ export function ExpandableListCard({
             }
           } : undefined}
         >
-          <div className="flex items-center space-x-3 min-w-0 flex-1 basis-48">
-            {Icon && (
-              <Icon className={cn('w-5 h-5 shrink-0', iconClass(tone))} />
-            )}
-            <div className="min-w-0">
-              <h4 className="font-semibold text-sm">{title}</h4>
-              {subtitle && (
-                <div className="text-sm text-muted-foreground">{subtitle}</div>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div className="flex items-center space-x-3 min-w-0 flex-1 basis-48">
+              {Icon && (
+                <Icon className={cn('w-5 h-5 shrink-0', iconClass(tone))} />
+              )}
+              <div className="min-w-0">
+                <h4 className="font-semibold text-sm">{title}</h4>
+                {subtitle && (
+                  <div className="text-sm text-muted-foreground">{subtitle}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex min-w-0 max-w-full items-center space-x-3 empty:hidden">
+              {headerRight}
+              {value !== undefined && (
+                <div className="min-w-0 text-right">
+                  <div className="font-semibold font-mono tabular-nums">{value}</div>
+                  {valueSubtext && (
+                    <div className="text-sm text-muted-foreground">{valueSubtext}</div>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 shrink-0">
-            {headerRight}
-            {value !== undefined && (
-              <div className="text-right">
-                <div className="font-semibold font-mono tabular-nums">{value}</div>
-                {valueSubtext && (
-                  <div className="text-sm text-muted-foreground">{valueSubtext}</div>
-                )}
-              </div>
-            )}
-            {isExpandable && (
-              <Chevron className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
+          {isExpandable && (
+            <Chevron className="w-4 h-4 shrink-0 text-muted-foreground" />
+          )}
         </div>
 
         {expanded && children && (
