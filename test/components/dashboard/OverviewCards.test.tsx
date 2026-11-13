@@ -12,6 +12,7 @@
 import React from 'react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { CashBufferCard } from '@/components/dashboard/CashBufferCard';
 import OverviewDashboard from '@/components/dashboard/OverviewDashboard';
 import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
 import { LEVERAGE_CALCULATOR } from '@/lib/calculators/leverage/definition';
@@ -22,6 +23,8 @@ import { formatPercent } from '@/lib/format';
 import type { ProfilePatch } from '@/lib/profile/types';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
+import { normalizeProfile } from '@/lib/profile/defaults';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 import { resetProfileStore } from '@/test/utils/stores';
 
 const PROFILES = {
@@ -254,6 +257,12 @@ describe('CashBufferCard', () => {
     await renderOverview('rich');
     expect(ASSUMED_PORTFOLIO_RETURN).toBe(0.07);
     expect(card('cash')).toHaveTextContent(`At an assumed ${formatPercent(ASSUMED_PORTFOLIO_RETURN)} long-run portfolio return`);
+  });
+
+  it('names the accounts that hold the fund in place of the APY (the owner fixture: Robinhood holds BOXX)', () => {
+    render(<CashBufferCard profile={normalizeProfile(ownerRaw())} />);
+    // BOXX 90 x 115 = 10,350.
+    expect(tile(card('cash'), 'Emergency fund')).toBe('$10,350Held in Robinhood');
   });
 
   it('shows the missing-value dash when necessary expenses are not set', () => {
