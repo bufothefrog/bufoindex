@@ -20,7 +20,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { Layers, Scale, Sunset, UserRound, Wallet } from 'lucide-react';
-import { formForFlow, requiredScreens } from '@/lib/calculators/forms';
+import { formForFlow, intakeScreens, requiredScreens } from '@/lib/calculators/forms';
 import { CLASS_TARGETS_PATH, classTargetsError } from '@/lib/calculators/portfolio/bindings';
 import {
   CORE_SCREENS,
@@ -33,7 +33,7 @@ import {
   takeHomeSummary,
 } from '@/lib/fields/shared';
 import { getAt, makeGet } from '@/lib/fields/paths';
-import { screenPaths, screensFor, validateFields } from '@/lib/fields/runtime';
+import { screenPaths, validateFields } from '@/lib/fields/runtime';
 import type { FieldErrors, FieldSpec, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import { isProfilePath } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -313,10 +313,11 @@ export function intakeForm(flow: IntakeFlow, mode: IntakeMode = 'all'): FormSpec
  * The flow's intake screens, in form order. Visibility rules follow the
  * values `get` reads in every mode, so in 'remaining' mode the employer-match
  * screen still appears only when the (saved or new) 401(k) answer is Yes.
+ * Calculator-only values are read as unset (intakeScreens).
  */
 export function getIntakeScreens(flow: IntakeFlow, get: Get, options: IntakeScreenOptions = {}): ScreenSpec[] {
   const mode = options.mode ?? 'all';
-  return screensFor(intakeForm(flow, mode), get, { mode, provided: options.provided, surface: 'intake' });
+  return intakeScreens(intakeForm(flow, mode), get, { mode, provided: options.provided });
 }
 
 /**

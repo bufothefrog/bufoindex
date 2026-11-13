@@ -30,7 +30,7 @@ import {
   intakeDerivedWrites,
 } from '@/lib/fields/shared';
 import { makeGet } from '@/lib/fields/paths';
-import { fieldMap, screensFor } from '@/lib/fields/runtime';
+import { fieldMap, screensFor, type ScreensForOptions } from '@/lib/fields/runtime';
 import type { CrossFieldRule, FieldSpec, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { LEVERAGE_FORM } from './leverage/form';
@@ -215,16 +215,32 @@ export interface ProfileCompleteness {
 }
 
 /**
- * Calculator-only values: set for one run on a calculator page and never
- * asked by the profile. Completeness reads them as unset, so a figure typed
- * on the rebalancer (this month's new cash) never changes which topics the
- * profile counts.
+ * Calculator-only values (the fields of the calculator-only screens, Surface
+ * 'calculator', that no other screen asks): set for one run on a calculator
+ * page and never asked by the profile. Every place that decides which
+ * profile screens exist (completeness, the review page, the intake screens
+ * and remaining mode) reads them as unset through intakeScreens, so a figure
+ * typed on the rebalancer (this month's new cash) never changes which topics
+ * the profile has. The calculator page reads them as they are.
  */
-const CALCULATOR_ONLY_PATHS: readonly string[] = ['portfolio.newCash'];
+const CALCULATOR_ONLY_PATHS: readonly string[] = (() => {
+  const screens = Object.values(FORMS).flatMap((form) => form.screens);
+  const elsewhere = new Set(screens.filter((screen) => screen.surface !== 'calculator').flatMap((screen) => screen.fields));
+  const only = screens.filter((screen) => screen.surface === 'calculator').flatMap((screen) => screen.fields);
+  return Array.from(new Set(only.filter((path) => !elsewhere.has(path))));
+})();
 
 function withoutCalculatorOnly(get: Get): Get {
   return (path) =>
     CALCULATOR_ONLY_PATHS.some((only) => path === only || path.startsWith(`${only}.`)) ? undefined : get(path);
+}
+
+/**
+ * The intake-surface screens of `form` for `get`, with the calculator-only
+ * values read as unset: the one rule for which profile screens exist.
+ */
+export function intakeScreens(form: FormSpec, get: Get, options: Omit<ScreensForOptions, 'surface'>): ScreenSpec[] {
+  return screensFor(form, withoutCalculatorOnly(get), { ...options, surface: 'intake' });
 }
 
 /**
@@ -234,11 +250,9 @@ function withoutCalculatorOnly(get: Get): Get {
  * is every optional screen, answered or not.
  */
 export function profileCompleteness(profile: FinancialProfile): ProfileCompleteness {
-  const get = withoutCalculatorOnly(makeGet(profile));
-  const total = requiredScreens(screensFor(PROFILE_FORM, get, { mode: 'all', surface: 'intake' })).length;
-  const missing = requiredScreens(
-    screensFor(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided, surface: 'intake' })
-  );
+  const get = makeGet(profile);
+  const total = requiredScreens(intakeScreens(PROFILE_FORM, get, { mode: 'all' })).length;
+  const missing = requiredScreens(intakeScreens(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided }));
   return { provided: total - missing.length, total, missing };
 }
 

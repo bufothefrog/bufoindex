@@ -20,10 +20,16 @@
  */
 
 import { makeGet } from '@/lib/fields/paths';
-import { fallbackSummary, screensFor, summarizeScreen, visibleScreenFields } from '@/lib/fields/runtime';
+import { fallbackSummary, summarizeScreen, visibleScreenFields } from '@/lib/fields/runtime';
 import type { FieldSpec, FormSpec, Get, ScreenSpec } from '@/lib/fields/types';
 import type { FinancialProfile } from '@/lib/profile/types';
-import { PROFILE_FORM, PROFILE_FORM_SECTION_LABELS, profileFormSection, type ProfileFormSection } from './forms';
+import {
+  PROFILE_FORM,
+  PROFILE_FORM_SECTION_LABELS,
+  intakeScreens,
+  profileFormSection,
+  type ProfileFormSection,
+} from './forms';
 
 /** The review page's path. */
 export const REVIEW_PATH = '/start/review';
@@ -134,7 +140,7 @@ export function profileReview(profile: FinancialProfile, form: FormSpec = PROFIL
   const provided = new Set(profile.provided);
   const groups: ReviewGroup[] = [];
 
-  for (const screen of screensFor(form, get, { mode: 'all', surface: 'intake' })) {
+  for (const screen of intakeScreens(form, get, { mode: 'all' })) {
     const section = profileFormSection(screen.id) ?? 'core';
     let group = groups.find((candidate) => candidate.section === section);
     if (!group) {

@@ -22,8 +22,8 @@ import {
   accountsInEffect,
   hasHoldings,
   newCashFor,
+  normalNewCash,
   rebalanceCandidates,
-  rebalancedAccounts,
 } from '@/lib/profile/accounts';
 import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/lib/profile/defaults';
 import type { TargetMixPreset } from '@/lib/profile/types';
@@ -50,9 +50,20 @@ function plural(count: number, one: string, many: string): string {
   return `${formatCount(count)} ${count === 1 ? one : many}`;
 }
 
-/** True while the rebalancer works on at least one account (the targets then matter). */
-export function hasRebalancedAccount(get: Get): boolean {
-  return rebalancedAccounts(get).length > 0;
+/**
+ * True while an account could be rebalanced (the targets then matter): a
+ * candidate with holdings, normal contributions above 0, or this run's new
+ * cash above 0. Where calculator-only values read as unset (the profile
+ * screens, intakeScreens in lib/calculators/forms.ts) the new cash is the
+ * normal contributions, so the targets screen follows the holdings and the
+ * normal contributions only; the calculator page also follows a Custom new
+ * cash. Every account rebalancedAccounts returns meets it, so it holds
+ * whenever the rebalancer works on an account.
+ */
+export function hasTargetsInEffect(get: Get): boolean {
+  return rebalanceCandidates(get).some(
+    (account) => hasHoldings(get, account.id) || normalNewCash(get, account.id) > 0 || newCashFor(get, account.id) > 0
+  );
 }
 
 /** True while an account in effect, other than a cash account, has a holding (the holdings screen shows). */
@@ -93,7 +104,7 @@ export const TARGET_MIX: FieldSpec = {
   options: TARGET_MIX_OPTIONS,
   tier: 'details',
   onChange: targetsFromPreset,
-  visibleWhen: hasRebalancedAccount,
+  visibleWhen: hasTargetsInEffect,
   summary: (value) => TARGET_MIX_LABELS[value as TargetMixPreset] ?? null,
 };
 
@@ -104,7 +115,7 @@ export const CLASS_TARGETS: FieldSpec = {
   label: 'Target allocation',
   renderer: CLASS_TARGETS_RENDERER,
   covers: [CUSTOM_ASSET_CLASSES_PATH],
-  visibleWhen: (get) => usesCustomTargets(get) && hasRebalancedAccount(get),
+  visibleWhen: (get) => usesCustomTargets(get) && hasTargetsInEffect(get),
   tier: 'details',
   summary: (value, get) => {
     const customs = readPortfolio(get).customAssetClasses;

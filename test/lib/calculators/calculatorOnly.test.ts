@@ -15,7 +15,7 @@ import { isProfileScreenId, profileReview, profileScreenIds } from '@/lib/calcul
 import { CALCULATOR_IDS } from '@/lib/calculators/registry';
 import { getIntakeScreens, remainingIntakeScreens } from '@/lib/constants/intake';
 import { makeGet } from '@/lib/fields/paths';
-import { screensFor } from '@/lib/fields/runtime';
+import { screensFor, visibleScreenFields } from '@/lib/fields/runtime';
 import type { ScreenSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -109,5 +109,94 @@ describe('calculator-only screens', () => {
     const profile = getDefaultFinancialProfile();
     expect(profile.strategy.leverageRatio).toBe(2);
     expect(profile.retirementIncome.socialSecurityAge).toBe(67);
+  });
+});
+
+/**
+ * A calculator-only value never changes which profile screens exist (R1 of
+ * the second PR 4 review): completeness, the review page, the intake screens
+ * and remaining mode all read a Custom new cash as unset (intakeScreens in
+ * lib/calculators/forms.ts), while the rebalancer page still reads it.
+ */
+describe('a Custom new cash and the profile screens', () => {
+  const EMPTY_BROKERAGE = { id: 'acc-b', kind: 'brokerage' as const, name: '', balance: 0, holdsEmergencyFund: false };
+
+  /** One stored empty brokerage, no 401(k), taxable `taxable`, every profile topic answered but `leave`. */
+  function emptyBrokerage(taxable: number, leave: readonly string[] = []): FinancialProfile {
+    const profile = getDefaultFinancialProfile();
+    profile.workplace.has401k = false;
+    profile.investing.taxableMonthlyContribution = taxable;
+    profile.portfolio.accounts = [EMPTY_BROKERAGE];
+    profile.portfolio.holdings = [];
+    profile.portfolio.securities = [];
+    const get = makeGet(profile);
+    const shown = screensFor(PROFILE_FORM, get, { mode: 'all', surface: 'intake' }).filter((s) => !leave.includes(s.id));
+    profile.provided = Array.from(new Set(['workplace.has401k', 'investing.taxableMonthlyContribution', ...pathsOf(shown)]));
+    return profile;
+  }
+
+  const withNewCash = (profile: FinancialProfile, id: string, amount: number): FinancialProfile => ({
+    ...profile,
+    portfolio: { ...profile.portfolio, newCash: [{ id, amount }] },
+  });
+
+  /** Everything that decides which profile screens exist, in one comparable shape. */
+  function screensDecided(profile: FinancialProfile) {
+    const get = makeGet(profile);
+    const review = profileReview(profile);
+    return {
+      completeness: profileCompleteness(profile),
+      review: review.groups.flatMap((group) => group.topics.map((topic) => `${topic.id}:${topic.status}`)),
+      hasUnansweredRequired: review.hasUnansweredRequired,
+      profileRemaining: getIntakeScreens('profile', get, { mode: 'remaining', provided: profile.provided }).map((s) => s.id),
+      profileAll: getIntakeScreens('profile', get, { mode: 'all' }).map((s) => s.id),
+      portfolioRemaining: remainingIntakeScreens('portfolio', profile).map((s) => s.id),
+    };
+  }
+
+  it('one empty brokerage and taxable 0: a Custom 300 leaves every count, topic and remaining screen as it was', () => {
+    const before = emptyBrokerage(0);
+    const after = withNewCash(before, 'acc-b', 300);
+    expect(screensDecided(after)).toEqual(screensDecided(before));
+    const decided = screensDecided(after);
+    expect(decided.completeness.provided).toBe(decided.completeness.total);
+    expect(decided.review.map((topic) => topic.split(':')[0])).not.toContain('targets');
+    expect(decided.hasUnansweredRequired).toBe(false);
+    expect(decided.profileRemaining).toEqual([]);
+    expect(decided.portfolioRemaining).toEqual([]);
+  });
+
+  it('one empty brokerage and taxable 0, one topic left: remaining mode asks only that topic, Custom or not', () => {
+    const before = emptyBrokerage(0, ['debts']);
+    const after = withNewCash(before, 'acc-b', 300);
+    expect(screensDecided(after)).toEqual(screensDecided(before));
+    expect(screensDecided(after).profileRemaining).toEqual(['debts']);
+  });
+
+  it('the default profile: a Custom 0 on the brokerage leaves every count, topic and remaining screen as it was', () => {
+    const before = getDefaultFinancialProfile();
+    expect(screensDecided(withNewCash(before, 'acc-brok', 0))).toEqual(screensDecided(before));
+    expect(screensDecided(withNewCash(before, 'acc-brok', 900))).toEqual(screensDecided(before));
+  });
+
+  it('an empty brokerage with normal contributions and a Custom 0: the targets screen stays, with its fields', () => {
+    const before = emptyBrokerage(500, ['targets']);
+    const after = withNewCash(before, 'acc-b', 0);
+    expect(screensDecided(after)).toEqual(screensDecided(before));
+    expect(screensDecided(after).profileRemaining).toEqual(['targets']);
+    // The wizard renders the screen's fields from the values as they are; the target mix is one of them.
+    const targets = PROFILE_FORM.screens.find((s) => s.id === 'targets');
+    if (!targets) throw new Error('no targets screen');
+    expect(visibleScreenFields(PROFILE_FORM, targets, makeGet(after)).map((spec) => spec.path)).toContain(
+      'investing.targetMix'
+    );
+  });
+
+  it('the rebalancer page still follows a Custom new cash', () => {
+    const before = emptyBrokerage(0);
+    const page = (profile: FinancialProfile) =>
+      screensFor(FORMS.portfolio, makeGet(profile), { mode: 'all', surface: 'calculator' }).map((s) => s.id);
+    expect(page(before)).not.toContain('targets');
+    expect(page(withNewCash(before, 'acc-b', 300))).toContain('targets');
   });
 });

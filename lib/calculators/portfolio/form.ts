@@ -3,8 +3,9 @@
  * every field the rebalancer uses, settings last (O3).
  *
  * - targets: the target mix, Custom included; Custom shows the class-targets
- *   editor (which also registers custom asset classes). Shown while at least
- *   one account is rebalanced.
+ *   editor (which also registers custom asset classes). Shown while an
+ *   account could be rebalanced (hasTargetsInEffect); on the profile screens
+ *   a Custom new cash does not count.
  * - accounts: the shared account list (lib/fields/shared.ts), the single
  *   record of what the visitor owns.
  * - holdings: what each account holds, at what price; shown while an
