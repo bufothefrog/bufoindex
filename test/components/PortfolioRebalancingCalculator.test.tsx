@@ -73,8 +73,8 @@ describe('PortfolioRebalancingCalculator page', () => {
 
     act(() => useProfileStore.setState({ hasHydrated: true }));
     expect(screen.queryByRole('status', { name: 'Loading results' })).not.toBeInTheDocument();
-    // The default profile: $8,775 held, $1,000 of new cash in the Brokerage.
-    expect(store.getState().results?.totalValueBefore).toBe(8775);
+    // The default profile: $12,875 held, $1,000 of new cash in the Brokerage.
+    expect(store.getState().results?.totalValueBefore).toBe(12875);
     expect(store.getState().results?.totalDeposit).toBe(1000);
     expect(results()).toHaveTextContent('Drift Reduction');
     expect(screen.getByTestId('placement-advice-card')).toBeInTheDocument();
@@ -108,8 +108,8 @@ describe('PortfolioRebalancingCalculator page', () => {
     render(<PortfolioRebalancingCalculatorPage />);
     expect(inputIn('account-name-0').value).toBe('Roth IRA');
     expect(inputIn('account-name-1').value).toBe('Brokerage');
-    expect(inputIn('holding-price-0').value).toBe('250');
-    expect(inputIn('holding-price-3').value).toBe('60');
+    expect(inputIn('holding-price-0').value).toBe('375');
+    expect(inputIn('holding-price-3').value).toBe('85');
   });
 
   it('names each holding input with its account', () => {
@@ -130,11 +130,11 @@ describe('PortfolioRebalancingCalculator page', () => {
 
   it('edits a holding through the holdings editor', () => {
     render(<PortfolioRebalancingCalculatorPage />);
-    // Doubling the Roth VTI position adds 10 x $250 = $2,500.
+    // Doubling the Roth VTI position adds 10 x $375 = $3,750.
     fireEvent.change(inputIn('holding-shares-0'), { target: { value: '20' } });
     expect(profile().portfolio.holdings[0].shares).toBe(20);
     expect(profile().provided).toContain('portfolio.holdings');
-    expect(store.getState().results?.totalValueBefore).toBe(8775 + 2500);
+    expect(store.getState().results?.totalValueBefore).toBe(12875 + 3750);
   });
 
   it('adds a holding to an account with its own blank security', async () => {
@@ -160,7 +160,7 @@ describe('PortfolioRebalancingCalculator page', () => {
     expect(securities.map((s) => s.id)).toEqual(['sec-vti', 'sec-vxus']);
     // The last account cannot be removed.
     expect(within(section('Accounts')).getByRole('button', { name: 'Remove Brokerage' })).toBeDisabled();
-    expect(store.getState().results?.totalValueBefore).toBe(5900);
+    expect(store.getState().results?.totalValueBefore).toBe(8775);
   });
 
   it('shows the class targets for the custom mix and keeps the last results while they miss 100%', async () => {

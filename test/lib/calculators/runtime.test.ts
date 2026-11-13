@@ -9,7 +9,7 @@ import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { setAt } from '@/lib/fields/paths';
 import type { FieldErrors, FormSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 import type { FinancialProfile } from '@/lib/profile/types';
 
 interface Engine {
@@ -69,15 +69,15 @@ const DEFINITION: CalculatorDefinition<Engine, number> = {
 };
 
 function profileWith(values: Record<string, unknown>): FinancialProfile {
-  let profile = getDefaultFinancialProfile();
+  let profile = defaultProfileAt3bb0132();
   for (const [path, value] of Object.entries(values)) profile = setAt(profile, path, value);
   return profile;
 }
 
 describe('engineInputsFor', () => {
   it('applies the bindings to the engine base and keeps unbound paths', () => {
-    // Defaults: age 30, retirementAge 60, state TX.
-    expect(engineInputsFor(DEFINITION, getDefaultFinancialProfile())).toEqual({
+    // The fixture profile (3bb0132's defaults): age 30, retirementAge 60, state TX.
+    expect(engineInputsFor(DEFINITION, defaultProfileAt3bb0132())).toEqual({
       age: 30,
       years: 30,
       state: 'TX',
@@ -93,8 +93,8 @@ describe('engineInputsFor', () => {
 
   it('starts from a fresh engine base on every call', () => {
     const engineBase = vi.fn(DEFINITION.engineBase);
-    engineInputsFor({ ...DEFINITION, engineBase }, getDefaultFinancialProfile());
-    engineInputsFor({ ...DEFINITION, engineBase }, getDefaultFinancialProfile());
+    engineInputsFor({ ...DEFINITION, engineBase }, defaultProfileAt3bb0132());
+    engineInputsFor({ ...DEFINITION, engineBase }, defaultProfileAt3bb0132());
     expect(engineBase).toHaveBeenCalledTimes(2);
   });
 });
@@ -102,7 +102,7 @@ describe('engineInputsFor', () => {
 describe('prepareRun errors', () => {
   it('returns no errors for valid values, ignoring intake-only screens', () => {
     // lifeExpectancy 85 fails its min of 200, but only the intake shows it.
-    expect(prepareRun(DEFINITION, getDefaultFinancialProfile()).errors).toEqual({});
+    expect(prepareRun(DEFINITION, defaultProfileAt3bb0132()).errors).toEqual({});
   });
 
   it('reports form bounds and relations on profile paths', () => {
@@ -141,7 +141,7 @@ describe('prepareRun errors', () => {
       ...DEFINITION,
       validate: () => ({ untouched: 'Something else went wrong.' }),
     };
-    expect(prepareRun(definition, getDefaultFinancialProfile()).errors).toEqual({
+    expect(prepareRun(definition, defaultProfileAt3bb0132()).errors).toEqual({
       calculation: 'Something else went wrong.',
     });
   });

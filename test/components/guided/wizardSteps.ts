@@ -30,7 +30,7 @@ export interface AboutAnswers {
 }
 
 /** Fills the "A little about you" screen (the default profile's values unless given). */
-export async function fillAbout(user: User, { age = '30', state = 'Texas', status = 'Single' }: AboutAnswers = {}) {
+export async function fillAbout(user: User, { age = '25', state = 'California', status = 'Single' }: AboutAnswers = {}) {
   await typeInto('Your age', age);
   await chooseState(user, state);
   await user.click(within(screen.getByRole('radiogroup', { name: 'Tax filing status' })).getByRole('radio', { name: status }));
@@ -38,9 +38,9 @@ export async function fillAbout(user: User, { age = '30', state = 'Texas', statu
 
 /** Fills the paycheck screen with the default profile's values. */
 export async function fillPay(user: User) {
-  await typeInto('Gross pay per paycheck', '3500');
+  await typeInto('Gross pay per paycheck', '4000');
   await user.selectOptions(screen.getByLabelText('How often you are paid'), 'bi-weekly');
-  await typeInto('Take-home pay per paycheck', '2600');
+  await typeInto('Take-home pay per paycheck', '2550');
 }
 
 /** Answers the three basics screens with the default profile's values and moves past each. */

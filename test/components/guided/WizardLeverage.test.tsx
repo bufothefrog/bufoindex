@@ -41,7 +41,7 @@ describe('Wizard, leverage intent', () => {
     expect(screen.getByRole('heading', { name: FACTS })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Your age')).toHaveValue('');
-    expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '30');
+    expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '25');
     expect(screen.getByLabelText('Age you plan to stop contributing')).toBeInTheDocument();
     expect(screen.getByLabelText('Monthly taxable contribution')).toBeInTheDocument();
     // The comparison's own overrides and the leverage ratio are calculator-only.

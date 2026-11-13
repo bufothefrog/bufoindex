@@ -25,7 +25,7 @@ export interface PayFrequencyMeta {
   phrase: string;
   /** Intake option text, e.g. "Every two weeks". */
   intakeOption: string;
-  /** In-sentence cadence of the intake's core summary, e.g. "$3,500 every 2 weeks". */
+  /** In-sentence cadence of the intake's core summary, e.g. "$4,000 every 2 weeks". */
   cadence: string;
   /** Paychecks per month (FREQUENCY_MULTIPLIERS). */
   perMonth: number;

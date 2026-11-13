@@ -26,6 +26,7 @@ import { makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
 import { applyProfileWrites, BROKERAGE_ACCOUNT_ID, getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
+import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
 const V1_DEFAULT = {
   version: 1,
@@ -46,8 +47,15 @@ const V1_DEFAULT = {
   provided: [] as string[],
 };
 
+/**
+ * A v1 payload loaded over the 3bb0132 defaults the fixture was captured on
+ * (the worked example's securities come from there), every field answered
+ * (test/factories/profile-3bb0132.ts).
+ */
 function fromV1(investing: Partial<typeof V1_DEFAULT.investing>): FinancialProfile {
-  return normalizeProfile({ ...V1_DEFAULT, investing: { ...V1_DEFAULT.investing, ...investing } });
+  return answeredEverywhere(
+    normalizeProfile({ ...V1_DEFAULT, investing: { ...V1_DEFAULT.investing, ...investing } }, defaultProfileAt3bb0132())
+  );
 }
 
 /** `profile` with the Brokerage account's deposit (its new cash) set to `deposit`, past the store's own checks. */
@@ -147,7 +155,7 @@ const severalValue = (path: string): unknown => SEVERAL.find((write) => write.pa
 
 describe('portfolio bindings: golden against the old mapper output', () => {
   const GOLDEN: [string, FinancialProfile, RebalanceInputsV2][] = [
-    ['the default profile', getDefaultFinancialProfile(), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
+    ['the 3bb0132 default profile, every field answered', answeredEverywhere(defaultProfileAt3bb0132()), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
     ['the v1 default', fromV1({}), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
     [
       'a v1 100/0 mix with a $2,400 Brokerage deposit',
@@ -188,9 +196,15 @@ describe('portfolio bindings: golden against the old mapper output', () => {
     });
   });
 
-  it('pins the default profile inputs and their rebalance', () => {
+  it('pins the default profile inputs and their rebalance (PR 3 example prices)', () => {
     const inputs = engineInputsFor(PORTFOLIO_CALCULATOR, getDefaultFinancialProfile());
     expect(inputs.setupMode).toBe('multi-shared');
+    expect(inputs.securities.map((sec) => [sec.ticker, sec.price])).toEqual([
+      ['VTI', 375],
+      ['VXUS', 85],
+      ['BND', 70],
+    ]);
+    expect(inputs.holdings).toEqual(EXAMPLE_HOLDINGS);
     expect(inputs.accounts.map((a) => [a.id, a.deposit])).toEqual([
       ['acc-roth', 0],
       ['acc-brok', 1000],
@@ -203,9 +217,9 @@ describe('portfolio bindings: golden against the old mapper output', () => {
       ['cash', 0],
     ]);
     expect([inputs.mode, inputs.allowTaxableSelling, inputs.showPlacementAdvice]).toEqual(['whole', false, true]);
-    // Roth 10 x 250 + 5 x 75 = 2,875; Brokerage 20 x 250 + 15 x 60 = 5,900.
+    // Roth 10 x 375 + 5 x 70 = 4,100; Brokerage 20 x 375 + 15 x 85 = 8,775.
     const result = PORTFOLIO_CALCULATOR.calculate(inputs);
-    expect(result.totalValueBefore).toBe(8775);
+    expect(result.totalValueBefore).toBe(12875);
     expect(result.totalDeposit).toBe(1000);
   });
 

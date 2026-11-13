@@ -11,6 +11,7 @@ import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { composeDisclaimer, DISCLAIMER } from '@/lib/constants/disclaimers';
 import { TARGET_MIX_LABELS } from '@/lib/constants/labels';
+import { withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -39,7 +40,10 @@ const OVERVIEW_DISCLAIMER = composeDisclaimer(DISCLAIMER.overview, DISCLAIMER.ov
 export function OverviewDashboard({ className }: OverviewDashboardProps) {
   const hasHydrated = useProfileStore((s) => s.hasHydrated);
   const hasProfile = useProfileStore((s) => s.hasProfile);
-  const profile = useProfileStore((s) => s.profile);
+  const stored = useProfileStore((s) => s.profile);
+  // Every card reads the profile with its unanswered derived leaves filled
+  // (lib/profile/derived.ts), as the calculators do.
+  const profile = useMemo(() => withDerivedValues(stored), [stored]);
   const reset = useProfileStore((s) => s.reset);
 
   const ready = hasHydrated && hasProfile;

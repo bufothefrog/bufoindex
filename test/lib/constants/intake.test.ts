@@ -424,7 +424,7 @@ describe('buildIntakeSubmission', () => {
   it('drops unknown paths', () => {
     const result = buildIntakeSubmission('core', values(), ['person.age', 'person.nickname'], ['cash.targetMonths']);
     expect(result.providedPaths).toEqual(['person.age']);
-    expect(result.writes).toEqual([{ path: 'person.age', value: 30 }]);
+    expect(result.writes).toEqual([{ path: 'person.age', value: 25 }]);
   });
 
   it('keeps stored emergency months that came from the old preset write, in every flow', () => {
@@ -432,14 +432,14 @@ describe('buildIntakeSubmission', () => {
     // cash-flow investor preset without marking it provided. No intake rewrites it.
     for (const flow of [...CALCULATOR_INTENTS, 'core', 'profile'] as const) {
       const result = buildIntakeSubmission(flow, values({ cash: { targetMonths: 1 } }), ['person.age']);
-      expect(result.writes, flow).toEqual([{ path: 'person.age', value: 30 }]);
+      expect(result.writes, flow).toEqual([{ path: 'person.age', value: 25 }]);
     }
   });
 
   it('marks a "strategy.preset" answer from an old wizard session as unknown and drops it', () => {
     const result = buildIntakeSubmission('profile', values(), ['strategy.preset', 'person.age']);
     expect(result.providedPaths).toEqual(['person.age']);
-    expect(result.writes).toEqual([{ path: 'person.age', value: 30 }]);
+    expect(result.writes).toEqual([{ path: 'person.age', value: 25 }]);
   });
 
   it('keeps emergency months entered in the same intake', () => {
@@ -569,7 +569,7 @@ describe('LEARN_OPTIONS', () => {
 describe('coreSummary', () => {
   it('summarizes a complete core in one line', () => {
     expect(coreSummary(profileWith([...CORE_PATHS]))).toBe(
-      '30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs'
+      '25, CA, single, $4,000 gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs'
     );
   });
 
@@ -609,9 +609,9 @@ describe('coreSummary', () => {
   });
 
   it('words take-home pay, with the cadence on the gross amount when both are saved', () => {
-    expect(coreSummary(profileWith(['income.netPerPaycheck']))).toBe('$2,600 take-home');
+    expect(coreSummary(profileWith(['income.netPerPaycheck']))).toBe('$2,550 take-home');
     expect(coreSummary(profileWith(['income.netPerPaycheck', 'income.frequency']))).toBe(
-      'paid every 2 weeks, $2,600 take-home'
+      'paid every 2 weeks, $2,550 take-home'
     );
   });
 
@@ -619,7 +619,7 @@ describe('coreSummary', () => {
     const profile = profileWith([...CORE_PATHS]);
     const get = makeGet(profile);
     const cards = CORE_SCREENS.map((screen) => summarizeScreen(CORE_FORM, screen, get));
-    expect(cards).toEqual(['30, TX, single', '$3,500 gross every 2 weeks, $2,600 take-home', '$3,000 a month']);
+    expect(cards).toEqual(['25, CA, single', '$4,000 gross every 2 weeks, $2,550 take-home', '$3,000 a month']);
     expect(coreSummary(profile)).toBe(`${cards[0]}, ${cards[1]}, ${cards[2]} in must-pay costs`);
   });
 });

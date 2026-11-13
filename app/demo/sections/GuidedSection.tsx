@@ -97,7 +97,7 @@ export function GuidedSection() {
               <ReviewTopicRow
                 anchorId="demo-topic-pay"
                 title="What does a typical paycheck look like?"
-                summary="$3,500 gross every 2 weeks, $2,600 take-home"
+                summary="$4,000 gross every 2 weeks, $2,550 take-home"
                 status="answered"
                 href="/start/review/pay"
               />

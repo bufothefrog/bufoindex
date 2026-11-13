@@ -91,7 +91,7 @@ describe('ContinueProfileCard', () => {
     expect(link).toHaveAttribute('href', '/start/choose');
     // Default core values, all marked as answered.
     expect(link).toHaveTextContent(
-      '30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs. 3 of 14 topics answered, saved in this browser.'
+      '25, CA, single, $4,000 gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs. 3 of 14 topics answered, saved in this browser.'
     );
   });
 

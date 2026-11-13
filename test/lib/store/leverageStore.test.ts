@@ -29,10 +29,10 @@ describe('useLeverageStore', () => {
   it('runs the profile through the simulation in-thread on an immediate submit', () => {
     useLeverageStore.getState().submit(profile(), { immediate: true });
     const { inputs, results, errors, stale, hasCalculatedOnce } = useLeverageStore.getState();
-    // The default profile: $500 taxable a month, age 30 to 60, $25,000 invested, 2x.
-    expect(inputs).toMatchObject({ monthlyContribution: 500, years: 30, startingBalance: 25000, leverageRatio: 2 });
+    // The default profile: $500 taxable a month, age 25 to 65, $25,000 invested, 2x.
+    expect(inputs).toMatchObject({ monthlyContribution: 500, years: 40, startingBalance: 25000, leverageRatio: 2 });
     expect(results).toEqual(simulateDcaComparison(inputs!));
-    expect(results!.totalContributed).toBe(500 * 360 + 25000);
+    expect(results!.totalContributed).toBe(500 * 480 + 25000);
     expect(errors).toEqual({});
     expect(stale).toBe(false);
     expect(hasCalculatedOnce).toBe(true);
@@ -44,7 +44,7 @@ describe('useLeverageStore', () => {
     vi.advanceTimersByTime(249);
     expect(useLeverageStore.getState().results).toBeNull();
     vi.advanceTimersByTime(1);
-    expect(useLeverageStore.getState().inputs?.years).toBe(30);
+    expect(useLeverageStore.getState().inputs?.years).toBe(40);
 
     useProfileStore.getState().setValues([{ path: 'leverage.years', value: 12 }]);
     useLeverageStore.getState().submit(profile());
@@ -52,7 +52,7 @@ describe('useLeverageStore', () => {
     useProfileStore.getState().setValues([{ path: 'leverage.years', value: 15 }]);
     useLeverageStore.getState().submit(profile());
     vi.advanceTimersByTime(249);
-    expect(useLeverageStore.getState().inputs?.years).toBe(30);
+    expect(useLeverageStore.getState().inputs?.years).toBe(40);
     vi.advanceTimersByTime(1);
     // The newer submit restarted the delay; only its inputs ran.
     expect(useLeverageStore.getState().inputs?.years).toBe(15);

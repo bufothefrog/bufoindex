@@ -32,6 +32,7 @@ import {
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
+import { derivedEmergencyFundBalance, derivedHsaCoverage, derivedTargetRetirementIncome } from './derived';
 import { getAt, isRecord, setAt } from '@/lib/fields/paths';
 import { isFiniteNumber } from '@/lib/fields/runtime';
 import type { Write } from '@/lib/fields/types';
@@ -88,49 +89,78 @@ export const BROKERAGE_ACCOUNT_ID = 'acc-brok';
 
 const DEFAULT_NEW_CASH = 1000;
 
+/**
+ * Take-home pay of the worked example (single, CA, $4,000 gross every two
+ * weeks, 8% traditional 401(k)), computed with the tax model the paycheck
+ * allocator itself uses and rounded to the nearest 50. Working (2026 tax
+ * year, test/lib/profile/defaults.test.ts recomputes it):
+ * - Gross per year: 4,000 x 26 = 104,000. 401(k): 8% = 8,320.
+ * - Federal: calculateAnnualFederalTax(104,000 - 8,320 = 95,680, single)
+ *   (lib/calculations/projections.ts): 95,680 - 16,100 standard deduction =
+ *   79,580 taxable; 1,240 + 4,560 + 6,419.60 = 12,219.60.
+ * - State: STATE_TAX_RATES_2026.CA.rate 9.3% of 95,680 = 8,898.24.
+ * - FICA: getFICARate(104,000, single) 7.65% of 104,000 = 7,956.
+ * - Take-home per year: 104,000 - 8,320 - 12,219.60 - 8,898.24 - 7,956 =
+ *   66,606.16; per paycheck 66,606.16 / 26 = 2,561.78, rounded to 2,550.
+ */
+const DEFAULT_NET_PER_PAYCHECK = 2550;
+
+/** Must-pay costs per month and the fun money range of the worked example. */
+const DEFAULT_NECESSARY_MONTHLY = 3000;
+const DEFAULT_FUN_MONEY_MIN = 300;
+const DEFAULT_FUN_MONEY_MAX = 600;
+
 export function getDefaultFinancialProfile(): FinancialProfile {
   const leverage = DEFAULT_DCA_COMPARISON_INPUTS;
   return {
     version: 2,
     updatedAt: 0,
     person: {
-      age: 30,
-      state: 'TX',
+      age: 25,
+      state: 'CA',
       filingStatus: 'single',
-      retirementAge: 60,
+      retirementAge: 65,
       lifeExpectancy: RetirementConstants.DEFAULT_LIFE_EXPECTANCY,
     },
     income: {
-      grossPerPaycheck: 3500,
-      netPerPaycheck: 2600,
+      grossPerPaycheck: 4000,
+      netPerPaycheck: DEFAULT_NET_PER_PAYCHECK,
       frequency: 'bi-weekly',
       hasBonus: false,
       bonusAmount: 0,
       bonusFrequency: 'annual',
     },
     spending: {
-      necessaryMonthly: 3000,
-      funMoneyMin: 300,
-      funMoneyMax: 600,
-      targetRetirementIncome: 80000,
+      necessaryMonthly: DEFAULT_NECESSARY_MONTHLY,
+      funMoneyMin: DEFAULT_FUN_MONEY_MIN,
+      funMoneyMax: DEFAULT_FUN_MONEY_MAX,
+      // Derived while unanswered (lib/profile/derived.ts); stored as the
+      // value the rule gives for the defaults, 41,000.
+      targetRetirementIncome: derivedTargetRetirementIncome(
+        DEFAULT_NECESSARY_MONTHLY,
+        DEFAULT_FUN_MONEY_MIN,
+        DEFAULT_FUN_MONEY_MAX
+      ),
     },
     cash: {
-      emergencyFundBalance: 5000,
+      // Derived while unanswered: three months of must-pay costs, 9,000.
+      emergencyFundBalance: derivedEmergencyFundBalance(DEFAULT_NECESSARY_MONTHLY),
       emergencyFundApy: 0.04,
       targetMonths: 3,
     },
     workplace: {
       has401k: true,
-      matchPercent: 0.5,
-      matchLimit: 0.06,
+      matchPercent: 1,
+      matchLimit: 0.04,
       contributionType: 'traditional',
-      contributionPercent: 0.06,
+      contributionPercent: 0.08,
       rothContributionPercent: 0,
       afterTaxAvailable: false,
     },
     hsa: {
       eligible: false,
-      coverage: 'individual',
+      // Derived while unanswered (family when filing jointly).
+      coverage: derivedHsaCoverage('single'),
       monthlyContribution: 0,
       employerAnnualContribution: 0,
       investing: false,
@@ -157,15 +187,21 @@ export function getDefaultFinancialProfile(): FinancialProfile {
     debts: [],
     // The rebalancer's three-fund worked example (Roth IRA plus a taxable
     // brokerage). The ids are stable so server and client render the same.
+    // Prices: the closing price on 2026-11-12, read on 2026-11-13 from two
+    // market data pages that agreed to the cent or within 0.02%: Yahoo
+    // Finance chart data (query1.finance.yahoo.com/v8/finance/chart/<ticker>:
+    // VTI 372.62, VXUS 82.66, BND 70.65) and the Nasdaq quote page
+    // (api.nasdaq.com/api/quote/<ticker>/info: VTI 372.57, VXUS 82.66, BND
+    // 70.65), each rounded to the nearest 5 dollars.
     portfolio: {
       accounts: [
         { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
         { id: BROKERAGE_ACCOUNT_ID, name: 'Brokerage', accountType: 'taxable', deposit: DEFAULT_NEW_CASH },
       ],
       securities: [
-        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
-        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
-        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 375, assetClass: 'us-stock' },
+        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 85, assetClass: 'intl-stock' },
+        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 70, assetClass: 'bonds' },
       ],
       holdings: [
         { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },

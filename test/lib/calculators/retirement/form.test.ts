@@ -174,7 +174,7 @@ describe('retirement form: screens', () => {
     // Age 30 holds 90% stocks; the returns come from the engine's glide path.
     const at30 = tdfProfileFor(30);
     expect(at30.stocks).toBe(0.9);
-    expect(resolveOptions(spec, fromDefaults())).toEqual([
+    expect(resolveOptions(spec, fromDefaults({ 'person.age': 30 }))).toEqual([
       {
         value: 'tdf',
         label: 'Target Date Fund',
@@ -200,14 +200,14 @@ describe('retirement form: screens', () => {
   it('summarizes the collapsed core cards with their values; take-home pay is not on them', () => {
     const summary = (id: string, get = fromDefaults()) => summarizeScreen(RETIREMENT_FORM, screen(id), get);
     // The filing status always shows; it says so when it runs here as single (the form's own FILING summary).
-    expect(summary('about')).toBe('30, TX, single');
+    expect(summary('about')).toBe('25, CA, single');
     expect(summary('about', fromDefaults({ 'person.filingStatus': 'marriedJoint' }))).toBe(
-      '30, TX, married filing jointly'
+      '25, CA, married filing jointly'
     );
     expect(summary('about', fromDefaults({ 'person.filingStatus': 'marriedSeparate' }))).toBe(
-      '30, TX, married filing separately, run here as single'
+      '25, CA, married filing separately, run here as single'
     );
-    expect(summary('pay')).toBe('$3,500 gross every 2 weeks');
+    expect(summary('pay')).toBe('$4,000 gross every 2 weeks');
     expect(summary('must-pay')).toBe('$3,000 a month');
   });
 
@@ -223,7 +223,7 @@ describe('retirement form: screens', () => {
       )
     ).toBe('8% / 6% returns, 15% volatility, 3% inflation, 15% tax rate, 1x healthcare');
     expect(summarizeScreen(RETIREMENT_FORM, screen('savings'), fromDefaults())).toBe('saving $1,500/mo, $25,000 invested');
-    expect(summarizeScreen(RETIREMENT_FORM, screen('target'), fromDefaults())).toBe('retire at 60, $80,000/yr target, plan to age 85');
+    expect(summarizeScreen(RETIREMENT_FORM, screen('target'), fromDefaults())).toBe('retire at 65, $41,000/yr target, plan to age 90');
     expect(summarizeScreen(RETIREMENT_FORM, screen('ss-healthcare'), fromDefaults())).toBe(
       'Social Security $30,000/yr, typical healthcare cost'
     );
@@ -246,13 +246,17 @@ describe('retirement form: screens', () => {
 
 describe('retirement form: nullable overrides', () => {
   it('estimates the effective tax rate from the target income and the filing status the model runs', () => {
+    const at80k = (values: Record<string, unknown> = {}) =>
+      fromDefaults({ 'spending.targetRetirementIncome': 80000, ...values });
     // 80,000 single: 63,900 taxable after the 16,100 deduction;
     // 1,240 + 4,560 + 2,970 = 8,770 tax, 10.9625%.
-    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, fromDefaults())).toBeCloseTo(0.109625, 10);
+    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, at80k())).toBeCloseTo(0.109625, 10);
     // Head of household runs as single (O10).
-    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, fromDefaults({ 'person.filingStatus': 'headOfHousehold' }))).toBeCloseTo(0.109625, 10);
+    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, at80k({ 'person.filingStatus': 'headOfHousehold' }))).toBeCloseTo(0.109625, 10);
     // Joint: 47,800 taxable after 32,200; 2,480 + 2,760 = 5,240 tax, 6.55%.
-    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, fromDefaults({ 'person.filingStatus': 'marriedJoint' }))).toBeCloseTo(0.0655, 10);
+    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, at80k({ 'person.filingStatus': 'marriedJoint' }))).toBeCloseTo(0.0655, 10);
+    // The PR 3 default target, 41,000 single: 24,900 taxable; 1,240 + 1,500 = 2,740 tax, 2,740 / 41,000.
+    expect(resolveOverrideDefault(EFFECTIVE_TAX_RATE, fromDefaults())).toBeCloseTo(2740 / 41000, 10);
     expect(EFFECTIVE_TAX_RATE.nullable?.autoLabel).toBe('Estimated from your target income and filing status');
   });
 

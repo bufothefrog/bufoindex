@@ -121,9 +121,9 @@ describe('leverage form: the comparison fields', () => {
     );
     expect(resolveText(years.nullable!.autoLabel, get)).toBe('From your age to the age you plan to stop contributing');
     expect(resolveText(balance.nullable!.autoLabel, get)).toBe('What you already have invested');
-    // Defaults: taxable $500, age 30 to 60, $25,000 invested.
+    // Defaults: taxable $500, age 25 to 65, $25,000 invested.
     const auto = (field: FieldSpec, g = get) => (field.nullable!.overrideDefault as (g: typeof get) => number)(g);
-    expect([auto(contribution), auto(years), auto(balance)]).toEqual([500, 30, 25000]);
+    expect([auto(contribution), auto(years), auto(balance)]).toEqual([500, 40, 25000]);
     expect(auto(contribution, fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toBe(1500);
   });
 
@@ -167,7 +167,7 @@ describe('leverage form: the comparison fields', () => {
 
   it('summarizes each screen in one line, auto values included', () => {
     const [comparison, , market] = LEVERAGE_FORM.screens;
-    expect(summarizeScreen(LEVERAGE_FORM, comparison, fromDefaults())).toBe('$500/mo, 30 years, $25,000 start, 2x fund');
+    expect(summarizeScreen(LEVERAGE_FORM, comparison, fromDefaults())).toBe('$500/mo, 40 years, $25,000 start, 2x fund');
     expect(
       summarizeScreen(LEVERAGE_FORM, comparison, fromDefaults({ 'leverage.monthlyContribution': 750, 'leverage.years': 1 }))
     ).toBe('$750/mo, 1 year, $25,000 start, 2x fund');

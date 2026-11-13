@@ -20,16 +20,21 @@ import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { applyWrites } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
+import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { PaycheckProfile } from '@/lib/types';
+import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
-/** A v1-shaped profile: the given sections over the defaults, normalized the way any stored profile is. */
-const v1 = (patch: ProfilePatch = {}): FinancialProfile => normalizeProfile(patch);
+/**
+ * A v1-shaped profile: the given sections over the 3bb0132 defaults the
+ * fixture was captured on, normalized the way any stored profile is, every
+ * field answered (test/factories/profile-3bb0132.ts).
+ */
+const v1 = (patch: ProfilePatch = {}): FinancialProfile => answeredAt3bb0132(patch);
 
-/** The default profile with `writes` applied; each must be a valid profile write, or the test fails. */
+/** The 3bb0132 default profile, all answered, with `writes` applied; each must be a valid profile write, or the test fails. */
 function withWrites(writes: Write[]): FinancialProfile {
-  const { profile, accepted } = applyProfileWrites(getDefaultFinancialProfile(), writes);
+  const { profile, accepted } = applyProfileWrites(answeredEverywhere(defaultProfileAt3bb0132()), writes);
   expect(accepted).toEqual(writes.map((write) => write.path));
   return profile;
 }
@@ -319,26 +324,28 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
     expect(inputs.debts).toEqual(profile.debts);
   });
 
-  it('pins the default profile value by value where the profile sets it', () => {
+  it('pins the default profile value by value where the profile sets it (the PR 3 worked example)', () => {
     const inputs = engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile());
-    expect(inputs.income).toMatchObject({ grossPaycheck: 3500, frequency: 'bi-weekly', regularBonus: false });
-    expect(inputs.taxes).toMatchObject({ federalBracket: 0.22, state: 'TX', filingStatus: 'single' });
+    expect(inputs.income).toMatchObject({ grossPaycheck: 4000, netPaycheck: 2550, frequency: 'bi-weekly', regularBonus: false });
+    expect(inputs.taxes).toMatchObject({ federalBracket: 0.22, state: 'CA', filingStatus: 'single' });
     expect(inputs.benefits.employer401k).toMatchObject({
       available: true,
-      matchPercent: 0.5,
-      matchLimit: 0.06,
+      matchPercent: 1,
+      matchLimit: 0.04,
       contributionType: 'traditional',
-      currentContribution: 0.06,
-      traditionalContribution: 0.06,
+      currentContribution: 0.08,
+      traditionalContribution: 0.08,
       rothContribution: 0,
     });
+    expect(inputs.benefits.hsa.coverageType).toBe('individual');
     expect(inputs.preferences).toMatchObject({
       emergencyFundMonths: 3,
-      currentEmergencyFund: 5000,
+      // Derived while unanswered: 3 x 3,000 of must-pay costs.
+      currentEmergencyFund: 9000,
       emergencyFundAPY: 0.04,
       necessaryExpenses: 3000,
       funMoney: { min: 300, max: 600, current: 450 },
-      age: 30,
+      age: 25,
       hasTaxableAccount: true,
       taxableAccountContribution: 500,
     });

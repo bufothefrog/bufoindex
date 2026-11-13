@@ -54,17 +54,17 @@ describe('reviewTopic', () => {
   it('lists only the answered facts of a partly answered topic, never a typical sibling value', () => {
     const result = reviewTopic(PROFILE_FORM, screenOf('pay'), get, ['income.grossPerPaycheck']);
     expect(result.status).toBe('partial');
-    expect(result.summary).toBe('Gross pay per paycheck: $3,500');
+    expect(result.summary).toBe('Gross pay per paycheck: $4,000');
     // The card summary would word the typical pay frequency with it.
     expect(result.summary).not.toMatch(/week/);
-    expect(result.summary).not.toMatch(/2,600/);
+    expect(result.summary).not.toMatch(/2,550/);
   });
 
   it('accepts the answered paths as a set or an array', () => {
     const asSet = reviewTopic(PROFILE_FORM, screenOf('about'), get, new Set(['person.age']));
     const asArray = reviewTopic(PROFILE_FORM, screenOf('about'), get, ['person.age']);
     expect(asSet).toEqual(asArray);
-    expect(asArray.summary).toMatch(/30/);
+    expect(asArray.summary).toMatch(/25/);
   });
 
   it('falls back to "Answered" when no answered fact can be put in words', () => {

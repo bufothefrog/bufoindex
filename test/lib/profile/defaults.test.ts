@@ -31,6 +31,11 @@ import {
 import type { PresetTargetMix } from '@/lib/profile/defaults';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
 import { RetirementConstants } from '@/lib/constants/retirement';
+import { calculateAnnualFederalTax } from '@/lib/calculations/projections';
+import { STATE_TAX_RATES_2026 } from '@/lib/constants/states-2026';
+import { DEFAULT_FINANCING_RATE, SHORT_RATE_ASSUMPTION, SWAP_FINANCING_SPREAD } from '@/lib/constants/leverage';
+import { withDerivedValues } from '@/lib/profile/derived';
+import { getFICARate } from '@/lib/utils';
 
 /** The 25 leaves of the v1 profile, as v1 listed them. */
 const V1_LEAF_PATHS = [
@@ -44,28 +49,76 @@ const V1_LEAF_PATHS = [
   'strategy.preset', 'strategy.leverageRatio',
 ];
 
+describe('the PR 3 worked example', () => {
+  it('is the example the site owner filled in: 25, CA, single, retiring at 65, planning to 90', () => {
+    const p = getDefaultFinancialProfile();
+    expect(p.person).toEqual({ age: 25, state: 'CA', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 });
+    expect(p.income).toMatchObject({ grossPerPaycheck: 4000, frequency: 'bi-weekly', hasBonus: false });
+    expect(p.spending).toMatchObject({ necessaryMonthly: 3000, funMoneyMin: 300, funMoneyMax: 600 });
+    expect(p.cash).toMatchObject({ emergencyFundApy: 0.04, targetMonths: 3 });
+    expect(p.workplace).toMatchObject({ has401k: true, matchPercent: 1, matchLimit: 0.04, contributionType: 'traditional', contributionPercent: 0.08 });
+  });
+
+  it("computes take-home pay with the paycheck allocator's own tax model, to the nearest 50", () => {
+    const p = getDefaultFinancialProfile();
+    const annualGross = p.income.grossPerPaycheck * 26;
+    const deferral = annualGross * p.workplace.contributionPercent;
+    const wages = annualGross - deferral;
+    const federal = calculateAnnualFederalTax(wages, p.person.filingStatus);
+    const state = wages * STATE_TAX_RATES_2026.CA.rate;
+    const fica = annualGross * getFICARate(annualGross, p.person.filingStatus);
+    // By hand: 104,000 - 8,320 - 12,219.60 - 8,898.24 - 7,956 = 66,606.16 a year.
+    expect(federal).toBeCloseTo(12219.6, 6);
+    expect(state).toBeCloseTo(8898.24, 6);
+    expect(fica).toBeCloseTo(7956, 6);
+    const perPaycheck = (annualGross - deferral - federal - state - fica) / 26;
+    expect(perPaycheck).toBeCloseTo(2561.775, 3);
+    expect(p.income.netPerPaycheck).toBe(Math.round(perPaycheck / 50) * 50);
+    expect(p.income.netPerPaycheck).toBe(2550);
+  });
+
+  it('stores what the derived rules give for its own answers', () => {
+    const p = getDefaultFinancialProfile();
+    expect(p.cash.emergencyFundBalance).toBe(9000);
+    expect(p.spending.targetRetirementIncome).toBe(41000);
+    expect(p.hsa.coverage).toBe('individual');
+    expect(withDerivedValues(p)).toBe(p);
+  });
+
+  it('prices the example funds at whole multiples of 5 dollars', () => {
+    const prices = getDefaultFinancialProfile().portfolio.securities.map((s) => [s.ticker, s.price]);
+    expect(prices).toEqual([['VTI', 375], ['VXUS', 85], ['BND', 70]]);
+  });
+
+  it('keeps the financing rate at the 4% short rate plus the 0.5 point spread', () => {
+    expect(SHORT_RATE_ASSUMPTION).toBe(0.04);
+    expect(SWAP_FINANCING_SPREAD).toBe(0.005);
+    expect(DEFAULT_FINANCING_RATE).toBeCloseTo(0.045, 12);
+  });
+});
+
 describe('getDefaultFinancialProfile', () => {
   it('returns the documented v2 placeholder values', () => {
     expect(getDefaultFinancialProfile()).toEqual({
       version: 2,
       updatedAt: 0,
-      person: { age: 30, state: 'TX', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 },
+      person: { age: 25, state: 'CA', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 },
       income: {
-        grossPerPaycheck: 3500,
-        netPerPaycheck: 2600,
+        grossPerPaycheck: 4000,
+        netPerPaycheck: 2550,
         frequency: 'bi-weekly',
         hasBonus: false,
         bonusAmount: 0,
         bonusFrequency: 'annual',
       },
-      spending: { necessaryMonthly: 3000, funMoneyMin: 300, funMoneyMax: 600, targetRetirementIncome: 80000 },
-      cash: { emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 3 },
+      spending: { necessaryMonthly: 3000, funMoneyMin: 300, funMoneyMax: 600, targetRetirementIncome: 41000 },
+      cash: { emergencyFundBalance: 9000, emergencyFundApy: 0.04, targetMonths: 3 },
       workplace: {
         has401k: true,
-        matchPercent: 0.5,
-        matchLimit: 0.06,
+        matchPercent: 1,
+        matchLimit: 0.04,
         contributionType: 'traditional',
-        contributionPercent: 0.06,
+        contributionPercent: 0.08,
         rothContributionPercent: 0,
         afterTaxAvailable: false,
       },
@@ -85,9 +138,9 @@ describe('getDefaultFinancialProfile', () => {
           { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 1000 },
         ],
         securities: [
-          { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
-          { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
-          { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+          { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 375, assetClass: 'us-stock' },
+          { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 85, assetClass: 'intl-stock' },
+          { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 70, assetClass: 'bonds' },
         ],
         holdings: [
           { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
@@ -157,7 +210,7 @@ describe('getDefaultFinancialProfile', () => {
     a.portfolio.accounts[0].deposit = 5;
     a.assumptions.retirement.volatility = 0.3;
     const b = getDefaultFinancialProfile();
-    expect(b.person.age).toBe(30);
+    expect(b.person.age).toBe(25);
     expect(b.provided).toEqual([]);
     expect(b.portfolio.accounts[0].deposit).toBe(0);
     expect(b.assumptions.retirement.volatility).toBe(0.15);
@@ -293,7 +346,7 @@ describe('path registry', () => {
 
   it('reads any profile path and nothing else', () => {
     const p = getDefaultFinancialProfile();
-    expect(getProfileValue(p, 'income.grossPerPaycheck')).toBe(3500);
+    expect(getProfileValue(p, 'income.grossPerPaycheck')).toBe(4000);
     expect(getProfileValue(p, 'workplace.has401k')).toBe(true);
     expect(getProfileValue(p, 'assumptions.retirement.effectiveTaxRate')).toBeNull();
     expect(getProfileValue(p, 'portfolio.accounts.1.deposit')).toBe(1000);
@@ -389,9 +442,9 @@ describe('normalizeProfile', () => {
     });
     expect(p.version).toBe(2);
     expect(p.updatedAt).toBe(1234);
-    expect(p.person).toEqual({ age: 45, state: 'NY', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 });
+    expect(p.person).toEqual({ age: 45, state: 'NY', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 });
     expect(p.income).toEqual(getDefaultFinancialProfile().income);
-    expect(p.cash).toEqual({ emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 6 });
+    expect(p.cash).toEqual({ emergencyFundBalance: 9000, emergencyFundApy: 0.04, targetMonths: 6 });
     // The removed strategy preset is an unknown key now and is dropped.
     expect(p.strategy).toEqual({ leverageRatio: 3 });
     expect(p.assumptions.retirement).toEqual({ ...getDefaultFinancialProfile().assumptions.retirement, volatility: 0.2 });
@@ -429,7 +482,7 @@ describe('normalizeProfile', () => {
     p.provided.push('person.age');
     p.portfolio.accounts[1].deposit = 1;
     p.assumptions.portfolio.mode = 'fractional';
-    expect(base.person.age).toBe(30);
+    expect(base.person.age).toBe(25);
     expect(base.provided).toEqual([]);
     expect(base.portfolio.accounts[1].deposit).toBe(1000);
     expect(base.assumptions.portfolio.mode).toBe('whole');
@@ -552,7 +605,7 @@ describe('applyProfileWrites', () => {
     expect(profile.assumptions.retirement.effectiveTaxRate).toBe(0.18);
     expect(accepted).toEqual(['person.age', 'assumptions.retirement.effectiveTaxRate', 'person.age']);
     expect(profile.income).toBe(base.income);
-    expect(base.person.age).toBe(30);
+    expect(base.person.age).toBe(25);
   });
 
   it('refuses unknown paths and invalid values, keeping the previous value', () => {

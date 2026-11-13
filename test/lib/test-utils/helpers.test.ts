@@ -111,7 +111,7 @@ describe('renderWithProfile', () => {
 
   it('renders against the defaults when no profile is given', () => {
     renderWithProfile(createElement(AgeProbe))
-    expect(screen.getByText('Age is 30')).toBeInTheDocument()
+    expect(screen.getByText('Age is 25')).toBeInTheDocument()
   })
 })
 

@@ -8,12 +8,19 @@ import { engineErrorsToFields, toEngineInputs } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import { screensFor, validateFields } from '@/lib/fields/runtime';
 import type { FieldErrors } from '@/lib/fields/types';
+import { withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { CalculatorDefinition } from './types';
 
-/** The engine inputs `def` computes from the profile `values`. */
+/**
+ * The engine inputs `def` computes from the profile `values`, with every
+ * unanswered derived leaf filled first (withDerivedValues). This and
+ * prepareRun are the only callers of toEngineInputs on a visitor's profile,
+ * so no binding reads a derived leaf's stored value
+ * (test/lib/profile/derived.test.ts checks both).
+ */
 export function engineInputsFor<E, R>(def: CalculatorDefinition<E, R>, values: FinancialProfile): E {
-  return toEngineInputs(def.bindings, def.engineBase(), makeGet(values));
+  return toEngineInputs(def.bindings, def.engineBase(), makeGet(withDerivedValues(values)));
 }
 
 /** Engine inputs and validation errors from one pass over the profile. */
@@ -36,7 +43,7 @@ export interface PreparedRun<E> {
  * engine errors fill only the paths the form left clean.
  */
 export function prepareRun<E, R>(def: CalculatorDefinition<E, R>, values: FinancialProfile): PreparedRun<E> {
-  const get = makeGet(values);
+  const get = makeGet(withDerivedValues(values));
   const inputs = toEngineInputs(def.bindings, def.engineBase(), get);
   const errors: FieldErrors = {};
   const add = (more: FieldErrors) => {

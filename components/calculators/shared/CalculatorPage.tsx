@@ -13,6 +13,7 @@ import { makeGet } from '@/lib/fields/paths';
 import { screenPaths } from '@/lib/fields/runtime';
 import type { FieldErrors, ScreenSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -76,7 +77,7 @@ interface ResultsBodyProps<E, R> {
  * change (D29).
  */
 const ResultsBody = React.memo(function ResultsBody<E, R>({ results, inputs, stale, renderResults }: ResultsBodyProps<E, R>) {
-  const values = useProfileStore.getState().profile;
+  const values = withDerivedValues(useProfileStore.getState().profile);
   return <>{renderResults({ results, inputs, values, stale })}</>;
 }) as <E, R>(props: ResultsBodyProps<E, R>) => React.ReactElement;
 

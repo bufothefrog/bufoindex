@@ -199,9 +199,9 @@ describe('FieldSection', () => {
       </>
     );
     const line = (title: string) => within(screen.getByRole('region', { name: title })).getByText(/./, { selector: 'p' });
-    expect(line('A little about you')).toHaveTextContent(/^30, TX, single$/);
+    expect(line('A little about you')).toHaveTextContent(/^25, CA, single$/);
     expect(line('What does a typical paycheck look like?')).toHaveTextContent(
-      /^\$3,500 gross every 2 weeks, \$2,600 take-home$/
+      /^\$4,000 gross every 2 weeks, \$2,550 take-home$/
     );
     expect(line('What do you have to pay each month?')).toHaveTextContent(/^\$3,000 a month$/);
     expect(screen.queryByText(/Age sets the time horizon/)).not.toBeInTheDocument();

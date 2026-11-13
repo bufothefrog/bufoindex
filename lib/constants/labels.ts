@@ -41,7 +41,7 @@ function optionsFrom<V extends string>(
 export interface FilingStatusMeta {
   /** Select-option and heading text. */
   label: string;
-  /** In-sentence text, e.g. "30, TX, married filing jointly". */
+  /** In-sentence text, e.g. "25, CA, married filing jointly". */
   phrase: string;
 }
 

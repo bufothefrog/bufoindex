@@ -126,11 +126,11 @@ describe('RetirementCalculator', () => {
     await showAssumptions();
 
     const tax = screen.getByRole('group', { name: 'Effective tax rate' });
-    // 80,000 single: 8,770 of tax, 10.96%.
-    expect(tax).toHaveTextContent('Estimated from your target income and filing status: 10.96%');
+    // The derived 41,000 target, single: 2,740 of tax, 6.68%.
+    expect(tax).toHaveTextContent('Estimated from your target income and filing status: 6.68%');
     await userEvent.setup().click(within(tax).getByRole('radio', { name: 'Custom' }));
 
-    expect(useProfileStore.getState().profile.assumptions.retirement.effectiveTaxRate).toBeCloseTo(0.109625, 10);
+    expect(useProfileStore.getState().profile.assumptions.retirement.effectiveTaxRate).toBeCloseTo(2740 / 41000, 10);
     expect(within(tax).getByRole('textbox', { name: 'Effective tax rate' })).toBeInTheDocument();
   });
 

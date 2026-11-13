@@ -1,5 +1,7 @@
 /**
- * Every figure the overview cards show, for three fixed profiles. The
+ * Every figure the overview cards show, for four fixed profiles. The
+ * 'example' profile is the PR 3 default (figures captured on 2026-11-13);
+ * the other three were built so their figures stay as captured before. The
  * paycheck, retirement, cash (apart from O16) and automation figures were
  * captured once from the dashboard before slice d1 and must not move; the
  * leverage figures are the comparison page's own (the card now runs the
@@ -23,8 +25,19 @@ import { useProfileStore } from '@/lib/store/profileStore';
 import { resetProfileStore } from '@/test/utils/stores';
 
 const PROFILES = {
-  /** The default profile, with only the age answered. */
-  basics: { person: { age: 30 } },
+  /**
+   * The 3bb0132 default profile (the worked example before PR 3), answered:
+   * its figures were captured on it and stay as they were.
+   */
+  basics: {
+    person: { age: 30, state: 'TX', retirementAge: 60, lifeExpectancy: 85 },
+    income: { grossPerPaycheck: 3500, netPerPaycheck: 2600 },
+    spending: { targetRetirementIncome: 80000 },
+    cash: { emergencyFundBalance: 5000 },
+    workplace: { matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
+  },
+  /** The PR 3 default profile, with only the age answered (25, its default). */
+  example: { person: { age: 25 } },
   /** Weekly pay, joint filing, cash above the default 3-month target, a 3x ratio. */
   rich: {
     person: { age: 41, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 60, lifeExpectancy: 92 },
@@ -35,11 +48,17 @@ const PROFILES = {
     investing: { investedBalance: 250000, monthlyContribution: 2500, taxableMonthlyContribution: 700, targetMix: '60-40' },
     strategy: { leverageRatio: 3 },
   },
-  /** Monthly pay, a thin margin, a custom 2-month target, no monthly investing. */
+  /**
+   * Monthly pay, a thin margin, a custom 2-month target, no monthly
+   * investing. The leaves it leaves to the defaults are pinned to the 3bb0132
+   * example (TX, life expectancy 85, $80,000 target, 50% of the first 6%,
+   * 6% contribution), so its captured figures stay.
+   */
   lean: {
-    person: { age: 52, retirementAge: 67 },
+    person: { age: 52, state: 'TX', retirementAge: 67, lifeExpectancy: 85 },
+    spending: { necessaryMonthly: 3500, targetRetirementIncome: 80000 },
+    workplace: { matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
     income: { grossPerPaycheck: 5200, netPerPaycheck: 3900, frequency: 'monthly' },
-    spending: { necessaryMonthly: 3500 },
     cash: { emergencyFundBalance: 1500, emergencyFundApy: 0.01, targetMonths: 2 },
     investing: { investedBalance: 40000, monthlyContribution: 0, taxableMonthlyContribution: 0, targetMix: 'custom' },
     strategy: { leverageRatio: 1.5 },
@@ -96,6 +115,15 @@ describe('PaycheckCard', () => {
       [['Emergency FundBuild from 1.7 to 3 months expenses. Good HYSA rate', '$1,077']],
     ],
     [
+      'example',
+      'Take-home $2,550 per bi-weekly paycheck: $1,385 necessary expenses, $138 fun money (the minimum), and $1,027 to allocate.',
+      [
+        ['Roth IRAYoung + not peak earnings = Roth for maximum tax-free growth', '$288'],
+        ['Roth 401kRoth 401k recommended for tax-free growth and retirement flexibility', '$622'],
+        ['Taxable InvestmentBuild wealth with tax-efficient index funds (VTI/VTSAX)', '$116'],
+      ],
+    ],
+    [
       'rich',
       'Take-home $1,750 per weekly paycheck: $969 necessary expenses, $69 fun money (the minimum), and $712 to allocate.',
       [
@@ -140,6 +168,8 @@ describe('RetirementOddsCard', () => {
   it.each<[ProfileName, string, string, string, string, string]>([
     ['basics', '5%', 'Share of 1,000 seeded paths with money left at age 85, retiring at 60', '$1,037,677', '$2,000,000',
       "Saving $500 more per month moves the simulated success rate from 5% to 36.4% and the projected balance to $1,343,473 in today's dollars (same simulated markets)."],
+    ['example', '100%', 'Share of 1,000 seeded paths with money left at age 90, retiring at 65', '$1,735,749', '$1,025,000',
+      "Saving $500 more per month moves the simulated success rate from 100% to 100% and the projected balance to $2,249,490 in today's dollars (same simulated markets)."],
     ['rich', '8.3%', 'Share of 1,000 seeded paths with money left at age 92, retiring at 60', '$1,350,387', '$2,250,000',
       "Saving $500 more per month moves the simulated success rate from 8.3% to 18% and the projected balance to $1,495,138 in today's dollars (same simulated markets)."],
     ['lean', '0%', 'Share of 1,000 seeded paths with money left at age 85, retiring at 67', '$72,086', '$2,000,000',
@@ -174,6 +204,13 @@ describe('CashBufferCard', () => {
       [['Emergency fund', '$5,000Earning 4% APY'], ['Months on hand', '1.7 monthsAt $3,000/mo necessary expenses'],
         ['Target', '$9,0003 months of necessary expenses']],
       'The fund is $4,000 below the 3 months target.',
+    ],
+    [
+      'example',
+      // Unanswered, the balance is derived: 3 x $3,000 of must-pay costs.
+      [['Emergency fund', '$9,000Earning 4% APY'], ['Months on hand', '3 monthsAt $3,000/mo necessary expenses'],
+        ['Target', '$9,0003 months of necessary expenses']],
+      'The fund matches the 3 months target.',
     ],
     [
       'rich',
@@ -220,6 +257,18 @@ describe('LeverageCard', () => {
         ['10th percentile', '$189,729', '$104,511'],
         ['90th percentile', '$1,074,258', '$3,071,470'],
         ['Median max drawdown', '36.8%', '70.1%'],
+      ],
+      'The 2x fund ended behind the index fund in 40% of 500 simulated paths. Estimated annual drag from volatility, financing, and fees: 8%.',
+    ],
+    [
+      'example',
+      '$500/mo of taxable contributions for 40 years ($265,000 in total, starting from $25,000), into an index fund or a 2x daily-reset fund on the same dates.',
+      [
+        ['Metric', 'Index', '2x fund'],
+        ['Median ending balance', '$776,692', '$922,371'],
+        ['10th percentile', '$314,335', '$162,750'],
+        ['90th percentile', '$2,427,008', '$9,033,310'],
+        ['Median max drawdown', '38.7%', '73.5%'],
       ],
       'The 2x fund ended behind the index fund in 40% of 500 simulated paths. Estimated annual drag from volatility, financing, and fees: 8%.',
     ],
@@ -309,6 +358,16 @@ describe('AutomationChecklistCard', () => {
         'Emergency Fund$1,077Save $1,077 per paycheck toward emergency fund target',
       ],
       '0 of 2 set up.',
+    ],
+    [
+      'example',
+      [
+        '401(k) payroll deferral$3208% of grossPayroll election at 8% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
+        'Roth IRA$288Contribute $288 per paycheck to Roth IRA ($7,500 annually)',
+        'Roth 401k$622+15.6% of grossIncrease Roth 401k contribution by $622 per paycheck',
+        'Taxable Investment$116Invest $116 per paycheck in low-cost index funds',
+      ],
+      '0 of 4 set up.',
     ],
     [
       'rich',

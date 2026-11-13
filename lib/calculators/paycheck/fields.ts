@@ -143,7 +143,7 @@ export const MATCH_LIMIT: FieldSpec = {
   path: 'workplace.matchLimit',
   kind: 'percent',
   label: 'Matched up to this share of your pay',
-  help: 'The 6% in "50% of the first 6%".',
+  help: 'The 4% in "100% of the first 4%".',
   min: 0,
   max: 0.25,
   tier: 'details',

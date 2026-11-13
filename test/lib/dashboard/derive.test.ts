@@ -21,6 +21,7 @@ import { engineInputsFor } from '@/lib/calculators/runtime';
 import { formatCurrency } from '@/lib/format';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
+import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 import type { AllocationItem } from '@/lib/types';
 import { toTodaysDollars } from '@/lib/utils/displayDollars';
 
@@ -28,9 +29,14 @@ type Overrides = {
   [K in keyof FinancialProfile]?: FinancialProfile[K] extends unknown[] ? FinancialProfile[K] : Partial<FinancialProfile[K]>;
 };
 
-/** The default profile with some sections partly replaced. */
+/**
+ * The 3bb0132 default profile (30, TX, $3,500 every two weeks, 6% to the
+ * 401(k)), every field answered, with some sections partly replaced. The
+ * figures below were worked out on it; the PR 3 defaults have their own
+ * tests.
+ */
 function profileWith(overrides: Overrides = {}): FinancialProfile {
-  const base = getDefaultFinancialProfile();
+  const base = answeredEverywhere(defaultProfileAt3bb0132());
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(overrides)) {
     const current = (base as unknown as Record<string, unknown>)[key];
@@ -60,7 +66,18 @@ describe('ASSUMED_PORTFOLIO_RETURN', () => {
 });
 
 describe('summarizeCashBuffer', () => {
-  it('measures the default profile against its 3-month target: a $4,000 shortfall', () => {
+  it('measures the PR 3 default profile (nothing answered): the derived balance is the 3-month target', () => {
+    // Unanswered, the balance is 3 x $3,000 of must-pay costs = $9,000, whatever is stored.
+    const stored = { ...getDefaultFinancialProfile(), cash: { ...getDefaultFinancialProfile().cash, emergencyFundBalance: 5000 } };
+    const cash = summarizeCashBuffer(stored);
+    expect([cash.balance, cash.target, cash.shortfall, cash.excess]).toEqual([9000, 9000, 0, 0]);
+    expect(cash.monthsOnHand).toBeCloseTo(3, 12);
+    // Must-pay costs answered as $2,000: the derived balance follows, $6,000.
+    const answered = { ...stored, spending: { ...stored.spending, necessaryMonthly: 2000 }, provided: ['spending.necessaryMonthly'] };
+    expect(summarizeCashBuffer(answered).balance).toBe(6000);
+  });
+
+  it('measures the answered 3bb0132 example against its 3-month target: a $4,000 shortfall', () => {
     // $5,000 on hand, $3,000 a month of necessary expenses, 3 target months, 4% APY.
     const cash = summarizeCashBuffer(profileWith());
     expect(cash.balance).toBe(5000);
@@ -117,8 +134,9 @@ describe('summarizeCashBuffer', () => {
 
   it('measures against the stored months whether or not the visitor entered them, up to 60', () => {
     // A target written by the removed preset (1 month, never marked provided) is kept and used: $3,000.
-    expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 1 } })).target).toBe(3000);
-    const entered = summarizeCashBuffer({ ...profileWith({ cash: { targetMonths: 6 } }), provided: ['cash.targetMonths'] });
+    const unmarked = { ...profileWith({ cash: { targetMonths: 1 } }), provided: ['cash.emergencyFundBalance'] };
+    expect(summarizeCashBuffer(unmarked).target).toBe(3000);
+    const entered = summarizeCashBuffer(profileWith({ cash: { targetMonths: 6 } }));
     expect([entered.targetMonths, entered.target, entered.shortfall]).toEqual([6, 18000, 13000]);
     // 60 months of $3,000 is $180,000.
     expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 60 } })).target).toBe(180000);
@@ -185,7 +203,7 @@ describe('buildChecklistRows', () => {
 });
 
 describe('summarizeRetirement', () => {
-  it('runs the calculator on the default profile and the same markets with $500 more a month', () => {
+  it('runs the calculator on the answered 3bb0132 example and the same markets with $500 more a month', () => {
     const inputs = engineInputsFor(RETIREMENT_CALCULATOR, profileWith());
     const outcome = summarizeRetirement(inputs);
     if (outcome.status !== 'ok') throw new Error('expected a result');

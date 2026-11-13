@@ -51,7 +51,7 @@ const OLD_QUESTIONS: Record<string, OldQuestion> = {
   'spending.funMoneyMax': { path: 'spending.funMoneyMax', label: 'At most, per month', kind: 'money', min: 0 },
   'workplace.has401k': { path: 'workplace.has401k', label: 'Workplace retirement plan', kind: 'choice', options: [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] },
   'workplace.matchPercent': { path: 'workplace.matchPercent', label: 'Employer match rate', kind: 'percent', help: 'Per dollar you contribute; 50% means 50 cents.', min: 0, max: 2 },
-  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'The 6% in "50% of the first 6%".', min: 0, max: 1 },
+  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'The 4% in "100% of the first 4%".', min: 0, max: 1 },
 };
 
 const OLD_FLOW: readonly OldScreen[] = [
@@ -163,19 +163,19 @@ describe('paycheck form: collapsed summaries', () => {
   const summary = (id: string, get: Get = fromDefaults()) => summarizeScreen(FORM, screen(id), get);
 
   it('summarizes the core cards with their values, not their descriptions', () => {
-    expect(summary('about')).toBe('30, TX, single');
-    expect(summary('pay')).toBe('$3,500 gross every 2 weeks, $2,600 take-home');
+    expect(summary('about')).toBe('25, CA, single');
+    expect(summary('pay')).toBe('$4,000 gross every 2 weeks, $2,550 take-home');
     expect(summary('must-pay')).toBe('$3,000 a month');
     expect(
-      [summary('about', fromDefaults({ 'person.age': 25, 'person.state': 'CA', 'person.filingStatus': 'marriedJoint' })),
-        summary('pay', fromDefaults({ 'income.grossPerPaycheck': 4000, 'income.netPerPaycheck': 3000, 'income.frequency': 'monthly' }))]
-    ).toEqual(['25, CA, married filing jointly', '$4,000 gross once a month, $3,000 take-home']);
+      [summary('about', fromDefaults({ 'person.age': 41, 'person.state': 'NY', 'person.filingStatus': 'marriedJoint' })),
+        summary('pay', fromDefaults({ 'income.grossPerPaycheck': 6000, 'income.netPerPaycheck': 4200, 'income.frequency': 'monthly' }))]
+    ).toEqual(['41, NY, married filing jointly', '$6,000 gross once a month, $4,200 take-home']);
   });
 
   it('summarizes each paycheck screen of the default profile in one line', () => {
     expect(summary('spending-bonus')).toBe('fun money $300\u2013$600/mo, no regular bonus');
-    expect(summary('emergency-fund')).toBe('$5,000 saved, 4% APY, 3-month emergency fund');
-    expect(summary('401k')).toBe('50% match on the first 6%, contributing 6% traditional (pre-tax)');
+    expect(summary('emergency-fund')).toBe('$9,000 saved, 4% APY, 3-month emergency fund');
+    expect(summary('401k')).toBe('100% match on the first 4%, contributing 8% traditional (pre-tax)');
     expect(summary('hsa')).toBe('no HSA');
     expect(summary('ira-taxable')).toBe('no IRA, taxable $500/mo');
     expect(summary('debts')).toBe('no debts');
@@ -203,12 +203,12 @@ describe('paycheck form: collapsed summaries', () => {
     });
     expect(summary('spending-bonus', get)).toBe('fun money $300\u2013$600/mo, $6,000 quarterly bonus');
     expect(summary('401k', get)).toBe(
-      '50% match on the first 6%, contributing 6% split between traditional and Roth, after-tax contributions allowed'
+      '100% match on the first 4%, contributing 8% split between traditional and Roth, after-tax contributions allowed'
     );
     expect(summary('hsa', get)).toBe('family HSA, $300/mo, invested');
     expect(summary('ira-taxable', get)).toBe('traditional IRA $200/mo, Roth IRA $500/mo, no taxable investing');
     expect(summary('assumptions', get)).toBe('optimizer risk, balanced goal, 12% retirement bracket');
-    expect(summary('emergency-fund', get)).toBe('$5,000 saved, 4% APY, 4.5-month emergency fund');
+    expect(summary('emergency-fund', get)).toBe('$9,000 saved, 4% APY, 4.5-month emergency fund');
     expect(summary('401k', fromDefaults({ 'workplace.has401k': false }))).toBe('no workplace plan');
     expect(summary('debts', withDebts([{ id: 'd1', name: 'Card', balance: 3000, interestRate: 0.24, minimumPayment: 90, extraPayment: 0, taxDeductible: false }]))).toBe('1 debt');
   });

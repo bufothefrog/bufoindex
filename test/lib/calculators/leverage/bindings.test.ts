@@ -36,6 +36,7 @@ import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import { applyProfileWrites, getDefaultFinancialProfile, normalizeProfile, patchWrites } from '@/lib/profile/defaults';
 import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
+import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
 const V1_DEFAULT = {
   version: 1,
@@ -129,8 +130,9 @@ const GOLDEN: { name: string; edits: V1Edits; link: string; inputs: DcaCompariso
   },
 ];
 
+/** The 3bb0132 default profile, every field answered (the fixtures' base), with `patch` applied. */
 const withPatch = (patch: ProfilePatch): FinancialProfile =>
-  applyProfileWrites(getDefaultFinancialProfile(), patchWrites(patch)).profile;
+  applyProfileWrites(answeredEverywhere(defaultProfileAt3bb0132()), patchWrites(patch)).profile;
 
 describe('golden: engineInputsFor equals the old profile link, read by the old query reader', () => {
   it.each(GOLDEN)('$name', ({ edits, inputs }) => {
@@ -164,8 +166,12 @@ describe('every engine input is bound or engine-only', () => {
 });
 
 describe('leverage bindings', () => {
-  it('runs the v2 defaults the same as the v1 default', () => {
-    expect(engineInputsFor(LEVERAGE_CALCULATOR, getDefaultFinancialProfile())).toEqual(GOLDEN[0].inputs);
+  it('runs the 3bb0132 defaults, every field answered, the same as the v1 default', () => {
+    expect(engineInputsFor(LEVERAGE_CALCULATOR, withPatch({}))).toEqual(GOLDEN[0].inputs);
+  });
+
+  it('runs the PR 3 defaults over 40 years (age 25 to 65), the rest as before', () => {
+    expect(engineInputsFor(LEVERAGE_CALCULATOR, getDefaultFinancialProfile())).toEqual({ ...GOLDEN[0].inputs, years: 40 });
   });
 
   it('uses each override when it is set, unclamped (the form checks it)', () => {

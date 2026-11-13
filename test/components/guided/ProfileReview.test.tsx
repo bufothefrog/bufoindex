@@ -62,7 +62,7 @@ describe('ProfileReview, an empty profile', () => {
 
   it('does not show a typical value as an answer', () => {
     render(<ProfileReview />);
-    expect(row('about')).not.toHaveTextContent('30');
+    expect(row('about')).not.toHaveTextContent('25');
     expect(row('pay')).not.toHaveTextContent('$');
   });
 });
@@ -76,7 +76,7 @@ describe('ProfileReview, a partly answered profile', () => {
     const pay = row('pay');
     expect(within(pay).getByText('Gross pay per paycheck: $4,200')).toBeInTheDocument();
     // The typical pay frequency and take-home pay are not shown as answers.
-    expect(pay).not.toHaveTextContent(/week|2,600/);
+    expect(pay).not.toHaveTextContent(/week|2,550/);
     expect(within(pay).getByRole('link', { name: 'Edit: What does a typical paycheck look like?' })).toHaveAttribute(
       'href',
       '/start/review/pay'
@@ -84,7 +84,7 @@ describe('ProfileReview, a partly answered profile', () => {
 
     const about = row('about');
     expect(about).toHaveTextContent('41');
-    expect(about).not.toHaveTextContent(/Single|Texas|TX/);
+    expect(about).not.toHaveTextContent(/Single|California|CA/);
 
     expect(within(row('must-pay')).getByText('Not answered')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Answer the remaining questions' })).toBeInTheDocument();

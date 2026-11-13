@@ -218,26 +218,30 @@ Rules:
 - Lists are first-class: debts, and the portfolio accounts, securities, holdings and class targets.
 - `provided` keeps dot paths. For a list, the path is the list path (for example 'debts').
 
+Note (PR 3 of the follow-up stack, 2026-11-13): the defaults below are the
+current worked example in lib/profile/defaults.ts; the three derived typical
+values are computed in lib/profile/derived.ts.
+
 | Section.leaf (new in v2 marked +) | Type / default | Home for (calculator input) | Form, screen, tier |
 |---|---|---|---|
-| person.age | number 30 | P8 preferences.age, R1 startingAge, L2 (derived) | core: about |
-| person.state | code 'TX' | P21 taxes.state, R6 state | core: about |
+| person.age | number 25 | P8 preferences.age, R1 startingAge, L2 (derived) | core: about |
+| person.state | code 'CA' | P21 taxes.state, R6 state | core: about |
 | person.filingStatus (widened to 4) | 'single' | P22 taxes.filingStatus; R7 via map (O10) | core: about |
-| person.retirementAge | 60 | R2; L2 (derived) | retirement: target; leverage: facts |
-| +person.lifeExpectancy | 85 | R13 | retirement: target |
-| income.grossPerPaycheck / frequency / netPerPaycheck | 3500 / 'bi-weekly' / 2600 | P1-P3; R3 (incomeAmount/period derived) | core: pay |
+| person.retirementAge | 65 | R2; L2 (derived) | retirement: target; leverage: facts |
+| +person.lifeExpectancy | 90 | R13 | retirement: target |
+| income.grossPerPaycheck / frequency / netPerPaycheck | 4000 / 'bi-weekly' / 2550 | P1-P3; R3 (incomeAmount/period derived) | core: pay |
 | +income.hasBonus / bonusAmount / bonusFrequency | false / 0 / 'annual' | P4-P6 | paycheck: spending-bonus |
 | spending.necessaryMonthly | 3000 | P7, R9 | core: must-pay |
 | spending.funMoneyMin / funMoneyMax | 300 / 600 | P9, P10 (current = midpoint, derived) | paycheck: spending-bonus |
-| spending.targetRetirementIncome | 80000 | R8 (never askable before) | retirement: target |
-| cash.emergencyFundBalance / emergencyFundApy | 5000 / 0.04 | P11, P13 | paycheck: emergency-fund |
+| spending.targetRetirementIncome | 41000; while unanswered, derived: 12 x (must-pay + fun money midpoint), nearest 1,000 | R8 (never askable before) | retirement: target |
+| cash.emergencyFundBalance / emergencyFundApy | 9000 (while unanswered, derived: 3 x must-pay) / 0.04 | P11, P13 | paycheck: emergency-fund |
 | cash.targetMonths | 3 (preset rule kept) | P12 (never askable before) | paycheck: assumptions |
-| workplace.has401k / matchPercent / matchLimit | true / 0.5 / 0.06 | P23-P25 | paycheck: 401k |
+| workplace.has401k / matchPercent / matchLimit | true / 1 / 0.04 | P23-P25 | paycheck: 401k |
 | +workplace.contributionType | 'traditional' | P26 | paycheck: 401k |
-| workplace.contributionPercent | 0.06 | P27/P28 total (never askable before) | paycheck: 401k |
+| workplace.contributionPercent | 0.08 | P27/P28 total (never askable before) | paycheck: 401k |
 | +workplace.rothContributionPercent | 0 | P29 (split only) | paycheck: 401k |
 | +workplace.afterTaxAvailable | false | H2 | paycheck: 401k |
-| +hsa.eligible / coverage / monthlyContribution / employerAnnualContribution / investing | false / 'individual' / 0 / 0 / false | P30-P33, H3 | paycheck: hsa |
+| +hsa.eligible / coverage / monthlyContribution / employerAnnualContribution / investing | false / 'individual' (while unanswered, derived: 'family' when filing jointly) / 0 / 0 / false | P30-P33, H3 | paycheck: hsa |
 | +ira.traditional / roth / traditionalMonthly / rothMonthly / traditionalBalance / rothBalance | false x2 / 0 x4 | P14-P18, H5 (hasIRA derived) | paycheck: ira-taxable |
 | investing.taxableMonthlyContribution | 500 | P19/P20 (hasTaxable derived), L1 auto | paycheck: ira-taxable; leverage: facts |
 | investing.investedBalance / monthlyContribution | 25000 / 1500 | R5, R4; L3/L1 auto | retirement: savings; leverage: facts |

@@ -52,12 +52,12 @@ const FILING_OPTIONS: readonly FieldOption[] = FILING_STATUS_OPTIONS.map(({ valu
 const GROSS_PAY_PATH = 'income.grossPerPaycheck';
 const PAY_FREQUENCY_PATH = 'income.frequency';
 
-/** 30 -> "30". */
+/** 25 -> "25". */
 export function ageSummary(age: unknown): string | null {
   return isFiniteNumber(age) ? String(age) : null;
 }
 
-/** "TX" -> "TX". */
+/** "CA" -> "CA". */
 export function stateSummary(state: unknown): string | null {
   return typeof state === 'string' && state.trim() !== '' ? state : null;
 }
@@ -75,7 +75,7 @@ function cadence(frequency: unknown): string | null {
     : null;
 }
 
-/** 3500, 'bi-weekly' -> "$3,500 gross every 2 weeks"; without a frequency, "$3,500 gross per paycheck". */
+/** 4000, 'bi-weekly' -> "$4,000 gross every 2 weeks"; without a frequency, "$4,000 gross per paycheck". */
 export function grossPaySummary(gross: unknown, frequency: unknown): string | null {
   if (!isFiniteNumber(gross)) return null;
   return `${formatCurrency(gross)} gross ${cadence(frequency) ?? 'per paycheck'}`;
@@ -87,7 +87,7 @@ export function payFrequencySummary(frequency: unknown): string | null {
   return text ? `paid ${text}` : null;
 }
 
-/** 2600 -> "$2,600 take-home". */
+/** 2550 -> "$2,550 take-home". */
 export function takeHomeSummary(net: unknown): string | null {
   return isFiniteNumber(net) ? `${formatCurrency(net)} take-home` : null;
 }
@@ -139,7 +139,7 @@ export const GROSS_PAY: FieldSpec = {
   help: 'Before taxes and deductions.',
   min: 0,
   tier: 'core',
-  // The gross amount carries the pay cadence: "$3,500 gross every 2 weeks".
+  // The gross amount carries the pay cadence: "$4,000 gross every 2 weeks".
   summary: (value, get) => grossPaySummary(value, get(PAY_FREQUENCY_PATH)),
 };
 

@@ -408,8 +408,8 @@ export function buildIntakeSubmission(
 // ---------------------------------------------------------------------------
 
 /**
- * One-line summary of the saved core answers, e.g. "30, TX, single, $3,500
- * gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs".
+ * One-line summary of the saved core answers, e.g. "25, CA, single, $4,000
+ * gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs".
  * The pieces are the ones the collapsed core cards use (lib/fields/shared.ts),
  * so both say the same thing. Parts the user has not answered (still
  * placeholders) are left out; an empty string means none of the core answers

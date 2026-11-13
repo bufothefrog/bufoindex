@@ -17,15 +17,21 @@ import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
-import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
+import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
 import type { Write } from '@/lib/fields/types';
 import type { FilingStatus, FinancialProfile, PayFrequency, ProfilePatch } from '@/lib/profile/types';
+import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
-/** A v1-shaped profile: the given sections over the defaults, normalized the way any stored profile is. */
-const v1 = (patch: ProfilePatch = {}): FinancialProfile => normalizeProfile(patch);
+/**
+ * A v1-shaped profile: the given sections over the 3bb0132 defaults the
+ * fixture was captured on, normalized the way any stored profile is, every
+ * field answered (test/factories/profile-3bb0132.ts).
+ */
+const v1 = (patch: ProfilePatch = {}): FinancialProfile => answeredAt3bb0132(patch);
 
-/** The default profile with `writes` applied (each must be a valid profile write). */
-const withWrites = (writes: Write[]): FinancialProfile => applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
+/** The 3bb0132 default profile, all answered, with `writes` applied (each must be a valid profile write). */
+const withWrites = (writes: Write[]): FinancialProfile =>
+  applyProfileWrites(answeredEverywhere(defaultProfileAt3bb0132()), writes).profile;
 
 /** Every RetirementInputs leaf; the Record type makes the compiler reject a missing or extra one. */
 const LEAVES: Readonly<Record<keyof RetirementInputs, true>> = {
@@ -121,16 +127,17 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
     expect(engineInputsFor(RETIREMENT_CALCULATOR, v1(patch))).toEqual({ ...DEFAULT_INPUTS, ...changed });
   });
 
-  it('pins the default profile value by value', () => {
+  it('pins the default profile value by value (the PR 3 worked example)', () => {
     expect(engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile())).toEqual({
-      startingAge: 30,
-      retirementAge: 60,
-      lifeExpectancy: 85,
-      targetIncome: 80000,
+      startingAge: 25,
+      retirementAge: 65,
+      lifeExpectancy: 90,
+      // Derived while unanswered: 12 x (3,000 + 450) = 41,400, to the nearest 1,000.
+      targetIncome: 41000,
       startingBalance: 25000,
-      // 3,500 every two weeks x 26.
-      currentIncome: 91000,
-      incomeAmount: 3500,
+      // 4,000 every two weeks x 26.
+      currentIncome: 104000,
+      incomeAmount: 4000,
       incomePeriod: 'biweekly',
       monthlySavings: 1500,
       necessaryMonthlyExpenses: 3000,
@@ -142,7 +149,7 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       healthcareCostMultiplier: 1,
       volatility: 0.15,
       filingStatus: 'single',
-      state: 'TX',
+      state: 'CA',
       riskProfile: 'tdf',
       effectiveTaxRate: null,
       estimatedAnnualHealthcareCost: null,

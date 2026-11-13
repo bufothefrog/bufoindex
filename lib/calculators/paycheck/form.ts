@@ -60,7 +60,7 @@ import {
 // old input cards' placeholders. Core screens show on the calculator page
 // only (the intake asks the shared core).
 const BASICS_OWN: readonly FieldSpec[] = [
-  withOverrides(AGE, { placeholder: '30' }),
+  withOverrides(AGE, { placeholder: '25' }),
   withOverrides(GROSS_PAY, { placeholder: '2,500' }),
   withOverrides(NET_PAY, { placeholder: '1,900' }),
   withOverrides(NECESSARY_MONTHLY, { placeholder: '2,500' }),

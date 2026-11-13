@@ -19,6 +19,7 @@ import {
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RetirementConstants } from '@/lib/constants/retirement';
 import { formatPercent } from '@/lib/format';
+import { withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { AllocationItem } from '@/lib/types';
 
@@ -49,7 +50,13 @@ export interface CashBufferSummary {
   annualCostOfExcess: number;
 }
 
-export function summarizeCashBuffer(profile: FinancialProfile): CashBufferSummary {
+/**
+ * The cash buffer of `profile`. An unanswered emergency fund balance is its
+ * derived typical value, three months of must-pay costs (withDerivedValues;
+ * a no-op when the caller already applied it).
+ */
+export function summarizeCashBuffer(stored: FinancialProfile): CashBufferSummary {
+  const profile = withDerivedValues(stored);
   const necessaryMonthly = Math.max(0, profile.spending.necessaryMonthly);
   const balance = Math.max(0, profile.cash.emergencyFundBalance);
   const targetMonths = Math.max(0, profile.cash.targetMonths);
