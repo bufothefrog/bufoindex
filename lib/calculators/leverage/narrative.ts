@@ -65,6 +65,7 @@ export type NoiseInputs = Pick<DcaComparisonInputs, 'leverageRatio' | 'years' | 
  * 20 years, scaled by the leverage above 1x, the square root of the horizon,
  * and one over the square root of the path count. It only decides whether the
  * copy calls a difference noise; it is not a confidence interval.
+ * Calibrated for the earlier monthly versus whole-total-at-month-0 pair; for monthly versus start of each year it is conservative (at the defaults the seed-to-seed SD of the difference is about 1.5 points, mean 0.26, over 30 seeds).
  */
 export function relativeGapNoisePoints(inputs: NoiseInputs): number {
   const excess = Math.abs(inputs.leverageRatio - 1);
@@ -76,72 +77,72 @@ export function relativeGapNoisePoints(inputs: NoiseInputs): number {
 
 /**
  * `display` converts an ending-balance gap for display (the results pass the
- * active dollar mode); the total contributed is money paid in and is printed
- * as entered. The relative gaps and the noise test read the engine figures.
+ * active dollar mode); the yearly amount is money paid in and is printed as
+ * entered. The relative gaps and the noise test read the engine figures.
  */
 export function dcaEffectSentence(
   result: DcaComparisonResult,
   L: string,
-  inputs: NoiseInputs,
+  inputs: NoiseInputs & Pick<DcaComparisonInputs, 'monthlyContribution'>,
   display: (nominal: number) => number = (nominal) => nominal
 ): string {
-  const { dcaGap, lumpSumGap } = result.dcaEffect;
-  if (Math.abs(dcaGap) < 0.5 && Math.abs(lumpSumGap) < 0.5) {
-    return `At these settings the ${L} fund and the index fund produce the same balances under both framings.`;
+  const { dcaGap, yearStartGap } = result.dcaEffect;
+  if (Math.abs(dcaGap) < 0.5 && Math.abs(yearStartGap) < 0.5) {
+    return `At these settings the ${L} fund and the index fund produce the same balances under both timings.`;
   }
   const dcaRel = relativeGap(dcaGap, result.index.dca.p50);
-  const lumpRel = relativeGap(lumpSumGap, result.index.lumpSum.p50);
-  const diffPoints = (dcaRel - lumpRel) * 100;
+  const yearStartRel = relativeGap(yearStartGap, result.index.yearStart.p50);
+  const diffPoints = (dcaRel - yearStartRel) * 100;
   const pointsText = `${Math.abs(diffPoints).toFixed(1)} percentage points`;
   const noise = relativeGapNoisePoints(inputs);
   const gaps =
     `With monthly contributions the ${L} fund's median ends ${direction(dcaGap)} the index fund's ` +
     `median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} (${formatPercent(dcaRel, SIGNED_ONE_DECIMAL)} of the index median). ` +
-    `Investing the same ${formatCurrency(result.totalContributed, COMPACT)} at month 0 gives a gap of ` +
-    `${formatCurrency(display(lumpSumGap), COMPACT_SIGNED)} (${formatPercent(lumpRel, SIGNED_ONE_DECIMAL)}).`;
+    `Investing the same ${formatCurrency(12 * Math.max(0, inputs.monthlyContribution), COMPACT)} a year at the start of each year gives a gap of ` +
+    `${formatCurrency(display(yearStartGap), COMPACT_SIGNED)} (${formatPercent(yearStartRel, SIGNED_ONE_DECIMAL)}).`;
 
   if (noise > 0 && Math.abs(diffPoints) < noise) {
     return (
       `${gaps} The two relative gaps differ by ${pointsText}, which is within the sampling error of ` +
-      `${inputs.paths} simulated paths, so at these settings this run does not separate the two framings.`
+      `${inputs.paths} simulated paths, so at these settings this run does not separate the two timings.`
     );
   }
   const sign = diffPoints >= 0 ? '+' : MINUS;
   const noiseNote =
     noise > 0 ? ` With ${inputs.paths} paths that figure still carries sampling error of a few percentage points.` : '';
   return (
-    `${gaps} Both framings use the same simulated markets, so the difference between the two relative ` +
-    `gaps (${sign}${pointsText}) comes from how the contribution pattern interacts with the funds' ` +
+    `${gaps} Both timings use the same simulated markets, so the difference between the two relative ` +
+    `gaps (${sign}${pointsText}) comes from when the money goes in, interacting with the funds' ` +
     `different growth rates.${noiseNote}`
   );
 }
 
 /**
- * Compares each fund's lump-sum median with its monthly-contribution median.
- * The direction depends on the inputs: with positive expected returns the lump
- * sum's longer time in the market usually makes it larger, but at low or
- * negative returns (or where volatility drag dominates the leveraged fund) it
- * can be smaller for one fund or both, so the sentence is computed rather
- * than fixed.
+ * Compares each fund's start-of-year median with its monthly-contribution
+ * median. Each year's amount goes in before most of that year's monthly
+ * amounts, so with positive expected returns the start-of-year median is
+ * usually larger, but at low or negative returns (or where volatility drag
+ * dominates the leveraged fund) it can be smaller for one fund or both, so the
+ * sentence is computed rather than fixed. No sentence prints a month count:
+ * the average lead depends on the horizon.
  */
-export function lumpSumScaleSentence(result: DcaComparisonResult, L: string): string {
-  const indexDiff = result.index.lumpSum.p50 - result.index.dca.p50;
-  const levDiff = result.leveraged.lumpSum.p50 - result.leveraged.dca.p50;
+export function yearStartScaleSentence(result: DcaComparisonResult, L: string): string {
+  const indexDiff = result.index.yearStart.p50 - result.index.dca.p50;
+  const levDiff = result.leveraged.yearStart.p50 - result.leveraged.dca.p50;
   const indexDir = direction(indexDiff);
   const levDir = direction(levDiff);
-  const tail = 'The relative gap in the table is the like-for-like comparison.';
   if (indexDir === levDir) {
     if (indexDir === 'above') {
-      return `The lump sum has more money in the market for longer, and at these settings that makes its median balance larger than the monthly median under both funds. ${tail}`;
+      return "Each year's amount goes in at the start of the year, before most of the monthly amounts, and at these settings that makes its median balance larger than the monthly median under both funds.";
     }
     if (indexDir === 'below') {
-      return `At these settings the lump sum's median balance is smaller than the monthly median under both funds: when the typical path grows slowly or falls, money that sits in the market longer has more time to lose ground. ${tail}`;
+      return 'At these settings the start-of-year median balance is smaller than the monthly median under both funds: when the typical path grows slowly or falls, money that goes in earlier has more time to lose ground.';
     }
-    return `At these settings the lump sum and monthly contributions end at about the same median balance under both funds. ${tail}`;
+    return 'At these settings the two timings end at about the same median balance under both funds.';
   }
   return (
-    `At these settings the lump sum's median ends ${indexDir} the monthly median for the index fund and ` +
-    `${levDir} it for the ${L} fund: the two funds' typical paths grow at different rates, and the lump sum ` +
-    `spends longer exposed to that difference. ${tail}`
+    `At these settings the start-of-year median ends ${indexDir} the monthly median for the index fund and ` +
+    `${levDir} it for the ${L} fund: the two funds' typical paths grow at different rates, and money that goes ` +
+    'in earlier spends longer exposed to that difference.'
   );
 }

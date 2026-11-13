@@ -32,7 +32,9 @@ const PAGE_METADATA = {
  * Each page's metadata as it shipped before the rebuild (6fb0576), as golden
  * strings: once phase 3 makes the pages export calculatorMetadata(id), the
  * comparison above compares the registry with itself, and these still pin
- * the titles and meta descriptions.
+ * the titles and meta descriptions. The leverage description and meta
+ * description changed in PR 5, when the comparison with the whole total at
+ * month 0 gave way to the same yearly amount at the start of each year.
  */
 const GOLDEN_METADATA: Record<CalculatorId, { title: string; description: string }> = {
   paycheck: {
@@ -53,7 +55,7 @@ const GOLDEN_METADATA: Record<CalculatorId, { title: string; description: string
   leverage: {
     title: 'Leverage Comparison',
     description:
-      'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the lump-sum framing shown side by side.',
+      'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the same yearly amount invested at the start of each year, side by side.',
   },
 };
 
@@ -86,13 +88,21 @@ const SHELLS: Record<CalculatorId, { path: string; title: string; description: s
     path: '/tools/leverage-comparison',
     title: 'Leverage Comparison',
     description:
-      'Monthly contributions into a plain index fund versus the same contributions into a daily-reset leveraged fund, across simulated markets, alongside the usual lump-sum framing on the same dollars.',
+      'Monthly contributions into a plain index fund versus the same contributions into a daily-reset leveraged fund, across simulated markets, alongside the same yearly amount invested at the start of each year.',
     disclaimer:
       'Educational tool only. Results are simulated outcomes under the assumptions you enter, not predictions. Leveraged ETFs can lose most of their value in a severe decline. Not tax or investment advice.',
   },
 };
 
 describe('calculator registry', () => {
+  it('describes the leverage comparison as monthly against the start of each year, with no lump-sum wording', () => {
+    const leverage = CALCULATORS.leverage;
+    expect(leverage.card.summary).toBe(
+      'Cash-flow dollar-cost averaging into a 2x fund versus a plain index fund, with start-of-year contributions side by side and the drawdowns shown.'
+    );
+    expect(JSON.stringify(leverage)).not.toMatch(/lump/i);
+  });
+
   it('lists every calculator once, in site order, keyed by its own id', () => {
     expect(CALCULATOR_IDS).toEqual(['paycheck', 'retirement', 'portfolio', 'leverage']);
     expect(Object.keys(CALCULATORS)).toEqual([...CALCULATOR_IDS]);

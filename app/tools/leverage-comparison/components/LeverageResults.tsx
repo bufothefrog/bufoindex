@@ -20,9 +20,9 @@ import {
   COMPACT_SIGNED,
   dcaEffectSentence,
   dragParts,
-  lumpSumScaleSentence,
   recoveryGain,
   relativeGap,
+  yearStartScaleSentence,
 } from '@/lib/calculators/leverage/narrative';
 import { formatCurrency, formatMultiple, formatPercent } from '@/lib/format';
 import { DISPLAY_INFLATION_ASSUMPTION } from '@/lib/utils/displayDollars';
@@ -41,7 +41,7 @@ const SIGNED_ONE_DECIMAL = { digits: 1, signed: true } as const;
 const WHOLE = { digits: 0 } as const;
 const TWO_DECIMALS = { digits: 2 } as const;
 
-interface FramingRow {
+interface TimingRow {
   label: string;
   sublabel: string;
   index: number;
@@ -89,7 +89,7 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
   const mddLeveraged = result.medianMaxDrawdown.leveraged;
   const monthsBehind = Math.round(result.medianMonthsBehind);
 
-  const framingRows: FramingRow[] = [
+  const timingRows: TimingRow[] = [
     {
       label: 'Monthly',
       sublabel: `${formatCurrency(inputs.monthlyContribution, COMPACT)}/mo + ${formatCurrency(inputs.startingBalance, COMPACT)} start`,
@@ -98,15 +98,15 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
       gap: atHorizon(result.dcaEffect.dcaGap),
     },
     {
-      label: 'Lump sum',
-      sublabel: `${formatCurrency(result.totalContributed, COMPACT)} at month 0`,
-      index: atHorizon(index.lumpSum.p50),
-      leveraged: atHorizon(leveraged.lumpSum.p50),
-      gap: atHorizon(result.dcaEffect.lumpSumGap),
+      label: 'Start of each year',
+      sublabel: `${formatCurrency(12 * inputs.monthlyContribution, COMPACT)}/yr + ${formatCurrency(inputs.startingBalance, COMPACT)} start`,
+      index: atHorizon(index.yearStart.p50),
+      leveraged: atHorizon(leveraged.yearStart.p50),
+      gap: atHorizon(result.dcaEffect.yearStartGap),
     },
   ];
-  const framingColumns: DataTableColumn<FramingRow>[] = [
-    rowLabelColumn('Framing'),
+  const timingColumns: DataTableColumn<TimingRow>[] = [
+    rowLabelColumn('Timing'),
     { id: 'index', header: 'Index', numeric: true, value: (row) => row.index, format: 'currency-compact' },
     { id: 'leveraged', header: L, numeric: true, value: (row) => row.leveraged, format: 'currency-compact' },
     {
@@ -180,19 +180,19 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
         </ChartFrame>
       </ResultCard>
 
-      <ResultCard title="Cash flow vs lump sum" icon={Scale}>
+      <ResultCard title="Monthly vs start of each year" icon={Scale}>
         <div className="space-y-4">
           <DataTable
-            caption={`Median ending balances ${dollars.chartCaption} for the index fund and the ${L} fund under monthly contributions and a lump sum; contributions as entered`}
-            columns={framingColumns}
-            rows={framingRows}
+            caption={`Median ending balances ${dollars.chartCaption} for the index fund and the ${L} fund with the same yearly amount invested monthly or at the start of each year; contributions as entered`}
+            columns={timingColumns}
+            rows={timingRows}
             rowKey={(row) => row.label}
           />
           <p className="text-sm text-muted-foreground">{dcaEffectSentence(result, L, inputs, atHorizon)}</p>
           <p className="text-sm text-muted-foreground">
             Paths where the {L} fund ends behind: {formatPercent(result.probLeveragedBehindDca, WHOLE)} with
-            monthly contributions, {formatPercent(result.probLeveragedBehindLumpSum, WHOLE)} as a lump
-            sum. {lumpSumScaleSentence(result, L)}
+            monthly contributions, {formatPercent(result.probLeveragedBehindYearStart, WHOLE)} at the
+            start of each year. {yearStartScaleSentence(result, L)}
           </p>
         </div>
       </ResultCard>
@@ -219,8 +219,8 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
             Recovering from the median {L} drawdown ({formatPercent(mddLeveraged, WHOLE)}) needs a gain of{' '}
             {recoveryGain(mddLeveraged)}; for the index fund ({formatPercent(mddIndex, WHOLE)}) it needs{' '}
             {recoveryGain(mddIndex)}. With monthly contributions, money added during a drawdown buys
-            in at the lower price, which is part of why the cash-flow framing differs from the lump
-            sum.
+            in at the lower price, which is part of why monthly and start-of-year contributions end at
+            different balances.
           </p>
         </div>
       </ResultCard>
@@ -230,8 +230,8 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
           <p>
             Each of the {inputs.paths} paths draws one index return per month from a lognormal
             distribution with a {formatPercent(inputs.indexMeanReturn, { digits: 1 })} expected annual return and{' '}
-            {formatPercent(sigma, { digits: 1 })} annual volatility. Both funds, and both the monthly and lump-sum
-            framings, use the same draws, so the comparison is not distorted by comparing different
+            {formatPercent(sigma, { digits: 1 })} annual volatility. Both funds, and both contribution
+            timings, use the same draws, so the comparison is not distorted by comparing different
             random markets. With {inputs.paths} paths the summary figures (the share of paths behind,
             the medians, and the gaps between them) can still carry sampling error of a few
             percentage points; a different seed would move them.
