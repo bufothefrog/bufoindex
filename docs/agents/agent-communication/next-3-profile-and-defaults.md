@@ -1,11 +1,12 @@
 # PR 3 hand-off: profile versus calculator questions, new defaults, Social Security estimate, computed bracket
 
-Branch claude/next-3-profile-and-defaults, base 3bb0132 (head of PR 2). Four slices, one commit each:
+Branch claude/next-3-profile-and-defaults, base 3bb0132 (head of PR 2). Four slices, one commit each, then one review fix per slice:
 
     04f1a42 c1-profile-versus-calculator
     670becc c2-defaults-and-derived-typicals
     30878ca c3-social-security-auto
     7e2f6ad c4-retirement-bracket-select
+    76923cc fix c1, c6c9494 fix c2, 46dd8c4 fix c3, 6a1ceab fix c4 (see "Review fixes" below)
 
 The profile schema version stays 2. No existing file under lib/calculations/ or test/lib/calculations/ changed; new pure modules were added
 (socialSecurityEstimate.ts, taxBracket.ts, with tests of hand-computed values). package.json and package-lock.json are unchanged.
@@ -35,15 +36,20 @@ Everything below that is not one of those sentences or cells is the orchestratin
 - Questions one calculator needs for one run (leverage ratio, Social Security claiming age) are asked only on that calculator. The claiming age is a
   three-choice control (62, 67, 70) with a table of the yearly benefit at each age.
 - Assumption-tier screens are no longer asked in the /start intakes; they stay as collapsed cards on the calculator pages.
-- strategy.preset is removed everywhere (leaf, labels, overview switch, preset cash lines, copy). Old stored profiles load and keep their months.
+- strategy.preset is removed everywhere (leaf, labels, overview switch, preset cash lines, copy). An old stored profile keeps months the visitor
+  entered; months it holds unanswered (the preset wrote 1 or 3) load as the typical 3 (review fix, see below).
 - Emergency fund target moved to the emergency fund screen: whole months 0 to 60, typical 3, help says 3 to 6 is common.
-- Profile completeness counts 14 topics instead of 16.
+- Profile completeness counts 14 topics instead of 16. A profile finished at 3bb0132 (16 of 16) loads as 13 of 14: its emergency fund topic
+  now holds the months, which the 3bb0132 profile form never asked. /start/profile asks that one screen (months blank, grey 3), the overview lists
+  "Emergency fund" among the illustrative defaults, and the footers read "13 of 14 topics answered" until it is answered.
 
 ### c2-defaults-and-derived-typicals (670becc)
 - Worked example defaults: age 25, CA, single, retire at 65, plan to 90, $4,000 gross every two weeks, 100% match up to 4%, 8% traditional 401(k). The take-home
   figure is derived from the site's own tax functions.
 - New pure module lib/profile/derived.ts fills unanswered emergency fund balance, target retirement income and HSA coverage from the visitor's own
-  answers. Every engine, page, dashboard and wizard call site goes through withDerivedValues, with a guard test.
+  answers. The guards that tests pin are engineInputsFor and prepareRun (lib/calculators/runtime.ts), lib/dashboard/derive.ts,
+  useCalculatorValues, the wizard and the rule itself. The calls in OverviewDashboard.tsx, CalculatorPage.tsx (ResultsBody) and
+  useCalculatorBootstrap.ts are defence in depth: those paths derive again downstream, so removing one fails no test.
 - The wizard shows derived values as grey typical values and saves them when accepted with Next.
 - Example fund prices refreshed (VTI 375, VXUS 85, BND 70) and the T-bill citation updated; the financing rate is unchanged. See the c2 diff in
   lib/constants/ for the citation comments.
@@ -82,10 +88,11 @@ Everything below that is not one of those sentences or cells is the orchestratin
 - Paycheck allocator note: "Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income." -> "Tax savings use your N% federal
   bracket and one 2026 state rate." (N is computed; 22% for the worked example). In the wizard's "all" mode the note is on the first screen, before pay is
   asked, so it states the bracket of the typical values.
-- "Expected tax bracket in retirement": free percent input 0% to 37% -> select. Worked example (single, CA): "10% federal + 9.3% CA (taxable up to $12,400)",
-  "12% federal + 9.3% CA (taxable $12,400 to $50,400)", "22% ... ($50,400 to $105,700)", "24% ... ($105,700 to $201,775)", "32% ... ($201,775 to $256,225)",
-  "35% ... ($256,225 to $640,600)", "37% ... (over $640,600)". A state with no income tax shows federal only. Joint, separate and head of household use their own ranges.
-- Help on that field: "Federal bracket you expect when withdrawing, compared with today's 22%." -> "Compared with today's N% federal bracket; state rate assumed equal in both."
+- "Expected tax bracket in retirement": free percent input 0% to 37% -> select. Worked example (single, CA): "10% federal + 9.3% CA" to
+  "37% federal + 9.3% CA" (short, so a phone does not cut them off). A state with no income tax shows federal only.
+- Help on that field: "Federal bracket you expect when withdrawing, compared with today's 22%." -> the taxable range of the selected bracket for the
+  filing status, then today's bracket: "Taxable $12,400 to $50,400. Today: 22% federal; same state rate in both." First bracket "Taxable up to $N",
+  last "Taxable over $N".
 - Assumptions card summary for an old stored value off the list: "15% retirement bracket" -> "12% retirement bracket" (nearest rate).
 - QuickActions detail "deferred tax at your N% federal bracket" and the HSA tax-savings step status use the computed bracket instead of 22%.
 - /overview "rich" fixture (joint, CA, $2,400 weekly, 8% traditional): recommendation wording changes with the same amounts. "Roth IRA: Tax diversification
@@ -118,15 +125,30 @@ same as stored 0.12. No figure changes for the default profile. Others (before -
 - Stored retirement bracket off the seven rates: the engine reads the nearest rate (0.15 -> 0.12, 0.20 -> 0.22). A stored 0 reads as 0.10; before, the engine read 0
   as 80% of 22% = 17.6%.
 
+- Head of household 24%/32% edge (review fix): $201,775 -> $201,750 (Rev. Proc. 2025-32 Table 2). Every reader of the HoH table moves for taxable
+  income from $201,750.01 to $201,775: the bracket reads 32% instead of 24%, and the federal tax in the allocator's projections takes 32% on that
+  slice. Before PR 3 the allocator used a fixed 22%, so only the projections' tax math read this edge.
+- Capped deductions in the current bracket (review fix): the traditional 401(k) share is capped at the 402(g) limit for the age (24,500, plus
+  8,000 at 50+, 11,250 at 60 to 63) and HSA payroll money at the coverage limit (4,400 / 8,750, plus 1,000 at 55+) less the employer's HSA money.
+  Example: single, $9,500 every two weeks, 30% traditional: 32% (was 24%); at 55, 24%.
+
 c2 number changes (new defaults, derived typicals, fund prices) are in the diff of 670becc; fixtures with explicit answers keep their expected values.
+
+Unanswered emergency fund months (review fix of c1). A stored profile whose cash.targetMonths is not in provided loads it as 3
+(UNANSWERED_LOADS_AS in lib/profile/defaults.ts, the same rule that loads the old Social Security default as Auto). Before PR 3 the default
+cash-flow investor preset wrote 1 there on every intake finish, so most saved profiles hold an unanswered 1. For them: the allocator's
+emergencyFundMonths 1 -> 3 (the full emergency fund step targets 3 months of must-pay costs), the overview cash card target 1 month -> 3 months,
+and the wizard's grey value 1 -> 3. A profile that answered its months keeps them, 1 included; a profile that already held 3 does not change.
 
 ## Outside sources (read 2026-11-13)
 
 - https://www.ssa.gov/oact/cola/bendpoints.html - 2026 PIA bend points 1,286 and 7,749.
 - https://www.ssa.gov/oact/cola/cbb.html - 2026 contribution and benefit base 184,500.
 - https://www.ssa.gov/oact/cola/piaformula.html - factors 90/32/15 only.
-- c4 read no outside source; brackets and standard deductions are the existing tables in lib/constants/irs-2026.ts, state rates are STATE_TAX_RATES_2026.
-- c2 fund prices and T-bill citation: citation comments in lib/constants/ in commit 670becc.
+- https://www.irs.gov/pub/irs-drop/rp-25-32.pdf - Rev. Proc. 2025-32 section 4.01 Tables 1 to 4 (review fix of c4): head of household 24%/32%
+  edge $201,750 and 32% ceiling $256,200; every single, joint and separate edge in lib/constants/irs-2026.ts matched. State rates are STATE_TAX_RATES_2026.
+- c2 fund prices: lib/constants/example-prices.ts (moved there from lib/profile/defaults.ts by the review fix), with the citation. T-bill citation:
+  lib/constants/ in commit 670becc.
 
 ## Orchestrating session's defaults on open questions, and where each lives
 
@@ -145,6 +167,32 @@ c2 number changes (new defaults, derived typicals, fund prices) are in the diff 
 - Unanswered benefit loads as Auto: UNANSWERED_LOADS_AS_AUTO and loadUnansweredAsAuto in lib/profile/defaults.ts. A stored payload with its own provided list that lacks the
   leaf loads it as null; answered numbers (including 0) and an answered null are kept; a partial patch over a base is left alone.
 
+## Review fixes
+
+Three reviewers checked the four slices; one commit per slice fixes what was real.
+
+- c1: unanswered stored months load as 3 (above). The allocator display no longer names a 1-month fund: the step "1-Month Emergency Fund" ->
+  "Starter Emergency Fund" (lib/constants/financialSteps.ts), its unreachable status "Build 1-month emergency fund" -> "Build starter
+  emergency fund", and the quick action "Emergency Fund Below One Month of Expenses" shows the months on hand, rounded down ("0.3 months of
+  necessary expenses on hand", was "1 month of necessary expenses covered"), with the description "Cash on hand covers less than one month of
+  necessary expenses, so a minor emergency may mean borrowing at credit-card rates." (was "A month of necessary expenses on hand covers a minor
+  emergency without borrowing at credit-card rates."). A precision-0 field rejects a fraction: a stored 2.5 months (steps of 0.5 before) now
+  shows "Emergency fund target must be a whole number." on the emergency fund field and the allocator waits for a whole number. The claiming-age
+  control shows "Saved age 65 is used until you pick one." under it for a stored age that is not 62, 67 or 70 (the control still shows the
+  nearest choice and the run still uses the stored age), and the radio group is described by that note or the error. intakeDerivedWrites lost
+  its unused parameter.
+- c2: example prices moved to lib/constants/example-prices.ts. The target retirement income has no fixed "41,000" placeholder. A select in the
+  wizard marks its typical option in the label: "Family (typical)" for HSA coverage when filing jointly (choices keep their "Typical" tag).
+- c3: methodology limitations "One worker's own benefit only: no spousal, survivor, earnings test or WEP/GPO adjustments" -> "... no spousal,
+  survivor or earnings test adjustments", and on the claiming-age card "No earnings test, spousal, survivor, or WEP/GPO adjustments" -> "No
+  earnings test, spousal or survivor adjustments" (the Social Security Fairness Act of 2025 repealed WEP and GPO). The custom benefit input has
+  no "30,000" placeholder. estimateSocialSecurityBenefit(+Infinity) is the capped maximum (52,433.52), not 0.
+- c4: head of household edge, capped deductions and the short select labels with the range in the help (above).
+
+Not changed, by design: a stored retirement bracket of 0.5 failed validation at 3bb0132 ("must be between 0% and 37%"); it now rides the 37%
+option and passes, read as 0.37 like the 0, 0.15 and 0.2 reads above. Typing 61 months clamps to 60 with no message, like the other numeric
+inputs.
+
 ## Deferred
 
 - Social Security figures stay at 2026 although SSA already shows 2027 figures (bend points 1,340 and 8,077, base 192,300). Changing years means editing only
@@ -153,6 +201,16 @@ c2 number changes (new defaults, derived typicals, fund prices) are in the diff 
 - lib/fields/runtime.ts fallbackSummary lists "Social Security benefit: Auto" (not "estimate") when only one fact of the optional screen is answered. Change wording there if wanted.
 - docs/rebuild-plan.md O9 rows (about lines 62, 172, 266, 1003, 1234, 1254) still describe a fixed 22%; this note supersedes them for the allocator.
 - docs/architecture.md does not yet describe the Auto benefit modules.
+- The engine's own first step still carries 1-month wording, which lib/calculations/optimization.ts writes and this PR may not change: the
+  allocation account "1-Month Emergency Fund", its reason "Build basic financial security before optimization. One month of expenses provides
+  essential protection." and "Save $N per paycheck to complete 1-month emergency fund". They show on the overview paycheck card, the automation
+  checklist and the payroll setup guide. A later PR allowed to touch lib/calculations can rename them (or the display can map the account name).
+- Engine copy and behavior with a real current bracket (lib/calculations/optimization.ts, frozen here): the currentBracket <= 0.12 branch gives
+  the Roth recommendation and the Roth IRA reason "Low tax bracket makes Roth optimal for tax-free growth" for more profiles than the fixed 22%
+  did. The reason is advice wording, and the branch ignores the retirement bracket, so it can name Roth when the stored retirement bracket is
+  lower (12% today, 10% in retirement). Reword and condition it in a PR that may edit the engine.
+- lib/fields/runtime.ts fallbackSummary prints the unit suffix as is, so an answered 1 month on a partly answered emergency fund screen reads
+  "Emergency fund target: 1 months".
 
 ## For the next PRs of the stack
 
