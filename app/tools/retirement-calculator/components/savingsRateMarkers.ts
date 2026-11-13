@@ -38,6 +38,37 @@ export interface SavingsRateMarkers {
   sentence: string;
 }
 
+/** Where the chart draws the two marker labels (Recharts label positions). */
+export interface SavingsRateLabelPositions {
+  /**
+   * The current-rate label at the right end of the dashed line. On a
+   * reference line Recharts draws 'insideBottomRight' just above the line
+   * and 'insideTopRight' just below it.
+   */
+  rateLabel: 'insideTopRight' | 'insideBottomRight';
+  /** The planned-age label, above or below the dot. */
+  dotLabel: 'top' | 'bottom';
+}
+
+/**
+ * Label positions that cannot collide: the dot's label goes on the far side
+ * of the dot from the dashed line (below a dot under the line, above a dot
+ * over it), and the rate label goes on the other side of the line. The line
+ * then separates the two labels and crosses neither, however close the dot
+ * sits to it. With no dot the rate label sits below the line.
+ */
+export function savingsRateLabelPositions(
+  currentSavingsRate: number | null,
+  plannedPoint: SavingsRatePoint | null,
+): SavingsRateLabelPositions {
+  if (currentSavingsRate === null || !plannedPoint) {
+    return { rateLabel: 'insideTopRight', dotLabel: 'top' };
+  }
+  return plannedPoint.requiredSavingsRate <= currentSavingsRate
+    ? { rateLabel: 'insideBottomRight', dotLabel: 'bottom' }
+    : { rateLabel: 'insideTopRight', dotLabel: 'top' };
+}
+
 /** A percent (0 to 100 and beyond) as whole percent text, "12%". */
 const wholePercent = (percent: number) => formatPercent(percent / 100, { digits: 0 });
 

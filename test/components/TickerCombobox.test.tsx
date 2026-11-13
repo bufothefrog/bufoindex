@@ -19,12 +19,14 @@ const OPTIONS: TickerOption[] = [
 interface HarnessProps {
   onSelect: (id: string) => void;
   onCommit: (ticker: string) => void;
+  initialOptions?: TickerOption[];
+  initialLinkedId?: string;
 }
 
 /** Holds the linked security like the rebalancer does, and reports every callback. */
-function Harness({ onSelect, onCommit }: HarnessProps) {
-  const [securities, setSecurities] = useState(OPTIONS);
-  const [linkedId, setLinkedId] = useState('sec1');
+function Harness({ onSelect, onCommit, initialOptions = OPTIONS, initialLinkedId = 'sec1' }: HarnessProps) {
+  const [securities, setSecurities] = useState(initialOptions);
+  const [linkedId, setLinkedId] = useState(initialLinkedId);
   const linked = securities.find(s => s.id === linkedId);
   return (
     <div>
@@ -50,10 +52,12 @@ function Harness({ onSelect, onCommit }: HarnessProps) {
   );
 }
 
-function setup() {
+function setup(initialOptions?: TickerOption[], initialLinkedId?: string) {
   const onSelect = vi.fn();
   const onCommit = vi.fn();
-  render(<Harness onSelect={onSelect} onCommit={onCommit} />);
+  render(
+    <Harness onSelect={onSelect} onCommit={onCommit} initialOptions={initialOptions} initialLinkedId={initialLinkedId} />
+  );
   const input = screen.getByRole('combobox', { name: 'Ticker' }) as HTMLInputElement;
   return { input, onSelect, onCommit };
 }
@@ -173,5 +177,44 @@ describe('TickerCombobox', () => {
     expect(onCommit).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
     expect(input).toHaveValue('VTI');
+  });
+
+  it('discards a typed ticker on Escape, with no commit from the later blur', () => {
+    const { input, onSelect, onCommit } = setup();
+    act(() => input.focus());
+    fireEvent.change(input, { target: { value: 'zzz' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    leaveField(input);
+
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(input).toHaveValue('VTI');
+    expect(screen.getByTestId('linked')).toHaveTextContent('sec1:VTI');
+  });
+
+  it('lists and picks the exact ticker first on Enter when others contain the typed text', () => {
+    const options: TickerOption[] = [
+      { id: 'a', ticker: 'AAA', price: 10 },
+      { id: 'b', ticker: 'VTI', price: 250 },
+      { id: 'c', ticker: 'VT', price: 110 },
+    ];
+    const { input, onSelect, onCommit } = setup(options, 'a');
+    act(() => input.focus());
+    fireEvent.change(input, { target: { value: 'vt' } });
+
+    const listed = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(listed[0]).toMatch(/^VT\$/);
+    expect(listed[1]).toMatch(/^VTI\$/);
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith('c');
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByTestId('linked')).toHaveTextContent('c:VT');
   });
 });

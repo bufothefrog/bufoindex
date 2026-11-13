@@ -90,11 +90,17 @@ export function TickerCombobox({
   // If the draft still matches the external value, the user hasn't started
   // editing — treat focus as "browse mode" and show all other options.
   const effectiveQuery = query === value.trim().toUpperCase() ? '' : query;
-  const filtered = options.filter(opt => {
-    if (opt.id === currentId) return false;
-    if (!effectiveQuery) return true;
-    return opt.ticker.toUpperCase().includes(effectiveQuery);
-  });
+  // An option whose ticker equals the typed text comes first, so the first
+  // highlighted option (what Enter picks) is that exact match, not another
+  // ticker that merely contains the text (typing VT lists VT before VTI).
+  const isExact = (opt: TickerOption) => effectiveQuery !== '' && opt.ticker.toUpperCase() === effectiveQuery;
+  const filtered = options
+    .filter(opt => {
+      if (opt.id === currentId) return false;
+      if (!effectiveQuery) return true;
+      return opt.ticker.toUpperCase().includes(effectiveQuery);
+    })
+    .sort((a, b) => Number(isExact(b)) - Number(isExact(a)));
 
   const commit = () => {
     const normalized = draft.trim().toUpperCase();
@@ -142,6 +148,9 @@ export function TickerCombobox({
       }
       inputRef.current?.blur();
     } else if (e.key === 'Escape') {
+      // Escape discards the edit: mark it handled so the deferred blur does
+      // not commit the typed text its closure captured.
+      handledRef.current = true;
       setDraft(value);
       setOpen(false);
       inputRef.current?.blur();

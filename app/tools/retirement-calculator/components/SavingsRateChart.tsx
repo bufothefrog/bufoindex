@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/charts';
 import type { SavingsRatePoint } from '@/lib/calculations/savingsRate';
 import { formatCurrency, formatPercent } from '@/lib/format';
-import { savingsRateMarkers, type SavingsRateMarkerInputs } from './savingsRateMarkers';
+import { savingsRateLabelPositions, savingsRateMarkers, type SavingsRateMarkerInputs } from './savingsRateMarkers';
 
 export interface SavingsRateChartProps {
   /** The curve's inputs plus monthlySavings and retirementAge for the visitor's markers. */
@@ -94,6 +94,7 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
     [startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome, monthlySavings, retirementAge]
   );
 
+  const labels = savingsRateLabelPositions(currentSavingsRate, plannedPoint);
   const axis = chartAxisProps(theme);
   const mutedLabel = { textAnchor: 'middle', fill: theme.muted } as const;
   const accent = theme.tertiary;
@@ -138,7 +139,7 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
           ifOverflow="extendDomain"
           label={{
             value: `Your savings rate: ${formatPercent(currentSavingsRate / 100, { digits: 0 })}`,
-            position: 'insideTopRight',
+            position: labels.rateLabel,
             fill: theme.text,
             fontSize: 12,
           }}
@@ -154,7 +155,7 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
           strokeWidth={2}
           label={{
             value: `Retire at ${plannedPoint.retirementAge}`,
-            position: 'top',
+            position: labels.dotLabel,
             fill: theme.text,
             fontSize: 12,
           }}

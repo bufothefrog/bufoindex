@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  savingsRateLabelPositions,
   savingsRateMarkers,
   type SavingsRateMarkerInputs,
 } from '@/app/tools/retirement-calculator/components/savingsRateMarkers';
@@ -99,5 +100,20 @@ describe('savingsRateMarkers', () => {
     expect(capped.sentence).toBe(
       'Your current savings rate is 12%. Retiring at 45 needs 100% of current income or more.'
     );
+  });
+});
+
+describe('savingsRateLabelPositions', () => {
+  const point = (requiredSavingsRate: number) => ({ retirementAge: 60, requiredSavingsRate, requiredMonthlySavings: 0 });
+
+  it('puts the labels on opposite sides of the line, the dot label away from it', () => {
+    expect(savingsRateLabelPositions(20, point(15))).toEqual({ rateLabel: 'insideBottomRight', dotLabel: 'bottom' });
+    expect(savingsRateLabelPositions(20, point(20))).toEqual({ rateLabel: 'insideBottomRight', dotLabel: 'bottom' });
+    expect(savingsRateLabelPositions(20, point(25))).toEqual({ rateLabel: 'insideTopRight', dotLabel: 'top' });
+  });
+
+  it('keeps the defaults when there is no line or no dot', () => {
+    expect(savingsRateLabelPositions(null, point(15))).toEqual({ rateLabel: 'insideTopRight', dotLabel: 'top' });
+    expect(savingsRateLabelPositions(20, null)).toEqual({ rateLabel: 'insideTopRight', dotLabel: 'top' });
   });
 });
