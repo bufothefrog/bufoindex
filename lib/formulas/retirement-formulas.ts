@@ -193,7 +193,8 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     name: "Contribution Timing",
     functionName: "scheduleFutureValue",
     category: "core",
-    latex: "FV = m\\frac{(1+i)^{12n}-1}{i} + Y(1+r)\\frac{(1+r)^n-1}{r} \\qquad i = (1+r)^{1/12}-1",
+    // Three short rows so each fits a 360 px screen.
+    latex: "\\begin{aligned} FV &= m\\frac{(1+i)^{12n}-1}{i} \\\\ &\\quad + Y(1+r)\\frac{(1+r)^n-1}{r} \\\\ i &= (1+r)^{1/12}-1 \\end{aligned}",
     variables: {
       m: {
         symbol: "m",

@@ -28,6 +28,7 @@ import {
   type RetirementInputs,
 } from '@/lib/calculations/retirement'
 import { scheduleFutureValue } from '@/lib/calculations/contributionSchedule'
+import { renderLatex } from '@/components/methodology/renderLatex'
 import { estimateSocialSecurityBenefit } from '@/lib/calculations/socialSecurityEstimate'
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random'
 import { RetirementConstants } from '@/lib/constants/retirement'
@@ -236,6 +237,18 @@ describe('engine functions match the published LaTeX on hand-computed fixtures',
     // The page's comparison figure is text only (ExampleData holds one output).
     expect(entry.example.explanation).toContain('$4,150.92')
     expect(entry.example.explanation).toContain('$4,369.20')
+  })
+
+  it('the contribution timing formula renders as three short rows (FV, the yearly term, i) for phone width', () => {
+    const entry = retirementEntries.find((f) => f.id === 'retirement-contribution-timing')!
+    const rows = entry.latex.replace(/\\begin\{aligned\}|\\end\{aligned\}/g, '').split('\\\\')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toContain('FV')
+    expect(rows[1]).toContain('Y(1+r)')
+    expect(rows[2]).toContain('i &= (1+r)^{1/12}-1')
+    const html = renderLatex(entry.latex, false)
+    expect(html).not.toBeNull()
+    expect(html).not.toContain('katex-error')
   })
 
   it('the annuity entry states the monthly-rate convention', () => {
