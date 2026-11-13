@@ -152,6 +152,34 @@ describe('PortfolioRebalancingCalculator page', () => {
     expect(store.getState().results?.totalDeposit).toBe(500);
   });
 
+  it('names two unnamed brokerages 1 and 2 in every card, visible text included', async () => {
+    const user = userEvent.setup();
+    render(<PortfolioRebalancingCalculatorPage />);
+    await user.click(within(section(ACCOUNTS_TITLE)).getByRole('button', { name: 'Add account' }));
+    const [first, second] = profile().portfolio.accounts.filter((a) => a.kind === 'brokerage');
+
+    // The account list: the visible line and the controls.
+    expect(within(screen.getByTestId(`account-${first.id}`)).getByText('Brokerage (taxable) 1')).toBeInTheDocument();
+    expect(within(screen.getByTestId(`account-${second.id}`)).getByText('Brokerage (taxable) 2')).toBeInTheDocument();
+    expect(within(section(ACCOUNTS_TITLE)).getByRole('button', { name: 'Done editing Brokerage (taxable) 2' })).toBeInTheDocument();
+    // The holdings card: the regions, their headings and the holding controls.
+    const holdings = section('Holdings');
+    const one = within(holdings).getByRole('region', { name: 'Brokerage (taxable) 1 holdings' });
+    expect(within(one).getByText('Brokerage (taxable) 1')).toBeInTheDocument();
+    expect(within(one).getByRole('textbox', { name: 'Shares, Brokerage (taxable) 1 holding 1' })).toBeInTheDocument();
+    expect(within(holdings).getByRole('region', { name: 'Brokerage (taxable) 2 holdings' })).toHaveTextContent(
+      'No holdings yet. Add one below.'
+    );
+    expect(within(holdings).queryByRole('region', { name: 'Brokerage (taxable) holdings' })).not.toBeInTheDocument();
+    // The new cash card and its note.
+    const newCash = section(NEW_CASH_TITLE);
+    expect(within(newCash).getByRole('group', { name: 'Brokerage (taxable) 1' })).toBeInTheDocument();
+    expect(within(newCash).getByRole('group', { name: 'Brokerage (taxable) 2' })).toBeInTheDocument();
+    expect(newCash).toHaveTextContent(
+      'Not rebalanced: 401(k) or similar (no holdings entered), Brokerage (taxable) 2 (no holdings or new cash).'
+    );
+  });
+
   it('edits a typed balance in the account list as one whole-list write', () => {
     render(<PortfolioRebalancingCalculatorPage />);
     fireEvent.change(within(section(ACCOUNTS_TITLE)).getByRole('textbox', { name: '401(k) or similar balance' }), {

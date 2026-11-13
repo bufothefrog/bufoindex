@@ -303,10 +303,19 @@ export function distinctAccountNames(rows: readonly AccountRow[]): Map<string, s
   return out;
 }
 
-/** distinctAccountNames over the rows in effect and the suggested rows, in the order the account list shows them. */
+/**
+ * distinctAccountNames over the rows in effect and the suggested rows, in the
+ * order the account list shows them: the name every card shows a visitor for
+ * a row, so the same account reads the same in each.
+ */
 export function accountLabels(get: Get): Map<string, string> {
   const { rows, suggested } = accountsInEffect(get);
   return distinctAccountNames([...rows, ...suggested]);
+}
+
+/** One row's accountLabels name (its display name when it is not in effect). */
+export function accountLabel(get: Get, a: AccountRow): string {
+  return accountLabels(get).get(a.id) ?? accountDisplayName(a);
 }
 
 // ---------------------------------------------------------------------------
@@ -576,7 +585,9 @@ const REASON_TEXT: Readonly<Record<NotRebalancedReason, string>> = {
 export function notRebalancedNote(get: Get): string | null {
   const items = notRebalanced(get);
   if (items.length === 0) return null;
-  return `Not rebalanced: ${items.map(({ account, reason }) => `${accountDisplayName(account)} (${REASON_TEXT[reason]})`).join(', ')}.`;
+  const labels = accountLabels(get);
+  const named = items.map(({ account, reason }) => `${labels.get(account.id) ?? accountDisplayName(account)} (${REASON_TEXT[reason]})`);
+  return `Not rebalanced: ${named.join(', ')}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -590,11 +601,12 @@ export function notRebalancedNote(get: Get): string | null {
  */
 export function accountLines(get: Get): string[] {
   const { rows, suggested } = accountsInEffect(get);
+  const labels = accountLabels(get);
   const lines = rows.map((a) => {
     const count = holdingsOf(get, a.id).length;
     const holdings = count === 0 ? '' : count === 1 ? ' (1 holding)' : ` (${count} holdings)`;
     const fund = isEmergencyFundAccount(a) ? ' (emergency fund)' : '';
-    return `${accountDisplayName(a)} ${formatCurrency(accountValue(get, a))}${holdings}${fund}`;
+    return `${labels.get(a.id) ?? accountDisplayName(a)} ${formatCurrency(accountValue(get, a))}${holdings}${fund}`;
   });
   return [...lines, ...suggested.map((a) => `${ACCOUNT_KINDS[a.kind].label}: no balance yet`)];
 }

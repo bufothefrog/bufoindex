@@ -19,6 +19,7 @@ import type { FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
 import {
   accountDisplayName,
+  accountLabels,
   accountsInEffect,
   hasHoldings,
   newCashFor,
@@ -158,8 +159,9 @@ export const NEW_CASH: FieldSpec = {
   renderer: NEW_CASH_RENDERER,
   tier: 'details',
   summary: (_value, get) => {
+    const labels = accountLabels(get);
     const parts = rebalanceCandidates(get).map(
-      (account) => `${accountDisplayName(account)} ${formatCurrency(newCashFor(get, account.id))}`
+      (account) => `${labels.get(account.id) ?? accountDisplayName(account)} ${formatCurrency(newCashFor(get, account.id))}`
     );
     return parts.length > 0 ? parts.join(', ') : null;
   },

@@ -24,6 +24,8 @@ import { HoldingRow } from './HoldingRow';
 
 export interface AccountSectionProps {
   account: AccountRow;
+  /** The account's name as every card shows it (accountLabels); its display name when left out. */
+  label?: string;
   /** The account's place in the holdings editor (its test ids). */
   index: number;
   /** Every holding of the portfolio; the section shows the account's own. */
@@ -39,6 +41,7 @@ export interface AccountSectionProps {
 /** One account's holdings, each a HoldingRow, with Add holding. */
 export function AccountSection({
   account,
+  label,
   index,
   holdings: allHoldings,
   securities,
@@ -48,7 +51,7 @@ export function AccountSection({
   className,
 }: AccountSectionProps) {
   const holdings = allHoldings.filter(h => h.accountId === account.id);
-  const title = accountDisplayName(account);
+  const title = label ?? accountDisplayName(account);
 
   return (
     <section

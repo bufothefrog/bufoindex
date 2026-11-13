@@ -19,7 +19,7 @@ import { ACCOUNT_KIND_OPTIONS, FILING_STATUS_META, FILING_STATUS_OPTIONS } from 
 import { formatCurrency } from '@/lib/format';
 import {
   ACCOUNT_PATHS,
-  accountDisplayName,
+  accountLabel,
   accountValue,
   accountsSummary,
   emergencyFundAccounts,
@@ -246,7 +246,7 @@ export const EMERGENCY_FUND_BALANCE: FieldSpec = {
 export function emergencyFundHeldText(get: Get): string | undefined {
   const accounts = emergencyFundAccounts(get);
   if (accounts.length === 0) return undefined;
-  const items = accounts.map((a) => `${accountDisplayName(a)} ${formatCurrency(accountValue(get, a))}`);
+  const items = accounts.map((a) => `${accountLabel(get, a)} ${formatCurrency(accountValue(get, a))}`);
   return `Held in your accounts: ${items.join(', ')}.`;
 }
 

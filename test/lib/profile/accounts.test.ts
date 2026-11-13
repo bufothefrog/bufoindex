@@ -7,11 +7,15 @@
 
 import { describe, expect, it } from 'vitest';
 import { setNewCash } from '@/lib/calculators/portfolio/accountWrites';
+import { engineAccounts } from '@/lib/calculators/portfolio/bindings';
+import { emergencyFundHeldText } from '@/lib/fields/shared';
 import { ACCOUNT_KIND_LABELS, ACCOUNT_KIND_OPTIONS } from '@/lib/constants/labels';
 import {
   ACCOUNT_KINDS,
   ACCOUNT_PATHS,
   accountDisplayName,
+  accountLabel,
+  accountLabels,
   distinctAccountNames,
   accountLines,
   accountValue,
@@ -110,6 +114,55 @@ describe('kinds', () => {
       ['d', 'Brokerage (taxable) 3'],
       ['e', 'Fidelity'],
     ]);
+  });
+
+  it('names rows that share a display name with their accountLabels number in every summary and note', () => {
+    // The default plus a second, empty brokerage and a ticked cash-holding third one: three unnamed brokerages.
+    const get = getOf(
+      rawWith({
+        'portfolio.accounts': [
+          { id: 'acc-401k', kind: '401k', name: '', balance: 16225, holdsEmergencyFund: false },
+          { id: 'acc-brok', kind: 'brokerage', name: '', balance: 0, holdsEmergencyFund: false },
+          { id: 'acc-b2', kind: 'brokerage', name: '', balance: 0, holdsEmergencyFund: false },
+          { id: 'acc-b3', kind: 'brokerage', name: '', balance: 9000, holdsEmergencyFund: true },
+        ],
+      })
+    );
+    expect([...accountLabels(get).values()]).toEqual([
+      '401(k) or similar',
+      'Brokerage (taxable) 1',
+      'Brokerage (taxable) 2',
+      'Brokerage (taxable) 3',
+    ]);
+    expect(accountLabel(get, row(get, 'acc-b2'))).toBe('Brokerage (taxable) 2');
+    expect(notRebalancedNote(get)).toBe(
+      'Not rebalanced: 401(k) or similar (no holdings entered), Brokerage (taxable) 2 (no holdings or new cash), Brokerage (taxable) 3 (emergency fund).'
+    );
+    expect(accountLines(get)).toEqual([
+      '401(k) or similar $16,225',
+      'Brokerage (taxable) 1 $8,775 (3 holdings)',
+      'Brokerage (taxable) 2 $0',
+      'Brokerage (taxable) 3 $9,000 (emergency fund)',
+    ]);
+  });
+
+  it('gives the emergency fund note and the rebalancer the same numbered names', () => {
+    const brokerage = (id: string, balance: number, holdsEmergencyFund: boolean) => ({
+      id,
+      kind: 'brokerage',
+      name: '',
+      balance,
+      holdsEmergencyFund,
+    });
+    const get = getOf(
+      rawWith({
+        'workplace.has401k': false,
+        'portfolio.accounts': [brokerage('acc-brok', 0, false), brokerage('acc-b2', 0, false), brokerage('acc-f1', 4000, true), brokerage('acc-f2', 5000, true)],
+      })
+    );
+    expect(emergencyFundHeldText(get)).toBe('Held in your accounts: Brokerage (taxable) 3 $4,000, Brokerage (taxable) 4 $5,000.');
+    // acc-brok holds the example holdings; acc-b2 takes the taxable 500 only when it is the first brokerage, so it is not sent.
+    expect(engineAccounts(get).map((a) => [a.id, a.name])).toEqual([['acc-brok', 'Brokerage (taxable) 1']]);
   });
 
   it('counts cash, and a ticked brokerage only, as an emergency-fund account', () => {

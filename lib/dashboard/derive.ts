@@ -22,7 +22,7 @@ import { RetirementConstants } from '@/lib/constants/retirement';
 import { makeGet } from '@/lib/fields/paths';
 import { formatPercent } from '@/lib/format';
 import {
-  accountDisplayName,
+  accountLabel,
   accountLines,
   emergencyFundAccounts,
   emergencyFundBalance,
@@ -73,7 +73,7 @@ export function summarizeCashBuffer(stored: FinancialProfile): CashBufferSummary
   const get = makeGet(profile);
   const necessaryMonthly = Math.max(0, profile.spending.necessaryMonthly);
   const balance = Math.max(0, emergencyFundBalance(get));
-  const heldIn = emergencyFundAccounts(get).map(accountDisplayName);
+  const heldIn = emergencyFundAccounts(get).map((a) => accountLabel(get, a));
   const targetMonths = Math.max(0, profile.cash.targetMonths);
   const target = targetMonths * necessaryMonthly;
   const excess = Math.max(0, balance - target);
@@ -119,7 +119,7 @@ export function summarizeAccounts(stored: FinancialProfile): AccountsSummary {
     invested: investedBalance(get),
     emergencyFund: {
       balance: emergencyFundBalance(get),
-      heldIn: emergencyFundAccounts(get).map(accountDisplayName),
+      heldIn: emergencyFundAccounts(get).map((a) => accountLabel(get, a)),
     },
   };
 }

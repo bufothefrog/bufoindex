@@ -49,6 +49,7 @@ import { formatCount, formatCurrency } from '@/lib/format';
 import {
   ACCOUNT_PATHS,
   accountDisplayName,
+  accountLabel,
   accountLabels,
   accountsInEffect,
   answeredPaths,
@@ -90,7 +91,7 @@ function getAfter(get: Get, writes: readonly Write[]): Get {
  * again (its answer is still Yes), the sentence that says so.
  */
 export function removeAccountMessage(get: Get, account: AccountRow, writes: readonly Write[]): string {
-  const base = `Delete ${accountDisplayName(account)}? Its holdings will be removed too.`;
+  const base = `Delete ${accountLabel(get, account)}? Its holdings will be removed too.`;
   const group = kindGroup(account.kind);
   const suggested = accountsInEffect(getAfter(get, writes)).suggested.find((row) => group.includes(row.kind));
   const seed = suggested ? SEED_LABEL[suggested.kind] : undefined;
@@ -106,7 +107,7 @@ function holdingsText(count: number): string {
 
 interface AccountLineProps {
   account: AccountRow;
-  /** The row's name for its controls' accessible names, distinct across the list (accountLabels). */
+  /** The row's name as every card shows it, distinct across the list (accountLabels); visible and in the controls' names. */
   label: string;
   suggested: boolean;
   get: Get;
@@ -120,9 +121,11 @@ interface AccountLineProps {
 
 /** One account: the compact line, and its editor while open. */
 function AccountLine({ account, label, suggested, get, onWrite, open, onToggle, onRemoved, idPrefix, large }: AccountLineProps) {
-  const name = accountDisplayName(account);
-  const kindLabel = ACCOUNT_KIND_LABELS[account.kind];
+  // A row that shares its display name with another shows its number on the line that carries that name.
+  const numbered = label !== accountDisplayName(account);
   const ownName = account.name.trim();
+  const kindLabel = numbered && !ownName ? label : ACCOUNT_KIND_LABELS[account.kind];
+  const nameLine = numbered && ownName ? label : ownName;
   const count = holdingsOf(get, account.id).length;
   const held = holdingsValue(get, account.id);
   const editorId = `${idPrefix}-${account.id}-edit`;
@@ -138,7 +141,7 @@ function AccountLine({ account, label, suggested, get, onWrite, open, onToggle, 
     }
   };
   const oneBalance = () => {
-    if (window.confirm(`Remove the holdings of ${name}? Its balance is used again.`)) {
+    if (window.confirm(`Remove the holdings of ${label}? Its balance is used again.`)) {
       write(oneBalanceWrites(get, account.id));
     }
   };
@@ -148,7 +151,7 @@ function AccountLine({ account, label, suggested, get, onWrite, open, onToggle, 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-40">
           <p className={cn(large ? 'text-base' : 'text-sm', 'font-medium text-foreground')}>{kindLabel}</p>
-          {ownName && <p className="truncate text-sm text-muted-foreground">{ownName}</p>}
+          {nameLine && <p className="truncate text-sm text-muted-foreground">{nameLine}</p>}
           {isEmergencyFundAccount(account) && (
             <span className="mt-1 inline-block rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
               Emergency fund

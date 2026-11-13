@@ -70,6 +70,8 @@ function HoldingsEditor({ spec, get, onWrite, error, size }: CustomRendererProps
   const [portfolio, update] = usePortfolio({ get, onWrite });
   const classTargets = classTargetsFor(get) ?? portfolio.classTargets;
   const accounts = accountsInEffect(get).rows.filter((account) => account.kind !== 'cash');
+  // The same names as the account list and the new cash card, so two unnamed brokerages read 1 and 2 here too.
+  const labels = accountLabels(get);
 
   return (
     <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-3">
@@ -80,6 +82,7 @@ function HoldingsEditor({ spec, get, onWrite, error, size }: CustomRendererProps
         <AccountSection
           key={account.id}
           account={account}
+          label={labels.get(account.id) ?? accountDisplayName(account)}
           index={index}
           holdings={portfolio.holdings}
           securities={portfolio.securities}

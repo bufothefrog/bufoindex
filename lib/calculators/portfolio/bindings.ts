@@ -30,7 +30,7 @@ import {
 } from '@/lib/calculations/portfolioRebalancing';
 import type { Binding } from '@/lib/fields/binding';
 import type { Get } from '@/lib/fields/types';
-import { ACCOUNT_KINDS, accountDisplayName, newCashFor, rebalancedAccounts } from '@/lib/profile/accounts';
+import { ACCOUNT_KINDS, accountDisplayName, accountLabels, newCashFor, rebalancedAccounts } from '@/lib/profile/accounts';
 import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/lib/profile/defaults';
 import { PORTFOLIO_LIST_PATHS, readPortfolio } from './reducers';
 
@@ -84,9 +84,10 @@ export function classTargetsError(get: Get): string | undefined {
 
 /** The engine accounts: the rebalanced accounts with their tax treatment and this run's new cash. */
 export function engineAccounts(get: Get): Account[] {
+  const labels = accountLabels(get);
   return rebalancedAccounts(get).map((account) => ({
     id: account.id,
-    name: accountDisplayName(account),
+    name: labels.get(account.id) ?? accountDisplayName(account),
     // A rebalanced account is never kind 'cash', the one kind without a treatment.
     accountType: ACCOUNT_KINDS[account.kind].taxTreatment ?? 'taxable',
     deposit: newCashFor(get, account.id),
