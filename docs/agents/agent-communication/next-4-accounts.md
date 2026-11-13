@@ -151,7 +151,9 @@ screens show). A profile completed at 90ef4ed loads as N of N.
   holdings)" and the new cash summary "Brokerage (taxable) $500".
 - Rebalancer: new note "Not rebalanced: 401(k) or similar (no holdings entered)." for the default; new empty state "Add holdings to an
   account, or new cash to an empty one, to rebalance." when no account is rebalanced; the "Target allocation" card and the "Holdings" card
-  are then hidden (both show only while an account is rebalanced or has holdings; example 4a shows neither, where 90ef4ed showed both).
+  are then hidden (the Target allocation card shows while an account that could be rebalanced has holdings, normal contributions above
+  0 or new cash above 0, hasTargetsInEffect; the Holdings card shows while an account in effect other than a cash account has a holding,
+  hasHoldingsInEffect; example 4a shows neither, where 90ef4ed showed both).
   Holdings regions are named by the account's display name ("Brokerage holdings" -> "Brokerage (taxable) holdings").
   From that state, Edit on an account, then "List holdings instead", adds a blank holding: the Holdings card and the Target allocation
   card appear, and a ticker and shares give a plan.
@@ -174,7 +176,8 @@ screens show). A profile completed at 90ef4ed loads as N of N.
   new cash summaries, the overview Accounts card lines, "Held in your accounts: ...", the cash card "Held in ...", the Remove and "Use one
   balance instead" confirms and the account names in the rebalancer results. A uniquely named row reads as before.
 - Wizard accounts screen (second fix round): with no account in effect (no 401(k), HSA or IRA, taxable 0) the line "This is an example.
-  Change it to match yours, or skip." no longer shows above "No accounts yet."; it shows while an example account is on the screen.
+  Change it to match yours, or skip." no longer shows above "No accounts yet."; it shows only while an example account row (id and kind of
+  a row in exampleAccountLists, lib/profile/accounts.ts) is on the screen, so it also stays hidden after that visitor adds an account.
 
 ## The v2 double count that only the tick removes (example 6)
 
@@ -263,6 +266,8 @@ Second fix round, one commit per item:
   the profile asks always shows its target mix; the rebalancer page still follows a Custom new cash.
 - Account names (f7a8aad): accountLabels names every row a visitor sees (list above).
 - Wizard accounts screen (b6af5e2): the example line counts the rows in effect, not the stored list.
+- Wizard accounts screen (after the browser check): the example line shows only while a row in effect is an example row
+  (isExampleAccount in lib/profile/accounts.ts); before, an account the visitor added brought it back.
 - Rebalancer empty state (d3ca471): checked, no code change. For example 4a the page shows no Target allocation and no Holdings card;
   Edit, "List holdings instead", a ticker and shares lead to a plan with controls visible at each step. A page test pins the path.
 
