@@ -942,6 +942,30 @@ describe('calculateStepStatus — implementation guidance', () => {
     expect(status.implementationSteps.join(' ')).not.toMatch(/\$1,000/)
   })
 
+  it('has no transfer line for a complete fund', () => {
+    // 6 x $3,000 = $18,000 target, $18,000 in cash: complete, nothing to transfer.
+    const status = statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 18000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
+    }))
+
+    expect(status.isComplete).toBe(true)
+    expect(status.implementationSteps).toEqual([
+      'Calculate total needed: $18,000',
+      'Park funds in a high-yield savings account',
+    ])
+  })
+
+  it('has no transfer line for a target of 0 months', () => {
+    const status = statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 0, necessaryExpenses: 3000, emergencyFundMonths: 0 },
+    }))
+
+    expect(status.implementationSteps).toEqual([
+      'Calculate total needed: $0',
+      'Park funds in a high-yield savings account',
+    ])
+  })
+
   it('says "1 month", not "1 months", for a complete 1-month fund', () => {
     const status = statusFor('emergency-full', buildProfile({
       preferences: { currentEmergencyFund: 3000, necessaryExpenses: 3000, emergencyFundMonths: 1 },

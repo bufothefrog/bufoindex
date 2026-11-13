@@ -225,8 +225,16 @@ export function calculateStepStatus(
         }
         case 'emergency-full': {
           const needed = profile.preferences.necessaryExpenses * profile.preferences.emergencyFundMonths;
-          // The transfer figure is the allocation's own monthly amount, so the
-          // list never quotes a figure the card's header does not show.
+          // A complete fund (or a target of 0) needs no transfer, so there is
+          // no transfer line. Otherwise the figure is the allocation's own
+          // monthly amount, so the list never quotes a figure the card's
+          // header does not show; without an allocation it names no amount.
+          if (isComplete || !(needed > 0)) {
+            return [
+              `Calculate total needed: ${formatCurrency(needed)}`,
+              "Park funds in a high-yield savings account"
+            ];
+          }
           return [
             `Calculate total needed: ${formatCurrency(needed)}`,
             allocation

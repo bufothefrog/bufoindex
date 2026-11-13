@@ -105,6 +105,24 @@ describe('FinancialStepCard: Emergency Fund on the zero-cash default', () => {
     expect(within(howTo).getByText('Set automatic transfer for $2,225/month')).toBeInTheDocument();
     expect(screen.queryByText(/\$750\/month/)).not.toBeInTheDocument();
   });
+
+  it('tells a visitor whose fund is complete to set up no transfer', () => {
+    // Default profile with $100,000 in the emergency fund: above the 3 x 3,000 = $9,000 target.
+    const writes = [{ path: 'cash.emergencyFundBalance', value: 100000 }];
+    const { profile: stored, accepted } = applyProfileWrites(getDefaultFinancialProfile(), writes);
+    const profile = engineInputsFor(PAYCHECK_CALCULATOR, { ...stored, provided: [...stored.provided, ...accepted] });
+    const steps = calculateStepStatus(FINANCIAL_STEPS, calculateOptimalAllocation(profile).allocations, profile);
+    const step = steps.find((candidate) => candidate.id === 'emergency-full')!;
+    render(<FinancialStepCard step={step} profile={profile} expanded onToggle={() => {}} />);
+
+    expect(screen.getByText('Complete.')).toBeInTheDocument();
+    const howTo = screen.getByRole('list');
+    expect(within(howTo).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      '1.Calculate total needed: $9,000',
+      '2.Park funds in a high-yield savings account',
+    ]);
+    expect(screen.queryByText(/automatic transfer/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('ResultsSection', () => {
