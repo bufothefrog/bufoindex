@@ -2,7 +2,7 @@
 
 Branch claude/next-6-desktop-layout, built from 1a031eb (staging branch "next" after PR 1 to 5) in seven slices, one commit each,
 then three follow-up commits that apply the orchestrating session's decisions D-A to D-C (defaults on open questions 1, 10 and 11
-below) and this note's update:
+below), this note's update, and the fixes after an independent review (code and browser):
 
     8d0a95c slice 1: keep the Retire at N label right of the y axis
     a007825 slice 2: trim the savings-rate chart label matrix to 26 rows
@@ -14,7 +14,11 @@ below) and this note's update:
     90a2964 D-A leverage inputs: start the cards collapsed at every width
     33cf68e D-B leverage results: keep What next and methodology variables at reading width
     d6f9ed0 D-C leverage inputs row: let a last card alone span the row from lg to below xl
-    (this commit) hand-off note for PR 6 after the decisions
+    ee88805 hand-off note for PR 6 after the decisions
+    28bff2d review: account editor keeps two columns in the 1024 side column with a classic scrollbar
+    5d491ed review: test for the freeze on the first edit
+    111bf67 review: /demo NextSteps entry says where the columns layout is shown
+    (this commit) hand-off note for PR 6 after review
 
 Layout only: no file under lib/calculations changes, no number or text changes, package.json and package-lock.json are unchanged, no
 new dependency, the stored profile and preferences are untouched, and there is no new toggle, mode or visitor setting. The one new
@@ -61,7 +65,12 @@ line of an element in characters (trailing space not counted).
 - The results take the full width: the headline tiles three in a row, a full-width chart, "Monthly vs start of each year" and "Tail and
   drawdown" side by side, and "Model and caveats" prose in two text columns. The dollar caption and the chart caption are capped at
   reading width.
-- In a strip card an opened account editor stacks Kind over Account name (container query; phones, 768 and the side columns unchanged).
+- An opened account editor stacks Kind over Account name when its account row is narrower than 22rem (352 px; container query
+  `sm:@min-[22rem]:`): in the three-across row from 1280 (row 303 to 319 px). From 1024 to 1279 the leverage accounts card is as
+  wide as a side column and keeps two editor columns, as on base. Phones (one column), 768 and the side columns of retirement and
+  portfolio are unchanged, also with a classic scrollbar: at 1024 the side-column row is 384 px without a scrollbar and 377 px with
+  one (clientWidth 1009), two editor columns on base and head alike. The first build used `@sm` (384 px), which dropped retirement
+  and portfolio to one editor column at 1024 with a scrollbar; the review caught it.
 - The "What next?" card at the end of the leverage results sets its body in two columns from 1024 (the profile line and its link on
   the left, the calculator links on the right) through a `layout="columns"` prop of NextSteps that CalculatorPage passes only with
   inputs above. The default `layout="stack"` keeps NextSteps on the other three calculators as it was: every box of the card
@@ -70,8 +79,9 @@ line of an element in characters (trailing space not counted).
 
 | Check | Before (1a031eb) | After |
 |---|---|---|
-| Page height at 1440, empty / filled | 3583 / 3929 | 2677 / 2913 (limit 2750 / 3050) |
-| Page height at 1024, empty / filled | 3883 / 4249 | 2980 / 3216 |
+| Page height at 1440, empty / filled | 3583 / 3909 | 2677 / 2913 (limit 2750 / 3050) |
+| Page height at 1280, empty / filled | 3583 / 3929 | 2692 / 2928 |
+| Page height at 1024, empty / filled | 3883 / 4229 | 2980 / 3216 |
 | Inputs height, empty | side column 990 at 1024, 882 at 1440 | strip 182 at 1280, 1440 and 1920; 316 at 1024 (two rows, Assumptions 944 wide) |
 | Cumulative layout shift at 1440, 4x CPU throttle, three runs | 0.0000 each | 0.0000 each (0.1034 with the desktop-only fold, 0.0399 after D-A alone: the disclaimer) |
 | Cumulative layout shift at 1024, same | 0.0000 each | 0.0000, 0.0000, 0.0022 |
@@ -186,8 +196,10 @@ of the y-axis line; against the pre-fix helper 6 rows fail. The file runs in 3.9
 Suite counts: 3171 tests in 141 files at 1a031eb; 2810 after slices 1 to 3 (-364 chart rows, +2 helper tests, +1 paycheck test); 2818 in
 142 files after slice 5 (+4 media-query hook, +1 CalculatorLayout, +3 leverage); slices 6 and 7 add none (slice 6 is CSS only, which jsdom
 cannot see; it was checked in the browser). After the decisions: 2814 in 141 files (D-A removes the media-query hook test file, -4, and turns
-the three leverage card tests into two that need no media-query mock, -1; D-B adds one NextSteps test; D-C is CSS only). Coverage
-98.5 statements, 94.56 branches, 98.77 functions, 99.06 lines.
+the three leverage card tests into two that need no media-query mock, -1; D-B adds one NextSteps test; D-C is CSS only). After the
+review: 2815 in 141 files (+1 FieldSections test: a card an error held open stays open after an edit elsewhere once the error clears;
+it fails with the first-edit freeze removed, which no test caught before). Coverage 98.5 statements, 94.56 branches, 98.77 functions,
+99.06 lines.
 
 Mutation re-run, one mutation at a time against the committed files. Failed tests in the trimmed chart file (of 32) / the helper file
 (of 17) / the untrimmed 1a031eb chart file (of 396):
@@ -241,12 +253,19 @@ M10, M11, M14 and M26 stay known gaps, as the contract allows.
   uses `lg:max-w-prose` so 768 is unchanged. Pages checked: leverage at 768 to 1920.
 - Caveats: one `*:break-inside-avoid` on the wrapper instead of a class on each child (same effect).
 - /demo "Inputs above" entry: the gallery column is narrow, so the demo row follows its own width (container query) and shows two cards;
-  CalculatorLayout itself takes `inputsPlacement="above"` as specified. /demo FieldSection cards at 1024 go from two field columns to one
-  (C8 expects this).
+  CalculatorLayout itself takes `inputsPlacement="above"` as specified. /demo at 1024 (gallery column 284 to 360 px) changes in two
+  places: the FieldSection cards go from two field columns to one (C8 expects this), and on the Accounts tab the opened account
+  editors go from two columns to one (row 284 px, below any threshold that still stacks the 319 px strip rows). 390, 768 and from
+  1280 (rows 400 and 460 px) are unchanged.
+- /demo NextSteps entry: it names `layout="columns"` but samples only the stack layout, and says why: the columns layout needs a
+  page-wide card, and a sample in the gallery's 290 to 536 px light and dark columns squeezed the link cards to a few words per line
+  at 1024. The layout is seen on the leverage page.
 - D-A: the decision named only the fold; with it gone the shift was still 0.0399 (the disclaimer, visible under the short strip while
   the skeleton showed, moved out of view when the results came). The skeleton's `lg:min-h-screen` under a row of inputs brings it to
   0.0000; it shows only until the first results.
-- D-B: NextSteps columns and the CSS-only D-C rule have no jsdom-visible effect; they were checked in the browser. The NextSteps test
+- D-B: NextSteps columns, the CSS-only D-C rule, the results skeleton's `lg:min-h-screen` and the account editor's container query
+  have no jsdom-visible effect (jsdom computes no layout, and class-name assertions are not allowed); they were checked in the
+  browser, and no unit test fails when one of them is reverted. The NextSteps test
   checks that the columns layout keeps the same links in the same order.
 - Phone heights were compared against the base build, not the contract's absolute G2 numbers, which measure something else.
 - Methodology Container: `px-4 py-8 sm:px-6` instead of Container's `p-6`, so phones keep their 16 px padding (page identical at 360 and
@@ -259,6 +278,11 @@ M10, M11, M14 and M26 stay known gaps, as the contract allows.
 - Pre-existing: at 1024 the open Contributions card's "Leverage ratio" select cuts off its value, as the base's 460 px side column does.
 - Resolved by the decisions: the layout shift after load (D-A), the 101 cpl "What next?" lines (D-B), the Assumptions card alone at
   half width at 1024 (D-C). The media-query hook and the extra render it caused on every calculator are gone.
+- Left as built after the review (taste, covered by the open questions or the contract): the leverage row cards have uneven closed
+  heights from 1280 (130, 162 and 182 px at 1440; Assumptions wraps Restore defaults above its title, check L7 accepts it); with a
+  filled profile the two-column "What next?" leaves about 250 px empty under its left column at 1440 (question 10).
+- Known test gap, older than PR 6: no one-line mutation of the right-edge bound of the savings-rate labels fails a test (M10); the
+  trim lost no protection (no mutation is caught only by the untrimmed file).
 
 ## Open questions for the owner (default built meanwhile)
 
