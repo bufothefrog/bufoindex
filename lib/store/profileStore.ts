@@ -3,12 +3,14 @@
  * 'bufo-profile', version 3). Only `profile` is persisted; `hasProfile` is
  * derived from it and `hasHydrated` is runtime-only.
  *
- * Hydration and SSR: on the server there is no localStorage, so nothing
- * hydrates and `hasHydrated` stays false. On the client, persist hydrates
- * synchronously when this module loads, but zustand's React binding renders
- * the hydration pass from getInitialState() (the pre-hydration defaults with
- * hasHydrated false), so server and client markup match. Gate any
- * profile-dependent UI on `hasHydrated`.
+ * Hydration and SSR: storage comes from browserLocalStorage, which gives
+ * persist no storage on the server on every Node version (it never reads the
+ * bare global, which Node 25 and later define), so on the server nothing
+ * hydrates, `hasHydrated` stays false and a setState only updates memory.
+ * On the client, persist hydrates synchronously when this module loads, but
+ * zustand's React binding renders the hydration pass from getInitialState()
+ * (the pre-hydration defaults with hasHydrated false), so server and client
+ * markup match. Gate any profile-dependent UI on `hasHydrated`.
  *
  * Persisted data saved under another version goes through migrateProfile
  * (a version 2 payload is reshaped into the v3 account list first, then
@@ -30,6 +32,7 @@ import {
 } from '@/lib/profile/defaults';
 import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
 import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
+import { browserLocalStorage } from '@/lib/store/browserStorage';
 
 export interface SetValuesOptions {
   /** Paths to mark as answered. Defaults to the accepted written paths. */
@@ -89,9 +92,10 @@ let storedPayloadIsNewer = false;
 
 /** localStorage, minus the writes that would overwrite a newer payload. */
 function profileStorage(): StateStorage {
-  // Read eagerly, so that on the server this throws here and persist runs
-  // without storage, exactly as createJSONStorage(() => localStorage) did.
-  const storage = localStorage;
+  // Read eagerly, so that on the server browserLocalStorage throws here and
+  // persist runs without storage, exactly as with
+  // createJSONStorage(browserLocalStorage).
+  const storage = browserLocalStorage();
   return {
     getItem: (name) => storage.getItem(name),
     setItem: (name, value) => {

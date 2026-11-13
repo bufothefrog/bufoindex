@@ -4,14 +4,17 @@
  * calculator and the dashboard (O15); display only, never a calculation
  * input. Only `displayMode` is persisted; `hasHydrated` is runtime-only.
  *
- * Hydration and SSR follow the profile store: nothing hydrates on the
- * server, and zustand's React binding renders the hydration pass from
+ * Hydration and SSR follow the profile store: storage comes from
+ * browserLocalStorage, so on the server (any Node version) persist runs
+ * without storage, nothing hydrates and hasHydrated stays false. On the
+ * client, zustand's React binding renders the hydration pass from
  * getInitialState() (the default mode, hasHydrated false), so server and
  * first client markup agree. The stored mode appears on the next render.
  */
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { browserLocalStorage } from '@/lib/store/browserStorage';
 import { DEFAULT_DOLLAR_DISPLAY_MODE, type DollarDisplayMode } from '@/lib/utils/displayDollars';
 
 export interface PreferencesState {
@@ -46,7 +49,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     {
       name: PREFERENCES_STORAGE_KEY,
       version: PREFERENCES_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(browserLocalStorage),
       partialize: (state) => ({ displayMode: state.displayMode }),
       // Any other version passes through to merge, which keeps only a valid mode.
       migrate: (persisted) => persisted as Pick<PreferencesState, 'displayMode'>,

@@ -10,15 +10,15 @@ npm install
 npm run dev   # http://localhost:3000
 ```
 
-Node 22.22.2+ is required — see `engines` in `package.json` for the exact
-range. Pre-commit hooks (husky + lint-staged) run `eslint --fix` and
+Node 26 is required (`engines` in `package.json` is `26.x`; `.nvmrc` says
+`26`), the same version Vercel builds the site with. Pre-commit hooks (husky + lint-staged) run `eslint --fix` and
 `tsc --noEmit` on staged TypeScript files.
 
 ## Quality bar
 
 Before opening a PR, make sure all four of these pass locally. CI runs
-type-check, lint and tests on a Node 22 + 24 matrix, and the production build
-in a separate Node 22 job:
+type-check, lint and tests on Node 26 only, and the production build in a
+separate Node 26 job:
 
 ```bash
 npm run type-check

@@ -52,3 +52,20 @@ class ResizeObserverStub {
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverStub
 }
+
+// Node 25 and later define their own global localStorage and sessionStorage
+// (Web Storage is on by default; localStorage is undefined and warns unless
+// --localstorage-file is given). Vitest's jsdom environment does not
+// overwrite a global the runtime already has, so those Node objects would
+// hide jsdom's. Point both names at the jsdom window's storage, as on
+// Node 22 and 24. Vitest exposes that window as the global `jsdom`.
+const jsdomWindow = (globalThis as { jsdom?: { window: Window } }).jsdom?.window
+if (jsdomWindow) {
+  for (const key of ['localStorage', 'sessionStorage'] as const) {
+    Object.defineProperty(globalThis, key, {
+      value: jsdomWindow[key],
+      configurable: true,
+      writable: true,
+    })
+  }
+}
