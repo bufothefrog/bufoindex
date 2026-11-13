@@ -5,13 +5,17 @@
  *
  * PROFILE_FORM is the core screens, then the union of every calculator
  * form's non-core, non-assumption, intake-surface screens in
- * PROFILE_FORM_ORDER, then PROFILE_EXTRA_SCREENS. Fields are deduplicated by
+ * PROFILE_FORM_ORDER, then PROFILE_EXTRA_SCREENS, then every optional screen
+ * (ScreenSpec.optional) of those forms, in the same order, in the section
+ * "Optional". Fields are deduplicated by
  * path across all of them: the first screen that asks a path keeps it (with
  * that form's spec), later screens drop it, and a screen left with no field
  * is dropped; a trimmed screen takes the wording in TRIMMED_SCREEN_COPY when
  * it has an entry there. Relations are the union of every form's (one per
  * lower, upper and checkOn), and onSubmit runs each distinct form onSubmit,
  * the first write to a path winning.
+ *
+ * Completeness leaves the optional screens out (requiredScreens).
  */
 
 import {
@@ -59,7 +63,7 @@ export const PROFILE_FORM_ORDER: readonly CalculatorId[] = ['retirement', 'paych
  * profile screen (the taxable contribution) sits with the portfolio
  * questions, so the two calculators share one section.
  */
-export type ProfileFormSection = 'core' | 'retirement' | 'paycheck' | 'portfolio' | 'cash';
+export type ProfileFormSection = 'core' | 'retirement' | 'paycheck' | 'portfolio' | 'cash' | 'optional';
 
 export const PROFILE_FORM_SECTION_LABELS: Readonly<Record<ProfileFormSection, string>> = {
   core: 'The basics',
@@ -67,6 +71,7 @@ export const PROFILE_FORM_SECTION_LABELS: Readonly<Record<ProfileFormSection, st
   paycheck: 'Paycheck',
   portfolio: 'Portfolio',
   cash: 'Cash and strategy',
+  optional: 'Optional',
 };
 
 const FORM_SECTION: Readonly<Record<CalculatorId, ProfileFormSection>> = {
@@ -144,15 +149,23 @@ export function composeProfileForm(
     sections.set(id, section);
   };
 
+  // Optional screens wait until every other screen is taken, then come last.
+  const optional: { form: FormSpec; screen: ScreenSpec; trimmedCopy?: Readonly<Record<string, ScreenCopy>> }[] = [];
+
   for (const screen of core.screens) take(core, screen, 'core');
   for (const { form, section, trimmedCopy } of parts) {
     for (const screen of form.screens) {
       const surface = screen.surface ?? 'both';
       if (screen.tier === 'core' || screen.tier === 'assumption' || surface === 'calculator') continue;
-      take(form, screen, section, trimmedCopy);
+      if (screen.optional) optional.push({ form, screen, trimmedCopy });
+      else take(form, screen, section, trimmedCopy);
     }
   }
-  for (const screen of extra.screens) take(extra, screen, 'cash');
+  for (const screen of extra.screens) {
+    if (screen.optional) optional.push({ form: extra, screen });
+    else take(extra, screen, 'cash');
+  }
+  for (const { form, screen, trimmedCopy } of optional) take(form, screen, 'optional', trimmedCopy);
 
   const sources = [core, ...parts.map((part) => part.form), extra];
   const relations = new Map<string, CrossFieldRule>();
@@ -201,10 +214,18 @@ export function formForFlow(flow: FormFlow): FormSpec {
   return FORMS[flow];
 }
 
+/**
+ * The screens that count toward profile completeness, remaining questions
+ * and every "finished" state: all but the optional ones (ScreenSpec.optional).
+ */
+export function requiredScreens(screens: readonly ScreenSpec[]): ScreenSpec[] {
+  return screens.filter((screen) => !screen.optional);
+}
+
 export interface ProfileCompleteness {
-  /** Topic screens whose every visible fact is answered. */
+  /** Required topic screens whose every visible fact is answered. */
   provided: number;
-  /** Topic screens with at least one visible fact. */
+  /** Required topic screens with at least one visible fact. */
   total: number;
   /** The screens still to answer, in PROFILE_FORM order. */
   missing: ScreenSpec[];
@@ -213,12 +234,15 @@ export interface ProfileCompleteness {
 /**
  * Profile completeness counted by topic screen (O14): a PROFILE_FORM screen
  * counts once every fact visible on it is in profile.provided. A screen with
- * no visible fact (the employer match without a 401(k)) is left out.
+ * no visible fact (the employer match without a 401(k)) is left out, and so
+ * is every optional screen, answered or not.
  */
 export function profileCompleteness(profile: FinancialProfile): ProfileCompleteness {
   const get = makeGet(profile);
-  const total = screensFor(PROFILE_FORM, get, { mode: 'all', surface: 'intake' }).length;
-  const missing = screensFor(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided, surface: 'intake' });
+  const total = requiredScreens(screensFor(PROFILE_FORM, get, { mode: 'all', surface: 'intake' })).length;
+  const missing = requiredScreens(
+    screensFor(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided, surface: 'intake' })
+  );
   return { provided: total - missing.length, total, missing };
 }
 

@@ -136,6 +136,7 @@ export const RETIREMENT_FORM: FormSpec = {
       question: 'What will Social Security and healthcare look like?',
       description: "Amounts are in today's dollars.",
       tier: 'details',
+      optional: true,
       fields: [SOCIAL_SECURITY_BENEFIT.path, SOCIAL_SECURITY_AGE.path, ANNUAL_HEALTHCARE_COST.path],
     },
     {

@@ -17,7 +17,7 @@
 
 import { getIntakeScreens, intakeForm, type IntakeFlow } from '@/lib/constants/intake';
 import { resolveOptions, visibleScreenFields } from '@/lib/fields/runtime';
-import type { FieldOption, Get } from '@/lib/fields/types';
+import type { FieldOption, FormSpec, Get, ScreenSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
 
 /** Every profile path a flow's intake can ask, in order, deduplicated. */
@@ -103,10 +103,9 @@ export interface AskedScreen {
   questions: AskedQuestion[];
 }
 
-/** What the flow asks now ('all' mode), screen by screen, with each visible question's wording and bounds. */
-export function askedScreens(flow: IntakeFlow, get: Get = fromDefaults()): AskedScreen[] {
-  const form = intakeForm(flow);
-  return getIntakeScreens(flow, get).map((screen) => ({
+/** One screen of `form` in askedScreens' shape: its wording and each visible question's wording and bounds. */
+export function askedScreen(form: FormSpec, screen: ScreenSpec, get: Get = fromDefaults()): AskedScreen {
+  return {
     id: screen.id,
     title: screen.title,
     description: screen.description,
@@ -123,7 +122,13 @@ export function askedScreens(flow: IntakeFlow, get: Get = fromDefaults()): Asked
         step: spec.step,
       };
     }),
-  }));
+  };
+}
+
+/** What the flow asks now ('all' mode), screen by screen, with each visible question's wording and bounds. */
+export function askedScreens(flow: IntakeFlow, get: Get = fromDefaults()): AskedScreen[] {
+  const form = intakeForm(flow);
+  return getIntakeScreens(flow, get).map((screen) => askedScreen(form, screen, get));
 }
 
 /** What the old intake asked for `flow` rows, from the given screen and question tables. */

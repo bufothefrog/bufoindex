@@ -18,7 +18,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { Layers, Scale, Sunset, UserRound, Wallet } from 'lucide-react';
-import { formForFlow } from '@/lib/calculators/forms';
+import { formForFlow, requiredScreens } from '@/lib/calculators/forms';
 import { CLASS_TARGETS_PATH, classTargetsError } from '@/lib/calculators/portfolio/bindings';
 import {
   CORE_SCREENS,
@@ -254,6 +254,19 @@ export const BLANK_FIELDS_NOTE = {
 export const EXAMPLE_ROWS_NOTE = 'This is an example. Change it to match yours, or skip.';
 
 const REMAINING_FORMS = new WeakMap<FormSpec, FormSpec>();
+const INTENT_FORMS = new WeakMap<FormSpec, FormSpec>();
+
+/**
+ * A calculator intent's form without its optional screens: /start/<intent>
+ * does not ask them (the calculator page and the profile form do).
+ */
+function withoutOptional(form: FormSpec): FormSpec {
+  const cached = INTENT_FORMS.get(form);
+  if (cached) return cached;
+  const intent = { ...form, screens: requiredScreens(form.screens) };
+  INTENT_FORMS.set(form, intent);
+  return intent;
+}
 
 /** An intent's form for 'remaining' mode: its non-core screens, with the core facts left out. */
 function withoutCore(form: FormSpec): FormSpec {
@@ -268,10 +281,15 @@ function withoutCore(form: FormSpec): FormSpec {
   return remaining;
 }
 
-/** The form whose screens a flow asks in `mode` (shares its field specs with formForFlow). */
+/**
+ * The form whose screens a flow asks in `mode` (shares its field specs with
+ * formForFlow). A calculator intent leaves out its optional screens; the
+ * profile flow asks them, last.
+ */
 export function intakeForm(flow: IntakeFlow, mode: IntakeMode = 'all'): FormSpec {
-  const form = formForFlow(flow);
-  return flow === 'core' || mode === 'all' ? form : withoutCore(form);
+  if (flow === 'core') return formForFlow(flow);
+  const form = flow === 'profile' ? formForFlow(flow) : withoutOptional(formForFlow(flow));
+  return mode === 'all' ? form : withoutCore(form);
 }
 
 /**
@@ -285,18 +303,20 @@ export function getIntakeScreens(flow: IntakeFlow, get: Get, options: IntakeScre
 }
 
 /**
- * The screens `intent` still asks in 'remaining' mode given the saved
- * profile: what /start/<intent> shows on arrival. Empty means that page goes
- * straight to its destination (the calculator, or the overview for
- * 'profile').
+ * The required screens `intent` still asks in 'remaining' mode given the
+ * saved profile: the questions the chooser counts as left. For a calculator
+ * intent this is what /start/<intent> shows on arrival (empty means it goes
+ * straight to the calculator). For 'profile' the optional screens are left
+ * out, although /start/profile still asks the unanswered ones at the end.
  */
 export function remainingIntakeScreens(intent: IntakeIntent, profile: FinancialProfile): ScreenSpec[] {
-  return getIntakeScreens(intent, makeGet(profile), { mode: 'remaining', provided: profile.provided });
+  return requiredScreens(getIntakeScreens(intent, makeGet(profile), { mode: 'remaining', provided: profile.provided }));
 }
 
 /**
  * Whether "Finish your profile" has nothing left to do, so the guided flow
- * offers the overview in its place: the profile intake has no screen left.
+ * offers the overview in its place: the profile intake has no required
+ * screen left (optional screens never hold it back).
  * Fields on a calculator-only screen are never asked by an intake, and
  * fields behind an unmet condition (the match terms without a 401(k)) are
  * not asked, so /start/profile can have nothing left to ask while some

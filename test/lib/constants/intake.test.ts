@@ -40,6 +40,7 @@ import {
   OLD_CORE_FLOW,
   OLD_CORE_QUESTIONS,
   OLD_CORE_SCREENS,
+  askedScreen,
   askedScreens,
   fromDefaults,
   intakePaths,
@@ -157,14 +158,21 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
   for (const screen of askedScreens('core', get)) take('core', screen, 'core');
   for (const id of PROFILE_FORM_ORDER) {
     const specs = new Map(FORMS[id].screens.map((spec) => [spec.id, spec]));
+    // The intent intake leaves its optional screens out; the profile form asks them last.
     for (const screen of askedScreens(id, get)) {
       const spec = specs.get(screen.id)!;
+      expect(spec.optional, `${id}:${spec.id}`).not.toBe(true);
       if (spec.tier === 'core' || spec.tier === 'assumption' || spec.surface === 'calculator') continue;
       take(id, screen, FORM_SECTIONS[id]);
     }
   }
   const extras = oldScreens(OLD_PROFILE_EXTRA_FLOW, OLD_PROFILE_EXTRA_SCREENS, OLD_PROFILE_EXTRA_QUESTIONS);
   for (const screen of extras) take('profile-extra', screen, 'cash');
+  for (const id of PROFILE_FORM_ORDER) {
+    for (const spec of FORMS[id].screens.filter((screen) => screen.optional)) {
+      take(id, askedScreen(FORMS[id], spec, get), 'optional');
+    }
+  }
   return out;
 }
 
@@ -242,9 +250,11 @@ describe('intake screens', () => {
     }
   });
 
-  it('counts each intent from its form', () => {
+  it('counts each intent from its form, without its optional screens', () => {
     for (const intent of CALCULATOR_INTENTS) {
-      expect(screenIds(intent)).toEqual(FORMS[intent].screens.filter((s) => s.surface !== 'calculator').map((s) => s.id));
+      expect(screenIds(intent)).toEqual(
+        FORMS[intent].screens.filter((s) => s.surface !== 'calculator' && !s.optional).map((s) => s.id)
+      );
     }
     expect(screenIds('profile')).toEqual(PROFILE_FORM.screens.map((s) => s.id));
     expect(screenIds('core')).toEqual(formForFlow('core').screens.map((s) => s.id));
@@ -613,6 +623,23 @@ describe('remainingIntakeScreens', () => {
       expect(ids(intent, profileWith([...CORE_PATHS, ...intakePaths(intent)])), intent).toEqual([]);
     }
   });
+
+  it('never counts an optional screen, answered or not, though /start/profile still asks it', () => {
+    const optional = PROFILE_FORM.screens.filter((s) => s.optional);
+    expect(optional.map((s) => s.id)).toEqual(['ss-healthcare']);
+    const optionalPaths = optional.flatMap((s) => s.fields);
+    const required = intakePaths('profile').filter((path) => !optionalPaths.includes(path));
+    for (const intent of INTAKE_INTENTS) {
+      // A profile saved before the optional section, with the optional facts answered or not.
+      const without = ids(intent, profileWith([...CORE_PATHS]));
+      expect(without, intent).not.toContain('ss-healthcare');
+      expect(ids(intent, profileWith([...CORE_PATHS, ...optionalPaths])), intent).toEqual(without);
+    }
+    expect(ids('profile', profileWith(required))).toEqual([]);
+    // The profile wizard asks the unanswered optional screen at the end.
+    const asked = getIntakeScreens('profile', makeGet(profileWith(required)), { mode: 'remaining', provided: required });
+    expect(asked.map((s) => [s.id, profileFormSection(s.id)])).toEqual([['ss-healthcare', 'optional']]);
+  });
 });
 
 describe('isProfileFinished', () => {
@@ -633,6 +660,22 @@ describe('isProfileFinished', () => {
     // forms neither is the contribution rate.
     expect(neverAsked).toContain('cash.targetMonths');
     expect(isProfileFinished(profileWith(asked))).toBe(true);
-    expect(isProfileFinished(profileWith(asked.filter((path) => path !== asked[asked.length - 1])))).toBe(false);
+    const required = PROFILE_FORM.screens.filter((s) => !s.optional);
+    const lastFields = required[required.length - 1].fields;
+    const lastRequired = lastFields[lastFields.length - 1];
+    expect(isProfileFinished(profileWith(asked.filter((path) => path !== lastRequired)))).toBe(false);
+  });
+
+  it('does not wait for the optional screens', () => {
+    const optionalPaths = PROFILE_FORM.screens.filter((s) => s.optional).flatMap((s) => s.fields);
+    expect(optionalPaths).toEqual([
+      'retirementIncome.socialSecurityBenefit',
+      'retirementIncome.socialSecurityAge',
+      'retirementIncome.annualHealthcareCost',
+    ]);
+    const required = intakePaths('profile').filter((path) => !optionalPaths.includes(path));
+    expect(isProfileFinished(profileWith(required))).toBe(true);
+    expect(isProfileFinished(profileWith([...required, ...optionalPaths]))).toBe(true);
+    expect(isProfileFinished(profileWith(optionalPaths))).toBe(false);
   });
 });
