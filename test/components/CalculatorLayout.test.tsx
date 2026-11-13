@@ -102,3 +102,25 @@ describe('CalculatorLayout disclaimer', () => {
     expect(screen.getByText('Disclaimer:')).toBeInTheDocument();
   });
 });
+
+describe('CalculatorLayout inputsPlacement="above"', () => {
+  it('renders both panels, the inputs before the results, with the tab bar and the action bar', () => {
+    render(
+      <CalculatorLayout
+        {...baseProps}
+        inputsPlacement="above"
+        resultsLabel="Above results"
+        inputSections={<div data-testid="inputs">Inputs here</div>}
+        resultSection={<div>Results here</div>}
+      />
+    );
+    const inputs = screen.getByTestId('inputs');
+    const region = screen.getByRole('region', { name: 'Above results' });
+    expect(region).toHaveTextContent('Results here');
+    // Document (reading and tab) order: the inputs panel, then the results.
+    expect(inputs.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /Inputs/ })).toHaveAttribute('aria-controls', inputs.parentElement?.id);
+    expect(screen.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-controls', region.id);
+    expect(screen.getByRole('button', { name: /See results/ })).toBeInTheDocument();
+  });
+});

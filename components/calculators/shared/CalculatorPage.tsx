@@ -7,6 +7,7 @@ import { FieldSections } from '@/components/fields';
 import type { CustomRenderers } from '@/components/fields';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import type { InputsPlacement } from '@/components/ui/layouts/ResponsiveGrid';
 import { calculatorDisclaimer, calculatorMeta } from '@/lib/calculators/registry';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { makeGet } from '@/lib/fields/paths';
@@ -43,15 +44,41 @@ export interface CalculatorPageProps<E, R> {
   renderResults: (args: CalculatorResultsArgs<E, R>) => React.ReactNode;
   /** Rendered after the layout (the retirement methodology link). */
   afterLayout?: React.ReactNode;
+  /**
+   * From lg up, the inputs beside the results (the default) or in a row of
+   * cards above them. With 'above' every input card starts collapsed to its
+   * summary line at every width, in the server render and the first client
+   * render alike, so nothing folds after load.
+   */
+  inputsPlacement?: InputsPlacement;
 }
+
+/**
+ * The input cards as one row from lg up (two across, three from xl). From lg
+ * to below xl a last card alone in its row spans the row, as on /overview.
+ */
+const INPUTS_ROW_CLASS =
+  'lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:items-start lg:gap-6 lg:space-y-0 lg:max-xl:*:last:odd:col-span-2';
+
+const startCollapsed = () => true;
 
 /** The run store's key for an error that belongs to no field (createCalculatorStore). */
 const RUN_ERROR_PATH = 'calculation';
 
-/** Placeholder for the results column until the first run after hydration. */
-function ResultsSkeleton() {
+/**
+ * Placeholder for the results column until the first run after hydration.
+ * Under a row of inputs (from lg) it holds at least a screen's height, so
+ * what follows the results (the disclaimer) stays below the fold until the
+ * results arrive instead of jumping down out of view.
+ */
+function ResultsSkeleton({ belowInputs }: { belowInputs: boolean }) {
   return (
-    <div role="status" aria-busy="true" aria-label="Loading results" className="space-y-4">
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label="Loading results"
+      className={cn('space-y-4', belowInputs && 'lg:min-h-screen')}
+    >
       {Array.from({ length: 2 }, (_, i) => (
         <div key={i} className="space-y-3 rounded-lg border border-border bg-card p-4 sm:p-6">
           <div className="h-5 w-1/3 animate-pulse rounded bg-muted" />
@@ -106,6 +133,7 @@ export default function CalculatorPage<E, R>({
   renderers,
   renderResults,
   afterLayout,
+  inputsPlacement = 'beside',
 }: CalculatorPageProps<E, R>) {
   const meta = calculatorMeta(definition.id);
   const { ready, arrivedFromProfile } = useCalculatorBootstrap(definition, store);
@@ -116,6 +144,12 @@ export default function CalculatorPage<E, R>({
   const errors = store((state) => state.errors);
   const stale = store((state) => state.stale);
   const provided = values.provided;
+  // Inputs above the results start collapsed at every width, so each card
+  // shows its summary line. The rule reads no viewport, so the server and
+  // client markup match and no card folds after hydration. An error still
+  // forces a card open; the first edit freezes and a toggle pins
+  // (FieldSections).
+  const inputsAbove = inputsPlacement === 'above';
 
   // The bootstrap's immediate submit already covers the first ready render;
   // this repeat is a memo hit (or joins the run in flight).
@@ -161,7 +195,7 @@ export default function CalculatorPage<E, R>({
       </StatusAlert>
     );
   } else if (!ready || !hasErrors) {
-    resultSection = <ResultsSkeleton />;
+    resultSection = <ResultsSkeleton belowInputs={inputsAbove} />;
   }
 
   return (
@@ -171,6 +205,7 @@ export default function CalculatorPage<E, R>({
         description={meta.description}
         resultsLabel={meta.liveResultsLabel}
         showResultsKey={arrivedFromProfile ? 'profile' : undefined}
+        inputsPlacement={inputsPlacement}
         inputSections={
           <FieldSections
             form={definition.form}
@@ -180,10 +215,12 @@ export default function CalculatorPage<E, R>({
             renderers={renderers}
             provided={provided}
             onRestoreDefaults={restoreDefaults}
+            className={inputsAbove ? INPUTS_ROW_CLASS : undefined}
+            initiallyCollapsed={inputsAbove ? startCollapsed : undefined}
           />
         }
         resultSection={resultSection}
-        resultFooter={<NextSteps intent={definition.id} />}
+        resultFooter={<NextSteps intent={definition.id} layout={inputsAbove ? 'columns' : 'stack'} />}
         errors={fieldErrors}
         disclaimer={calculatorDisclaimer(definition.id)}
       />

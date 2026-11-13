@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { screensFor, visibleScreenFields } from '@/lib/fields/runtime';
+import { cn } from '@/lib/utils';
 import type { ScreenSpec, Write } from '@/lib/fields/types';
 import { FieldSection, screenHasError } from './FieldSection';
 import type { FieldSectionsProps } from './types';
@@ -27,6 +28,7 @@ export function FieldSections({
   provided,
   initiallyCollapsed,
   onRestoreDefaults,
+  className,
 }: FieldSectionsProps) {
   const [pinned, setPinned] = useState<Readonly<Record<string, boolean>>>({});
   const [frozen, setFrozen] = useState(false);
@@ -61,7 +63,7 @@ export function FieldSections({
   };
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className={cn('space-y-4 lg:space-y-6', className)}>
       {screens.map((screen) => (
         <FieldSection
           key={screen.id}

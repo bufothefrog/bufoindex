@@ -66,7 +66,7 @@ export function GuidedSection() {
         </DemoEntry>
         <DemoEntry
           name="NextSteps"
-          description={<>The &quot;What next?&quot; card CalculatorPage passes to CalculatorLayout as <Code>resultFooter</Code>. It reflects this browser&apos;s saved profile and renders after hydration.</>}
+          description={<>The &quot;What next?&quot; card CalculatorPage passes to CalculatorLayout as <Code>resultFooter</Code>. It reflects this browser&apos;s saved profile and renders after hydration. With <Code>layout=&quot;columns&quot;</Code> (a calculator with its inputs above the results) its body sits in two columns from lg, so the full-width card keeps short lines; it needs a card as wide as the page, so it is not sampled in this narrow column (see the leverage comparison).</>}
         >
           <div className="max-w-xl">
             <NextSteps intent="paycheck" />

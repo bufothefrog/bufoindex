@@ -86,6 +86,8 @@ export interface FieldSectionsProps {
   /** Replaces the default rule for whether a screen starts collapsed. */
   initiallyCollapsed?(s: ScreenSpec): boolean;
   onRestoreDefaults?(s: ScreenSpec): void;
+  /** Merged onto the wrapper of the cards (a layout, e.g. a row of cards from lg). */
+  className?: string;
 }
 
 export interface FieldListProps {

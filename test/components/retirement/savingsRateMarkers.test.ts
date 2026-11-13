@@ -175,9 +175,40 @@ describe('savingsRateLabelPositions', () => {
   });
 
   it('anchors the label inward at the first plotted age near the left edge', () => {
-    const { dotLabel } = place({ x: 30, y: 100 }, 250);
+    // The first plotted age sits on the y-axis line (plot.x = 80): a label
+    // centered on it would run over the axis and its tick labels, so it
+    // starts at the plot edge plus the 4 px gap.
+    const { dotLabel } = place({ x: 80, y: 100 }, 250);
     expect(dotLabel!.textAnchor).toBe('start');
-    expect(dotLabel!.box.left).toBeGreaterThanOrEqual(0);
+    expect(dotLabel!.box.left).toBeGreaterThanOrEqual(84);
+  });
+
+  it('keeps the label right of the y-axis line for a dot on it, below the dot or lifted over the line', () => {
+    // Under the line: the label goes below the dot.
+    const under = place({ x: 80, y: 200 }, 150);
+    expect(below(under.dotLabel!.box, 200)).toBe(true);
+    expect(under.dotLabel!.box.left).toBeGreaterThanOrEqual(84);
+    // On the axis with the line just over it: the lifted candidate.
+    const lifted = place({ x: 80, y: AXIS_Y }, 314);
+    expect(above(lifted.dotLabel!.box, 312)).toBe(true);
+    expect(lifted.dotLabel!.box.left).toBeGreaterThanOrEqual(84);
+  });
+
+  it('never accepts a label left of the plot, even where only beside-left would fit', () => {
+    // A narrow chart with a 100 px y axis and a dot on the y-axis line just
+    // over the x axis, with the line 12 px over it: below meets the axis,
+    // above meets the line, beside-right and the lifted label run past the
+    // SVG's right edge. Beside-left would start at x 3.6, inside the SVG but
+    // over the y axis and its tick labels, so no candidate fits and the
+    // label keeps its first choice, which starts right of the plot edge.
+    const { dotLabel } = savingsRateLabelPositions({
+      ...GEOMETRY,
+      svgWidth: 180,
+      plot: { x: 100, y: 20, width: 76, height: 304 },
+      dot: { x: 100, y: 304 },
+      lineY: 292,
+    });
+    expect(dotLabel!.box.left).toBeGreaterThanOrEqual(100);
   });
 
   it('puts the label beside a dot near the axis when the line leaves no room above it', () => {

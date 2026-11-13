@@ -6,25 +6,31 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+/**
+ * Where the inputs sit from lg up: 'beside' the results (two columns) or
+ * 'above' them (one column: the inputs, then full-width results). Below lg
+ * both are one column.
+ */
+export type InputsPlacement = 'beside' | 'above';
+
 export interface ResponsiveGridProps {
   children: React.ReactNode;
   hasResults?: boolean;
+  /** Default 'beside'. */
+  inputsPlacement?: InputsPlacement;
 }
 
-/** Two columns with results, three (inputs over two) without; one column below lg. */
-export function ResponsiveGrid({ children, hasResults = false }: ResponsiveGridProps) {
+/**
+ * Beside: two columns with results, three (inputs over two) without; one
+ * column below lg. Above: one column at every width.
+ */
+export function ResponsiveGrid({ children, hasResults = false, inputsPlacement = 'beside' }: ResponsiveGridProps) {
+  let columns: string;
+  if (inputsPlacement === 'above') columns = 'grid-cols-1';
+  else if (hasResults) columns = 'grid-cols-1 lg:grid-cols-2'; // Results present: 2-column layout
+  else columns = 'grid-cols-1 lg:grid-cols-3'; // No results: 3-column with empty state
   return (
-    <div
-      className={cn(
-        "grid transition-all duration-500",
-        "gap-6",
-        hasResults
-          ? "grid-cols-1 lg:grid-cols-2" // Results present: 2-column layout
-          : "grid-cols-1 lg:grid-cols-3", // No results: 3-column with empty state
-        "max-w-7xl",
-        "mx-auto"
-      )}
-    >
+    <div className={cn("grid transition-all duration-500", "gap-6", columns)}>
       {children}
     </div>
   );

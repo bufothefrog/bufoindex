@@ -18,8 +18,22 @@ import { OptionCard } from './OptionCard';
 export interface NextStepsProps {
   /** The calculator this card sits on; used for the no-profile intake link. */
   intent: Exclude<IntakeIntent, 'profile'>;
+  /**
+   * 'stack' (the default): one column at every width. 'columns': from lg the
+   * card's body sits in two columns (the profile line and its link, then the
+   * calculator links), for a card as wide as the page, so no line runs long.
+   */
+  layout?: NextStepsLayout;
   className?: string;
 }
+
+export type NextStepsLayout = 'stack' | 'columns';
+
+/** The card body: one column, or two from lg with 'columns'. */
+const BODY_CLASSES: Record<NextStepsLayout, string> = {
+  stack: 'space-y-3',
+  columns: 'space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0',
+};
 
 /**
  * "What next?" card rendered at the end of a calculator's results.
@@ -31,7 +45,7 @@ export interface NextStepsProps {
  * questions, returning to this calculator afterwards. Renders nothing until
  * the persisted profile has hydrated, so server and client markup match.
  */
-export function NextSteps({ intent, className }: NextStepsProps) {
+export function NextSteps({ intent, layout = 'stack', className }: NextStepsProps) {
   const hasHydrated = useProfileStore((state) => state.hasHydrated);
   const hasProfile = useProfileStore((state) => state.hasProfile);
   const profile = useProfileStore((state) => state.profile);
@@ -49,7 +63,7 @@ export function NextSteps({ intent, className }: NextStepsProps) {
   if (!hasProfile) {
     return (
       <BaseCard {...cardProps}>
-        <div className="space-y-3">
+        <div className={BODY_CLASSES[layout]}>
           <p className="text-sm text-muted-foreground">
             Answer once and the answers carry across every calculator.
           </p>
@@ -74,29 +88,31 @@ export function NextSteps({ intent, className }: NextStepsProps) {
 
   return (
     <BaseCard {...cardProps}>
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Your answers are saved in this browser.</p>
-        <ul className="space-y-2">
-          <li className="flex">
-            {finished ? (
-              <OptionCard
-                href="/overview"
-                tone="emphasis"
-                icon={LayoutDashboard}
-                title="See your overview"
-                description="Every calculator's result from the same answers, on one page."
-              />
-            ) : (
-              <OptionCard
-                href={'/start/profile' as Route}
-                tone="emphasis"
-                icon={UserRound}
-                title="Finish your profile"
-                description={finishDescription}
-              />
-            )}
-          </li>
-        </ul>
+      <div className={BODY_CLASSES[layout]}>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Your answers are saved in this browser.</p>
+          <ul className="space-y-2">
+            <li className="flex">
+              {finished ? (
+                <OptionCard
+                  href="/overview"
+                  tone="emphasis"
+                  icon={LayoutDashboard}
+                  title="See your overview"
+                  description="Every calculator's result from the same answers, on one page."
+                />
+              ) : (
+                <OptionCard
+                  href={'/start/profile' as Route}
+                  tone="emphasis"
+                  icon={UserRound}
+                  title="Finish your profile"
+                  description={finishDescription}
+                />
+              )}
+            </li>
+          </ul>
+        </div>
         <CalculatorLinks label="Try another calculator" exclude={[intent]} />
       </div>
     </BaseCard>

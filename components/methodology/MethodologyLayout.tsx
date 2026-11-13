@@ -108,7 +108,7 @@ export function MethodologyLayout({
             </div>
             
             {description && (
-              <p className="text-foreground mb-4 max-w-3xl">{description}</p>
+              <p className="text-foreground mb-4 max-w-prose">{description}</p>
             )}
 
             <div className="flex items-center space-x-6 text-sm text-muted-foreground">
@@ -260,7 +260,7 @@ export function MethodologyLayout({
         <div className="text-center py-12">
           <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">No formulas found</h3>
-          <p className="text-muted-foreground mb-4">
+          <p className="mx-auto max-w-prose text-muted-foreground mb-4">
             Try adjusting your search terms or category filter.
           </p>
           <button
@@ -277,7 +277,7 @@ export function MethodologyLayout({
 
       {/* Footer */}
       <div className="border-t pt-6 mt-12">
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-prose text-sm text-muted-foreground">
           This page is maintained alongside the code it describes: every entry is registered
           by hand in <code className="font-mono">lib/formulas/</code>, names the function that
           implements it, and has its worked example re-derived from that function by the test

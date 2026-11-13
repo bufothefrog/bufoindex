@@ -13,7 +13,11 @@ function renderResults({ results, inputs }: CalculatorResultsArgs<DcaComparisonI
   return <LeverageResults result={results} inputs={inputs} />;
 }
 
-/** The leverage comparison on the shared calculator page, reading and writing the profile. */
+/**
+ * The leverage comparison on the shared calculator page, reading and writing
+ * the profile. Its few inputs sit in a row of collapsed cards above
+ * full-width results from lg up.
+ */
 export function LeverageComparison() {
   return (
     <CalculatorPage
@@ -21,6 +25,7 @@ export function LeverageComparison() {
       store={useLeverageStore}
       renderers={LEVERAGE_RENDERERS}
       renderResults={renderResults}
+      inputsPlacement="above"
     />
   );
 }

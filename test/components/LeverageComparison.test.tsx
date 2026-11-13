@@ -29,6 +29,18 @@ function page() {
 const tile = (name: string) => screen.getByRole('group', { name });
 const results = () => screen.getByRole('region', { name: 'Leverage comparison results' });
 const sourceSwitch = (label: string) => screen.getByRole('radiogroup', { name: `${label}: auto or custom` });
+const sections = () => [
+  screen.getByRole('region', { name: 'Contributions' }),
+  screen.getByRole('region', { name: 'What do you have saved and invested?' }),
+  screen.getByRole('region', { name: 'Assumptions' }),
+];
+const toggleOf = (section: HTMLElement) =>
+  within(within(section).getByRole('group', { name: /^Controls for / })).getByRole('button', { name: /^(Show|Hide|Edit|Done) / });
+
+/** The input cards start collapsed: open Contributions to reach its fields. */
+async function openContributions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(toggleOf(screen.getByRole('region', { name: 'Contributions' })));
+}
 
 beforeEach(() => {
   clearBrowserState();
@@ -56,12 +68,17 @@ describe('LeverageComparison page', () => {
     });
   });
 
-  it('renders the default inputs on the server, with no results', () => {
+  it('renders the default inputs on the server, collapsed to their summaries, with no results', () => {
     resetProfileStore({ hydrated: false });
     const html = renderToString(page());
     expect(html).toContain('Leverage Comparison');
     expect(html).toContain('Contributions');
-    expect(html).toContain('Your monthly taxable contribution');
+    // The server render already shows every card collapsed (no fold after
+    // hydration): the summary line, no field, no open card.
+    expect(html).toContain('$500/mo, 40 years, $25,000 start, 2x fund');
+    expect(html).not.toContain('Your monthly taxable contribution');
+    expect(html.match(/aria-expanded="false"/g)).toHaveLength(3);
+    expect(html).not.toContain('aria-expanded="true"');
     expect(html).toContain('Loading results');
     expect(html).not.toContain('median ending balance');
   });
@@ -147,8 +164,10 @@ describe('LeverageComparison page', () => {
     expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent('over 40 years');
   });
 
-  it('shows where each auto value comes from, and the ratio and assumptions it uses', () => {
+  it('shows where each auto value comes from, and the ratio and assumptions it uses', async () => {
+    const user = userEvent.setup();
     render(page());
+    await openContributions(user);
     const contribution = screen.getByRole('group', { name: 'Monthly contribution' });
     expect(contribution).toHaveTextContent('Your monthly taxable contribution: $500');
     expect(screen.getByRole('group', { name: 'Years' })).toHaveTextContent(
@@ -166,6 +185,7 @@ describe('LeverageComparison page', () => {
   it('writes an override through to the profile and recalculates', async () => {
     const user = userEvent.setup();
     render(page());
+    await openContributions(user);
     await user.click(within(sourceSwitch('Years')).getByRole('radio', { name: 'Custom' }));
     const years = screen.getByRole('textbox', { name: 'Years' });
     expect(years).toHaveValue('40');
@@ -187,6 +207,7 @@ describe('LeverageComparison page', () => {
   it('saves the leverage ratio to the profile', async () => {
     const user = userEvent.setup();
     render(page());
+    await openContributions(user);
     await user.selectOptions(screen.getByLabelText('Leverage ratio'), '3x (UPRO-like daily-reset fund)');
     expect(useProfileStore.getState().profile.strategy.leverageRatio).toBe(3);
     await act(() => useLeverageStore.getState().flush());
@@ -196,6 +217,7 @@ describe('LeverageComparison page', () => {
   it('keeps the last results, marked out of date, while nothing is invested', async () => {
     const user = userEvent.setup();
     render(page());
+    await openContributions(user);
     await user.click(within(sourceSwitch('Monthly contribution')).getByRole('radio', { name: 'Custom' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Monthly contribution' }), { target: { value: '0' } });
     await user.click(within(sourceSwitch('Starting balance')).getByRole('radio', { name: 'Custom' }));
@@ -216,5 +238,34 @@ describe('LeverageComparison page', () => {
     const { profile } = useProfileStore.getState();
     expect(profile.assumptions.leverage.indexMeanReturn).toBe(0.1);
     expect(profile.provided).not.toContain('assumptions.leverage.indexMeanReturn');
+  });
+
+  describe('the input cards', () => {
+    // No matchMedia stub decides this: the cards start collapsed at every
+    // width (the beforeEach stub matches no query).
+    it('start collapsed, each showing its summary line', () => {
+      render(page());
+      const [contributions, accounts, market] = sections();
+      for (const section of sections()) expect(toggleOf(section)).toHaveAttribute('aria-expanded', 'false');
+      expect(contributions).toHaveTextContent('$500/mo, 40 years, $25,000 start, 2x fund');
+      expect(within(contributions).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(accounts).toHaveTextContent('Brokerage');
+      expect(market).toHaveTextContent('10.0% return, 16.0% volatility, 4.50% financing');
+    });
+
+    it('keep a card the visitor opened open while they edit it, and the others collapsed', async () => {
+      const user = userEvent.setup();
+      render(page());
+      const [contributions, accounts, market] = sections();
+      await user.click(toggleOf(contributions));
+      expect(toggleOf(contributions)).toHaveAttribute('aria-expanded', 'true');
+
+      await user.selectOptions(screen.getByLabelText('Leverage ratio'), '3x (UPRO-like daily-reset fund)');
+      expect(useProfileStore.getState().profile.strategy.leverageRatio).toBe(3);
+      expect(toggleOf(contributions)).toHaveAttribute('aria-expanded', 'true');
+      expect(within(contributions).getByLabelText('Leverage ratio')).toBeInTheDocument();
+      expect(toggleOf(accounts)).toHaveAttribute('aria-expanded', 'false');
+      expect(toggleOf(market)).toHaveAttribute('aria-expanded', 'false');
+    });
   });
 });

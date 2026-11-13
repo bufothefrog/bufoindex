@@ -127,7 +127,7 @@ function StepExpandedContent({ step }: { step: StepStatus }) {
             <h4 className="font-medium text-foreground">Financial Impact</h4>
           </div>
           <KeyValueList
-            className="grid grid-cols-2 gap-4 space-y-0 text-sm"
+            layout="grid"
             items={[
               {
                 id: 'monthly',
