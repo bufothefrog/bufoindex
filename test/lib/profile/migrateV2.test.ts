@@ -184,6 +184,31 @@ describe('example 4: IRA balances answered', () => {
   });
 });
 
+describe('a stored everything-answered profile at the 3bb0132 prices', () => {
+  it('keeps the answered Roth IRA row, so the paycheck Roth IRA balance is 2,875 (not the 0 of the 3bb0132 fixture)', () => {
+    const base = defaultPayloadAt90ef4ed().portfolio as { securities: { ticker: string; price: number }[] };
+    const prices: Record<string, number> = { VTI: 250, VXUS: 60, BND: 75 };
+    const out = migrateV2Payload(
+      v2With(
+        {
+          'investing.investedBalance': 25000,
+          'portfolio.securities': base.securities.map((s) => ({ ...s, price: prices[s.ticker] ?? s.price })),
+        },
+        ['investing.investedBalance', 'portfolio.accounts', 'portfolio.holdings', 'portfolio.securities']
+      )
+    );
+    expect((out.portfolio as { accounts: { id: string; balance: number }[] }).accounts.map((a) => [a.id, a.balance])).toEqual([
+      ['acc-roth', 0],
+      ['acc-brok', 0],
+      ['acc-other', 16225],
+    ]);
+    const get = getOf(out);
+    // Roth IRA 10 x 250 + 5 x 75 = 2,875; brokerage 20 x 250 + 15 x 60 = 5,900; the rest 25,000 - 8,775 = 16,225.
+    expect(iraBalances(get)).toEqual({ traditional: 0, roth: 2875 });
+    expect(investedBalance(get)).toBe(25000);
+  });
+});
+
 describe('a typed IRA balance at or below the holdings of its kind', () => {
   it('adds no rest row: a Roth IRA typed 3,000 next to Roth IRA holdings worth 4,100 keeps 4,100', () => {
     const out = migrateV2Payload(

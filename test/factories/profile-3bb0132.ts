@@ -6,9 +6,14 @@
  * The golden fixtures in the bindings tests pin engine inputs for explicit
  * answers. PR 3 changed the defaults those fixtures were built over, so they
  * now build over this profile with every leaf and list marked answered
- * (answeredEverywhere): the expected engine inputs stay exactly as captured,
- * and a stored profile in which every field is answered runs the same
- * numbers as at 3bb0132.
+ * (answeredEverywhere): the expected engine inputs stay exactly as captured.
+ *
+ * Since profile v3 this fixture is not what a stored 3bb0132 profile
+ * migrates to: it keeps the same retirement and leverage inputs (start
+ * 25,000, 1,500 a month), but a stored everything-answered 3bb0132 payload
+ * migrates its answered example lists as the visitor's own (a Roth IRA row
+ * worth 2,875 at the 3bb0132 prices, so the paycheck Roth IRA balance is
+ * 2,875, not 0) and gets other rebalancer inputs.
  *
  * Profile v3 keeps the invested money on the account rows. The 3bb0132
  * default invested 25,000 and saved 1,500 a month; here that is the example
