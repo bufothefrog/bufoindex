@@ -274,6 +274,10 @@ export function PercentInput({
     return inputField;
   }
 
+  // A blank field (null) puts the slider and its readout at the typical value
+  // the placeholder shows, never at a 0 that may lie below the field's minimum.
+  const sliderValue = valueOrNull ?? clamp(placeholderValue ?? 0, min, max);
+
   const handleSliderChange = ([percent]: number[]) => {
     // Round to avoid floating point precision issues (4 decimal places)
     onChange(Math.round(percent * 100) / 10000);
@@ -284,7 +288,7 @@ export function PercentInput({
       {inputField}
       <div className="px-3">
         <Slider
-          value={[value * 100]}
+          value={[sliderValue * 100]}
           onValueChange={handleSliderChange}
           min={min * 100}
           max={max * 100}
@@ -295,7 +299,7 @@ export function PercentInput({
         />
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>{formatPercent(min, { digits: 1 })}</span>
-          <span className="font-medium">{formatPercent(value, { digits: 1 })}</span>
+          <span className="font-medium">{formatPercent(sliderValue, { digits: 1 })}</span>
           <span>{formatPercent(max, { digits: 1 })}</span>
         </div>
       </div>

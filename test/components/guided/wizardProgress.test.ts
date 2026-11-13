@@ -1,11 +1,13 @@
 /**
  * Saving as you go (components/guided/wizardProgress.ts). The wizard saves
  * after every Next and Skip; the old wizard saved once, at Finish, with
- * buildIntakeSubmission. For the same actions both must leave the same
- * profile: these tests run seeded sequences of Next, Skip, Back and field
- * edits through the progress functions, apply each save to the profile
- * store as the wizard does, and compare the store after every save with the
- * old single save of the same progress applied to the arrival profile.
+ * buildIntakeSubmission of its working copy. These tests run seeded
+ * sequences of Next, Skip, Back and field edits through the progress
+ * functions, apply each save to the profile store as the wizard does, and
+ * check the store after every save against a separate model of what the
+ * visitor has confirmed: a shadow progress that receives a screen's edits
+ * only when that screen is confirmed with Next (and drops them on Skip),
+ * saved the old way. At Finish the store also equals the old single save.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -91,9 +93,11 @@ function editFor(spec: FieldSpec, get: Get, rng: () => number): Write[] | undefi
 }
 
 interface Run {
-  /** Store profile and old-path profile after every save. */
+  /** Store profile and the confirmed-values model, saved the old way, after every save. */
   checks: { action: string; store: FinancialProfile; old: FinancialProfile }[];
   finished: boolean;
+  /** At Finish: the store and the old single save of the working copy. */
+  final?: { store: FinancialProfile; old: FinancialProfile };
 }
 
 /** Runs `count` seeded actions through the progress functions, saving as the wizard does. */
@@ -108,11 +112,17 @@ function run(flow: IntakeFlow, mode: IntakeMode, seed: FinancialProfile, rngSeed
   const screensOf = (p: WizardProgress) =>
     getIntakeScreens(flow, makeGet(p.answers), { mode, provided: seed.provided });
 
+  // The model: edits wait per screen and reach the shadow only on Next.
+  let shadow = startProgress(seed);
+  // Each edit is kept as its own group: editScreen tells own paths from
+  // coupled writes by the visibility at the time of the edit.
+  let pending: Record<string, Write[][]> = {};
+
   const save = (action: string) => {
-    const { writes, options, ledger: next } = saveWrites(flow, seed, progress, ledger);
+    const { writes, options, ledger: next } = saveWrites(flow, seed, progress, ledger, form.screens);
     ledger = next;
     useProfileStore.getState().setValues(writes, options);
-    checks.push({ action, store: useProfileStore.getState().profile, old: oldSave(flow, seed, progress) });
+    checks.push({ action, store: useProfileStore.getState().profile, old: oldSave(flow, seed, shadow) });
   };
 
   for (let i = 0; i < count; i += 1) {
@@ -127,11 +137,32 @@ function run(flow: IntakeFlow, mode: IntakeMode, seed: FinancialProfile, rngSeed
       const get = makeGet(progress.answers);
       const fields = visibleScreenFields(form, screen, get);
       const writes = fields.length > 0 ? editFor(fields[Math.floor(rng() * fields.length)], get, rng) : undefined;
-      if (writes) progress = editScreen(form, progress, screen, writes);
+      if (writes) {
+        progress = editScreen(form, progress, screen, writes);
+        pending = { ...pending, [screen.id]: [...(pending[screen.id] ?? []), writes] };
+      }
     } else {
-      progress = action === 'next' ? answerScreen(form, progress, screen) : skipScreens(form, progress, seed, [screen], screens);
+      const waiting = pending[screen.id] ?? [];
+      pending = { ...pending, [screen.id]: [] };
+      if (action === 'next') {
+        progress = answerScreen(form, progress, screen);
+        shadow = answerScreen(
+          form,
+          waiting.reduce((p, writes) => editScreen(form, p, screen, writes), shadow),
+          screen
+        );
+      } else {
+        progress = skipScreens(form, progress, seed, [screen], screens);
+        shadow = skipScreens(form, shadow, seed, [screen], screens);
+      }
       save(label);
-      if (step >= screensOf(progress).length - 1) return { checks, finished: true };
+      if (step >= screensOf(progress).length - 1) {
+        return {
+          checks,
+          finished: true,
+          final: { store: useProfileStore.getState().profile, old: oldSave(flow, seed, progress) },
+        };
+      }
       index = step + 1;
     }
   }
@@ -164,7 +195,7 @@ const CASES: readonly [IntakeFlow, IntakeMode, string, () => FinancialProfile][]
   ['profile', 'all', 'a returning visitor', returning],
 ];
 
-describe('saving as you go equals the single save at Finish', () => {
+describe('saving as you go stores exactly what the visitor has confirmed', () => {
   it.each(CASES)('%s (%s mode), %s: after every Next and Skip', (flow, mode, _who, makeSeed) => {
     let saves = 0;
     let finished = 0;
@@ -172,6 +203,9 @@ describe('saving as you go equals the single save at Finish', () => {
       const result = run(flow, mode, makeSeed(), rngSeed, 30);
       for (const { action, store, old } of result.checks) {
         expect(comparable(store), `seed ${rngSeed}, ${action}`).toEqual(comparable(old));
+      }
+      if (result.final) {
+        expect(comparable(result.final.store), `seed ${rngSeed}, Finish`).toEqual(comparable(result.final.old));
       }
       saves += result.checks.length;
       if (result.finished) finished += 1;
@@ -191,14 +225,14 @@ describe('saving as you go equals the single save at Finish', () => {
 
     let progress = editScreen(form, startProgress(seed), about, fieldWrites(age, 70, makeGet(seed)));
     progress = answerScreen(form, progress, about);
-    let save = saveWrites('core', seed, progress, EMPTY_LEDGER);
+    let save = saveWrites('core', seed, progress, EMPTY_LEDGER, form.screens);
     useProfileStore.getState().setValues(save.writes, save.options);
     // The derived write raises the retirement age above the new age.
     expect(useProfileStore.getState().profile.person).toMatchObject({ age: 70, retirementAge: 71 });
 
     // Back to the screen, then Skip: the store goes back to the arrival values.
     progress = skipScreens(form, progress, seed, [about], screens);
-    save = saveWrites('core', seed, progress, save.ledger);
+    save = saveWrites('core', seed, progress, save.ledger, form.screens);
     useProfileStore.getState().setValues(save.writes, save.options);
     const stored = useProfileStore.getState().profile;
     expect(stored.person).toMatchObject({ age: seed.person.age, retirementAge: seed.person.retirementAge });
@@ -213,13 +247,92 @@ describe('saving as you go equals the single save at Finish', () => {
     const about = screens[0];
     load(seed);
     let progress = answerScreen(form, startProgress(seed), about);
-    let save = saveWrites('profile', seed, progress, EMPTY_LEDGER);
+    let save = saveWrites('profile', seed, progress, EMPTY_LEDGER, form.screens);
     progress = skipScreens(form, progress, seed, [about], screens);
-    save = saveWrites('profile', seed, progress, save.ledger);
+    save = saveWrites('profile', seed, progress, save.ledger, form.screens);
     expect(save.options.unprovide).toEqual([]);
     useProfileStore.getState().setValues(save.writes, save.options);
     expect(useProfileStore.getState().profile.provided).toEqual(expect.arrayContaining([...CORE_PATHS]));
     expect(useProfileStore.getState().profile.person.age).toBe(58);
+  });
+});
+
+describe('saving as you go leaves unconfirmed edits out', () => {
+  /** Applies one save to the store as the wizard does. */
+  const apply = (save: ReturnType<typeof saveWrites>) => useProfileStore.getState().setValues(save.writes, save.options);
+
+  it('keeps an earlier screen\'s confirmed value when it was edited after Next and then left with Back', () => {
+    const seed = getDefaultFinancialProfile();
+    const form = intakeForm('core', 'all');
+    const screens = getIntakeScreens('core', makeGet(seed), { mode: 'all', provided: [] });
+    const [about, pay] = screens;
+    const frequency = form.fields.find((f) => f.path === 'income.frequency')!;
+    load(seed);
+
+    // Next on the first two screens, the pay frequency weekly.
+    let progress = answerScreen(form, startProgress(seed), about);
+    let save = saveWrites('core', seed, progress, EMPTY_LEDGER, form.screens);
+    apply(save);
+    progress = answerScreen(form, editScreen(form, progress, pay, fieldWrites(frequency, 'weekly', makeGet(progress.answers))), pay);
+    save = saveWrites('core', seed, progress, save.ledger, form.screens);
+    apply(save);
+    expect(useProfileStore.getState().profile.income.frequency).toBe('weekly');
+
+    // Back to the pay screen, change it to monthly, Back again, Next on the first screen.
+    progress = editScreen(form, progress, pay, fieldWrites(frequency, 'monthly', makeGet(progress.answers)));
+    progress = answerScreen(form, progress, about);
+    save = saveWrites('core', seed, progress, save.ledger, form.screens);
+    apply(save);
+    const stored = useProfileStore.getState().profile;
+    expect(stored.income.frequency).toBe('weekly');
+    expect(stored.provided).toContain('income.frequency');
+  });
+
+  it('computes derived writes from confirmed values only (an unconfirmed age past the retirement age)', () => {
+    const seed = getDefaultFinancialProfile();
+    const form = intakeForm('core', 'all');
+    const screens = getIntakeScreens('core', makeGet(seed), { mode: 'all', provided: [] });
+    const [about, pay] = screens;
+    const age = form.fields.find((f) => f.path === 'person.age')!;
+    load(seed);
+
+    let progress = answerScreen(form, startProgress(seed), about);
+    // Back to the first screen, an age of 70 typed and not confirmed, then Next on the next screen.
+    progress = editScreen(form, progress, about, fieldWrites(age, 70, makeGet(progress.answers)));
+    progress = answerScreen(form, progress, pay);
+    apply(saveWrites('core', seed, progress, EMPTY_LEDGER, form.screens));
+    expect(useProfileStore.getState().profile.person).toMatchObject({
+      age: seed.person.age,
+      retirementAge: seed.person.retirementAge,
+    });
+  });
+});
+
+describe('Skip takes back what the screen gave, hidden fields included', () => {
+  it('unmarks and reverts the 401(k) details answered before the plan was switched off and the screen skipped', () => {
+    const seed = returning();
+    const form = intakeForm('paycheck', 'remaining');
+    const screens = getIntakeScreens('paycheck', makeGet(seed), { mode: 'remaining', provided: seed.provided });
+    const plan = screens.find((s) => s.id === '401k')!;
+    const has401k = form.fields.find((f) => f.path === 'workplace.has401k')!;
+    const matchLimit = form.fields.find((f) => f.path === 'workplace.matchLimit')!;
+    load(seed);
+
+    // Next with a match limit typed in, then Back, the plan switched off, Skip.
+    let progress = editScreen(form, startProgress(seed), plan, fieldWrites(matchLimit, 0, makeGet(seed)));
+    progress = answerScreen(form, progress, plan);
+    let save = saveWrites('paycheck', seed, progress, EMPTY_LEDGER, form.screens);
+    useProfileStore.getState().setValues(save.writes, save.options);
+    expect(useProfileStore.getState().profile.provided).toContain('workplace.matchPercent');
+
+    progress = editScreen(form, progress, plan, fieldWrites(has401k, false, makeGet(progress.answers)));
+    progress = skipScreens(form, progress, seed, [plan], screens);
+    expect(progress.provided.filter((path) => path.startsWith('workplace.'))).toEqual([]);
+    save = saveWrites('paycheck', seed, progress, save.ledger, form.screens);
+    useProfileStore.getState().setValues(save.writes, save.options);
+    const stored = useProfileStore.getState().profile;
+    expect(stored.provided.filter((path) => path.startsWith('workplace.'))).toEqual([]);
+    expect(stored.workplace).toEqual(seed.workplace);
   });
 });
 

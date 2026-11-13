@@ -258,6 +258,32 @@ describe('PercentInput', () => {
     expect(screen.getByText('100.0%')).toBeInTheDocument();
   });
 
+  it('puts the slider and readout of a blank field (null) at the typical value, never at 0', () => {
+    const { unmount } = render(
+      <PercentInput
+        name="inflation"
+        label="Inflation rate"
+        value={null}
+        placeholderValue={0.03}
+        min={0.01}
+        max={0.05}
+        showSlider
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Inflation rate', { selector: 'input' })).toHaveValue('');
+    expect(screen.getByRole('slider', { name: 'Inflation rate' })).toHaveAttribute('aria-valuenow', '3');
+    expect(screen.getByText('3.0%')).toBeInTheDocument();
+    expect(screen.queryByText('0.0%')).toBeNull();
+    unmount();
+    // Without a typical value the slider rests at the minimum, not below it.
+    render(
+      <PercentInput name="inflation" label="Inflation rate" value={null} min={0.01} max={0.05} showSlider onChange={vi.fn()} />,
+    );
+    expect(screen.getByRole('slider', { name: 'Inflation rate' })).toHaveAttribute('aria-valuenow', '1');
+    expect(screen.queryByText('0.0%')).toBeNull();
+  });
+
   it('falls back to ariaLabel for the slider name when the label is empty', () => {
     render(
       <PercentInput

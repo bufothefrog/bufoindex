@@ -8,10 +8,9 @@
  * field the visitor has not answered is a display layer over it (isBlankField).
  *
  * Saving as you go: saveWrites returns the setValues call that makes the
- * store equal to "the arrival profile plus buildIntakeSubmission of the
- * progress so far", which is exactly what the single save at Finish wrote
- * before, so leaving through the site header loses nothing and the last
- * save is the old one.
+ * store equal to "the arrival profile plus buildIntakeSubmission of what the
+ * visitor has confirmed so far" (confirmedProfile), so leaving through the
+ * site header keeps every confirmed answer and nothing unconfirmed.
  */
 
 import { buildIntakeSubmission, type IntakeFlow } from '@/lib/constants/intake';
@@ -137,7 +136,17 @@ export function skipScreens(
 ): WizardProgress {
   const get = makeGet(progress.answers);
   const skippedIds = new Set(skipped.map((s) => s.id));
-  const skippedPaths = skipped.flatMap((s) => [...screenPaths(form, s, get), ...(progress.coupled[s.id] ?? [])]);
+  // The paths visible now, the coupled writes, and the paths the screen gave
+  // when it was last answered: a field a later toggle hides is reverted and
+  // unmarked too.
+  const skippedPaths = union(
+    [],
+    skipped.flatMap((s) => [
+      ...screenPaths(form, s, get),
+      ...(progress.coupled[s.id] ?? []),
+      ...Object.keys(progress.answered[s.id] ?? {}),
+    ])
+  );
   const kept = Object.entries(progress.answered).filter(([id]) => !skippedIds.has(id));
   const keptValue = (path: string) => {
     // The latest screen in flow order wins, as it did when it was answered.
@@ -165,6 +174,27 @@ export function skipScreens(
     answered: drop(progress.answered),
     touched: drop(progress.touched),
   };
+}
+
+/**
+ * The profile as the visitor has confirmed it: the arrival profile (`seed`)
+ * plus the values each answered screen gave when the visitor moved on from
+ * it, applied in flow order (`order`), so the latest screen wins as in
+ * skipScreens. Edits made after a screen was answered and not confirmed
+ * again with Next are not in it.
+ */
+export function confirmedProfile(
+  seed: FinancialProfile,
+  progress: WizardProgress,
+  order: readonly Pick<ScreenSpec, 'id'>[]
+): FinancialProfile {
+  const at = (id: string) => order.findIndex((s) => s.id === id);
+  return Object.entries(progress.answered)
+    .sort(([a], [b]) => at(a) - at(b))
+    .reduce(
+      (profile, [, values]) => applyWrites(profile, Object.entries(values).map(([path, value]) => ({ path, value }))),
+      seed
+    );
 }
 
 /** Field kinds the display layer can show with no value. */
@@ -215,13 +245,22 @@ export interface ProgressSave {
  * The store update after a Next or Skip, applied with setValues(writes,
  * options) to the store as the previous saves left it. It makes the store
  * equal to the arrival profile (`seed`) plus buildIntakeSubmission of the
- * progress: every path an earlier save wrote first goes back to its value on
+ * confirmed profile (confirmedProfile; `order` is the form's screens), so
+ * an unconfirmed edit on an earlier screen is neither saved nor fed to the
+ * derived writes: every path an earlier save wrote first goes back to its value on
  * arrival, then the submission's writes (answered paths and the form's
  * derived writes) apply; paths an earlier save marked and the progress no
  * longer answers are unmarked, unless they were answered on arrival.
  */
-export function saveWrites(flow: IntakeFlow, seed: FinancialProfile, progress: WizardProgress, ledger: SaveLedger): ProgressSave {
-  const { writes, providedPaths } = buildIntakeSubmission(flow, progress.answers, progress.provided, seed.provided);
+export function saveWrites(
+  flow: IntakeFlow,
+  seed: FinancialProfile,
+  progress: WizardProgress,
+  ledger: SaveLedger,
+  order: readonly Pick<ScreenSpec, 'id'>[]
+): ProgressSave {
+  const confirmed = confirmedProfile(seed, progress, order);
+  const { writes, providedPaths } = buildIntakeSubmission(flow, confirmed, progress.provided, seed.provided);
   const restore = ledger.written.map((path) => ({ path, value: getAt(seed, path) }));
   const unprovide = ledger.provided.filter((path) => !providedPaths.includes(path) && !seed.provided.includes(path));
   return {
