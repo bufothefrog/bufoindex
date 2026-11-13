@@ -2,12 +2,12 @@
 
 import React from 'react';
 import type { Route } from 'next';
-import { ClipboardList, Compass, LayoutDashboard, Signpost, UserRound } from 'lucide-react';
+import { ClipboardList, LayoutDashboard, Signpost, UserRound } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
+import { CalculatorLinks } from '@/components/shared/CalculatorLinks';
 import { profileCompleteness, topicsAnsweredText } from '@/lib/calculators/forms';
 import {
-  LEARN_CHOOSER_PATH,
   coreStartLink,
   isProfileFinished,
   type IntakeIntent,
@@ -25,8 +25,9 @@ export interface NextStepsProps {
  * "What next?" card rendered at the end of a calculator's results.
  *
  * With a saved profile it offers to finish the profile (or open the overview
- * once nothing is left to finish, see isProfileFinished) and to try another
- * calculator via the chooser. Without one it offers the shared core
+ * once nothing is left to finish, see isProfileFinished) and links straight
+ * to the other three calculators, which read the same saved profile without
+ * asking. Without one it offers the shared core
  * questions, returning to this calculator afterwards. Renders nothing until
  * the persisted profile has hydrated, so server and client markup match.
  */
@@ -95,15 +96,8 @@ export function NextSteps({ intent, className }: NextStepsProps) {
               />
             )}
           </li>
-          <li className="flex">
-            <OptionCard
-              href={LEARN_CHOOSER_PATH as Route}
-              icon={Compass}
-              title="Try another calculator"
-              description="Pick the next question to answer with the same profile."
-            />
-          </li>
         </ul>
+        <CalculatorLinks label="Try another calculator" exclude={[intent]} />
       </div>
     </BaseCard>
   );

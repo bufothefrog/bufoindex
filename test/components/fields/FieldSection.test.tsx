@@ -10,6 +10,9 @@ import { render, screen, cleanup, fireEvent, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { FieldSection, FieldSections } from '@/components/fields';
+import { FORMS } from '@/lib/calculators/forms';
+import { CORE_SCREENS } from '@/lib/fields/shared';
+import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
 import type { FieldSectionsProps } from '@/components/fields';
 import type { FieldErrors, FieldSpec, FormSpec, ScreenSpec } from '@/lib/fields/types';
 import { FieldHarness, writeSpy } from './harness';
@@ -128,7 +131,7 @@ describe('FieldSection', () => {
     );
   });
 
-  it('falls back to the description when the summary is empty', () => {
+  it('words the saved values as "label: value", not the description, when no own summary gives a fragment', () => {
     render(
       <FieldHarness initial={{ ...VALUES, hsa: { eligible: false, monthly: 0 } }}>
         {({ get, onWrite }) => (
@@ -136,8 +139,48 @@ describe('FieldSection', () => {
         )}
       </FieldHarness>
     );
-    expect(screen.getByText('Only if your plan qualifies.')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Health savings' });
+    expect(within(region).getByText('I can use an HSA: No')).toBeInTheDocument();
+    expect(within(region).queryByText('Only if your plan qualifies.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /health savings/ })).not.toBeInTheDocument();
+  });
+
+  it('falls back to the description only while no field on it holds a value', () => {
+    const empty: ScreenSpec = { ...SCREENS.intake, description: 'Nothing saved here yet.' };
+    render(
+      <FieldHarness initial={VALUES}>
+        {({ get, onWrite }) => <FieldSection form={FORM} screen={empty} get={get} errors={{}} onWrite={onWrite} collapsed />}
+      </FieldHarness>
+    );
+    expect(screen.getByText('Nothing saved here yet.')).toBeInTheDocument();
+  });
+
+  it('shows the core cards of a calculator as compact values while collapsed', () => {
+    const form = FORMS.paycheck;
+    render(
+      <>
+        {CORE_SCREENS.map((core) => (
+          <FieldSection
+            key={core.id}
+            form={form}
+            screen={form.screens.find((each) => each.id === core.id)!}
+            get={(path) => getProfileValue(getDefaultFinancialProfile(), path)}
+            errors={{}}
+            onWrite={() => {}}
+            collapsed
+            onToggle={() => {}}
+          />
+        ))}
+      </>
+    );
+    const line = (title: string) => within(screen.getByRole('region', { name: title })).getByText(/./, { selector: 'p' });
+    expect(line('A little about you')).toHaveTextContent(/^30, TX, single$/);
+    expect(line('What does a typical paycheck look like?')).toHaveTextContent(
+      /^\$3,500 gross every 2 weeks, \$2,600 take-home$/
+    );
+    expect(line('What do you have to pay each month?')).toHaveTextContent(/^\$3,000 a month$/);
+    expect(screen.queryByText(/Age sets the time horizon/)).not.toBeInTheDocument();
+    expect(screen.queryByText('A close guess is fine.')).not.toBeInTheDocument();
   });
 
   it('is forced open while a field on it has an error, and shows that error', () => {

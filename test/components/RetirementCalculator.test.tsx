@@ -3,8 +3,8 @@
  * profile, live results from the real engine (the worker runner's in-thread
  * fallback in jsdom), no results before hydration, write-through edits, the
  * risk-profile visibility rule, the auto/override tax rate, the filing-status
- * note (O10), the legacy storage import, the shared dollar-display
- * preference and the methodology link.
+ * note (O10), the shared dollar-display preference and the methodology
+ * link.
  */
 
 import React from 'react';
@@ -174,19 +174,6 @@ describe('RetirementCalculator', () => {
     expect(screen.queryByText('Results out of date')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Take-home pay per paycheck')).not.toBeInTheDocument();
     expect(useRetirementStore.getState().errors).toEqual({});
-  });
-
-  it('imports the old calculator storage once before the first run', async () => {
-    localStorage.setItem(
-      'retirement-calculator',
-      JSON.stringify({ state: { inputs: { startingAge: 25, monthlySavings: 3100 } }, version: 3 })
-    );
-    renderWithProfile(<RetirementCalculator />);
-    await findResults();
-
-    expect(useProfileStore.getState().profile.investing.monthlyContribution).toBe(3100);
-    expect(useRetirementStore.getState().inputs?.monthlySavings).toBe(3100);
-    expect(localStorage.getItem('retirement-calculator')).toBeNull();
   });
 
   it('strips ?from=profile after a handoff and opens on the results', async () => {

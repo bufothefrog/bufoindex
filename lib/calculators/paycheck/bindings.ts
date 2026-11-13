@@ -18,11 +18,7 @@
  *
  * Everything else the engine reads with no profile home keeps its value
  * from the engine base (getDefaultProfile); PAYCHECK_ENGINE_ONLY lists each
- * one with the reason. The reverse direction (`write`) serves only the
- * one-time import of the old calculator's localStorage (O7). Coupled paths
- * are written back by one derived binding as well as by their 1:1 ones (pay
- * with its frequency; the 401(k) type, total and Roth part), which is what
- * makes the import keep or skip them together.
+ * one with the reason.
  */
 
 import { updateLegacyIncomeFields } from '@/lib/calculations/core';
@@ -39,7 +35,7 @@ import {
   STATE,
   TAXABLE_MONTHLY,
 } from '@/lib/fields/shared';
-import type { Get, Write } from '@/lib/fields/types';
+import type { Get } from '@/lib/fields/types';
 import type { ContributionType } from '@/lib/profile/types';
 import type { IncomeData, PaycheckProfile } from '@/lib/types';
 
@@ -97,20 +93,9 @@ function incomeFrom(get: Get): IncomeData {
 
 export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   // Income: the derived figures first, then the leaves the profile owns.
-  // The pay amounts only mean something with their frequency, so the income
-  // binding writes the three back together (the legacy import keeps or
-  // skips paths written by one binding as one group).
   {
     engine: 'income',
     read: incomeFrom,
-    write: (value): Write[] => {
-      const income = value as IncomeData;
-      return [
-        { path: GROSS_PATH, value: income.grossPaycheck },
-        { path: NET_PATH, value: income.netPaycheck },
-        { path: FREQUENCY_PATH, value: income.frequency },
-      ];
-    },
     errorPath: GROSS_PATH,
   },
   { profile: GROSS_PATH, engine: 'income.grossPaycheck' },
@@ -138,17 +123,6 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   {
     engine: 'benefits.employer401k.rothContribution',
     read: (get) => electionFrom(get).roth,
-    // The election is the type, the total and (only for a split) the Roth
-    // part; the other types derive the Roth share from the total. Written
-    // back together, so the legacy import never splits them.
-    write: (value, engine): Write[] => {
-      const plan = engine.benefits.employer401k;
-      return [
-        { path: CONTRIBUTION_TYPE_PATH, value: plan.contributionType },
-        { path: CONTRIBUTION_PATH, value: plan.currentContribution },
-        ...(plan.contributionType === 'split' ? [{ path: ROTH_PART_PATH, value }] : []),
-      ];
-    },
     errorPath: ROTH_PART_PATH,
   },
   { profile: 'workplace.afterTaxAvailable', engine: 'benefits.employer401k.afterTaxAvailable' },

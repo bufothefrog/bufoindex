@@ -13,6 +13,7 @@ import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
 import { scenarioCountStat, successTone, withdrawalRateStat } from '@/lib/calculators/retirement/headline';
 import { formatCurrency, formatPercent } from '@/lib/format';
+import { savingsRateMarkers } from './savingsRateMarkers';
 
 // Loaded on demand (audit H1): Recharts stays out of the page's first chunk.
 const MonteCarloChart = dynamic(() => import('./MonteCarloChart'), { ssr: false });
@@ -129,7 +130,11 @@ export function ResultsSection({ results, inputs }: ResultsSectionProps) {
       </ResultCard>
 
       <ResultCard title="Savings Rate Impact" icon={TrendingUp}>
-        <ChartFrame height="tall" deferUntilVisible caption={SAVINGS_RATE_CAPTION}>
+        <ChartFrame
+          height="tall"
+          deferUntilVisible
+          caption={[SAVINGS_RATE_CAPTION, savingsRateMarkers(inputs).sentence].filter(Boolean).join('. ')}
+        >
           <SavingsRateChart inputs={inputs} />
         </ChartFrame>
       </ResultCard>

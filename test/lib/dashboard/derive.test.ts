@@ -23,6 +23,7 @@ import { formatCurrency } from '@/lib/format';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { AllocationItem } from '@/lib/types';
+import { toTodaysDollars } from '@/lib/utils/displayDollars';
 
 type Overrides = {
   [K in keyof FinancialProfile]?: FinancialProfile[K] extends unknown[] ? FinancialProfile[K] : Partial<FinancialProfile[K]>;
@@ -217,9 +218,15 @@ describe('summarizeRetirement', () => {
     expect(plan?.successProbability).toBeCloseTo(0.05, 3);
     expect(outcome.lever.extraMonthly).toBe(500);
     expect(outcome.lever.successProbability).toBeCloseTo(0.364, 3);
-    // Pinned from the pre-move dashboard: $1,343,473 in today's dollars (30 years at 3% inflation).
-    expect(outcome.lever.projectedBalanceToday).toBeCloseTo(1_343_473, -1);
-    expect(formatCurrency(outcome.lever.projectedBalanceToday)).toBe('$1,343,473');
+    // The lever's balance is nominal; the card converts it for display.
+    // Pinned from the pre-move dashboard: $1,343,473 in today's dollars (30
+    // years at 3% inflation), so the nominal figure is that times 1.03^30.
+    expect(inputs.inflationRate).toBe(0.03);
+    expect(outcome.lever.yearsToRetirement).toBe(30);
+    const today = toTodaysDollars(outcome.lever.projectedBalance, 0.03, 30);
+    expect(today).toBeCloseTo(1_343_473, -1);
+    expect(formatCurrency(today)).toBe('$1,343,473');
+    expect(outcome.lever.projectedBalance).toBeCloseTo(1_343_473 * 1.03 ** 30, -2);
   });
 
   it('returns the engine messages for inputs it rejects', () => {

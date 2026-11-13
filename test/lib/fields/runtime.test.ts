@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeGet, setAt } from '@/lib/fields/paths';
 import {
+  fallbackSummary,
   fieldWrites,
   fieldError,
   fieldMap,
@@ -538,9 +539,34 @@ describe('summarizeScreen', () => {
     expect(summarizeScreen(FORM, SCREENS.workplace, getWith(['workplace.has401k', true]))).toBe('401(k)');
   });
 
-  it('returns an empty string when no field summarizes', () => {
-    expect(summarizeScreen(FORM, SCREENS.pay, getWith())).toBe('');
-    expect(summarizeScreen(FORM, SCREENS.about, getWith(['person.age', undefined]))).toBe('');
+  it('leaves out a field without a summary on a screen whose other fields summarize', () => {
+    // FILING has no summary; AGE words the screen, so FILING stays off the line.
+    expect(summarizeScreen(FORM, SCREENS.about, getWith(['person.filingStatus', 'marriedJoint']))).toBe('age 30');
+  });
+
+  it('falls back to "label: value" for every field when no own summary gives a fragment', () => {
+    // No field on the pay screen has a summary.
+    expect(summarizeScreen(FORM, SCREENS.pay, getWith())).toBe('Gross pay: $3,500, Take-home pay: $2,600');
+    expect(summarizeScreen(FORM, SCREENS.pay, getWith(['income.netPerPaycheck', undefined]))).toBe('Gross pay: $3,500');
+    // AGE's summary returns null for a missing age, so FILING words the screen by its option label.
+    expect(summarizeScreen(FORM, SCREENS.about, getWith(['person.age', undefined]))).toBe('Filing status: Single');
+    // MATCH's summary always returns null (it shows only with a 401(k)).
+    expect(summarizeScreen(FORM, SCREENS.match, getWith(['workplace.has401k', true]))).toBe('Employer match: 50%');
+    // A list as a count, a nullable field holding null as Auto.
+    expect(summarizeScreen(FORM, SCREENS.debts, getWith())).toBe('1 debt');
+    expect(summarizeScreen(FORM, SCREENS.healthcare, getWith())).toBe('Healthcare cost: Auto');
+    expect(summarizeScreen(FORM, SCREENS.healthcare, getWith(['retirementIncome.annualHealthcareCost', 4200]))).toBe(
+      'Healthcare cost: $4,200'
+    );
+  });
+
+  it('returns an empty string only when no visible field holds a value', () => {
+    expect(
+      summarizeScreen(FORM, SCREENS.pay, getWith(['income.grossPerPaycheck', undefined], ['income.netPerPaycheck', NaN]))
+    ).toBe('');
+    expect(
+      summarizeScreen(FORM, SCREENS.about, getWith(['person.age', undefined], ['person.filingStatus', '']))
+    ).toBe('');
   });
 
   it('passes the value and get to the summary', () => {
@@ -553,6 +579,42 @@ describe('summarizeScreen', () => {
       screens: [SCREENS.about],
     };
     expect(summarizeScreen(form, SCREENS.about, getWith())).toBe('age 30, single at 30');
+  });
+});
+
+describe('fallbackSummary', () => {
+  const get = getWith();
+  const text: FieldSpec = { path: 'note', kind: 'text', label: 'Note', tier: 'details' };
+  const flag: FieldSpec = { path: 'flag', kind: 'boolean', label: 'Invested', tier: 'details' };
+
+  it('words a list as a count of its label', () => {
+    expect(fallbackSummary(DEBTS, [], get)).toBe('no debts');
+    expect(fallbackSummary(DEBTS, [{}], get)).toBe('1 debt');
+    expect(fallbackSummary(DEBTS, [{}, {}], get)).toBe('2 debts');
+    expect(fallbackSummary(DEBTS, undefined, get)).toBe('no debts');
+  });
+
+  it('words null on a nullable field as Auto, and an empty value as nothing', () => {
+    expect(fallbackSummary(HEALTHCARE, null, get)).toBe('Healthcare cost: Auto');
+    expect(fallbackSummary(GROSS, null, get)).toBeNull();
+    expect(fallbackSummary(GROSS, undefined, get)).toBeNull();
+    expect(fallbackSummary(text, '  ', get)).toBeNull();
+  });
+
+  it('words an option by its label, a number as the field shows it, a yes/no and a string', () => {
+    expect(fallbackSummary(FILING, 'marriedJoint', get)).toBe('Filing status: Married filing jointly');
+    expect(fallbackSummary(MATCH, 0.035, get)).toBe('Employer match: 3.5%');
+    expect(fallbackSummary(AGE, 30, get)).toBe('Age: 30');
+    expect(fallbackSummary(GROSS, 1234.5, get)).toBe('Gross pay: $1,235');
+    expect(fallbackSummary(GROSS, 3631.62, get)).toBe('Gross pay: $3,632');
+    expect(fallbackSummary(flag, true, get)).toBe('Invested: Yes');
+    expect(fallbackSummary(flag, false, get)).toBe('Invested: No');
+    expect(fallbackSummary(text, ' Car loan ', get)).toBe('Note: Car loan');
+  });
+
+  it('gives nothing for a value it cannot word', () => {
+    expect(fallbackSummary(HOLDINGS, { any: 1 }, get)).toBeNull();
+    expect(fallbackSummary(AGE, Infinity, get)).toBeNull();
   });
 });
 

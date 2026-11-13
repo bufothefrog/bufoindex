@@ -56,7 +56,7 @@ describe('LearnChooser', () => {
     answer(CORE_PATHS);
     render(<LearnChooser />);
 
-    expect(screen.getByText('30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay')).toBeInTheDocument();
+    expect(screen.getByText('30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit the basics' })).toHaveAttribute('href', '/start');
   });
 

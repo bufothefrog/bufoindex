@@ -29,7 +29,7 @@ export function LatexRenderer({
   if (html === null) {
     // KaTeX failed on the server: show the source as plain text.
     return (
-      <div className={`${baseClasses} ${className} text-destructive font-mono`} role="img" aria-label={label}>
+      <div className={`${baseClasses} ${className} text-negative font-mono`} role="img" aria-label={label}>
         {latex}
       </div>
     );

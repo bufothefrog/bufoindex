@@ -90,7 +90,7 @@ export function ChoiceGroup({
         className={cn(
           'font-medium',
           size === 'lg' ? 'text-base' : 'text-sm leading-none',
-          error && 'text-destructive',
+          error && 'text-negative',
           hideLabel && 'sr-only'
         )}
       >

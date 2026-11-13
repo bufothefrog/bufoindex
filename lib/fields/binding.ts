@@ -3,9 +3,8 @@
  * each calculator declares once (lib/calculators/<id>/bindings.ts). Pure.
  *
  * - A 1:1 binding copies one profile value to one engine path. A derived
- *   binding computes the engine value from the whole profile (read) and can
- *   map it back to profile writes (write) for the one-time legacy storage
- *   import.
+ *   binding computes the engine value from the whole profile (read). The
+ *   mapping runs one way, profile to engine.
  * - toEngineInputs starts from `base` (the calculator's engineBase()) and
  *   applies the bindings in order, so a later binding to the same engine path
  *   wins. A 1:1 binding whose profile value is undefined keeps the base
@@ -15,30 +14,29 @@
  * - Engine paths may address nested values ('taxes.state') and list rows.
  */
 
-import { getAt, setAt, splitPath, toDotPath } from './paths';
-import type { FieldErrors, Get, Write } from './types';
+import { setAt, splitPath, toDotPath } from './paths';
+import type { FieldErrors, Get } from './types';
 
 export interface DirectBinding {
   profile: string;
   engine: string;
 }
 
-export interface DerivedBinding<E> {
+export interface DerivedBinding {
   engine: string;
   read: (get: Get) => unknown;
-  /**
-   * Profile writes that reproduce `value` (the engine value at `engine`) in
-   * the profile `get` reads (the one the writes are for); omit for one-way
-   * bindings.
-   */
-  write?: (value: unknown, engine: E, get: Get) => Write[];
   /** The profile path that engine errors at this binding are shown on; omit to show them as 'calculation'. */
   errorPath?: string;
 }
 
-export type Binding<E> = DirectBinding | DerivedBinding<E>;
+/**
+ * A binding of a calculator whose engine inputs are E. The binding itself
+ * reads no part of E: the parameter only labels which engine a list of
+ * bindings is for (the conditional resolves to the same union for any E).
+ */
+export type Binding<E> = E extends unknown ? DirectBinding | DerivedBinding : never;
 
-export function isDerivedBinding<E>(binding: Binding<E>): binding is DerivedBinding<E> {
+export function isDerivedBinding<E>(binding: Binding<E>): binding is DerivedBinding {
   return 'read' in binding;
 }
 
@@ -56,25 +54,6 @@ export function toEngineInputs<E>(bindings: readonly Binding<E>[], base: E, get:
     engine = setAt(engine, binding.engine, value);
   }
   return engine;
-}
-
-/**
- * Profile writes that reproduce `engine` in the profile `get` reads, in
- * binding order. Used only for the one-time legacy localStorage import (O7).
- * Engine values that are undefined and derived bindings without `write`
- * produce nothing.
- */
-export function fromEngineInputs<E>(bindings: readonly Binding<E>[], engine: E, get: Get): Write[] {
-  const writes: Write[] = [];
-  for (const binding of bindings) {
-    const value = getAt(engine, binding.engine);
-    if (isDerivedBinding(binding)) {
-      if (binding.write) writes.push(...binding.write(value, engine, get));
-    } else if (value !== undefined) {
-      writes.push({ path: binding.profile, value });
-    }
-  }
-  return writes;
 }
 
 /** True when `path` is `prefix` or lies under it. Both are segment arrays. */

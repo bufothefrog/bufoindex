@@ -19,7 +19,6 @@ import { applyWrites, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FieldSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, presetClassTargets } from '@/lib/profile/defaults';
-import { migrateProfile } from '@/lib/profile/migrate';
 import { askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/test/utils/intakeFixture';
 
 /** The questions the intake asked for the portfolio intent before c5 (slice w1's fixture), after the core. */
@@ -364,18 +363,18 @@ describe("portfolio intake: 'remaining' mode", () => {
     expect(remainingIds(['investing.targetMix', 'portfolio.accounts', 'portfolio.holdings', ...SETTINGS_PATHS])).toEqual([]);
   });
 
-  it('asks the accounts again after an old new-cash answer, prefilled with it', () => {
-    // A v1 new-cash answer moves into the Brokerage deposit (migrateProfile)
-    // but does not answer the accounts list.
-    const v1 = {
-      ...getDefaultFinancialProfile(),
-      version: 1,
-      investing: { ...getDefaultFinancialProfile().investing, newCashThisMonth: 2400 },
-      provided: [...CORE_PATHS, 'investing.newCashThisMonth', 'investing.targetMix'],
+  it('asks the accounts while the list is unanswered, even with a deposit already set', () => {
+    // A deposit on the Brokerage row does not answer the accounts list; only
+    // the list's own path in profile.provided does.
+    const base = getDefaultFinancialProfile();
+    const accounts = base.portfolio.accounts.map((a, i) => (i === 1 ? { ...a, deposit: 2400 } : a));
+    const profile = {
+      ...base,
+      portfolio: { ...base.portfolio, accounts },
+      provided: [...CORE_PATHS, 'investing.targetMix'],
     };
-    const profile = migrateProfile(v1, 1);
-    expect(profile.portfolio.accounts[1].deposit).toBe(2400);
-    expect(profile.provided).toEqual([...CORE_PATHS, 'investing.targetMix']);
     expect(ids(remainingIntakeScreens('portfolio', profile))).toEqual(['accounts', 'holdings', 'settings']);
+    const answered = { ...profile, provided: [...profile.provided, 'portfolio.accounts'] };
+    expect(ids(remainingIntakeScreens('portfolio', answered))).toEqual(['holdings', 'settings']);
   });
 });

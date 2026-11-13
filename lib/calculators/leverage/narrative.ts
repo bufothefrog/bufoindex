@@ -74,7 +74,17 @@ export function relativeGapNoisePoints(inputs: NoiseInputs): number {
   return 4 * excess * Math.sqrt(years / 20) * Math.sqrt(500 / paths);
 }
 
-export function dcaEffectSentence(result: DcaComparisonResult, L: string, inputs: NoiseInputs): string {
+/**
+ * `display` converts an ending-balance gap for display (the results pass the
+ * active dollar mode); the total contributed is money paid in and is printed
+ * as entered. The relative gaps and the noise test read the engine figures.
+ */
+export function dcaEffectSentence(
+  result: DcaComparisonResult,
+  L: string,
+  inputs: NoiseInputs,
+  display: (nominal: number) => number = (nominal) => nominal
+): string {
   const { dcaGap, lumpSumGap } = result.dcaEffect;
   if (Math.abs(dcaGap) < 0.5 && Math.abs(lumpSumGap) < 0.5) {
     return `At these settings the ${L} fund and the index fund produce the same balances under both framings.`;
@@ -86,9 +96,9 @@ export function dcaEffectSentence(result: DcaComparisonResult, L: string, inputs
   const noise = relativeGapNoisePoints(inputs);
   const gaps =
     `With monthly contributions the ${L} fund's median ends ${direction(dcaGap)} the index fund's ` +
-    `median by ${formatCurrency(Math.abs(dcaGap), COMPACT)} (${formatPercent(dcaRel, SIGNED_ONE_DECIMAL)} of the index median). ` +
+    `median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} (${formatPercent(dcaRel, SIGNED_ONE_DECIMAL)} of the index median). ` +
     `Investing the same ${formatCurrency(result.totalContributed, COMPACT)} at month 0 gives a gap of ` +
-    `${formatCurrency(lumpSumGap, COMPACT_SIGNED)} (${formatPercent(lumpRel, SIGNED_ONE_DECIMAL)}).`;
+    `${formatCurrency(display(lumpSumGap), COMPACT_SIGNED)} (${formatPercent(lumpRel, SIGNED_ONE_DECIMAL)}).`;
 
   if (noise > 0 && Math.abs(diffPoints) < noise) {
     return (

@@ -13,11 +13,6 @@
  * - Filing status. The engine models single and married filing jointly; the
  *   other two statuses run as single (O10), with a note on the page
  *   (filingStatusNote).
- *
- * The reverse direction (`write`) serves only the one-time import of the old
- * calculator's localStorage (O7): an amount with its frequency, or, for a
- * period with no pay frequency (yearly, hourly), gross pay in the frequency
- * the profile holds at the same annual income, with no frequency.
  */
 
 import { annualizeIncome, type IncomePeriod, type RetirementInputs } from '@/lib/calculations/retirement';
@@ -35,7 +30,7 @@ import {
   RETIREMENT_AGE,
   STATE,
 } from '@/lib/fields/shared';
-import type { Get, Write } from '@/lib/fields/types';
+import type { Get } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 
 const GROSS_PATH = GROSS_PAY.path;
@@ -50,11 +45,6 @@ const INCOME_PERIOD: Readonly<Record<PayFrequency, IncomePeriod | null>> = {
   monthly: 'monthly',
 };
 
-/** The pay frequency for an engine period that has one (the legacy import). */
-const FREQUENCY_FOR_PERIOD: Readonly<Partial<Record<IncomePeriod, PayFrequency>>> = Object.fromEntries(
-  Object.entries(INCOME_PERIOD).flatMap(([frequency, period]) => (period ? [[period, frequency]] : []))
-);
-
 interface IncomeEntry {
   amount: number;
   period: IncomePeriod;
@@ -66,25 +56,6 @@ function incomeEntry(get: Get): IncomeEntry {
   const frequency = get(FREQUENCY_PATH) as PayFrequency;
   const period = INCOME_PERIOD[frequency];
   return period ? { amount: gross, period } : { amount: gross * PAY_FREQUENCY_META[frequency].perYear, period: 'yearly' };
-}
-
-/**
- * Profile writes for an old income entry. A period with a pay frequency
- * keeps its amount and writes that frequency. Hourly and yearly amounts
- * have no frequency of their own: they become gross pay per paycheck of
- * `held` (the frequency the profile holds) at the same annual income,
- * rounded to the cent.
- */
-function incomeWrites(amount: number, period: IncomePeriod, held: PayFrequency): Write[] {
-  const frequency = FREQUENCY_FOR_PERIOD[period];
-  if (frequency) {
-    return [
-      { path: GROSS_PATH, value: amount },
-      { path: FREQUENCY_PATH, value: frequency },
-    ];
-  }
-  const perPaycheck = annualizeIncome(amount, period) / PAY_FREQUENCY_META[held].perYear;
-  return [{ path: GROSS_PATH, value: Math.round(perPaycheck * 100) / 100 }];
 }
 
 /** The filing status the retirement engine runs for a profile status (O10). */
@@ -118,7 +89,6 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   {
     engine: 'incomeAmount',
     read: (get) => incomeEntry(get).amount,
-    write: (_value, engine, get) => incomeWrites(engine.incomeAmount, engine.incomePeriod, get(FREQUENCY_PATH) as PayFrequency),
     errorPath: GROSS_PATH,
   },
   { engine: 'incomePeriod', read: (get) => incomeEntry(get).period },
@@ -134,7 +104,6 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   {
     engine: 'filingStatus',
     read: (get) => retirementFilingStatus(get(FILING_PATH) as FilingStatus),
-    write: (value) => [{ path: FILING_PATH, value }],
     errorPath: FILING_PATH,
   },
   { profile: STATE.path, engine: 'state' },

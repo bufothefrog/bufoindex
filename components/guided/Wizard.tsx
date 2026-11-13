@@ -529,7 +529,7 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
         <p
           id={errorId}
           role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:border-destructive dark:bg-destructive/25 dark:text-foreground"
+          className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-negative dark:border-destructive dark:bg-destructive/25 dark:text-foreground"
         >
           <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{alert.join(' ')}</span>

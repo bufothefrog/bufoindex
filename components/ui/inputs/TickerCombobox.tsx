@@ -31,8 +31,12 @@ interface TickerComboboxProps {
 /**
  * Ticker input with an attached dropdown of existing securities. Clicking the
  * field opens the list; typing filters it; clicking an option links the
- * holding to that security; typing a new ticker and blurring creates a new
+ * holding to that security and shows its ticker at once; Enter on a
+ * highlighted option does the same. Typing a new ticker and leaving the field
+ * (blur, Enter with nothing highlighted, or a click outside) creates a new
  * one (or renames the current security when it has no other references).
+ * Each edit is reported once: the deferred blur commit is skipped after a
+ * pick or an Enter.
  */
 export function TickerCombobox({
   value,
@@ -57,6 +61,10 @@ export function TickerCombobox({
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Set when a pick or an Enter has already reported this edit. The deferred
+  // blur commit reads it so it does not report the edit a second time with
+  // the text its closure captured (which may be stale or partly typed).
+  const handledRef = useRef(false);
 
   // Keep the visible text in sync with the external value when not editing.
   useEffect(() => {
@@ -65,28 +73,34 @@ export function TickerCombobox({
     }
   }, [value]);
 
-  // Close when clicking outside.
+  // Close when clicking outside. The draft is left alone: the blur that
+  // follows the click commits a typed ticker (or reverts an empty one).
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setDraft(value);
       }
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open, value]);
+  }, [open]);
 
   const query = draft.trim().toUpperCase();
   // If the draft still matches the external value, the user hasn't started
   // editing — treat focus as "browse mode" and show all other options.
   const effectiveQuery = query === value.trim().toUpperCase() ? '' : query;
-  const filtered = options.filter(opt => {
-    if (opt.id === currentId) return false;
-    if (!effectiveQuery) return true;
-    return opt.ticker.toUpperCase().includes(effectiveQuery);
-  });
+  // An option whose ticker equals the typed text comes first, so the first
+  // highlighted option (what Enter picks) is that exact match, not another
+  // ticker that merely contains the text (typing VT lists VT before VTI).
+  const isExact = (opt: TickerOption) => effectiveQuery !== '' && opt.ticker.toUpperCase() === effectiveQuery;
+  const filtered = options
+    .filter(opt => {
+      if (opt.id === currentId) return false;
+      if (!effectiveQuery) return true;
+      return opt.ticker.toUpperCase().includes(effectiveQuery);
+    })
+    .sort((a, b) => Number(isExact(b)) - Number(isExact(a)));
 
   const commit = () => {
     const normalized = draft.trim().toUpperCase();
@@ -107,6 +121,14 @@ export function TickerCombobox({
     }
   };
 
+  /** Show the picked ticker at once, report the pick, and close the list. */
+  const selectOption = (opt: TickerOption) => {
+    handledRef.current = true;
+    setDraft(opt.ticker);
+    setOpen(false);
+    onSelectExisting(opt.id);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -118,14 +140,17 @@ export function TickerCombobox({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (open && filtered[highlighted]) {
-        onSelectExisting(filtered[highlighted].id);
-        setOpen(false);
+        selectOption(filtered[highlighted]);
       } else {
         commit();
+        handledRef.current = true;
         setOpen(false);
       }
       inputRef.current?.blur();
     } else if (e.key === 'Escape') {
+      // Escape discards the edit: mark it handled so the deferred blur does
+      // not commit the typed text its closure captured.
+      handledRef.current = true;
       setDraft(value);
       setOpen(false);
       inputRef.current?.blur();
@@ -146,8 +171,12 @@ export function TickerCombobox({
           open && filtered[highlighted] ? optionId(highlighted) : undefined
         }
         value={draft}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          handledRef.current = false;
+          setOpen(true);
+        }}
         onChange={e => {
+          handledRef.current = false;
           setDraft(e.target.value.toUpperCase());
           setOpen(true);
           setHighlighted(0);
@@ -158,6 +187,10 @@ export function TickerCombobox({
           setTimeout(() => {
             if (!wrapperRef.current) return;
             if (wrapperRef.current.contains(document.activeElement)) return;
+            if (handledRef.current) {
+              handledRef.current = false;
+              return;
+            }
             commit();
             setOpen(false);
           }, 120);
@@ -189,10 +222,11 @@ export function TickerCombobox({
               role="option"
               aria-selected={idx === highlighted}
               onMouseDown={e => {
-                // mousedown fires before blur, preventing the commit path.
+                // mousedown fires before blur; preventDefault keeps focus on
+                // the input, and selectOption marks the edit as reported so
+                // the later blur does not commit again.
                 e.preventDefault();
-                onSelectExisting(opt.id);
-                setOpen(false);
+                selectOption(opt);
               }}
               onMouseEnter={() => setHighlighted(idx)}
               data-testid={`ticker-option-${opt.ticker.toLowerCase()}`}

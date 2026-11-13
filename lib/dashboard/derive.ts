@@ -22,7 +22,6 @@ import { formatMultiple, formatPercent } from '@/lib/format';
 import { PRESET_EMERGENCY_MONTHS, STRATEGY_PRESETS } from '@/lib/profile/defaults';
 import type { FinancialProfile, StrategyPreset } from '@/lib/profile/types';
 import type { AllocationItem } from '@/lib/types';
-import { toTodaysDollars } from '@/lib/utils/displayDollars';
 
 /* ------------------------------------------------------------------ */
 /* Strategy                                                           */
@@ -177,8 +176,14 @@ export const LEVER_EXTRA_MONTHLY = 500;
 export interface RetirementLever {
   extraMonthly: number;
   successProbability: number;
-  /** Projected balance at retirement with the extra savings, in today's dollars. */
-  projectedBalanceToday: number;
+  /**
+   * Projected balance at retirement with the extra savings, in nominal
+   * dollars of the retirement year. The card converts it for display with
+   * the shared dollar mode over `yearsToRetirement`.
+   */
+  projectedBalance: number;
+  /** Years from now to retirement (never negative). */
+  yearsToRetirement: number;
 }
 
 export type RetirementOutcome =
@@ -223,7 +228,8 @@ export function summarizeRetirement(inputs: RetirementInputs): RetirementOutcome
     lever: {
       extraMonthly: LEVER_EXTRA_MONTHLY,
       successProbability: runMonteCarloSimulation(leverInputs, runs),
-      projectedBalanceToday: toTodaysDollars(calculateProjectedBalance(leverInputs), inputs.inflationRate, years),
+      projectedBalance: calculateProjectedBalance(leverInputs),
+      yearsToRetirement: years,
     },
   };
 }

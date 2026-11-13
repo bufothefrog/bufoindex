@@ -70,6 +70,8 @@ Summary of what the build follows:
 | O19 state picker | StateSelector in both places. |
 | O20 docs | CLAUDE.md and the design doc are updated in x2. |
 
+2026-11-12: the owner wrote "we do not need to preserve any functionality from old version of website." Accordingly the one-time import of old saved inputs (O7) and the v1 profile migration were removed in PR 1 of the follow-up stack (branch claude/next-1-cleanup-and-fixes); a stored payload of an older version now loads through normalizeProfile only.
+
 ### 0.1 Amendments caused by O6 (no legacy links)
 
 1. **Slice f6-hash-codec is removed.** There is no `lib/utils/hashCodec.ts`, no
@@ -135,7 +137,9 @@ it touches a behaviour-frozen engine and was not approved.
 - Each slice is written by a builder agent with exclusive file ownership, then integrated,
   gated and reviewed before its phase PR opens (docs/agents.md).
 - Stacked PRs do not target main, so the CI workflow's pull_request trigger is widened to
-  `claude/**` base branches on the first phase branch. No gate is added or changed.
+  `claude/**` base branches on the first phase branch. No gate is added or changed. The
+  follow-up stack (PR 1 of next-1-cleanup-and-fixes) adds the staging branch `next` to the push
+  and pull_request triggers.
 
 --------------------------------------------------------------------------------
 

@@ -10,11 +10,13 @@
  * tab bar or showResultsKey), never because a run finished. Panel visibility
  * is driven by CSS classes (hidden / lg:block) so server and client render
  * the same markup and nothing reads window.matchMedia during render.
+ * Anything inside the layout can call useRevealInputs() to switch the mobile
+ * view to Inputs before it scrolls to an input section.
  */
 
 'use client';
 
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Disclaimer } from '@/components/ui/results';
@@ -23,6 +25,38 @@ import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Contain
 
 /** Which panel the mobile (below lg) view shows. */
 type CalculatorMobileTab = 'inputs' | 'results';
+
+/** What `onShown` learns about the page once the inputs are shown. */
+export interface InputsShown {
+  /**
+   * The height in px of the sticky tab bar over the top of the viewport (the
+   * phone layout), or 0 when no bar is shown. Scroll a target this far below
+   * the top so the bar does not cover it.
+   */
+  topInset: number;
+}
+
+/**
+ * Asks the layout to show the inputs, then runs `onShown` once they are in
+ * the page (after the commit that selects the mobile Inputs tab), e.g. to
+ * scroll to and focus one input section. On desktop both panels are always
+ * shown, so only `onShown` has a visible effect.
+ */
+export type RevealInputs = (onShown: (shown: InputsShown) => void) => void;
+
+/** Outside a CalculatorLayout the inputs are not behind a tab: run at once. */
+const revealImmediately: RevealInputs = (onShown) => onShown({ topInset: 0 });
+
+const RevealInputsContext = createContext<RevealInputs>(revealImmediately);
+
+/**
+ * For anything rendered inside a CalculatorLayout (a results card, say) that
+ * needs to send the visitor to an input: on a phone with the Results tab
+ * open, it switches to the Inputs tab before `onShown` runs.
+ */
+export function useRevealInputs(): RevealInputs {
+  return useContext(RevealInputsContext);
+}
 
 /** The empty state: results are missing only while a field is invalid. */
 const LIVE_EMPTY_STATE = {
@@ -101,6 +135,21 @@ export function CalculatorLayout({
     anchor.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
   }, [scrollRequest]);
 
+  // A pending revealInputs callback, run after the Inputs tab is committed.
+  const [revealRequest, setRevealRequest] = useState<{ onShown: (shown: InputsShown) => void } | null>(null);
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  const revealInputs = useCallback<RevealInputs>((onShown) => {
+    setMobileTab('inputs');
+    setRevealRequest({ onShown });
+  }, []);
+  useEffect(() => {
+    if (!revealRequest) return;
+    // The bar is lg:hidden, so on desktop it has no layout box and no inset.
+    const bar = tabBarRef.current;
+    const topInset = bar && bar.getClientRects().length > 0 ? bar.getBoundingClientRect().height : 0;
+    revealRequest.onShown({ topInset });
+  }, [revealRequest]);
+
   const selectTab = (tab: CalculatorMobileTab) => {
     setMobileTab(tab);
     setScrollRequest((n) => n + 1);
@@ -114,97 +163,99 @@ export function CalculatorLayout({
   const showResultsOnMobile = mobileTab === 'results';
 
   return (
-    <div className={cn("calculator-container", className)} data-testid={testId}>
-      <Container className="px-0 py-4 sm:p-6">
-        {/* Header Section */}
-        <CalculatorHeader title={title} description={description} />
+    <RevealInputsContext.Provider value={revealInputs}>
+      <div className={cn("calculator-container", className)} data-testid={testId}>
+        <Container className="px-0 py-4 sm:p-6">
+          {/* Header Section */}
+          <CalculatorHeader title={title} description={description} />
 
-        {/* Mobile tab bar (below lg). The scroll anchor and the bar are direct
-            children of Container so the bar can stick for the calculator's
-            full height. */}
-        <div ref={anchorRef} aria-hidden="true" className="lg:hidden" />
-        <div className="lg:hidden sticky top-0 z-20 -mx-4 mb-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur-sm sm:mx-0 sm:rounded-lg sm:border sm:px-2">
-          <div
-            role="tablist"
-            aria-label="Calculator view"
-            className="flex gap-1 rounded-lg bg-muted p-1"
-          >
-            <MobileTabButton
-              label="Inputs"
-              isActive={mobileTab === 'inputs'}
-              controls={inputsPanelId}
-              onSelect={() => selectTab('inputs')}
-            />
-            <MobileTabButton
-              label="Results"
-              isActive={mobileTab === 'results'}
-              controls={resultsPanelId}
-              onSelect={() => selectTab('results')}
-              indicator={hasResults}
-            />
-          </div>
-        </div>
-
-        {/* Main Grid Layout */}
-        <ResponsiveGrid hasResults={hasResults}>
-          {/* Input Section */}
-          <InputSection
-            span={hasResults ? 1 : 2}
-            className={cn(
-              !showInputsOnMobile && 'hidden lg:block',
-              // Keep focused fields clear of the sticky bottom bar on mobile.
-              'max-lg:pb-4 max-lg:[&_input]:scroll-mb-32 max-lg:[&_select]:scroll-mb-32 max-lg:[&_button]:scroll-mb-32'
-            )}
-          >
-            <div id={inputsPanelId} className="space-y-6">
-              {inputSections}
-
-              {/* Mobile: errors stay in the flow; the actions live in the bar */}
-              {hasErrors && (
-                <ErrorList errors={errors} className="lg:hidden" />
-              )}
-            </div>
-          </InputSection>
-
-          {/* Results Section */}
-          {hasResults ? (
-            <ResultSection
-              span={1}
-              className={cn(!showResultsOnMobile && 'hidden lg:block')}
+          {/* Mobile tab bar (below lg). The scroll anchor and the bar are direct
+              children of Container so the bar can stick for the calculator's
+              full height. */}
+          <div ref={anchorRef} aria-hidden="true" className="lg:hidden" />
+          <div ref={tabBarRef} className="lg:hidden sticky top-0 z-20 -mx-4 mb-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur-sm sm:mx-0 sm:rounded-lg sm:border sm:px-2">
+            <div
+              role="tablist"
+              aria-label="Calculator view"
+              className="flex gap-1 rounded-lg bg-muted p-1"
             >
-              <div
-                id={resultsPanelId}
-                role={resultsLabel ? 'region' : undefined}
-                aria-label={resultsLabel}
-                className="space-y-6"
-              >
-                {resultSection}
-                {resultFooter}
+              <MobileTabButton
+                label="Inputs"
+                isActive={mobileTab === 'inputs'}
+                controls={inputsPanelId}
+                onSelect={() => selectTab('inputs')}
+              />
+              <MobileTabButton
+                label="Results"
+                isActive={mobileTab === 'results'}
+                controls={resultsPanelId}
+                onSelect={() => selectTab('results')}
+                indicator={hasResults}
+              />
+            </div>
+          </div>
+
+          {/* Main Grid Layout */}
+          <ResponsiveGrid hasResults={hasResults}>
+            {/* Input Section */}
+            <InputSection
+              span={hasResults ? 1 : 2}
+              className={cn(
+                !showInputsOnMobile && 'hidden lg:block',
+                // Keep focused fields clear of the sticky bottom bar on mobile.
+                'max-lg:pb-4 max-lg:[&_input]:scroll-mb-32 max-lg:[&_select]:scroll-mb-32 max-lg:[&_button]:scroll-mb-32'
+              )}
+            >
+              <div id={inputsPanelId} className="space-y-6">
+                {inputSections}
+
+                {/* Mobile: errors stay in the flow; the actions live in the bar */}
+                {hasErrors && (
+                  <ErrorList errors={errors} className="lg:hidden" />
+                )}
               </div>
-            </ResultSection>
-          ) : (
-            /* Empty State: desktop right column; on mobile, the Results tab */
-            <EmptyStateSection
-              id={resultsPanelId}
-              title={LIVE_EMPTY_STATE.title}
-              description={LIVE_EMPTY_STATE.description}
-              icon={Calculator}
-              className={cn(!showResultsOnMobile && 'hidden lg:block')}
-            />
-          )}
-        </ResponsiveGrid>
+            </InputSection>
 
-        {/* Footer */}
-        {disclaimer && <Disclaimer text={disclaimer} />}
+            {/* Results Section */}
+            {hasResults ? (
+              <ResultSection
+                span={1}
+                className={cn(!showResultsOnMobile && 'hidden lg:block')}
+              >
+                <div
+                  id={resultsPanelId}
+                  role={resultsLabel ? 'region' : undefined}
+                  aria-label={resultsLabel}
+                  className="space-y-6"
+                >
+                  {resultSection}
+                  {resultFooter}
+                </div>
+              </ResultSection>
+            ) : (
+              /* Empty State: desktop right column; on mobile, the Results tab */
+              <EmptyStateSection
+                id={resultsPanelId}
+                title={LIVE_EMPTY_STATE.title}
+                description={LIVE_EMPTY_STATE.description}
+                icon={Calculator}
+                className={cn(!showResultsOnMobile && 'hidden lg:block')}
+              />
+            )}
+          </ResponsiveGrid>
 
-        {/* Mobile sticky action bar (below lg) */}
-        <MobileActionBar
-          errorCount={Object.keys(errors).length}
-          activeTab={mobileTab}
-          onToggleTab={() => selectTab(mobileTab === 'inputs' ? 'results' : 'inputs')}
-        />
-      </Container>
-    </div>
+          {/* Footer */}
+          {disclaimer && <Disclaimer text={disclaimer} />}
+
+          {/* Mobile sticky action bar (below lg) */}
+          <MobileActionBar
+            errorCount={Object.keys(errors).length}
+            activeTab={mobileTab}
+            onToggleTab={() => selectTab(mobileTab === 'inputs' ? 'results' : 'inputs')}
+          />
+        </Container>
+      </div>
+    </RevealInputsContext.Provider>
   );
 }
 
@@ -273,7 +324,7 @@ interface ErrorListProps {
 function ErrorList({ errors, className }: ErrorListProps) {
   return (
     <div className={cn("p-4 bg-destructive/10 border border-destructive/20 rounded-md", className)}>
-      <div className="text-sm text-destructive">
+      <div className="text-sm text-negative">
         <p className="font-medium mb-2">Please fix the following errors:</p>
         <ul className="list-disc list-inside space-y-1">
           {Object.entries(errors).map(([field, error]) => (
@@ -310,7 +361,7 @@ function MobileActionBar({ errorCount, activeTab, onToggleTab }: MobileActionBar
     >
       <div aria-live="polite">
         {errorCount > 0 && (
-          <p className="mb-2 text-center text-xs text-destructive dark:text-foreground">
+          <p className="mb-2 text-center text-xs text-negative dark:text-foreground">
             {fieldsNeed} attention before the results update.
           </p>
         )}

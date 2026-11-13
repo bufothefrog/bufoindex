@@ -5,9 +5,11 @@
  *
  * Golden fixture. Each GOLDEN entry was captured on 2026-11-12 from the
  * former lib/profile/mappers.ts (deleted in phase 5): what its
- * toRebalanceInputs returned for that profile, for v1-shaped profiles
- * (migrateProfile from a v1 payload) and a v2 profile with several accounts,
- * holdings and a custom class. No documented exception.
+ * toRebalanceInputs returned for that profile, for v1-shaped profiles (a v1
+ * payload loaded through normalizeProfile, as any stored profile is; the
+ * Brokerage deposit set directly where a case needs new cash) and a v2
+ * profile with several accounts, holdings and a custom class. No documented
+ * exception.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -22,8 +24,7 @@ import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { applyProfileWrites, getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { migrateProfile } from '@/lib/profile/migrate';
+import { applyProfileWrites, BROKERAGE_ACCOUNT_ID, getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 
 const V1_DEFAULT = {
@@ -46,7 +47,15 @@ const V1_DEFAULT = {
 };
 
 function fromV1(investing: Partial<typeof V1_DEFAULT.investing>): FinancialProfile {
-  return migrateProfile({ ...V1_DEFAULT, investing: { ...V1_DEFAULT.investing, ...investing } }, 1);
+  return normalizeProfile({ ...V1_DEFAULT, investing: { ...V1_DEFAULT.investing, ...investing } });
+}
+
+/** `profile` with the Brokerage account's deposit (its new cash) set to `deposit`, past the store's own checks. */
+function withBrokerageDeposit(profile: FinancialProfile, deposit: number): FinancialProfile {
+  const accounts = profile.portfolio.accounts.map((account) =>
+    account.id === BROKERAGE_ACCOUNT_ID ? { ...account, deposit } : account
+  );
+  return { ...profile, portfolio: { ...profile.portfolio, accounts } };
 }
 
 const profileWith = (writes: Write[]): FinancialProfile =>
@@ -141,13 +150,13 @@ describe('portfolio bindings: golden against the old mapper output', () => {
     ['the default profile', getDefaultFinancialProfile(), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
     ['the v1 default', fromV1({}), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
     [
-      'a v1 100/0 mix with $2,400 of new cash',
-      fromV1({ targetMix: '100-0', newCashThisMonth: 2400 }),
+      'a v1 100/0 mix with a $2,400 Brokerage deposit',
+      withBrokerageDeposit(fromV1({ targetMix: '100-0' }), 2400),
       exampleInputs(2400, [0.75, 0.25, 0, 0]),
     ],
     [
-      'a v1 60/40 mix with negative new cash (clamped to 0)',
-      fromV1({ targetMix: '60-40', newCashThisMonth: -50 }),
+      'a v1 60/40 mix with no Brokerage deposit',
+      withBrokerageDeposit(fromV1({ targetMix: '60-40' }), 0),
       exampleInputs(0, [0.45, 0.15, 0.4, 0]),
     ],
     [
@@ -169,6 +178,14 @@ describe('portfolio bindings: golden against the old mapper output', () => {
 
   it.each(GOLDEN)('%s', (_name, profile, expected) => {
     expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual(expected);
+  });
+
+  it('passes a negative deposit through unclamped; the engine check reports it on its row', () => {
+    const profile = withBrokerageDeposit(fromV1({ targetMix: '60-40' }), -50);
+    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual(exampleInputs(-50, [0.45, 0.15, 0.4, 0]));
+    expect(prepareRun(PORTFOLIO_CALCULATOR, profile).errors).toEqual({
+      'portfolio.accounts.1.deposit': 'New cash must be at least $0.',
+    });
   });
 
   it('pins the default profile inputs and their rebalance', () => {

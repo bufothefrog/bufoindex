@@ -1,8 +1,8 @@
 /**
  * The paycheck bindings and definition: the golden test against the old
  * mapper's output for v1-shaped profiles, the 401(k) truth table, every
- * PaycheckProfile leaf bound or engine-only, the fixed federal bracket, the
- * form relations, and the reverse direction the legacy import uses.
+ * PaycheckProfile leaf bound or engine-only, the fixed federal bracket and
+ * the form relations.
  *
  * Golden fixture. The expected engine profiles were captured on 2026-11-12
  * from the former lib/profile/mappers.ts (deleted in phase 5): what its
@@ -16,19 +16,16 @@ import { getDefaultProfile } from '@/lib/calculations/core';
 import { PAYCHECK_BINDINGS, PAYCHECK_ENGINE_ONLY, split401k } from '@/lib/calculators/paycheck/bindings';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
-import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
-import { PAYCHECK_LEGACY } from '@/lib/calculators/paycheck/legacy';
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
-import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
-import { applyWrites, makeGet } from '@/lib/fields/paths';
+import { isDerivedBinding } from '@/lib/fields/binding';
+import { applyWrites } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
-import { migrateProfile } from '@/lib/profile/migrate';
+import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { PaycheckProfile } from '@/lib/types';
 
-/** A v1-shaped profile: the given v1 sections over the v1 defaults, loaded the way a saved v1 profile is. */
-const v1 = (patch: ProfilePatch = {}): FinancialProfile => migrateProfile(patch, 1);
+/** A v1-shaped profile: the given sections over the defaults, normalized the way any stored profile is. */
+const v1 = (patch: ProfilePatch = {}): FinancialProfile => normalizeProfile(patch);
 
 /** The default profile with `writes` applied; each must be a valid profile write, or the test fails. */
 function withWrites(writes: Write[]): FinancialProfile {
@@ -440,13 +437,11 @@ describe('the fixed federal bracket (O9)', () => {
 });
 
 describe('the definition and its relations', () => {
-  it('runs debounced by 150 ms, with the legacy storage import and no engine checks', () => {
+  it('runs debounced by 150 ms, with no engine checks', () => {
     expect(PAYCHECK_CALCULATOR.id).toBe('paycheck');
     expect(PAYCHECK_CALCULATOR.debounceMs).toBe(150);
     expect(PAYCHECK_CALCULATOR.form).toBe(PAYCHECK_FORM);
     expect(PAYCHECK_CALCULATOR.bindings).toBe(PAYCHECK_BINDINGS);
-    expect(LEGACY_IMPORTS[0].legacy).toBe(PAYCHECK_LEGACY);
-    expect(LEGACY_IMPORTS[0].bindings).toBe(PAYCHECK_BINDINGS);
     expect(PAYCHECK_CALCULATOR.validate(engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()))).toEqual({});
   });
 
@@ -471,54 +466,5 @@ describe('the definition and its relations', () => {
       'spending.funMoneyMax': 'The minimum is above the maximum. Adjust one of them.',
     });
     expect(prepareRun(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()).errors).toEqual({});
-  });
-});
-
-describe('the reverse direction (legacy import)', () => {
-  const writesFor = (edit: (engine: PaycheckProfile) => void) => {
-    const engine = PAYCHECK_LEGACY.storageDefaults();
-    edit(engine);
-    return fromEngineInputs(PAYCHECK_BINDINGS, engine, makeGet(getDefaultFinancialProfile()));
-  };
-  const valueAt = (writes: Write[], path: string) => writes.filter((write) => write.path === path).map((write) => write.value);
-
-  it('writes each 1:1 leaf to its profile path, and the coupled paths again from their derived binding', () => {
-    const writes = writesFor(() => undefined);
-    const paths = writes.map((write) => write.path);
-    const direct = PAYCHECK_BINDINGS.filter((binding) => !isDerivedBinding(binding));
-    expect(new Set(paths)).toEqual(new Set(direct.map((binding) => (binding as { profile: string }).profile)));
-    // The pay amounts with their frequency (the income binding), and the
-    // 401(k) type with its total (the Roth binding; the Roth part only for a
-    // split): written twice, with the same values, so the import keeps them together.
-    const coupled = [
-      'income.grossPerPaycheck',
-      'income.netPerPaycheck',
-      'income.frequency',
-      'workplace.contributionType',
-      'workplace.contributionPercent',
-    ];
-    expect(paths).toHaveLength(direct.length + coupled.length);
-    for (const path of coupled) {
-      const values = valueAt(writes, path);
-      expect(values, path).toHaveLength(2);
-      expect(values[1], path).toEqual(values[0]);
-    }
-    expect(valueAt(writes, 'person.state')).toEqual(['CA']);
-    expect(valueAt(writes, 'income.grossPerPaycheck')).toEqual([2500, 2500]);
-    expect(valueAt(writes, 'cash.targetMonths')).toEqual([3]);
-    expect(valueAt(writes, 'workplace.contributionPercent')).toEqual([0.03, 0.03]);
-  });
-
-  it('writes the Roth part only for a split election', () => {
-    const split = writesFor((engine) => {
-      engine.benefits.employer401k.contributionType = 'split';
-      engine.benefits.employer401k.rothContribution = 0.02;
-    });
-    expect(valueAt(split, 'workplace.rothContributionPercent')).toEqual([0.02]);
-    const roth = writesFor((engine) => {
-      engine.benefits.employer401k.contributionType = 'roth';
-      engine.benefits.employer401k.rothContribution = 0.03;
-    });
-    expect(valueAt(roth, 'workplace.rothContributionPercent')).toEqual([]);
   });
 });

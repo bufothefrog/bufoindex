@@ -178,7 +178,7 @@ export function HoldingRow({
           disabled={!canRemove}
           aria-label={`Remove holding ${index + 1}`}
           data-testid={`holding-remove-${index}`}
-          className="text-muted-foreground hover:text-destructive"
+          className="text-muted-foreground hover:text-negative"
         >
           <Trash2 className="w-4 h-4" />
         </Button>

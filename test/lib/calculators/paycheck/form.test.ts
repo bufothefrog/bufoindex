@@ -174,6 +174,16 @@ describe('paycheck form: screens and fields', () => {
 describe('paycheck form: collapsed summaries', () => {
   const summary = (id: string, get: Get = fromDefaults()) => summarizeScreen(FORM, screen(id), get);
 
+  it('summarizes the core cards with their values, not their descriptions', () => {
+    expect(summary('about')).toBe('30, TX, single');
+    expect(summary('pay')).toBe('$3,500 gross every 2 weeks, $2,600 take-home');
+    expect(summary('must-pay')).toBe('$3,000 a month');
+    expect(
+      [summary('about', fromDefaults({ 'person.age': 25, 'person.state': 'CA', 'person.filingStatus': 'marriedJoint' })),
+        summary('pay', fromDefaults({ 'income.grossPerPaycheck': 4000, 'income.netPerPaycheck': 3000, 'income.frequency': 'monthly' }))]
+    ).toEqual(['25, CA, married filing jointly', '$4,000 gross once a month, $3,000 take-home']);
+  });
+
   it('summarizes each paycheck screen of the default profile in one line', () => {
     expect(summary('spending-bonus')).toBe('fun money $300\u2013$600/mo, no regular bonus');
     expect(summary('emergency-fund')).toBe('$5,000 saved, 4% APY');

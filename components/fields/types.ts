@@ -57,6 +57,12 @@ export interface FieldSectionProps {
   renderers?: CustomRenderers;
   /** Show the one-line summary instead of the fields (ignored while a field on it has an error). */
   collapsed?: boolean;
+  /**
+   * False shows the screen description while collapsed instead of the
+   * summary (an unanswered core screen, whose values are only defaults).
+   * Default true.
+   */
+  summarize?: boolean;
   /** Renders the Edit / Show toggle; without it the section has no toggle. */
   onToggle?(): void;
   /** Renders "Restore defaults" on an assumption-tier screen. */

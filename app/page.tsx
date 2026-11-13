@@ -3,13 +3,8 @@ import Link from 'next/link'
 import { ArrowRight, ClipboardList, LockKeyhole, MonitorSmartphone, Sigma } from 'lucide-react'
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard'
 import { buttonVariants } from '@/components/ui/button'
-import { CALCULATORS, SITE_DISCLAIMER } from '@/lib/calculators/registry'
-import {
-  CORE_START_PATH,
-  coreStartLink,
-  getIntentOption,
-  type IntakeIntent,
-} from '@/lib/constants/intake'
+import { CALCULATORS, SITE_DISCLAIMER, calculatorHref } from '@/lib/calculators/registry'
+import { CORE_START_PATH, getIntentOption, type IntakeIntent } from '@/lib/constants/intake'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = {
@@ -42,12 +37,12 @@ const HOW_IT_WORKS = [
 ]
 
 /**
- * Calculator previews. Each card links through coreStartLink: the shared
- * core intake with `next` set, so the path answers the basics first and then
- * continues to that calculator's remaining questions, or straight to the
- * portfolio intake, which needs no basics (O5). The icon and the "what it shows"
- * line come from INTENT_OPTIONS so the landing page and the chooser agree;
- * the name comes from the calculator registry.
+ * Calculator previews. Each card links straight to the calculator page
+ * (calculatorHref, no `?from=profile`); the page reads the saved profile, or
+ * the defaults, without asking. "Get started" is the way into the guided
+ * questions. The icon and the "what it shows" line come from INTENT_OPTIONS
+ * so the landing page and the chooser agree; the name comes from the
+ * calculator registry.
  */
 const PREVIEWS: ReadonlyArray<{
   intent: Exclude<IntakeIntent, 'profile'>
@@ -76,7 +71,7 @@ function CalculatorPreviewCard({ intent, question }: (typeof PREVIEWS)[number]) 
   const name = CALCULATORS[intent].shortTitle
   return (
     <Link
-      href={coreStartLink(intent) as Route}
+      href={calculatorHref(intent) as Route}
       className={cn(
         'group flex h-full w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-card-foreground transition-colors md:p-5',
         'hover:border-sage-400 dark:hover:border-sage-500',
@@ -99,7 +94,7 @@ function CalculatorPreviewCard({ intent, question }: (typeof PREVIEWS)[number]) 
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <span className="mt-auto inline-flex min-h-6 items-center gap-1.5 text-sm font-medium text-sage-600 group-hover:text-sage-700 dark:text-sage-300 dark:group-hover:text-sage-200">
-        Start with the basics
+        Open the calculator
         <ArrowRight
           className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
           aria-hidden="true"

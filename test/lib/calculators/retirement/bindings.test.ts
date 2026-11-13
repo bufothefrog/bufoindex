@@ -1,9 +1,8 @@
 /**
  * The retirement bindings and definition: the golden test against the old
  * mapper's output for v1-shaped profiles, every RetirementInputs
- * leaf bound or engine-only, the derived income and filing-status leaves, the
- * reverse direction the legacy import uses, and engine errors mapped back to
- * profile paths.
+ * leaf bound or engine-only, the derived income and filing-status leaves,
+ * and engine errors mapped back to profile paths.
  *
  * Golden fixture. The expected inputs were captured on 2026-11-12 from the
  * former lib/profile/mappers.ts (deleted in phase 5): what its
@@ -16,18 +15,14 @@ import type { RetirementInputs } from '@/lib/calculations/retirement';
 import { RETIREMENT_BINDINGS, RETIREMENT_ENGINE_ONLY, filingStatusNote, retirementFilingStatus } from '@/lib/calculators/retirement/bindings';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
-import { LEGACY_IMPORTS } from '@/lib/calculators/legacyImports';
-import { RETIREMENT_LEGACY } from '@/lib/calculators/retirement/legacy';
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
-import { fromEngineInputs, isDerivedBinding } from '@/lib/fields/binding';
-import { makeGet } from '@/lib/fields/paths';
-import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
-import { migrateProfile } from '@/lib/profile/migrate';
+import { isDerivedBinding } from '@/lib/fields/binding';
+import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
 import type { Write } from '@/lib/fields/types';
 import type { FilingStatus, FinancialProfile, PayFrequency, ProfilePatch } from '@/lib/profile/types';
 
-/** A v1-shaped profile: the given v1 sections over the v1 defaults, loaded the way a saved v1 profile is. */
-const v1 = (patch: ProfilePatch = {}): FinancialProfile => migrateProfile(patch, 1);
+/** A v1-shaped profile: the given sections over the defaults, normalized the way any stored profile is. */
+const v1 = (patch: ProfilePatch = {}): FinancialProfile => normalizeProfile(patch);
 
 /** The default profile with `writes` applied (each must be a valid profile write). */
 const withWrites = (writes: Write[]): FinancialProfile => applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
@@ -247,12 +242,11 @@ describe('every RetirementInputs leaf is bound or engine-only', () => {
 });
 
 describe('the definition', () => {
-  it('runs debounced by 300 ms, with the legacy storage import', () => {
+  it('runs debounced by 300 ms', () => {
     expect(RETIREMENT_CALCULATOR.id).toBe('retirement');
     expect(RETIREMENT_CALCULATOR.debounceMs).toBe(300);
     expect(RETIREMENT_CALCULATOR.form).toBe(RETIREMENT_FORM);
-    expect(LEGACY_IMPORTS[1].legacy).toBe(RETIREMENT_LEGACY);
-    expect(LEGACY_IMPORTS[1].bindings).toBe(RETIREMENT_BINDINGS);
+    expect(RETIREMENT_CALCULATOR.bindings).toBe(RETIREMENT_BINDINGS);
   });
 
   it('maps engine errors back to profile paths, the form message first', () => {
@@ -273,49 +267,6 @@ describe('the definition', () => {
     expect(prepareRun(RETIREMENT_CALCULATOR, negative).errors).toEqual({
       'retirementIncome.annualHealthcareCost': 'Annual healthcare cost must be at least $0.',
     });
-  });
-});
-
-describe('the reverse direction (legacy import)', () => {
-  /** The writes for the old inputs `overrides` into a profile paid `held` (the profile default otherwise). */
-  const writesFor = (overrides: Partial<RetirementInputs>, held?: PayFrequency) => {
-    const profile = getDefaultFinancialProfile();
-    const target = held ? { ...profile, income: { ...profile.income, frequency: held } } : profile;
-    return fromEngineInputs(RETIREMENT_BINDINGS, { ...RETIREMENT_LEGACY.storageDefaults(), ...overrides }, makeGet(target));
-  };
-  const valueAt = (overrides: Partial<RetirementInputs>, path: string, held?: PayFrequency) =>
-    writesFor(overrides, held).filter((write) => write.path === path).map((write) => write.value);
-
-  it('keeps a period that has a pay frequency', () => {
-    expect(valueAt({ incomeAmount: 4200, incomePeriod: 'semimonthly' }, 'income.grossPerPaycheck')).toEqual([4200]);
-    expect(valueAt({ incomeAmount: 4200, incomePeriod: 'semimonthly' }, 'income.frequency')).toEqual(['semi-monthly']);
-    expect(valueAt({ incomeAmount: 3000, incomePeriod: 'biweekly' }, 'income.frequency')).toEqual(['bi-weekly']);
-    // Whatever frequency the profile holds.
-    expect(valueAt({ incomeAmount: 3000, incomePeriod: 'monthly' }, 'income.frequency', 'weekly')).toEqual(['monthly']);
-  });
-
-  it('turns yearly and hourly amounts into a paycheck of the frequency the profile holds, at the same annual income', () => {
-    // 100,000 a year / 26 = 3,846.15 bi-weekly (the profile default), to the cent.
-    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.grossPerPaycheck')).toEqual([3846.15]);
-    // 100,000 a year / 12 = 8,333.33 a month.
-    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.grossPerPaycheck', 'monthly')).toEqual([8333.33]);
-    // 30 an hour x 2,080 = 62,400 a year = 1,200 a week.
-    expect(valueAt({ incomeAmount: 30, incomePeriod: 'hourly' }, 'income.grossPerPaycheck', 'weekly')).toEqual([1200]);
-    // 100,800 a year = 4,200 semi-monthly.
-    expect(valueAt({ incomeAmount: 100800, incomePeriod: 'yearly' }, 'income.grossPerPaycheck', 'semi-monthly')).toEqual([4200]);
-  });
-
-  it('leaves the frequency alone for a yearly or hourly amount', () => {
-    expect(valueAt({ incomeAmount: 100000, incomePeriod: 'yearly' }, 'income.frequency', 'monthly')).toEqual([]);
-    expect(valueAt({ incomeAmount: 30, incomePeriod: 'hourly' }, 'income.frequency', 'weekly')).toEqual([]);
-  });
-
-  it('writes the filing status and skips the one-way income leaves', () => {
-    expect(valueAt({ filingStatus: 'marriedJoint' }, 'person.filingStatus')).toEqual(['marriedJoint']);
-    const paths = writesFor({}).map((write) => write.path);
-    expect(new Set(paths).size).toBe(paths.length);
-    // The old default yearly income writes gross pay only, in the profile's frequency.
-    expect(paths).toHaveLength(20);
   });
 });
 

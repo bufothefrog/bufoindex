@@ -16,8 +16,10 @@
 
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { FILING_STATUS_META, FILING_STATUS_OPTIONS, STRATEGY_PRESET_OPTIONS } from '@/lib/constants/labels';
+import { formatCurrency } from '@/lib/format';
 import { PAY_FREQUENCIES, PRESET_EMERGENCY_MONTHS, STRATEGY_PRESETS } from '@/lib/profile/defaults';
-import type { StrategyPreset } from '@/lib/profile/types';
+import type { FilingStatus, PayFrequency, StrategyPreset } from '@/lib/profile/types';
+import { isFiniteNumber } from './runtime';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, ScreenSpec, Write } from './types';
 
 /** A shared spec with a form's own wording or tier; the path and kind stay. */
@@ -42,6 +44,63 @@ const FILING_OPTIONS: readonly FieldOption[] = FILING_STATUS_OPTIONS.map(({ valu
 const INTAKE_STRATEGY_ORDER: readonly StrategyPreset[] = ['standard', 'cashflow-investor'];
 
 // ---------------------------------------------------------------------------
+// Summary pieces of the core facts
+// ---------------------------------------------------------------------------
+//
+// The wording of the core facts in one line, written once: the collapsed
+// core cards on the calculator pages (each core spec's summary) and the
+// guided flow's recap (coreSummary in lib/constants/intake.ts) both build
+// from these. Each piece is null for a value it cannot word.
+
+const GROSS_PAY_PATH = 'income.grossPerPaycheck';
+const PAY_FREQUENCY_PATH = 'income.frequency';
+
+/** 30 -> "30". */
+export function ageSummary(age: unknown): string | null {
+  return isFiniteNumber(age) ? String(age) : null;
+}
+
+/** "TX" -> "TX". */
+export function stateSummary(state: unknown): string | null {
+  return typeof state === 'string' && state.trim() !== '' ? state : null;
+}
+
+/** 'marriedJoint' -> "married filing jointly". */
+export function filingStatusSummary(status: unknown): string | null {
+  return typeof status === 'string' && Object.prototype.hasOwnProperty.call(FILING_STATUS_META, status)
+    ? FILING_STATUS_META[status as FilingStatus].phrase
+    : null;
+}
+
+function cadence(frequency: unknown): string | null {
+  return typeof frequency === 'string' && Object.prototype.hasOwnProperty.call(PAY_FREQUENCY_META, frequency)
+    ? PAY_FREQUENCY_META[frequency as PayFrequency].cadence
+    : null;
+}
+
+/** 3500, 'bi-weekly' -> "$3,500 gross every 2 weeks"; without a frequency, "$3,500 gross per paycheck". */
+export function grossPaySummary(gross: unknown, frequency: unknown): string | null {
+  if (!isFiniteNumber(gross)) return null;
+  return `${formatCurrency(gross)} gross ${cadence(frequency) ?? 'per paycheck'}`;
+}
+
+/** 'semi-monthly' -> "paid twice a month"; used when no gross amount carries the cadence. */
+export function payFrequencySummary(frequency: unknown): string | null {
+  const text = cadence(frequency);
+  return text ? `paid ${text}` : null;
+}
+
+/** 2600 -> "$2,600 take-home". */
+export function takeHomeSummary(net: unknown): string | null {
+  return isFiniteNumber(net) ? `${formatCurrency(net)} take-home` : null;
+}
+
+/** 3000 -> "$3,000 a month". */
+export function monthlyCostSummary(amount: unknown): string | null {
+  return isFiniteNumber(amount) ? `${formatCurrency(amount)} a month` : null;
+}
+
+// ---------------------------------------------------------------------------
 // Core facts (every calculator intent asks them first)
 // ---------------------------------------------------------------------------
 
@@ -53,6 +112,7 @@ export const AGE: FieldSpec = {
   max: 100,
   step: 1,
   tier: 'core',
+  summary: (value) => ageSummary(value),
 };
 
 export const STATE: FieldSpec = {
@@ -63,6 +123,7 @@ export const STATE: FieldSpec = {
   // empty answer is an error, never a skipped one saved as the old state.
   required: true,
   tier: 'core',
+  summary: (value) => stateSummary(value),
 };
 
 export const FILING_STATUS: FieldSpec = {
@@ -71,23 +132,28 @@ export const FILING_STATUS: FieldSpec = {
   label: 'Tax filing status',
   options: FILING_OPTIONS,
   tier: 'core',
+  summary: (value) => filingStatusSummary(value),
 };
 
 export const GROSS_PAY: FieldSpec = {
-  path: 'income.grossPerPaycheck',
+  path: GROSS_PAY_PATH,
   kind: 'money',
   label: 'Gross pay per paycheck',
   help: 'Before taxes and deductions.',
   min: 0,
   tier: 'core',
+  // The gross amount carries the pay cadence: "$3,500 gross every 2 weeks".
+  summary: (value, get) => grossPaySummary(value, get(PAY_FREQUENCY_PATH)),
 };
 
 export const PAY_FREQUENCY: FieldSpec = {
-  path: 'income.frequency',
+  path: PAY_FREQUENCY_PATH,
   kind: 'select',
   label: 'How often you are paid',
   options: PAY_FREQUENCIES.map((value): FieldOption => ({ value, label: PAY_FREQUENCY_META[value].intakeOption })),
   tier: 'core',
+  // Worded on its own only when no gross amount already carries it.
+  summary: (value, get) => (isFiniteNumber(get(GROSS_PAY_PATH)) ? null : payFrequencySummary(value)),
 };
 
 export const NET_PAY: FieldSpec = {
@@ -97,6 +163,7 @@ export const NET_PAY: FieldSpec = {
   help: 'What lands in your bank account after taxes and deductions.',
   min: 0,
   tier: 'core',
+  summary: (value) => takeHomeSummary(value),
 };
 
 export const NECESSARY_MONTHLY: FieldSpec = {
@@ -106,6 +173,7 @@ export const NECESSARY_MONTHLY: FieldSpec = {
   help: 'Rent or mortgage, utilities, insurance, groceries, minimum debt payments.',
   min: 0,
   tier: 'core',
+  summary: (value) => monthlyCostSummary(value),
 };
 
 // ---------------------------------------------------------------------------

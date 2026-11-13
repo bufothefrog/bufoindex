@@ -15,12 +15,21 @@ import {
   simulateDcaComparison,
   type DcaComparisonResult,
 } from '@/lib/calculations/leverageComparison';
-import { leverageHeadline } from '@/lib/calculators/leverage/headline';
+import {
+  leverageDisplayDollars,
+  leverageHeadline,
+  leverageHorizonYears,
+} from '@/lib/calculators/leverage/headline';
 import { dragParts, recoveryGain, relativeGap, yearsText } from '@/lib/calculators/leverage/narrative';
 import { formatStatValue } from '@/lib/design-system/stat';
+import type { DollarDisplayMode } from '@/lib/utils/displayDollars';
 
-const shown = (result: DcaComparisonResult, inputs = DEFAULT_DCA_COMPARISON_INPUTS) =>
-  leverageHeadline(result, inputs).map(({ id, label, value, format, hint }) => ({
+const shown = (
+  result: DcaComparisonResult,
+  inputs = DEFAULT_DCA_COMPARISON_INPUTS,
+  mode: DollarDisplayMode = 'nominal'
+) =>
+  leverageHeadline(result, inputs, mode).map(({ id, label, value, format, hint }) => ({
     id,
     label,
     value: formatStatValue(value, format),
@@ -28,7 +37,7 @@ const shown = (result: DcaComparisonResult, inputs = DEFAULT_DCA_COMPARISON_INPU
   }));
 
 describe('leverageHeadline', () => {
-  it('shows both median ending balances and the share of paths behind, at the defaults', () => {
+  it('shows both median ending balances and the share of paths behind, at the defaults (future dollars)', () => {
     const result = simulateDcaComparison(DEFAULT_DCA_COMPARISON_INPUTS);
     expect(shown(result)).toEqual([
       {
@@ -79,9 +88,58 @@ describe('leverageHeadline', () => {
       const [, , behind] = shown({ ...result, probLeveragedBehindDca: p });
       expect(behind.value, String(p)).toBe(`${(p * 100).toFixed(0)}%`);
     }
-    const [, , exact] = leverageHeadline({ ...result, probLeveragedBehindDca: 0.434 }, DEFAULT_DCA_COMPARISON_INPUTS);
+    const [, , exact] = leverageHeadline(
+      { ...result, probLeveragedBehindDca: 0.434 },
+      DEFAULT_DCA_COMPARISON_INPUTS,
+      'today'
+    );
     expect(exact.value).toBe(0.43);
     expect(exact.format).toBe('percent');
+  });
+});
+
+describe('leverageHeadline in the two dollar display modes', () => {
+  it("deflates the balances over the horizon at the fixed 3% in today's dollars; the share and the contributions do not move", () => {
+    const result = simulateDcaComparison(DEFAULT_DCA_COMPARISON_INPUTS);
+    const future = leverageHeadline(result, DEFAULT_DCA_COMPARISON_INPUTS, 'nominal');
+    const today = leverageHeadline(result, DEFAULT_DCA_COMPARISON_INPUTS, 'today');
+    // 20 years: 1.03^20 = 1.8061112...
+    expect(leverageHorizonYears(DEFAULT_DCA_COMPARISON_INPUTS)).toBe(20);
+    const factor = 1.03 ** 20;
+    expect(future[0].value).toBe(result.index.dca.p50);
+    expect(future[1].value).toBe(result.leveraged.dca.p50);
+    expect(today[0].value as number).toBeCloseTo(result.index.dca.p50 / factor, 6);
+    expect(today[1].value as number).toBeCloseTo(result.leveraged.dca.p50 / factor, 6);
+    expect(today[2].value).toBe(future[2].value);
+    expect(today[2].hint).toBe(future[2].hint);
+
+    expect(shown(result, DEFAULT_DCA_COMPARISON_INPUTS, 'today')).toEqual([
+      {
+        id: 'index-median',
+        label: 'Index fund, median ending balance',
+        value: '$320,070',
+        hint: '10th to 90th: $177k to $622k',
+      },
+      {
+        id: 'leveraged-median',
+        label: '2x fund, median ending balance',
+        value: '$350,424',
+        hint: '10th to 90th: $114k to $1.38M',
+      },
+      {
+        id: 'behind',
+        label: 'Share of simulated paths where the 2x fund ends behind the index fund',
+        value: '43%',
+        hint: '$221,000 contributed to each over 20 years, 500 paths',
+      },
+    ]);
+  });
+
+  it('converts each balance over the whole months of a fractional horizon', () => {
+    const inputs = { ...DEFAULT_DCA_COMPARISON_INPUTS, years: 7.5 };
+    expect(leverageHorizonYears(inputs)).toBe(7.5);
+    expect(leverageDisplayDollars(1000, 'today', 7.5)).toBeCloseTo(1000 / 1.03 ** 7.5, 9);
+    expect(leverageDisplayDollars(1000, 'nominal', 7.5)).toBe(1000);
   });
 });
 

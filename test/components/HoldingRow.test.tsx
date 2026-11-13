@@ -167,6 +167,8 @@ describe('HoldingRow', () => {
     fireEvent.focus(ticker);
     fireEvent.mouseDown(screen.getByTestId('ticker-option-bnd'));
     expect(onSelectSecurity).toHaveBeenCalledWith('sec2');
+    // The picked ticker shows at once, before the parent re-renders.
+    expect(ticker).toHaveValue('BND');
   });
 
   it('emits price and asset-class updates to the paired security', () => {

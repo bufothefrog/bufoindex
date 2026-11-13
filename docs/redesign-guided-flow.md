@@ -20,6 +20,8 @@ open questions.
 
 ## 1. Where the app is today
 
+Historical: this section is the original proposal. What was built is described in docs/architecture.md and docs/rebuild-plan.md.
+
 Facts that shape the redesign (file references are to the current tree):
 
 - Three calculators, three unrelated Zustand stores. Paycheck
@@ -232,6 +234,8 @@ Portfolio rebalancer
 
 ### 2.5 Dashboard (`/overview`)
 
+Historical: this section is the original proposal. What was built is described in docs/architecture.md and docs/rebuild-plan.md.
+
 Available once a profile exists. A single scrollable column on mobile, a
 card grid on desktop. Every card is computed from the profile through the
 existing pure calculation modules and deep-links into the calculator with
@@ -370,12 +374,10 @@ calculator stores are run stores made by `createCalculatorStore`
 (`lib/store/createCalculatorStore.ts`) that hold results and persist
 nothing. When a calculator mounts:
 
-1. The old calculators' own localStorage inputs, if any, are imported into
-   the profile once and their keys removed (O7, `lib/store/legacyImport.ts`).
-2. The page reads its inputs from the profile through the calculator's
+1. The page reads its inputs from the profile through the calculator's
    bindings (`lib/calculators/<id>/bindings.ts`), defaults filling anything
    unanswered, and runs.
-3. Each edit writes through to the profile (O1) and re-runs.
+2. Each edit writes through to the profile (O1) and re-runs.
 
 There is no hash step: old share links are not supported (O6). The dollar
 display mode is one site-wide preference (`lib/store/preferencesStore.ts`,
@@ -582,6 +584,8 @@ Mostly a presentation change over existing output. `PayrollSetupGuide` and
   works if contributions are mechanical and continue through drawdowns.
 
 ## 6. Engineering plan
+
+Historical: this section is the original proposal. What was built is described in docs/architecture.md and docs/rebuild-plan.md.
 
 ### 6.1 New and changed files
 

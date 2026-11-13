@@ -7,10 +7,7 @@
  *   editor (which also registers custom asset classes).
  * - accounts: each account's name, type and new cash. The deposits are the
  *   one record of the new cash: an account list in profile.provided means
- *   they are answered. A v1 answer to the removed
- *   investing.newCashThisMonth moves into the Brokerage deposit
- *   (migrateProfile), and the accounts screen shows it prefilled until the
- *   list itself is answered.
+ *   they are answered.
  * - holdings: what each account holds, at what price.
  * - settings: whole or fractional shares, taxable selling and placement
  *   advice.

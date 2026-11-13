@@ -26,7 +26,7 @@ describe('tone class maps', () => {
     ['neutral', 'text-foreground', 'border-border', 'bg-muted/40', 'bg-muted-foreground'],
     ['positive', 'text-success', 'border-success/30', 'bg-success/10', 'bg-success'],
     ['caution', 'text-warning', 'border-warning/30', 'bg-warning/10', 'bg-warning'],
-    ['negative', 'text-destructive', 'border-destructive/30', 'bg-destructive/10', 'bg-destructive'],
+    ['negative', 'text-negative', 'border-destructive/30', 'bg-destructive/10', 'bg-destructive'],
     ['info', 'text-info', 'border-info/30', 'bg-info/10', 'bg-info'],
     [
       'brand',
@@ -42,11 +42,19 @@ describe('tone class maps', () => {
     expect(TONE_FILL[tone]).toBe(fill);
   });
 
+  it('prints negative text in the negative token, not the destructive fill color', () => {
+    // --destructive is a fill (about 1.8:1 as text on the dark background);
+    // --negative is the text color (app/globals.css).
+    expect(TONE_TEXT.negative).toBe('text-negative');
+    expect(TONE_TEXT.negative).not.toContain('destructive');
+    expect(TONE_FILL.negative).toBe('bg-destructive');
+  });
+
   it('uses only semantic tokens or the sage scale with a dark-mode pair', () => {
     const classes = TONES.flatMap((tone) =>
       [TONE_TEXT, TONE_BORDER, TONE_SURFACE, TONE_FILL].flatMap((map) => map[tone].split(' '))
     );
-    const semantic = /^(dark:)?(text|border|bg)-(foreground|border|muted|muted-foreground|success|warning|destructive|info|sage-\d{2,3})(\/\d+)?$/;
+    const semantic = /^(dark:)?(text|border|bg)-(foreground|border|muted|muted-foreground|success|warning|destructive|negative|info|sage-\d{2,3})(\/\d+)?$/;
     for (const cls of classes) {
       expect(cls).toMatch(semantic);
     }

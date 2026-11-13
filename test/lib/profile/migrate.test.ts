@@ -1,14 +1,17 @@
 /**
- * v1 -> v2 profile migration.
+ * migrateProfile: the seam the persist `migrate` hook calls. It has no
+ * migration step today; a payload of any version is normalized against the
+ * v2 defaults.
  *
- * The fixtures are what the v1 store wrote to localStorage under
- * 'bufo-profile' (the `state.profile` part of `{ state, version: 1 }`): the
- * untouched default, a profile with every v1 field answered, and a
- * hand-edited payload with wrong types, stray keys and junk paths.
+ * The older-version fixtures are what the v1 store wrote to localStorage
+ * under 'bufo-profile' (the `state.profile` part of `{ state, version: 1 }`):
+ * the untouched default, a profile with every v1 field answered, and a
+ * hand-edited payload with wrong types, stray keys and junk paths. They must
+ * still load without throwing.
  */
 
 import { describe, expect, it } from 'vitest';
-import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
 import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
 
 /** v1 getDefaultFinancialProfile(), as JSON.parse returns it. */
@@ -72,15 +75,17 @@ const V1_GARBAGE = {
   provided: ['person.age', 'person.age', 42, null, 'person.nickname', 'debts.0.balance', 'strategy.leverageRatio'],
 };
 
-describe('migrateProfile from v1', () => {
+describe('migrateProfile from an older version (normalize only)', () => {
   it('turns the v1 default into exactly the v2 default', () => {
     expect(migrateProfile(V1_DEFAULT, 1)).toEqual(getDefaultFinancialProfile());
   });
 
-  it('carries every answered v1 field and its provided path over, and fills the new leaves with defaults', () => {
-    const p = migrateProfile(V1_ALL_PROVIDED, 1);
-    // The one-off new cash is no v2 leaf: its value moves to the Brokerage
-    // deposit (next test) and its provided path goes.
+  it('loads a v1 payload: every v2 leaf it holds is kept, the unknown v1 new-cash leaf is dropped', () => {
+    let p: ReturnType<typeof migrateProfile> | undefined;
+    expect(() => {
+      p = migrateProfile(V1_ALL_PROVIDED, 1);
+    }).not.toThrow();
+    if (!p) throw new Error('no profile');
     const defaults = getDefaultFinancialProfile();
     expect(p.version).toBe(2);
     expect(p.updatedAt).toBe(1761000000000);
@@ -90,23 +95,14 @@ describe('migrateProfile from v1', () => {
     expect(p.cash).toEqual(V1_ALL_PROVIDED.cash);
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
     expect(p.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
+    expect(p.investing).not.toHaveProperty('newCashThisMonth');
     expect(p.strategy).toEqual(V1_ALL_PROVIDED.strategy);
     expect(p.provided).toEqual(V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth'));
-    for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'assumptions'] as const) {
+    // The v1 new cash is not moved anywhere: the portfolio keeps its defaults,
+    // the Brokerage deposit included.
+    for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'portfolio', 'assumptions'] as const) {
       expect(p[key]).toEqual(defaults[key]);
     }
-  });
-
-  it('moves the new cash into the Brokerage deposit and leaves the rest of the worked example alone', () => {
-    const p = migrateProfile(V1_ALL_PROVIDED, 1);
-    const defaults = getDefaultFinancialProfile();
-    expect(p.portfolio.accounts).toEqual([
-      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
-      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 3000 },
-    ]);
-    expect(p.portfolio.securities).toEqual(defaults.portfolio.securities);
-    expect(p.portfolio.holdings).toEqual(defaults.portfolio.holdings);
-    expect(p.portfolio.classTargets).toEqual(defaults.portfolio.classTargets);
   });
 
   it('cleans a hand-edited payload: invalid leaves take defaults, unknown keys and paths go', () => {
@@ -123,16 +119,17 @@ describe('migrateProfile from v1', () => {
     expect(p.investing).toEqual(defaults.investing);
     expect(p.strategy).toEqual({ preset: 'cashflow-investor', leverageRatio: 3 });
     expect(p).not.toHaveProperty('extras');
-    // Negative new cash deposits nothing, as the v1 mapper clamped it.
-    expect(p.portfolio.accounts[1].deposit).toBe(0);
+    expect(p.portfolio).toEqual(defaults.portfolio);
     // Junk paths are dropped, and so is a row path whose row does not exist
     // (v1 had no debts list, so 'debts.0.balance' was never a real answer).
     expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
   });
 
-  it('treats any version below 2 as v1', () => {
-    expect(migrateProfile({ ...V1_DEFAULT, investing: { ...V1_DEFAULT.investing, newCashThisMonth: 750 } }, 0)
-      .portfolio.accounts[1].deposit).toBe(750);
+  it('treats every version the same: the result is normalizeProfile of the payload', () => {
+    for (const payload of [V1_DEFAULT, V1_ALL_PROVIDED, V1_GARBAGE]) {
+      const expected = normalizeProfile(payload);
+      for (const version of [0, 1, 2, 3]) expect(migrateProfile(payload, version)).toEqual(expected);
+    }
   });
 
   it('returns the defaults for a payload that is not an object', () => {
@@ -165,7 +162,7 @@ describe('migrateProfile at the current version', () => {
     expect(migrateProfile(stored, 3)).toEqual(expected);
   });
 
-  it('is idempotent across a v1 migration and a later load', () => {
+  it('is idempotent across a v1 load and a later load', () => {
     const once = migrateProfile(V1_ALL_PROVIDED, 1);
     expect(migrateProfile(JSON.parse(JSON.stringify(once)), 2)).toEqual(once);
   });

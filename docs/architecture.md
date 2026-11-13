@@ -33,11 +33,10 @@ What is and isn't randomized:
 
 There is no backend and no URL-hash sharing: links into a calculator carry only `?from=profile` (`calculatorHref` in `lib/calculators/registry.ts`), and old share links are not supported. Inputs live in one place, the shared financial profile.
 
-- **Profile.** `FinancialProfile` (`lib/profile/types.ts`) holds every input any calculator, the intake or the dashboard uses. `lib/store/profileStore.ts` persists it to localStorage (key `bufo-profile`, versioned; older payloads go through `lib/profile/migrate.ts` and every payload is normalized). Each saved answer is listed in `provided`, which drives profile completeness. Calculator edits write through to the profile.
+- **Profile.** `FinancialProfile` (`lib/profile/types.ts`) holds every input any calculator, the intake or the dashboard uses. `lib/store/profileStore.ts` persists it to localStorage (key `bufo-profile`, versioned; every payload goes through `lib/profile/migrate.ts`, which today only normalizes it against the current defaults, so a payload of an older version loads with every leaf that still exists). Each saved answer is listed in `provided`, which drives profile completeness. Calculator edits write through to the profile.
 - **Field schema.** Each field is a `FieldSpec` keyed by its profile path (`lib/fields/types.ts`), grouped into topic screens by a `FormSpec`. One spec drives the wizard at `/start`, the calculator's sections (`components/fields/`), validation (`lib/fields/runtime.ts`) and completeness. The profile form is composed from every calculator's form in `lib/calculators/forms.ts`.
 - **Bindings.** `lib/calculators/<id>/bindings.ts` maps profile paths to the engine's inputs; `lib/calculators/runtime.ts` builds engine inputs and validation errors from the profile in one pure pass.
 - **Run stores.** `createCalculatorStore` (`lib/store/createCalculatorStore.ts`) makes one store per calculator from its `CalculatorDefinition`. It validates, skips a run whose inputs match the last results, debounces, runs, and keeps the newest run. On invalid inputs the last results stay on screen marked stale. It persists nothing. The retirement simulation runs off the main thread through `lib/workers/createWorkerRunner.ts`, falling back to in-thread where there is no worker.
-- **Legacy import.** The old calculators' own localStorage inputs are imported into the profile once (`lib/store/legacyImport.ts`, `lib/calculators/legacyImports.ts`), non-default values only, and the old keys removed.
 
 `CalculatorPage` (`components/calculators/shared/CalculatorPage.tsx`) is the one calculator shell: it reads the registry entry (`lib/calculators/registry.ts`), renders the form's sections and the results inside `CalculatorLayout`, and submits each profile change to the run store.
 
@@ -65,8 +64,8 @@ Vitest 4 + jsdom (`vitest.config.ts`; `@/` aliases repo root). Suites:
 
 - `test/lib/calculations/` — one file per calculation module, numeric assertions.
 - `test/lib/utils/` - seeded RNG distribution checks, display-dollar conversion, tax-rate lookups.
-- `test/lib/fields/`, `test/lib/calculators/`, `test/lib/profile/` - the field schema, each calculator's form and bindings, the profile form and completeness, profile defaults and migration.
-- `test/lib/store/`, `test/lib/workers/` - the run store factory and each calculator's store, the profile and preference stores, the legacy import, and the worker runner.
+- `test/lib/fields/`, `test/lib/calculators/`, `test/lib/profile/` - the field schema, each calculator's form and bindings, the profile form and completeness, profile defaults and the persisted-payload normalization (`migrate`).
+- `test/lib/store/`, `test/lib/workers/` - the run store factory and each calculator's store, the profile and preference stores, and the worker runner.
 - `test/lib/formulas/` — the formula registry behind the methodology page.
 - `test/components/` — Testing Library component tests.
 - `test/factories/test-data-factory.ts` — shared mock builders.

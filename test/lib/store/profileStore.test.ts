@@ -368,7 +368,7 @@ describe('rehydration from localStorage', () => {
     expect(getState().hasProfile).toBe(true);
   });
 
-  it('migrates a saved v1 payload to v2 and saves it back as v2', async () => {
+  it('loads a saved v1 payload by normalizing it, keeping every v2 leaf, and saves it back as v2', async () => {
     const v1 = {
       version: 1,
       updatedAt: 1761000000000,
@@ -395,9 +395,15 @@ describe('rehydration from localStorage', () => {
     expect(profile.version).toBe(2);
     expect(profile.updatedAt).toBe(1761000000000);
     expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 85 });
-    // The v1 new cash moves to the Brokerage deposit; v2 has no such leaf.
+    expect(profile.income).toEqual({ ...getDefaultFinancialProfile().income, ...v1.income });
+    expect(profile.spending).toEqual(v1.spending);
+    expect(profile.cash).toEqual(v1.cash);
+    expect(profile.workplace).toEqual({ ...getDefaultFinancialProfile().workplace, ...v1.workplace });
+    expect(profile.strategy).toEqual(v1.strategy);
+    // The v1 new cash is no v2 leaf: it is dropped and not moved anywhere,
+    // so the Brokerage deposit keeps its default.
     expect(profile.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
-    expect(profile.portfolio.accounts[1]).toEqual({ id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 3000 });
+    expect(profile.portfolio).toEqual(getDefaultFinancialProfile().portfolio);
     expect(profile.assumptions).toEqual(getDefaultFinancialProfile().assumptions);
     expect(profile.provided).toEqual(['person.age']);
 

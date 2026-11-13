@@ -20,13 +20,19 @@ import type { LucideIcon } from 'lucide-react';
 import { Layers, Scale, Sunset, UserRound, Wallet } from 'lucide-react';
 import { formForFlow } from '@/lib/calculators/forms';
 import { CLASS_TARGETS_PATH, classTargetsError } from '@/lib/calculators/portfolio/bindings';
-import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
-import { FILING_STATUS_META } from '@/lib/constants/labels';
-import { CORE_SCREENS } from '@/lib/fields/shared';
+import {
+  CORE_SCREENS,
+  ageSummary,
+  filingStatusSummary,
+  grossPaySummary,
+  monthlyCostSummary,
+  payFrequencySummary,
+  stateSummary,
+  takeHomeSummary,
+} from '@/lib/fields/shared';
 import { getAt, makeGet } from '@/lib/fields/paths';
 import { screenPaths, screensFor, validateFields } from '@/lib/fields/runtime';
 import type { FieldErrors, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
-import { formatCurrency } from '@/lib/format';
 import { isProfilePath } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 
@@ -325,30 +331,28 @@ export function buildIntakeSubmission(
 // ---------------------------------------------------------------------------
 
 /**
- * One-line summary of the saved core answers, e.g.
- * "30, TX, single, $3,500 every 2 weeks, $3,000/mo must-pay". Parts the user
- * has not answered (still placeholders) are left out; an empty string means
- * none of the summarized answers are saved. Take-home pay is not summarized.
+ * One-line summary of the saved core answers, e.g. "30, TX, single, $3,500
+ * gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs".
+ * The pieces are the ones the collapsed core cards use (lib/fields/shared.ts),
+ * so both say the same thing. Parts the user has not answered (still
+ * placeholders) are left out; an empty string means none of the core answers
+ * are saved.
  */
 export function coreSummary(profile: FinancialProfile): string {
   const provided = new Set(profile.provided);
-  const has = (path: string) => provided.has(path);
+  const answered = (path: string, value: unknown): unknown => (provided.has(path) ? value : undefined);
   const { person, income, spending } = profile;
-  const parts: string[] = [];
+  const gross = answered('income.grossPerPaycheck', income.grossPerPaycheck);
+  const frequency = answered('income.frequency', income.frequency);
+  const mustPay = monthlyCostSummary(answered('spending.necessaryMonthly', spending.necessaryMonthly));
 
-  if (has('person.age')) parts.push(String(person.age));
-  if (has('person.state')) parts.push(person.state);
-  if (has('person.filingStatus')) parts.push(FILING_STATUS_META[person.filingStatus].phrase);
-
-  const frequency = has('income.frequency') ? PAY_FREQUENCY_META[income.frequency].cadence : null;
-  if (has('income.grossPerPaycheck')) {
-    parts.push(`${formatCurrency(income.grossPerPaycheck)} ${frequency ?? 'per paycheck'}`);
-  } else if (frequency) {
-    parts.push(`paid ${frequency}`);
-  }
-
-  if (has('spending.necessaryMonthly')) {
-    parts.push(`${formatCurrency(spending.necessaryMonthly)}/mo must-pay`);
-  }
-  return parts.join(', ');
+  const parts = [
+    ageSummary(answered('person.age', person.age)),
+    stateSummary(answered('person.state', person.state)),
+    filingStatusSummary(answered('person.filingStatus', person.filingStatus)),
+    grossPaySummary(gross, frequency) ?? payFrequencySummary(frequency),
+    takeHomeSummary(answered('income.netPerPaycheck', income.netPerPaycheck)),
+    mustPay && `${mustPay} in must-pay costs`,
+  ];
+  return parts.filter((part): part is string => Boolean(part)).join(', ');
 }

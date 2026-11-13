@@ -6,6 +6,7 @@ import { CoreSummary } from '@/components/guided/CoreSummary';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { OptionCard } from '@/components/guided/OptionCard';
 import { ProgressDots } from '@/components/guided/ProgressDots';
+import { CalculatorLinks } from '@/components/shared/CalculatorLinks';
 import { CORE_PATHS } from '@/lib/constants/intake';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { Code, DemoBlock, DemoEntry, DemoSection } from './DemoBlock';
@@ -62,6 +63,14 @@ export function GuidedSection() {
         >
           <div className="max-w-xl">
             <NextSteps intent="paycheck" />
+          </div>
+        </DemoEntry>
+        <DemoEntry
+          name="CalculatorLinks"
+          description={<>A labelled list of direct links to the calculators (bare paths from <Code>calculatorHref</Code>), built from OptionCard. The empty overview lists all four; NextSteps passes <Code>exclude</Code> to leave out the calculator it sits on, as here.</>}
+        >
+          <div className="max-w-xl">
+            <CalculatorLinks label="Try another calculator" exclude={['paycheck']} />
           </div>
         </DemoEntry>
         <DemoEntry

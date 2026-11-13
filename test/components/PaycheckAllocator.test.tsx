@@ -3,8 +3,7 @@
  * shared profile, live allocation results from the real engine with no
  * Calculate button, no results before hydration, write-through edits, the
  * fun-money relation keeping stale results, the fixed-bracket tax note
- * (O9), the debt rate badge and totals, the legacy storage import, the
- * ?from=profile strip, the reload regression (bug 1) and the shared
+ * (O9), the debt rate badge and totals, the ?from=profile strip, the reload regression (bug 1) and the shared
  * dollar-display preference.
  */
 
@@ -138,25 +137,6 @@ describe('PaycheckAllocator', () => {
     // The intake's one-tap answer is not on the calculator page.
     expect(screen.queryByRole('button', { name: 'I have no debts' })).not.toBeInTheDocument();
     expect(usePaycheckStore.getState().inputs?.debts).toEqual([CARD, CAR]);
-  });
-
-  it('imports the old allocator storage once before the first run', async () => {
-    localStorage.setItem(
-      'paycheck-allocator-storage',
-      JSON.stringify({
-        state: { profile: { preferences: { necessaryExpenses: 3300 }, taxes: { state: 'NY' } } },
-        version: 0,
-      })
-    );
-    renderWithProfile(<PaycheckAllocator />);
-    await findResults();
-
-    const { profile } = useProfileStore.getState();
-    expect(profile.spending.necessaryMonthly).toBe(3300);
-    expect(profile.person.state).toBe('NY');
-    expect(usePaycheckStore.getState().inputs?.preferences.necessaryExpenses).toBe(3300);
-    expect(usePaycheckStore.getState().inputs?.taxes.state).toBe('NY');
-    expect(localStorage.getItem('paycheck-allocator-storage')).toBeNull();
   });
 
   it('strips ?from=profile after a handoff and opens on the results', async () => {

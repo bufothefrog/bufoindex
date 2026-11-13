@@ -26,6 +26,7 @@ const SEMANTIC = [
   { name: 'Muted', className: 'bg-muted text-muted-foreground', use: 'Subdued content' },
   { name: 'Accent', className: 'bg-accent text-accent-foreground', use: 'Accent highlights' },
   { name: 'Destructive', className: 'bg-destructive text-destructive-foreground', use: 'Error states' },
+  { name: 'Negative text', className: 'bg-card text-negative border border-border', use: 'Red words and figures' },
 ] as const;
 
 export function ColorsSection() {

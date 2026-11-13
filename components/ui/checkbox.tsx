@@ -58,7 +58,7 @@ function Checkbox({
           className={cn(
             "text-sm font-medium leading-snug",
             disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
-            error && "text-destructive"
+            error && "text-negative"
           )}
         >
           {label}

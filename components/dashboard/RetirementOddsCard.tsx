@@ -6,6 +6,7 @@ import { TrendingUp } from 'lucide-react';
 import { BaseCard } from '@/components/ui/cards';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import { StatGrid } from '@/components/ui/results';
+import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
 import { calculatorHref } from '@/lib/calculators/registry';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
@@ -16,6 +17,7 @@ import { summarizeRetirement, type RetirementLever } from '@/lib/dashboard/deriv
 import { formatStatValue, type StatSpec } from '@/lib/design-system/stat';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
 import type { FinancialProfile } from '@/lib/profile/types';
+import type { DollarDisplayMode } from '@/lib/utils/displayDollars';
 import { CardLinkButton } from './CardLinkButton';
 import { SimulationRegion } from './SimulationRegion';
 import { useDeferredResult } from './useDeferredResult';
@@ -37,9 +39,9 @@ function successHint(inputs: RetirementInputs): string {
   return `Share of ${formatCount(RUNS)} seeded paths with money left at age ${inputs.lifeExpectancy}, retiring at ${inputs.retirementAge}`;
 }
 
-/** The headline's success, projected and required figures (today's dollars), under the card's labels. */
-function oddsStats(results: RetirementResults, inputs: RetirementInputs): StatSpec[] {
-  return retirementHeadline(results, inputs)
+/** The headline's success, projected and required figures (in the shared dollar mode), under the card's labels. */
+function oddsStats(results: RetirementResults, inputs: RetirementInputs, mode: DollarDisplayMode): StatSpec[] {
+  return retirementHeadline(results, inputs, mode)
     .filter((stat) => stat.id in CARD_LABELS)
     .map((stat) => ({
       ...stat,
@@ -107,7 +109,10 @@ interface OddsFiguresProps {
 }
 
 function OddsFigures({ results, inputs, lever }: OddsFiguresProps) {
-  const stats = oddsStats(results, inputs);
+  // Display only: the shared today's / future dollars preference, at the
+  // profile's own inflation rate (the retirement calculator's basis).
+  const dollars = useDollarDisplay(inputs.inflationRate);
+  const stats = oddsStats(results, inputs, dollars.mode);
   const success = stats.find((stat) => stat.id === 'success');
   const successText = formatStatValue(success?.value ?? null, 'percent');
 
@@ -122,7 +127,10 @@ function OddsFigures({ results, inputs, lever }: OddsFiguresProps) {
           {formatPercent(lever.successProbability)}
         </span>{' '}
         and the projected balance to{' '}
-        <span className="tabular-nums">{formatCurrency(lever.projectedBalanceToday)}</span> (same simulated markets).
+        <span className="tabular-nums">
+          {formatCurrency(dollars.fromNominal(lever.projectedBalance, lever.yearsToRetirement))}
+        </span>{' '}
+        {dollars.chartCaption} (same simulated markets).
       </p>
     </div>
   );

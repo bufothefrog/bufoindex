@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useRevealInputs } from '@/components/ui/layouts/CalculatorLayout';
 import { KeyValueList } from '@/components/ui/results';
 import { monthlyToPaycheck } from '@/lib/calculations/core';
 import { limitHsa, limitIra } from '@/lib/calculations/contributionLimits';
@@ -71,11 +72,30 @@ const URGENCY: Readonly<Record<Urgency, { heading: string; badge: string; tone: 
 
 const URGENCY_ORDER: readonly Urgency[] = ['critical', 'important', 'optimization'];
 
-/** Scrolls the calculator's input section for a form screen into view. */
-function scrollToScreen(screenId: string) {
+/**
+ * Scrolls the calculator's input section for a form screen into view and
+ * moves focus to it, so keyboard and screen-reader users land there too.
+ * With a sticky tab bar over the viewport (topInset, the phone layout) the
+ * section stops just below the bar, so its heading stays visible.
+ */
+function focusScreen(screenId: string, topInset = 0) {
   const title = PAYCHECK_FORM.screens.find((screen) => screen.id === screenId)?.title;
   if (!title) return;
-  document.querySelector(`section[aria-label="${title}"]`)?.scrollIntoView({ behavior: 'smooth' });
+  const section = document.querySelector<HTMLElement>(`section[aria-label="${title}"]`);
+  if (!section) return;
+  const reduceMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const behavior: ScrollBehavior = reduceMotion ? 'auto' : 'smooth';
+  if (topInset > 0) {
+    window.scrollTo({ top: section.getBoundingClientRect().top + window.scrollY - topInset, behavior });
+  } else {
+    section.scrollIntoView({ behavior });
+  }
+  // A section is not focusable by default; -1 lets a script focus it without
+  // adding it to the tab order.
+  if (!section.hasAttribute('tabindex')) section.setAttribute('tabindex', '-1');
+  section.focus({ preventScroll: true });
 }
 
 /** The actions for the current situation, most urgent first, then by monthly value. */
@@ -211,6 +231,7 @@ interface ActionCardProps {
 
 function ActionCard({ action }: ActionCardProps) {
   const titleId = useId();
+  const revealInputs = useRevealInputs();
   const Icon = action.icon;
   const { tone, badge } = URGENCY[action.urgency];
 
@@ -264,7 +285,7 @@ function ActionCard({ action }: ActionCardProps) {
               ]}
             />
 
-            <Button onClick={() => scrollToScreen(action.screen)} className="w-full text-sm" size="sm">
+            <Button onClick={() => revealInputs(({ topInset }) => focusScreen(action.screen, topInset))} className="w-full text-sm" size="sm">
               <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
               {action.actionLabel}
               <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
