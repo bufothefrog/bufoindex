@@ -7,7 +7,17 @@ commit each:
     b69ffe3 s2-retirement-side-engines-and-titles: coast, breakeven and savings curve honor timing; titles follow the dollar mode
     8085f88 s3-leverage-start-of-year: monthly against the same yearly amount at the start of each year, lump sum removed
     d3b3927 s4-allocator-and-projection: single emergency step, neutral engine texts, invested net worth, effective monthly rate
-    (s5)    s5-docs-and-end-to-end: methodology entry, architecture notes, this note and the end-to-end test
+    268df5b s5-docs-and-end-to-end: methodology entry, architecture notes, this note and the end-to-end test
+
+Fixes after review (one commit per area):
+
+    5f80909 contribution schedule: negative horizon keeps the ec300fd value; residue test with a real residue
+    cce8cbd allocator step card: the transfer figure is the funded amount
+    6be3ba4 allocator notes: a funded emergency step is not also listed as deprioritized
+    19417d8 paycheck projection: extra debt principal earns the debt rate only until the balance is paid
+    7dc30cb leverage texts: no timing attribution for a 0.0-point difference or a zero contribution
+    f27ccd5 list card layout: the header wraps on a narrow screen
+    6c1bdef methodology: the contribution timing formula in three rows
 
 package.json and package-lock.json are unchanged; no new dependency. The stored profile version stays 3: a profile stored at ec300fd loads
 with three 'monthly' timing leaves and the same provided list. docs/architecture.md, sections "Contribution timing" and "Paycheck
@@ -74,9 +84,30 @@ Default = getDefaultFinancialProfile, nothing touched; today's dollars at 3%. Ow
 | Zero-cash default | '1-Month Emergency Fund' ($1,973 more needed), critical | 'Emergency Fund' ($7,973 more needed), important | one emergency step |
 | Zero cash + 24% card (8,000, min 200) | starter step 1,026.92 only | 'Card (24%)' 934.62, then 'Emergency Fund' 92.31 ($8,908 more needed) | one step + known limit |
 | 20-year debt cost, 100 a month at 3% | 8,830.20 | 8,685.44 | convention |
+| Zero cash, below one month, target 0 months | one-month step funded anyway | no emergency step; the money flows to the later steps | one emergency step (0 target never reads as funded) |
+| Below one month, employer match not filled | one-month step first | the match is funded before the emergency fund | one emergency step, after the match |
+| Below one month, target above one month, money left after one month | one-month step, then HSA, Roth IRA, 401(k), taxable | the emergency step can take up to the whole remaining target, starving the later steps (pinned in core.test.ts) | one emergency step |
+| Zero-cash default, Emergency Fund card, How to Implement | (starter card) | 'Set automatic transfer for $2,225/month' (the funded amount; the build first printed $750, the target gap / 12) | review fix |
+| Zero cash (Z, ZD), Notes on This Allocation | 'Deprioritized: Insufficient Emergency Fund' | not listed when the emergency step is funded on the same page | review fix |
+| Zero cash + 24% card, 10-year nominal (today's) | ec300fd: current 155,753 today; optimized 492,992 (366,833); improvement 283,673 (211,079) | current 249,394.38 (185,573); optimized 587,341.00 (437,037); improvement 337,946.62 (251,464). The build first showed optimized 1,090,910.44 (811,740), improvement 841,516 (626,167) | review fix: debt principal earns 24% only until the 8,000 is paid (3.95 months), then 7% |
+| Any visitor with a debt_payoff allocation, 10-year optimized | the extra principal compounds at the debt rate for ten years | the debt rate only until the payments cover the highest-rate debt's balance, then 7%; e.g. default cash + 24% card (8,000): optimized 1,113,485.96 -> 609,916.53 nominal | review fix (the rule was already there at ec300fd) |
 
 Also visible, not in the contract table: the Optimization Progress bar counts change with the starter step gone ('3 of 6' becomes '2 of 5'
-for the default); the methodology page counts 11 formulas instead of 10.
+for the default); the methodology page counts 11 formulas instead of 10. The savings-rate caption ('Your current savings rate is X%.
+Retiring at N needs about Y%.') can round to a different whole percent for some inputs (about 1 in 9 in a seeded sample) as a result of the
+convention change; the default sentence is unchanged.
+
+The contract's section 10 sentence "For a visitor below one month without high-interest debt, the amount and category are unchanged" does
+not hold for the three allocator classes in the table above (target 0, unfilled match, target above one month with money left over); the
+code follows the section 8 rule as written.
+
+Unchanged after review: a "Work until age X" scenario whose age falls below the current age (custom profile, falling short) shows the
+ec300fd balance; the build had shown the starting balance there (165,764.68 against 364,246 in the pinned case, retirement.test.ts).
+
+Review fixes with wording only: on the leverage card, a monthly contribution of 0 gives one sentence that the two timings are the same, and
+a difference that prints as 0.0 points says the gaps are the same to one decimal place instead of attributing it to timing. A complete
+1-month fund reads '(1 month)'. The step and opportunity cards' header row wraps at narrow widths, so the figures drop below the title.
+The methodology Contribution Timing formula is three rows so it fits 360 px (other formulas on that page are wider and unchanged).
 
 Pinned in test/lib/calculators/contributionTiming.test.ts (the end-to-end test): an ec300fd payload builds the ec300fd engine inputs of
 every calculator, plus yearStartSavings 0 (retirement) and preferences.investedBalance 25,000 (paycheck); the default projection is
@@ -106,7 +137,9 @@ the minimum payment already needs. Fixing it would move allocations for every vi
 2. Wording and placement: 'Start of each year', 'Once a year, at the start: $X', the controls on the Monthly investing card. Default: as built.
 3. Should the leverage headline follow a taxable timing of once a year? Default: always monthly, start of each year only as row 2.
 4. Without a starter fund, where should the emergency step sit for someone with little cash? Default: after the match and high-interest
-   debt. Related: the known limit above; no emergency card is 'critical' any more; QuickActions still describes cash under one month.
+   debt. Related: the known limit above; no emergency card is 'critical' any more; QuickActions still describes cash under one month
+   ('Emergency Fund Below One Month of Expenses', 'Time to implement 3-6 months'), so a visitor at 1.5 months sees no QuickAction while
+   the step card reads 'Building emergency fund'; comparing against the target months instead is left to this question.
 5. Should the 3-month cash cap (CASH_MONTHS_CAP, analysis.ts) rise to 6? Default: unchanged.
 6. Should the under-30 Roth rule and the 12/12 gives Roth rule change? Default: rules unchanged, texts print both brackets.
 7. Should 'start of the year' follow the calendar? Default: the run's first day, with the error stated on the methodology page.
