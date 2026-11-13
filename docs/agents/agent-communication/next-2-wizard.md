@@ -19,7 +19,9 @@ Commits (git log --oneline 6291ddf..HEAD):
 - 8d7118b b2-skip-or-next
 - a4f6abc b3-optional-section
 - 9ae614f b4-review-page
-- this note
+- a45e3de this note (first version)
+- review fixes: e84faba b1, c46dcbe b2, e92e82a b3, e417860 b4
+- this note (updated for the review fixes)
 
 ## What changed per slice
 
@@ -41,7 +43,14 @@ Commits (git log --oneline 6291ddf..HEAD):
 - Unanswered fields show empty with the typical value as a grey placeholder.
   Next takes the typical value; Skip keeps it unmarked.
 - Each Next and Skip saves through the helpers in wizardProgress.ts, so leaving
-  mid-flow keeps confirmed answers.
+  mid-flow keeps confirmed answers. The save is built from confirmedProfile
+  (the arrival profile plus each answered screen's values as the visitor left
+  it with Next, in form order), so an edit on an earlier screen that was not
+  confirmed again with Next is neither saved nor fed to the derived writes.
+- Skip reverts and unmarks the screen's visible paths, its coupled writes and
+  the paths it gave when it was answered (fields hidden since by a toggle).
+- A blank percent field with a slider puts the slider and its readout at the
+  typical value (the minimum when there is none), not at 0.
 - Input primitives gain value null, placeholderValue, showZero and onClear.
 
 ### b3-optional-section
@@ -78,7 +87,7 @@ Commits (git log --oneline 6291ddf..HEAD):
 | Paycheck, HSA section | notes: three tax advantages; limit per year/month; reimbursement timing; held as investment; HSA and Roth compared | removed |
 | Paycheck, taxable accounts | note: "Taxable accounts: No contribution limits..." | removed |
 | HSA coverage options | "Individual ($X limit)" / "Family ($Y limit)" | "Individual" / "Family" |
-| Monthly HSA contribution | no limit line | "Up to $X a year ($Y a month)." |
+| Monthly HSA contribution | no limit line | "Up to $X a year with employer money ($Y a month)." |
 | Paycheck, age | "Used for catch-up contribution eligibility" | none |
 | Paycheck, must-pay | "Rent, utilities, groceries, minimum debt payments, insurance, etc." | none |
 | Paycheck, fun money screen | "Spending on things you enjoy, beyond the must-pay costs. A range is fine." | none |
@@ -87,7 +96,8 @@ Commits (git log --oneline 6291ddf..HEAD):
 | Employer match rate | "What your employer adds per dollar you contribute. 50% means 50 cents per dollar." | "Per dollar you contribute; 50% means 50 cents." |
 | Match limit | "In "50% of the first 6%", this is the 6%." | "The 6% in "50% of the first 6%"." |
 | 401(k) share | "The share of each paycheck you put into the plan, all types together." | "Share of pay, all types together." |
-| Roth share | "The rest of your contribution is traditional (pre-tax). A Roth part above the total counts as the whole contribution." | "Share of the total; the rest is traditional." |
+| Roth share | "The rest of your contribution is traditional (pre-tax). A Roth part above the total counts as the whole contribution." | "Percent of pay; the rest is traditional." |
+| 401(k) contribution type (wizard and paycheck page) | "Traditional reduces taxable income now, Roth is tax-free in retirement" | none |
 | Emergency fund months | "Months of expenses to save (typically 3-6)" | "Months of expenses to hold in cash." |
 | Retirement tax bracket | "The federal bracket you expect when you withdraw, weighed against the 22% bracket the allocator uses today." | "Federal bracket you expect when withdrawing, compared with today's 22%." |
 | Fixed 22% note | "Tax savings in this allocator use a fixed 22% federal bracket plus one 2026 rate for your state. Brackets are not calculated from your income." | "Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income." |
@@ -99,14 +109,16 @@ Commits (git log --oneline 6291ddf..HEAD):
 | Portfolio, accounts screen | "List each account you invest through and the new cash going into it." | none |
 | Portfolio, holdings screen | "A ticker, its current price and your shares. Prices are taken as current and executable." | "Prices are taken as current and executable." |
 | Portfolio, new cash | "Money you are ready to put into your accounts now." | "Money to invest now." |
-| Portfolio, share rounding | "Floor to integers; leftover kept as cash." / "Exact-to-penny splits. Requires broker support." | "Rounds down; leftover stays as cash." / "Exact amounts to the penny." |
-| Leverage, starting balance | "What you already have invested. A rough number is fine." and "Already invested at month 0. Use 0 to compare contributions only." | "Invested at month 0; 0 compares contributions only." |
+| Portfolio, share rounding | "Floor to integers; leftover kept as cash." / "Exact-to-penny splits. Requires broker support." | "Rounds down; leftover stays as cash." / "Exact amounts; your broker must allow fractions." |
+| Leverage, starting balance | wizard: "What you already have invested. A rough number is fine."; calculator page: "Already invested at month 0. Use 0 to compare contributions only." | wizard: "Money already invested; 0 compares contributions only."; calculator page: "Invested at month 0; 0 compares contributions only." |
+| Leverage, financing rate | "Short-term rate plus a swap spread, charged on the extra (L - 1) exposure." | "Short-term rate plus swap spread, charged on the extra (L-1) exposure." |
+| Profile, leverage-ratio screen | "The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions." | none |
 | Leverage, monthly amount | "Invested at the start of every month, in both funds." | "Added at each month's start, to both funds." |
 | Leverage, years | "N to M years of monthly contributions." | "N to M years." |
 | Leverage, ratio | "Compared against a plain index fund receiving the same dollars on the same dates." (and the 1x variant) | at 1x only: "At 1x, the funds differ only in expense ratio."; otherwise none |
 | Leverage, volatility | "The Lx fund's volatility is about Lx this figure." | removed |
 | Leverage, screens | timing/basis description; assumptions description; note on simulated paths and seed | removed |
-| Retirement, age to live to / SS benefit / claiming age / healthcare | "Age you expect to live to"; "Annual benefit estimate"; "When to claim benefits"; "Override estimated annual cost" plus hints | one line each: SS "A yearly amount; ssa.gov/myaccount shows your estimate."; claiming "Between 62 and 70."; healthcare "Premiums plus out-of-pocket costs for a year." |
+| Retirement, age to live to / SS benefit / claiming age / healthcare | "Age you expect to live to"; "Annual benefit estimate"; "When to claim benefits"; "Override estimated annual cost" plus hints | age to live to: none; one line each: SS "A yearly amount; ssa.gov/myaccount shows your estimate."; claiming "Between 62 and 70."; healthcare "Premiums plus out-of-pocket costs for a year." |
 | Retirement, spending | "Think about what you would spend per year; many people start near 70-80% of current income." | none |
 | Retirement, other | "Essential monthly expenses" help on must-pay; "Estimates in today's dollars are fine."; TDF help sentence; "Custom: Set your own values" | none; "Amounts are in today's dollars."; none; "Custom" |
 | Retirement, return/volatility/inflation | longer helps (dash text on today's-dollars view; "in the Monte Carlo draws"; "Grows spending in the simulation ...") | "Nominal (before inflation) annual return while saving"; "Annual standard deviation of returns"; none |
@@ -129,7 +141,16 @@ accounts-screen line; the retirement spending and TDF helps.
   grey placeholder. Next takes it; Skip leaves it unmarked.
 - On the three basics (core) screens Next with a blank field shows a message
   asking for the visitor's own entry.
-- Answers are saved on every Next and Skip.
+- Answers are saved on every Next and Skip, confirmed values only.
+- Wizard header line: core "Every calculator shares these answers, so you only
+  give them once." becomes "Every calculator uses these answers."; the intent
+  line "Everything this calculator uses, a few related questions per screen."
+  and the /start/profile line "Just the questions your profile still needs."
+  are removed.
+- A blank percent slider's readout shows the typical value (for example
+  inflation "3.0%"), not "0.0%".
+- Slider-kind fields (for example the healthcare cost multiplier) still show
+  their typical value on an unanswered screen; see the open questions below.
 
 ### Optional section (b3)
 - /start/retirement: "Step 1 of 4" to "Step 4 of 4" becomes "Step 1 of 3" to
@@ -154,7 +175,9 @@ accounts-screen line; the retirement spending and TDF helps.
   with a link to change any topic. Runs in your browser."
 - /start/review/<topic>: eyebrow "Review your answers", h1 the section label, the
   topic's fields, "Cancel" link and "Save" button ("Saving" while it works).
-  Save returns to /start/review#topic-<id> and focuses that row.
+  Save returns to /start/review#topic-<id> and focuses that row. The muted
+  line names Save: "Grey values are typical. Save uses them for anything left
+  blank."; on an example list "This is an example. Change it to match yours."
 - Dashboard card button "Review all answers" becomes "Review your answers".
   Chooser footnote: "To change a saved answer, review all answers." becomes
   "To see or change a saved answer, review your answers."
@@ -175,22 +198,35 @@ accounts-screen line; the retirement spending and TDF helps.
   section. The benefit stays a plain number (default 30000).
 - A link to the Optional section from the dashboard card when required topics
   are done: today it is reachable through /start/review and /start/profile.
-- docs/redesign-guided-flow.md and docs/architecture.md do not yet mention
-  ScreenSpec.optional or the Optional profile section.
-- The test title "counts the profile screens from the forms (14, 13 without a
-  401(k), ...)" in test/lib/constants/intake.test.ts names stale counts; its
-  assertions are derived and pass.
 - The b3 commit alone leaves Wizard.test.tsx, LearnChooser.test.tsx and
   OverviewDashboard.test.tsx at their old text, since their edits for both
   slices sit in the b4 commit. The tree at HEAD is green.
 
+## Open questions from the review (not changed; for the orchestrating session)
+- Save on an unanswered optional topic (/start/review/ss-healthcare) with
+  nothing typed marks the Social Security benefit, claiming age and healthcare
+  cost as answered with their typical values, as Next does. Should Save on a
+  review topic store only the fields the visitor touched?
+- Slider-kind fields are not blanked on unanswered wizard screens (FieldDisplay
+  in components/fields/FieldInput.tsx says slider fields ignore it). Should
+  they show no value until the visitor moves them?
+- Review rows use the screen question where a screen has one and the title
+  otherwise, so the list reads unevenly. Should each screen get a short title
+  for the review rows?
+- The placeholder grey is the same token in dark mode (3.81:1 on the dark
+  background, above the 3:1 large-text threshold at text-2xl). A lighter
+  dark-mode placeholder token is optional.
+
 ## What the next PRs must know
 - The optional rule is ScreenSpec.optional; the review page recognises an
   optional topic by the section id "optional" (OPTIONAL_SECTION in
-  lib/calculators/profileReview.ts). Rename both together.
+  lib/calculators/profileReview.ts), a section built from ScreenSpec.optional.
+  Rename both together.
+- saveWrites (components/guided/wizardProgress.ts) takes the form's screens as
+  its last argument, the order confirmedProfile applies answered screens in.
 - Wizard has an onlyScreen prop (single-screen mode used by /start/review/[screen]).
 - Profile completeness is out of 16, not 17; tests derive counts from the forms.
 - PR 3 changes default values and may make the benefit and healthcare cost
   nullable; the optional screen and the review summaries read profile.provided.
 - Gates at this commit: type-check, lint --max-warnings=0, test:coverage (119
-  files, 2628 tests, thresholds hold), Node 24 suite (same counts), build.
+  files, 2634 tests, thresholds hold), Node 24 suite (same counts), build.
