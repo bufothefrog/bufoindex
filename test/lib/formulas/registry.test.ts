@@ -27,6 +27,7 @@ import {
   runMonteCarloSimulation,
   type RetirementInputs,
 } from '@/lib/calculations/retirement'
+import { scheduleFutureValue } from '@/lib/calculations/contributionSchedule'
 import { estimateSocialSecurityBenefit } from '@/lib/calculations/socialSecurityEstimate'
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random'
 import { RetirementConstants } from '@/lib/constants/retirement'
@@ -89,6 +90,7 @@ const ENGINE_BY_FUNCTION_NAME: Record<
   futureValue: (i) => futureValue(i.PV, i.r, i.t),
   presentValue: (i) => presentValue(i.FV, i.r, i.t),
   futureValueOfAnnuity: (i) => futureValueOfAnnuity(i.PMT, i.r, i.t),
+  scheduleFutureValue: (i) => scheduleFutureValue({ monthly: i.m, yearStart: i.Y }, i.r, 12 * i.n),
   calculateRequiredBalance: (i) =>
     calculateRequiredBalance(i.targetIncome, i.withdrawalRate),
   calculateSocialSecurityBenefit: (i) =>
@@ -120,6 +122,7 @@ describe('formula registry <-> calculation engine consistency', () => {
     const ids = retirementEntries.map((f) => f.id).sort()
     expect(ids).toEqual([
       'retirement-annual-healthcare-cost-in-retirement',
+      'retirement-contribution-timing',
       'retirement-future-value-of-investment',
       'retirement-future-value-of-ordinary-annuity',
       'retirement-monte-carlo-success-probability',
@@ -217,6 +220,27 @@ describe('engine functions match the published LaTeX on hand-computed fixtures',
     // The closed form divides by r, so r = 0 takes the linear branch:
     // 24 payments of $500 with no growth = $12,000 exactly.
     expect(futureValueOfAnnuity(500, 0, 24)).toBe(12000)
+  })
+
+  it('scheduleFutureValue implements the contribution timing formula (E2: the same 1,200 a year, two timings)', () => {
+    // Once a year at the start, 10%, 3 years: 1,200 x (1.1^3 + 1.1^2 + 1.1)
+    // = 1,200 x (1.331 + 1.21 + 1.1) = 4,369.20.
+    expect(scheduleFutureValue({ monthly: 0, yearStart: 1200 }, 0.1, 36)).toBeCloseTo(4369.2, 6)
+    // The same dollars monthly: i = 1.1^(1/12) - 1 = 0.007974140428903764,
+    // 100 x (1.331 - 1) / i = 4,150.917618659306.
+    expect(scheduleFutureValue({ monthly: 100, yearStart: 0 }, 0.1, 36)).toBeCloseTo(4150.917618659306, 6)
+    // Mixed (E3): 60 a month plus 480 a year at 8% over 3 years:
+    // 2,421.922144 + 480 x (1.259712 + 1.1664 + 1.08) = 4,104.855904.
+    expect(scheduleFutureValue({ monthly: 60, yearStart: 480 }, 0.08, 36)).toBeCloseTo(4104.855904, 5)
+    const entry = retirementEntries.find((f) => f.id === 'retirement-contribution-timing')!
+    // The page's comparison figure is text only (ExampleData holds one output).
+    expect(entry.example.explanation).toContain('$4,150.92')
+    expect(entry.example.explanation).toContain('$4,369.20')
+  })
+
+  it('the annuity entry states the monthly-rate convention', () => {
+    const entry = retirementEntries.find((f) => f.id === 'retirement-future-value-of-ordinary-annuity')!
+    expect(entry.assumptions.join(' ')).toContain('i = (1 + r)^(1/12) - 1')
   })
 
   it('calculateRequiredBalance implements Income / SWR', () => {

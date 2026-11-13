@@ -573,6 +573,8 @@ Modeling requirements that follow from this:
   DCA, compared with leveraged lump sum minus index lump sum on the same
   total dollars, so the reader can see how much of the advantage is the
   contribution pattern versus the leverage itself.
+  (Since PR 5 the built card compares monthly contributions with the same
+  yearly amount invested at the start of each year, not a lump sum.)
 - Inputs that matter here and nowhere else: contribution growth rate
   (raises with income), whether contributions pause in a drawdown (the
   behavioral failure mode the automation section exists to prevent), and
