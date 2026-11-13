@@ -55,6 +55,9 @@ describe('RetirementCalculator', () => {
     ]) {
       expect(screen.getByRole('region', { name: title })).toBeInTheDocument();
     }
+    // Monthly investing on Auto names the figure once.
+    const monthly = screen.getByRole('region', { name: 'Monthly investing' });
+    expect(within(monthly).getByText(/^From your answers/)).toHaveTextContent(/^From your answers: \$1,540$/);
     expect(screen.queryByRole('button', { name: /Calculate/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Methodology' })).toHaveAttribute(
       'href',

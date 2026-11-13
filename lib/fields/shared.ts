@@ -207,7 +207,8 @@ export const MONTHLY_INVESTING: FieldSpec = {
   label: 'Monthly investing',
   min: 0,
   nullable: {
-    autoLabel: (get) => `From your answers: ${formatCurrency(monthlyInvestingAuto(get))} a month`,
+    // NullableField appends ": <amount>" to the Auto label, so the label does not carry it.
+    autoLabel: 'From your answers',
     overrideDefault: (get) => monthlyInvestingAuto(get),
   },
   tier: 'details',
@@ -315,7 +316,7 @@ export const ACCOUNTS: FieldSpec = {
       tier: 'details',
       testId: 'account-name-{i}',
     },
-    { path: 'balance', kind: 'money', label: 'Balance', min: 0, hint: "Today's balance.", tier: 'details' },
+    { path: 'balance', kind: 'money', label: 'Balance', min: 0, tier: 'details' },
     {
       path: 'holdsEmergencyFund',
       kind: 'boolean',

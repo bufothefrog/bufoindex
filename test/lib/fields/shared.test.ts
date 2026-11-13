@@ -157,11 +157,11 @@ describe('the account list and monthly investing (profile v3)', () => {
       addLabel: 'Add account',
     });
     expect(ACCOUNTS.covers).not.toContain('portfolio.newCash');
-    // Only the balance carries a line of text: its hint.
+    // No row field carries a line of text: the renderer draws none.
     expect(ACCOUNTS.row!.map((row) => [row.path, row.help, row.hint])).toEqual([
       ['kind', undefined, undefined],
       ['name', undefined, undefined],
-      ['balance', undefined, "Today's balance."],
+      ['balance', undefined, undefined],
       ['holdsEmergencyFund', undefined, undefined],
     ]);
   });
@@ -178,10 +178,10 @@ describe('the account list and monthly investing (profile v3)', () => {
     );
   });
 
-  it('runs monthly investing on Auto from the contribution answers, with the figure in the label', () => {
+  it('runs monthly investing on Auto from the contribution answers; the field appends the figure to the label', () => {
     expect(MONTHLY_INVESTING.label).toBe('Monthly investing');
     expect(MONTHLY_INVESTING.help).toBeUndefined();
-    expect(resolveText(MONTHLY_INVESTING.nullable!.autoLabel, fromDefaults())).toBe('From your answers: $1,540 a month');
+    expect(resolveText(MONTHLY_INVESTING.nullable!.autoLabel, fromDefaults())).toBe('From your answers');
     expect((MONTHLY_INVESTING.nullable!.overrideDefault as (get: Get) => number)(fromDefaults())).toBe(1540);
   });
 
