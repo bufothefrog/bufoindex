@@ -79,17 +79,20 @@ export function growOneYear(balance: number, annualRate: number, s: Contribution
  * END of each month plus the yearly part at the START of each year. With
  * k = floor(M / 12) whole years and q = M - 12k months left, the yearly
  * amount of the final partial year is prorated (yearStart x q / 12) and lands
- * at month 12k. 0 for M <= 0 or a non-finite M.
+ * at month 12k. 0 for a non-finite M. For M <= 0 only the monthly part
+ * counts, through the same annuity expression the engines used before the
+ * schedule existed (negative for a negative M, as a "work until" age below
+ * the current age gave at ec300fd); the yearly part adds nothing.
  */
 export function scheduleFutureValue(s: ContributionSchedule, annualRate: number, months: number): number {
-  if (!Number.isFinite(months) || months <= 0) return 0;
+  if (!Number.isFinite(months)) return 0;
   const i = monthlyRateOf(annualRate);
   const monthlyTerm = i === 0 ? s.monthly * months : s.monthly * ((Math.pow(1 + i, months) - 1) / i);
-  if (!(s.yearStart > 0)) return monthlyTerm;
+  if (!(s.yearStart > 0) || months <= 0) return monthlyTerm;
   const k = Math.floor(months / 12);
   const q = months - 12 * k;
   const r = annualRate;
-  const whole = r === 0 ? s.yearStart * k : s.yearStart * (1 + r) * ((Math.pow(1 + r, k) - 1) / r);
+  const whole = i === 0 ? s.yearStart * k : s.yearStart * (1 + r) * ((Math.pow(1 + r, k) - 1) / r);
   const partial = q > 0 ? s.yearStart * (q / 12) : 0;
   return monthlyTerm + (whole + partial) * Math.pow(1 + i, q);
 }
@@ -98,12 +101,12 @@ export function scheduleFutureValue(s: ContributionSchedule, annualRate: number,
  * Future value per monthly-equivalent dollar when a share f (clamped 0..1,
  * NaN read as 0) lands at the start of each year. Solvers divide by it.
  * f = 0 is the ordinary annuity factor ((1 + i)^M - 1) / i (M at i = 0),
- * in that exact operation order.
+ * in that exact operation order, negative for a negative M as before.
  */
 export function scheduleFactor(annualRate: number, months: number, yearStartShare: number): number {
   const f = Number.isFinite(yearStartShare) ? Math.min(1, Math.max(0, yearStartShare)) : 0;
   if (f === 0) {
-    if (!Number.isFinite(months) || months <= 0) return 0;
+    if (!Number.isFinite(months)) return 0;
     const i = monthlyRateOf(annualRate);
     return i === 0 ? months : (Math.pow(1 + i, months) - 1) / i;
   }

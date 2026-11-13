@@ -1254,6 +1254,24 @@ describe('contribution timing: the yearly part (yearStartSavings)', () => {
     const base = makeInputs({ startingAge: 30, retirementAge: 33, startingBalance: 0, accumulationReturn: 0.1, riskProfile: 'custom' })
     expect(calculateProjectedBalance({ ...base, monthlySavings: 100, yearStartSavings: 5000 })).toBeCloseTo(4369.2, 8)
   })
+
+  it('a "work until" age below the current age keeps the ec300fd balance (custom, all monthly)', () => {
+    // maxAge = min(49 - 5, 75) = 44 < startingAge 47, so the scenario runs over -3 years.
+    // At a 0% return: 364,246 + 5,513.37 x (-36) = 364,246 - 198,481.32 = 165,764.68, as at ec300fd.
+    const inputs = makeInputs({
+      startingAge: 47,
+      retirementAge: 49,
+      lifeExpectancy: 49,
+      riskProfile: 'custom',
+      accumulationReturn: 0,
+      monthlySavings: 5513.37,
+      startingBalance: 364246,
+    })
+    expect(calculateProjectedBalance({ ...inputs, retirementAge: 44 })).toBeCloseTo(165764.68, 6)
+    const reality = calculateRetirementAnalysis(inputs).scenarios.find((s) => s.id === 'reality-age')
+    expect(reality?.name).toBe('Work until age 44')
+    expect(reality?.projectedBalance).toBeCloseTo(165764.68, 6)
+  })
 })
 
 describe('calculateMinimumSavingsNeeded (E16)', () => {

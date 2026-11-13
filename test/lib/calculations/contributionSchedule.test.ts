@@ -55,10 +55,19 @@ describe('splitSchedule (E5)', () => {
   });
 
   it('gives exactly 0 monthly for an all-yearly rounded total', () => {
-    // 12 x 333.33 = 3,999.96, the cap; 333.33 - 3,999.96 / 12 is a floating residue, read as 0.
+    // 12 x 333.33 = 3,999.96, the cap; 333.33 - 3,999.96 / 12 is exactly 0 in doubles (no residue).
     const s = splitSchedule(333.33, 4000);
     expect(s.monthly).toBe(0);
     expect(s.yearStart).toBeCloseTo(3999.96, 9);
+  });
+
+  it('reads a real floating residue of an all-yearly total as exactly 0', () => {
+    // 693.33 - 8,319.96 / 12 is 1.1368683772161603e-13 in doubles, not 0; the 1e-9 rule makes it 0.
+    expect(693.33 - 8319.96 / 12).not.toBe(0);
+    expect(splitSchedule(693.33, 8319.96).monthly).toBe(0);
+    // 2,165.01 - 25,980.12 / 12 is 4.547473508864641e-13.
+    expect(2165.01 - 25980.12 / 12).not.toBe(0);
+    expect(splitSchedule(2165.01, 25980.12)).toEqual({ monthly: 0, yearStart: 25980.12 });
   });
 });
 
@@ -115,9 +124,25 @@ describe('scheduleFutureValue', () => {
 
   it('is 0 for zero, negative or non-finite months, and for a zero schedule', () => {
     expect(scheduleFutureValue({ monthly: 100, yearStart: 1200 }, 0.1, 0)).toBe(0);
-    expect(scheduleFutureValue({ monthly: 100, yearStart: 1200 }, 0.1, -12)).toBe(0);
     expect(scheduleFutureValue({ monthly: 100, yearStart: 1200 }, 0.1, NaN)).toBe(0);
     expect(scheduleFutureValue(splitSchedule(0, 0), 0.08, 36)).toBe(0);
+  });
+
+  it('keeps the ec300fd annuity value for a negative horizon; the yearly part adds nothing', () => {
+    // A "work until" age below the current age: M = -12 at 10%.
+    // 100 x (1.1^-1 - 1) / i10 = 100 x (-0.0909091 / 0.00797414) = -1,140.0488.
+    expect(scheduleFutureValue({ monthly: 100, yearStart: 0 }, 0.1, -12)).toBeCloseTo(-1140.0488, 4);
+    expect(scheduleFutureValue({ monthly: 100, yearStart: 1200 }, 0.1, -12)).toBeCloseTo(-1140.0488, 4);
+    expect(scheduleFutureValue({ monthly: 0, yearStart: 1200 }, 0.1, -12)).toBeCloseTo(0, 12);
+    // Zero rate: 100 x -12.
+    expect(scheduleFutureValue({ monthly: 100, yearStart: 0 }, 0, -12)).toBe(-1200);
+    // The solver factor follows: (1.1^-1 - 1) / i10 = -11.400488.
+    expect(scheduleFactor(0.1, -12, 0)).toBeCloseTo(-11.400488, 6);
+  });
+
+  it('treats a rate too small to move 1 + r as zero for the yearly part too', () => {
+    // 1 + 1e-17 === 1, so i = 0: 1,200 x 3 years = 3,600, as the month-by-month loop gives.
+    expect(scheduleFutureValue({ monthly: 0, yearStart: 1200 }, 1e-17, 36)).toBe(3600);
   });
 });
 
