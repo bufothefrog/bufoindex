@@ -41,8 +41,6 @@ import {
   STANDARD_DEDUCTIONS_2026,
   FEDERAL_TAX_BRACKETS_2026,
 } from '@/lib/constants/irs-2026'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 
 /**
  * Helper: produce a deterministic, typical-case set of retirement inputs

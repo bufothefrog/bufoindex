@@ -19,8 +19,6 @@ import {
   FREQUENCY_MULTIPLIERS
 } from '@/lib/calculations/core'
 import type { PaycheckProfile } from '@/lib/types'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 import { createPaycheckProfile, createDebtData } from '@/test/factories/test-data-factory'
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition'
 import { engineInputsFor } from '@/lib/calculators/runtime'

@@ -22,8 +22,6 @@ import {
   createEmployerBenefits,
   createDebtData,
 } from '@/test/factories/test-data-factory'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 
 /** Find a skipped item by id, or undefined. */
 function findItem(items: SkippedItem[], id: string): SkippedItem | undefined {
