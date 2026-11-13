@@ -15,7 +15,7 @@ import {
   calculateTaxableInvestment
 } from './optimization';
 import { identifySkippedOptimizations } from './analysis';
-import { calculateProjections, calculateOptimizationScore } from './projections';
+import { calculateProjections } from './projections';
 
 /**
  * Paycheck frequency conversion utilities
@@ -168,14 +168,10 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   // Step 4: Calculate future projections
   const projections = calculateProjections(updatedProfile, allocations);
 
-  // Step 5: Calculate optimization score
-  const optimizationScore = calculateOptimizationScore(updatedProfile, allocations, skippedItems);
-  
   return {
     allocations,
     skippedItems,
     projections,
-    optimizationScore,
     funMoneyAllocated: minFunMoneyMonthly, // Keep monthly for compatibility
     funMoneyRange: {
       min: minFunMoneyMonthly,

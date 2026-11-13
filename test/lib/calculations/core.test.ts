@@ -375,7 +375,6 @@ describe('Core Paycheck Optimization', () => {
       expect(Array.isArray(allocation.allocations)).toBe(true)
       expect(allocation.skippedItems).toBeDefined()
       expect(allocation.projections).toBeDefined()
-      expect(allocation.optimizationScore).toBeDefined()
       expect(allocation.funMoneyAllocated).toBe(mockProfile.preferences.funMoney.min)
       expect(allocation.remainingAmount).toBeGreaterThanOrEqual(0)
     })
@@ -897,7 +896,6 @@ describe('the single emergency step on the site default profile', () => {
       ['Taxable Investment', 116.15],
     ])
     expect(result.remainingAmount).toBeCloseTo(0, 9)
-    expect(result.optimizationScore.overall).toBe(80)
   })
 
   it('E12, zero cash: Emergency Fund 1,026.92 toward the 3-month fund, 7,973 more needed', () => {

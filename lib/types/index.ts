@@ -174,23 +174,10 @@ export interface ProjectionData {
   };
 }
 
-export interface OptimizationScore {
-  overall: number; // 0-100
-  breakdown: {
-    taxEfficiency: number;
-    employerBenefits: number;
-    debtStrategy: number;
-    emergencyFundSize: number;
-    accountPrioritization: number;
-  };
-  comparison: number; // Score with current strategy
-}
-
 export interface AllocationResult {
   allocations: AllocationItem[];
   skippedItems: SkippedItem[];
   projections: ProjectionData;
-  optimizationScore: OptimizationScore;
   funMoneyAllocated: number; // Monthly amount for compatibility
   funMoneyRange: {
     min: number;
