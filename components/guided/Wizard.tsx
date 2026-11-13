@@ -36,6 +36,7 @@ import { fieldWrites, listRows, relationErrors, visibleScreenFields } from '@/li
 import type { FieldErrors, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import { acceptAccounts } from '@/lib/calculators/portfolio/accountWrites';
 import { ACCOUNTS } from '@/lib/fields/shared';
+import { accountsInEffect } from '@/lib/profile/accounts';
 import { DERIVED_PATHS, withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -532,9 +533,13 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
       },
     };
   });
+  // The account list shows only the stored rows in effect (the example rows its answers rule out are
+  // hidden, and a suggested row is blank), so with none of those it shows no example to change.
   const showsExampleRows = shown.some(
     ({ spec, unanswered }) =>
-      unanswered && (spec.kind === 'list' || spec.kind === 'custom') && listRows(get(spec.path)).length > 0
+      unanswered &&
+      (spec.kind === 'list' || spec.kind === 'custom') &&
+      (spec.path === ACCOUNTS.path ? accountsInEffect(get).rows : listRows(get(spec.path))).length > 0
   );
   // Single-screen mode has Save in place of Skip and Next; the notes name it.
   const screenNote = showsExampleRows

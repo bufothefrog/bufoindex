@@ -11,10 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Wizard } from '@/components/guided/Wizard';
-import { CORE_PATHS } from '@/lib/constants/intake';
+import { CORE_PATHS, EXAMPLE_ROWS_NOTE } from '@/lib/constants/intake';
 import { normalizeProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
-import { beginnerRaw } from '@/test/factories/accountsFixtures';
+import { beginnerRaw, rawWith } from '@/test/factories/accountsFixtures';
 import { intakePaths } from '@/test/utils/intakeFixture';
 import { resetRouterMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -102,6 +102,26 @@ describe('Wizard, the accounts screen', () => {
     expect(seen).not.toContain(MIX_HEADING);
     expect(profile().portfolio.accounts.map((a) => a.id)).toEqual(['acc-401k']);
     expect(profile().portfolio.holdings).toEqual([]);
+  });
+
+  it('shows the example line only while an example account is on the screen', async () => {
+    const user = userEvent.setup();
+    // The beginner without a 401(k): no account in effect, nothing to change.
+    useProfileStore.setState({ profile: normalizeProfile(rawWith({ 'workplace.has401k': false }, undefined, beginnerRaw())) });
+    answer(CORE_PATHS);
+    const { unmount } = render(<Wizard flow="profile" />);
+    while (heading() !== ACCOUNTS_HEADING) await next(user);
+    expect(screen.getByText('No accounts yet.')).toBeInTheDocument();
+    expect(screen.queryByText(EXAMPLE_ROWS_NOTE)).not.toBeInTheDocument();
+    unmount();
+
+    // The beginner: the example 401(k) row is on the screen, so the line stays.
+    useProfileStore.setState({ profile: normalizeProfile(beginnerRaw()) });
+    answer(CORE_PATHS);
+    render(<Wizard flow="profile" />);
+    while (heading() !== ACCOUNTS_HEADING) await next(user);
+    expect(screen.getByRole('textbox', { name: '401(k) or similar balance' })).toHaveValue('16,225');
+    expect(screen.getByText(EXAMPLE_ROWS_NOTE)).toBeInTheDocument();
   });
 
   it.each(['retirement', 'leverage'] as const)('renders the accounts screen in /start/%s without a missing renderer', async (flow) => {
