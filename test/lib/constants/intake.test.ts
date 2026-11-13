@@ -229,7 +229,7 @@ describe('behaviour-preserving: the provisional forms carry the old question set
     expect(sections).toEqual(expectedProfile().map(({ section }) => section));
   });
 
-  it('counts the profile screens from the forms (14, 13 without a 401(k), 11 after the core, with the provisional forms)', () => {
+  it('counts the profile screens from the forms: all of them, fewer without a 401(k), and the non-core ones after the core', () => {
     const all = expectedProfile().length;
     expect(screenIds('profile')).toHaveLength(all);
     expect(screenIds('profile', { 'workplace.has401k': false })).toHaveLength(

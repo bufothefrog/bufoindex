@@ -168,7 +168,7 @@ the same fields with the same validation:
   chooser, or to the intent a landing card chose.
 - **Calculator** (`/start/<intent>`): the intent's non-core screens whose
   fields are not all provided yet; a partly answered screen shows all of
-  its fields, prefilled. Finishes to the calculator at `?from=profile`. The
+  its fields, the answered ones with their saved values. Finishes to the calculator at `?from=profile`. The
   `profile` intent asks the profile form (`PROFILE_FORM` in
   `lib/calculators/forms.ts`): every calculator's details screens with each
   field asked once, then the emergency fund and the strategy preset, and
@@ -179,10 +179,18 @@ Intake screens per calculator after the core:
 | Tool | Intake screens |
 |---|---|
 | Paycheck | fun money and bonuses; emergency fund; 401(k) (match terms only with a plan); HSA; IRAs and taxable investing; debts (a one-tap "I have no debts", O4); assumptions |
-| Retirement | what you invest today; when you would like to retire (with target income and life expectancy); Social Security and healthcare; assumptions |
+| Retirement | what you invest today; when you would like to retire (with target income and life expectancy); assumptions |
 | Portfolio | target allocation; accounts and new cash; holdings (O5); settings |
 | Leverage comparison | what goes into the comparison (stop age, taxable monthly contribution, invested balance, leverage ratio); market assumptions |
 | Finish your profile | every calculator's details screens not yet answered, then the emergency fund and the strategy preset |
+
+Optional screens: a screen with `optional: true` (`ScreenSpec` in
+`lib/fields/types.ts`) is not asked on the way into a calculator and does not
+count toward profile completeness. The profile form asks it last, in a
+section "Optional" (`composeProfileForm` in `lib/calculators/forms.ts`).
+Today the one optional screen is the retirement screen with the Social
+Security benefit, claiming age and annual healthcare cost
+(`lib/calculators/retirement/form.ts`); the calculator page still shows it.
 
 Design rules for the question set are unchanged: ask only what changes the
 first result materially, ask in the user's units, and keep a "where to find
