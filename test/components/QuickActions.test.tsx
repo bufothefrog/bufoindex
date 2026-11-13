@@ -490,6 +490,47 @@ describe('QuickActions', () => {
       expect(screen.getByRole('region', { name: '401(k) or similar plan' })).toHaveFocus();
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
     });
+    it('on the phone layout, stops the section just below the sticky tab bar', async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      const scrollTo = vi.fn();
+      vi.stubGlobal('scrollTo', scrollTo);
+      try {
+        render(
+          <CalculatorLayout
+            title="Paycheck"
+            description="Quick action test."
+            inputSections={
+              <section
+                aria-label="401(k) or similar plan"
+                ref={(el) => {
+                  if (!el) return;
+                  el.scrollIntoView = scrollIntoView;
+                  el.getBoundingClientRect = () => ({ top: 500 }) as DOMRect;
+                }}
+              >
+                Plan inputs
+              </section>
+            }
+            resultSection={<QuickActions profile={matchOnlyProfile()} />}
+          />
+        );
+        // jsdom lays nothing out: give the sticky bar (the tab list's wrapper)
+        // the box it has below lg, 65 px tall.
+        const bar = screen.getByRole('tablist', { name: 'Calculator view' }).parentElement as HTMLElement;
+        bar.getClientRects = () => [{}] as unknown as DOMRectList;
+        bar.getBoundingClientRect = () => ({ height: 65 }) as DOMRect;
+
+        await user.click(screen.getByRole('tab', { name: /Results/ }));
+        await user.click(screen.getByRole('button', { name: 'Increase 401k to 6%' }));
+
+        expect(scrollTo).toHaveBeenCalledWith({ top: 500 + window.scrollY - 65, behavior: 'smooth' });
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        expect(screen.getByRole('region', { name: '401(k) or similar plan' })).toHaveFocus();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
   });
 
   describe('impact row', () => {

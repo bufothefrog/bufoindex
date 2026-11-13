@@ -26,16 +26,26 @@ import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Contain
 /** Which panel the mobile (below lg) view shows. */
 type CalculatorMobileTab = 'inputs' | 'results';
 
+/** What `onShown` learns about the page once the inputs are shown. */
+export interface InputsShown {
+  /**
+   * The height in px of the sticky tab bar over the top of the viewport (the
+   * phone layout), or 0 when no bar is shown. Scroll a target this far below
+   * the top so the bar does not cover it.
+   */
+  topInset: number;
+}
+
 /**
  * Asks the layout to show the inputs, then runs `onShown` once they are in
  * the page (after the commit that selects the mobile Inputs tab), e.g. to
  * scroll to and focus one input section. On desktop both panels are always
  * shown, so only `onShown` has a visible effect.
  */
-export type RevealInputs = (onShown: () => void) => void;
+export type RevealInputs = (onShown: (shown: InputsShown) => void) => void;
 
 /** Outside a CalculatorLayout the inputs are not behind a tab: run at once. */
-const revealImmediately: RevealInputs = (onShown) => onShown();
+const revealImmediately: RevealInputs = (onShown) => onShown({ topInset: 0 });
 
 const RevealInputsContext = createContext<RevealInputs>(revealImmediately);
 
@@ -126,13 +136,18 @@ export function CalculatorLayout({
   }, [scrollRequest]);
 
   // A pending revealInputs callback, run after the Inputs tab is committed.
-  const [revealRequest, setRevealRequest] = useState<{ onShown: () => void } | null>(null);
+  const [revealRequest, setRevealRequest] = useState<{ onShown: (shown: InputsShown) => void } | null>(null);
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
   const revealInputs = useCallback<RevealInputs>((onShown) => {
     setMobileTab('inputs');
     setRevealRequest({ onShown });
   }, []);
   useEffect(() => {
-    if (revealRequest) revealRequest.onShown();
+    if (!revealRequest) return;
+    // The bar is lg:hidden, so on desktop it has no layout box and no inset.
+    const bar = tabBarRef.current;
+    const topInset = bar && bar.getClientRects().length > 0 ? bar.getBoundingClientRect().height : 0;
+    revealRequest.onShown({ topInset });
   }, [revealRequest]);
 
   const selectTab = (tab: CalculatorMobileTab) => {
@@ -158,7 +173,7 @@ export function CalculatorLayout({
               children of Container so the bar can stick for the calculator's
               full height. */}
           <div ref={anchorRef} aria-hidden="true" className="lg:hidden" />
-          <div className="lg:hidden sticky top-0 z-20 -mx-4 mb-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur-sm sm:mx-0 sm:rounded-lg sm:border sm:px-2">
+          <div ref={tabBarRef} className="lg:hidden sticky top-0 z-20 -mx-4 mb-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur-sm sm:mx-0 sm:rounded-lg sm:border sm:px-2">
             <div
               role="tablist"
               aria-label="Calculator view"
