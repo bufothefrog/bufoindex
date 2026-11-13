@@ -246,12 +246,17 @@ export function ownAnswerMessage(spec: FieldSpec): string {
 export const BLANK_FIELDS_NOTE = {
   /** Next takes the typical values. */
   typical: 'Grey values are typical. Next uses them for anything left blank.',
+  /** The same rule in single-screen mode (/start/review/<id>), whose only button is Save. */
+  typicalOnSave: 'Grey values are typical. Save uses them for anything left blank.',
   /** Next needs the visitor's own entry (nextNeedsOwnAnswer). */
   examples: 'Grey values are examples.',
 } as const;
 
 /** The line on an unanswered screen that shows example rows (accounts, holdings, class targets). */
 export const EXAMPLE_ROWS_NOTE = 'This is an example. Change it to match yours, or skip.';
+
+/** EXAMPLE_ROWS_NOTE in single-screen mode, which has no Skip. */
+export const EXAMPLE_ROWS_NOTE_ON_SAVE = 'This is an example. Change it to match yours.';
 
 const REMAINING_FORMS = new WeakMap<FormSpec, FormSpec>();
 const INTENT_FORMS = new WeakMap<FormSpec, FormSpec>();

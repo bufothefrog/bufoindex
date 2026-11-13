@@ -57,6 +57,17 @@ describe('/start/review/<screen>', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
+  it('names Save, not Next or Skip, in the line about grey values and example rows', async () => {
+    await renderTopic('ss-healthcare');
+    expect(screen.getByText('Grey values are typical. Save uses them for anything left blank.')).toBeInTheDocument();
+    expect(screen.queryByText(/Next uses them/)).not.toBeInTheDocument();
+    cleanup();
+
+    await renderTopic('accounts');
+    expect(screen.getByText('This is an example. Change it to match yours.')).toBeInTheDocument();
+    expect(screen.queryByText(/or skip/)).not.toBeInTheDocument();
+  });
+
   it('Save writes the topic as Next does and returns to its row on the review page', async () => {
     await renderTopic('must-pay');
     const user = await typeInto('Must-pay costs per month', '3100');

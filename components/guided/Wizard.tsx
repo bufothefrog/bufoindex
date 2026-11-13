@@ -15,6 +15,7 @@ import { REVIEW_PATH, reviewTopicReturnHref } from '@/lib/calculators/profileRev
 import {
   BLANK_FIELDS_NOTE,
   EXAMPLE_ROWS_NOTE,
+  EXAMPLE_ROWS_NOTE_ON_SAVE,
   coreDestination,
   coreStartLink,
   getIntakeScreens,
@@ -341,7 +342,7 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
    * so leaving through the site header loses nothing.
    */
   const save = (confirmed: WizardProgress) => {
-    const { writes, options, ledger: next } = saveWrites(flow, seed, confirmed, ledger.current);
+    const { writes, options, ledger: next } = saveWrites(flow, seed, confirmed, ledger.current, form.screens);
     ledger.current = next;
     setValues(writes, options);
   };
@@ -485,11 +486,16 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
     ({ spec, unanswered }) =>
       unanswered && (spec.kind === 'list' || spec.kind === 'custom') && listRows(get(spec.path)).length > 0
   );
+  // Single-screen mode has Save in place of Skip and Next; the notes name it.
   const screenNote = showsExampleRows
-    ? EXAMPLE_ROWS_NOTE
+    ? single
+      ? EXAMPLE_ROWS_NOTE_ON_SAVE
+      : EXAMPLE_ROWS_NOTE
     : shown.some(({ display }) => display.blank)
       ? acceptsTypical
-        ? BLANK_FIELDS_NOTE.typical
+        ? single
+          ? BLANK_FIELDS_NOTE.typicalOnSave
+          : BLANK_FIELDS_NOTE.typical
         : BLANK_FIELDS_NOTE.examples
       : undefined;
   const singleQuestion = fields.length === 1;
