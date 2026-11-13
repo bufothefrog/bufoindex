@@ -57,5 +57,10 @@ describe('estimateSocialSecurityBenefit', () => {
     expect(estimateSocialSecurityBenefit(0)).toBe(0);
     expect(estimateSocialSecurityBenefit(-5000)).toBe(0);
     expect(estimateSocialSecurityBenefit(Number.NaN)).toBe(0);
+    expect(estimateSocialSecurityBenefit(Number.NEGATIVE_INFINITY)).toBe(0);
+  });
+
+  it('caps an infinite pay figure at the base like any pay above it', () => {
+    expect(estimateSocialSecurityBenefit(Number.POSITIVE_INFINITY)).toBeCloseTo(52433.52, 6);
   });
 });

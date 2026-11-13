@@ -294,7 +294,7 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     ],
     limitations: [
       "Fewer than 35 years of earnings, or lower earlier pay, gives a lower real benefit than this estimate",
-      "One worker's own benefit only: no spousal, survivor, earnings test or WEP/GPO adjustments",
+      "One worker's own benefit only: no spousal, survivor or earnings test adjustments",
       "Uses the 2026 bend points and base for every age"
     ]
   },
@@ -350,7 +350,7 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     ],
     limitations: [
       "Real full retirement age varies by birth year (66–67); this model uses 67 for everyone",
-      "No earnings test, spousal, survivor, or WEP/GPO adjustments",
+      "No earnings test, spousal or survivor adjustments",
       "Benefits are grown at the general inflation rate you enter rather than an SSA cost-of-living adjustment",
       "Benefits are treated as untaxed income in the simulation",
       "Assumes the program pays scheduled benefits in full for the whole retirement"

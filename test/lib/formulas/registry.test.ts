@@ -134,6 +134,11 @@ describe('formula registry <-> calculation engine consistency', () => {
     expect(formulaRegistry.formulas.size).toBe(ids.length)
   })
 
+  it('names no WEP/GPO limitation: the Social Security Fairness Act (2025) repealed both', () => {
+    const text = JSON.stringify(retirementEntries)
+    expect(text).not.toMatch(/WEP|GPO/)
+  })
+
   it('documents the engine paths that produce the headline success probability', () => {
     // The Monte Carlo genuinely models Social Security and healthcare, so the
     // page has to carry an entry for each of them and for the simulation

@@ -86,7 +86,6 @@ export const SOCIAL_SECURITY_BENEFIT: FieldSpec = {
   kind: 'money',
   label: 'Social Security benefit',
   hint: 'A yearly amount; ssa.gov/myaccount shows your estimate.',
-  placeholder: '30,000',
   min: 0,
   nullable: { autoLabel: 'Estimate from your pay', overrideDefault: estimatedSocialSecurityBenefit },
   tier: 'details',

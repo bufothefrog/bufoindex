@@ -9,7 +9,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { EFFECTIVE_TAX_RATE, ANNUAL_HEALTHCARE_COST, TARGET_RETIREMENT_INCOME, tdfProfileFor } from '@/lib/calculators/retirement/fields';
+import {
+  EFFECTIVE_TAX_RATE,
+  ANNUAL_HEALTHCARE_COST,
+  SOCIAL_SECURITY_BENEFIT,
+  TARGET_RETIREMENT_INCOME,
+  tdfProfileFor,
+} from '@/lib/calculators/retirement/fields';
 import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
 import {
   CORE_PATHS,
@@ -380,5 +386,9 @@ describe('retirement form: the old intake question set is still asked', () => {
 describe('retirement form: placeholders', () => {
   it('gives the derived target income no fixed placeholder, which would disagree once must-pay is answered', () => {
     expect(TARGET_RETIREMENT_INCOME.placeholder).toBeUndefined();
+  });
+
+  it('gives the Social Security benefit no placeholder from the old 30,000 default', () => {
+    expect(SOCIAL_SECURITY_BENEFIT.placeholder).toBeUndefined();
   });
 });

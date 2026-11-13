@@ -43,10 +43,10 @@ export function primaryInsuranceAmount(aime: number): number {
 
 /**
  * The estimated yearly Social Security benefit at full retirement age, in
- * today's dollars, from yearly gross pay. A pay figure that is not a finite
- * number estimates 0.
+ * today's dollars, from yearly gross pay. NaN estimates 0; an infinite pay
+ * figure is capped like any other (+Infinity at the base, -Infinity at 0).
  */
 export function estimateSocialSecurityBenefit(yearlyPay: number): number {
-  if (!Number.isFinite(yearlyPay)) return 0;
+  if (Number.isNaN(yearlyPay)) return 0;
   return primaryInsuranceAmount(averageIndexedMonthlyEarnings(yearlyPay)) * 12;
 }
