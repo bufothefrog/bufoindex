@@ -15,6 +15,7 @@ Commits (git log --oneline 87e8bfb..HEAD):
 - 630ee4c a5-navigation-and-entry
 - df80630 a6-agreed-decisions
 - 883ec03 a7-compact-summaries
+- review fixes: one fix(next) commit per slice touched (a2, a4, a5, a6, a7)
 
 ## What changed per slice
 
@@ -29,24 +30,36 @@ Commits (git log --oneline 87e8bfb..HEAD):
 ### a2-ticker-and-chart
 - Ticker box: picking an option sets the ticker at once and closes the list;
   Enter on a highlighted option no longer commits the typed text too; clicking
-  elsewhere after typing a new ticker commits it.
+  elsewhere after typing a new ticker commits it. Escape discards the typed
+  text (the later blur commits nothing). An option whose ticker equals the
+  typed text is listed first, so Enter after typing "VT" picks VT, not VTI.
 - Savings Rate Impact chart: dashed line at the current savings rate, dot at the
-  planned retirement age, caption sentence with both figures.
+  planned retirement age, caption sentence with both figures. The two labels
+  sit on opposite sides of the dashed line, the dot's label on the far side
+  of the dot (savingsRateLabelPositions), so neither crosses the line or the
+  other label.
 
 ### a4-one-dollar-mode
 - Leverage comparison, the /overview retirement and leverage cards and
   OpportunityCostCard follow the stored today's/future dollars mode (3% basis).
   One toggle at the top of the profile overview. Engine numbers unchanged.
+- test/components/charts/DcaPathChart.test.tsx checks the chart's own
+  conversion and the legend suffix in both modes.
 
 ### a5-navigation-and-entry
 - Header with site name, Overview, the four calculators (a Calculators
-  disclosure below lg) and the theme toggle.
+  disclosure below lg) and the theme toggle. On a calculator page the button's
+  accessible name says the current one ("Calculators, current: Retirement
+  Calculator"), since the inline links with aria-current are hidden below lg.
 - Home preview cards link to bare calculator paths; empty overview and What next
   list calculators through CalculatorLinks.
 
 ### a6-agreed-decisions
 - CalculatorLayout provides useRevealInputs(); QuickActions calls
-  revealInputs(() => focusScreen(screen)). CalculatorPage unchanged.
+  revealInputs(({ topInset }) => focusScreen(screen, topInset)). topInset is
+  the sticky tab bar's height on the phone layout (0 on desktop), and the
+  section then stops just below the bar instead of under it. CalculatorPage
+  unchanged.
 - New token --negative / class text-negative. Light mode equals --destructive
   (unchanged); dark mode is 0 91% 71%. TONE_TEXT.negative and every other
   text-destructive use now use it. bg-destructive / text-destructive-foreground
@@ -60,7 +73,17 @@ Commits (git log --oneline 87e8bfb..HEAD):
   pay frequency, take-home, monthly cost); the seven core specs and coreSummary
   in lib/constants/intake.ts use them, so the wording exists once.
 - lib/fields/runtime.ts has fallbackSummary; summarizeScreen applies it for the
-  whole screen only when no field gives its own summary.
+  whole screen only when no field gives its own summary. This is per screen,
+  not per field as the task described: on a screen with hand-written
+  summaries, a field without one is left out on purpose (a per-field
+  fallback grows lines past the length limit and breaks recap pins). No live
+  card reaches the fallback today. Money in the fallback is whole dollars
+  (formatCurrency), as elsewhere on the site.
+- A core card with no answered field (nothing in profile.provided) shows its
+  description while collapsed, not the placeholder defaults, matching
+  coreSummary, which leaves unanswered facts out. Once one field on it is
+  answered the card shows its summary. Assumption and details cards are
+  unchanged (they show values).
 - CollapsedSummaries.test.tsx covers all four calculators, default and rich
   profile: non-empty, not the description, at most 120 characters.
 - EntryPoints and LearnChooser pins updated by the committer to the new recap.
@@ -79,8 +102,9 @@ Commits (git log --oneline 87e8bfb..HEAD):
 - Collapsed paycheck pay card: "A close guess is fine." -> "$3,500 gross every 2
   weeks, $2,600 take-home".
 - Collapsed paycheck must-pay card: empty line -> "$3,000 a month".
-- Retirement "A little about you": description -> "30, TX" (single filer);
-  "30, TX, married filing separately, run here as single" when that applies.
+- Retirement "A little about you": description -> "30, TX, single" (as on the
+  paycheck page); "30, TX, married filing separately, run here as single"
+  when that applies.
 - Retirement pay card -> "$3,500 gross every 2 weeks"; must-pay -> "$3,000 a month".
 - Recap on /start/choose and the Continue card: "30, TX, single, $3,500 every 2
   weeks, $3,000/mo must-pay" -> "30, TX, single, $3,500 gross every 2 weeks,
@@ -102,9 +126,23 @@ Commits (git log --oneline 87e8bfb..HEAD):
 - Take-home is its own summary piece instead of "X gross and Y take-home every
   ..." because a summary cannot see which fields are on its screen and the
   retirement pay card has no take-home field.
-- Optional: retirement FILING summary (lib/calculators/retirement/form.ts) could
-  return filingStatusSummary(value) so its card reads "30, TX, single"; pin in
-  test/lib/calculators/retirement/form.test.ts would change.
+- Retirement scenario card titles (ResultsSection renders scenario.name) embed
+  dollar figures built in lib/calculations/retirement.ts that ignore the
+  display mode; fixing it needs the engine to expose the name parts, and
+  lib/calculations is off limits in this PR.
+- OpportunityCostCard's "Why this matters" text still prints the nominal
+  10-year cost (from lib/calculations/analysis.ts) while the headline follows
+  the display mode; same reason.
+- Portfolio: a negative deposit is no longer clamped to 0; it blocks the run
+  with "New cash must be at least $0." (mention in the PR description).
+- Old site keys ('retirement-calculator', 'paycheck-allocator-storage') stay in
+  localStorage unread; a v1 'bufo-profile' is rewritten as v2 and loses its
+  new-cash value and old displayMode. Covered by the owner's sentence.
+- Not done (nits): the Calculators list does not close when focus tabs past
+  it; the home link sits outside the Site nav landmark; the header is tight
+  at 320 px; the /demo tooltip fixture has no dollar suffix.
+- Commit trailers on this branch name a model; which attribution rule wins is
+  for the orchestrating session to decide before pushing.
 - Optional: doc comment in lib/constants/frequency.ts line 28 still shows the
   old "$3,500 every 2 weeks" example.
 - The a6 builder had no map file; none was read.
@@ -119,5 +157,7 @@ Commits (git log --oneline 87e8bfb..HEAD):
   LearnChooser.test.tsx pins.
 - Components that need the phone Inputs tab opened use useRevealInputs() from
   components/ui/layouts/CalculatorLayout.tsx.
-- Gates on this tree: type-check, lint --max-warnings=0, test:coverage (111
-  files, 2094 tests), Node 24 suite and build all pass.
+- Components that scroll to an input on the phone layout should use the
+  topInset that revealInputs passes to onShown.
+- Gates on this tree: type-check, lint --max-warnings=0, test:coverage, Node 24
+  suite and build all pass.
