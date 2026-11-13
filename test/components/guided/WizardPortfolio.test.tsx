@@ -178,4 +178,40 @@ describe('Wizard, portfolio intent', () => {
     render(<Wizard flow="portfolio" />);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
   });
+
+  it('removes a holding with Remove holding and stays on the holdings screen', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    answer(CORE_PATHS);
+    render(<Wizard flow="portfolio" />);
+    await user.click(screen.getByRole('radio', { name: /60% stocks, 40% bonds/ }));
+    await user.click(next());
+    await user.click(next());
+    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Brokerage (taxable) holdings' });
+    const before = within(region).getAllByRole('button', { name: /^Remove holding/ }).length;
+
+    await user.click(within(region).getByRole('button', { name: 'Remove holding 1' }));
+
+    // The button does not submit the screen's form: no step forward, no Finish.
+    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+    expect(within(region).getAllByRole('button', { name: /^Remove holding/ })).toHaveLength(before - 1);
+  });
+
+  it('does not advance when a class target Remove button is pressed', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<Wizard flow="portfolio" />);
+    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+    const editor = screen.getByRole('group', { name: 'Target allocation' });
+    expect(within(editor).getByRole('textbox', { name: 'Cash target' })).toBeInTheDocument();
+
+    await user.click(within(editor).getByRole('button', { name: 'Remove Cash' }));
+
+    // The button does not submit the screen's form.
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+    expect(window.confirm).toHaveBeenCalledWith('Remove Cash from your target allocation?');
+  });
 });
+

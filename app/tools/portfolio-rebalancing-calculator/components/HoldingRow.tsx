@@ -172,6 +172,7 @@ export function HoldingRow({
 
       <div className="flex items-end md:pb-0.5">
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           onClick={onRemove}
