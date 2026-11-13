@@ -135,6 +135,15 @@ export function exampleAccountLists(): { accounts: AccountRow[]; securities: Sec
   };
 }
 
+/**
+ * True when `row` is one of the example accounts: its id and kind are an
+ * example row's. A row the visitor adds gets an 'acc-<n>' id
+ * (addAccountRow), never an example id, so it never counts.
+ */
+export function isExampleAccount(row: AccountRow): boolean {
+  return exampleAccountLists().accounts.some((example) => example.id === row.id && example.kind === row.kind);
+}
+
 // ---------------------------------------------------------------------------
 // Answered paths
 // ---------------------------------------------------------------------------

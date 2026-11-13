@@ -113,6 +113,12 @@ describe('Wizard, the accounts screen', () => {
     while (heading() !== ACCOUNTS_HEADING) await next(user);
     expect(screen.getByText('No accounts yet.')).toBeInTheDocument();
     expect(screen.queryByText(EXAMPLE_ROWS_NOTE)).not.toBeInTheDocument();
+
+    // The same visitor adds an account: the row is their own, so still no line.
+    await user.selectOptions(screen.getByLabelText('New account kind'), 'roth-ira');
+    await user.click(screen.getByRole('button', { name: 'Add account' }));
+    expect(screen.getByRole('textbox', { name: 'Roth IRA balance' })).toBeInTheDocument();
+    expect(screen.queryByText(EXAMPLE_ROWS_NOTE)).not.toBeInTheDocument();
     unmount();
 
     // The beginner: the example 401(k) row is on the screen, so the line stays.
