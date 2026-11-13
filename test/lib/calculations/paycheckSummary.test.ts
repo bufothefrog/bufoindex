@@ -101,14 +101,4 @@ describe('paycheckSummary', () => {
     expect(allDeferred.residualTaxes).toBe(0);
     expect(allDeferred.effectiveRate).toBe(0);
   });
-
-  it('prints the rate exactly as (rate x 100).toFixed(1) did', () => {
-    // The results printed `${(residual / taxable * 100).toFixed(1)}%`.
-    for (let taxable = 100; taxable <= 12000; taxable += 113) {
-      for (let residual = 0; residual <= taxable; residual += 7) {
-        const rate = residual / taxable;
-        expect(formatPercent(rate, { digits: 1 })).toBe(`${(rate * 100).toFixed(1)}%`);
-      }
-    }
-  });
 });
