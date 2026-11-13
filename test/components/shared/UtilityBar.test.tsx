@@ -53,7 +53,7 @@ function siteNav() {
 }
 
 function disclosure() {
-  return within(siteNav()).getByRole('button', { name: 'Calculators' });
+  return within(siteNav()).getByRole('button', { name: /^Calculators/ });
 }
 
 function openList() {
@@ -111,6 +111,22 @@ describe('UtilityBar', () => {
   it('marks no link on a route outside the navigation', () => {
     renderAt('/start/choose');
     expect(screen.getAllByRole('link').filter((link) => link.hasAttribute('aria-current'))).toEqual([]);
+  });
+
+  it('names the current calculator on the disclosure button, without opening it', () => {
+    renderAt('/tools/retirement-calculator');
+    expect(disclosure()).toHaveAccessibleName('Calculators, current: Retirement Calculator');
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('names the calculator section on the button on a page below a calculator', () => {
+    renderAt('/tools/retirement-calculator/methodology');
+    expect(disclosure()).toHaveAccessibleName('Calculators, current: Retirement Calculator');
+  });
+
+  it('names no current calculator on the button outside the calculators', () => {
+    renderAt('/overview');
+    expect(disclosure()).toHaveAccessibleName('Calculators');
   });
 
   it('opens the calculator list from the disclosure button', () => {

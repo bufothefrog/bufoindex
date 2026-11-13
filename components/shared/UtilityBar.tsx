@@ -82,7 +82,8 @@ export function UtilityBar() {
     };
   }, [open]);
 
-  const onCalculatorPage = CALCULATOR_ITEMS.some((item) => currentFor(pathname, item.href) !== undefined);
+  const currentCalculator = CALCULATOR_ITEMS.find((item) => currentFor(pathname, item.href) !== undefined);
+  const onCalculatorPage = currentCalculator !== undefined;
 
   return (
     <header className="flex min-h-12 items-center justify-between gap-2">
@@ -124,6 +125,9 @@ export function UtilityBar() {
                   )}
                 >
                   Calculators
+                  {/* Below lg the inline links (and their aria-current) are
+                      hidden, so the button names the current calculator. */}
+                  {currentCalculator && <span className="sr-only">, current: {currentCalculator.label}</span>}
                   <ChevronDown
                     className={cn('h-4 w-4 transition-transform', open && 'rotate-180')}
                     aria-hidden="true"
