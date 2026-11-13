@@ -11,6 +11,8 @@ import {
   type PayFrequency,
 } from '@/lib/constants/frequency';
 import {
+  ACCOUNT_KIND_LABELS,
+  ACCOUNT_KIND_OPTIONS,
   ACCOUNT_TYPE_LABELS,
   ACCOUNT_TYPE_OPTIONS,
   BONUS_FREQUENCY_LABELS,
@@ -57,6 +59,12 @@ const VOCABULARIES: Array<{
   },
   { name: 'bonus frequency', values: ['quarterly', 'annual', 'irregular'], labels: BONUS_FREQUENCY_LABELS, options: BONUS_FREQUENCY_OPTIONS },
   { name: 'account type', values: ['taxable', 'tax-deferred', 'tax-free'], labels: ACCOUNT_TYPE_LABELS, options: ACCOUNT_TYPE_OPTIONS },
+  {
+    name: 'account kind',
+    values: ['401k', 'roth-401k', 'traditional-ira', 'roth-ira', 'hsa', 'brokerage', 'cash'],
+    labels: ACCOUNT_KIND_LABELS,
+    options: ACCOUNT_KIND_OPTIONS,
+  },
   { name: 'target mix', values: [...new Set([...TARGET_MIX_PRESETS, 'custom'])], labels: TARGET_MIX_LABELS, options: TARGET_MIX_OPTIONS },
   { name: 'risk tolerance', values: ['conservative', 'moderate', 'optimizer'], labels: RISK_TOLERANCE_LABELS, options: RISK_TOLERANCE_OPTIONS },
   {
