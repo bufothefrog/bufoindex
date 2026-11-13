@@ -148,7 +148,7 @@ export function FormulaDisplay({
           </button>
           
           {expandedSections.variables && (
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 max-w-prose space-y-2 text-sm">
               {Object.entries(formula.variables).map(([symbol, variable]) => (
                 <div key={symbol} className="flex items-center space-x-3 text-sm">
                   <InlineLatex

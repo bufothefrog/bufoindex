@@ -69,6 +69,24 @@ describe('NextSteps', () => {
     }
   });
 
+  it('keeps the same links, profile link first, in the two-column layout', () => {
+    useProfileStore
+      .getState()
+      .setFields({ person: { age: 41, state: 'CA' } }, ['person.age', 'person.state', 'person.filingStatus']);
+
+    render(<NextSteps intent="leverage" layout="columns" />);
+
+    const finish = linkNamed(/Finish your profile/);
+    const list = screen.getByRole('list', { name: 'Try another calculator' });
+    expect(finish).toHaveAttribute('href', '/start/profile');
+    expect(finish.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(otherCalculators()).toEqual([
+      ['Paycheck Allocator', '/tools/paycheck-allocator'],
+      ['Retirement Calculator', '/tools/retirement-calculator'],
+      ['Portfolio Rebalancer', '/tools/portfolio-rebalancing-calculator'],
+    ]);
+  });
+
   it('offers to finish the profile and links the other calculators directly when a partial profile exists', () => {
     useProfileStore
       .getState()

@@ -216,7 +216,7 @@ export default function CalculatorPage<E, R>({
           />
         }
         resultSection={resultSection}
-        resultFooter={<NextSteps intent={definition.id} />}
+        resultFooter={<NextSteps intent={definition.id} layout={inputsAbove ? 'columns' : 'stack'} />}
         errors={fieldErrors}
         disclaimer={calculatorDisclaimer(definition.id)}
       />
