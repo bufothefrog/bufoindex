@@ -1,5 +1,6 @@
 import { AllocationItem, DebtData, PaycheckProfile } from '@/lib/types';
 import { formatCurrency, formatPercent } from '@/lib/format';
+import { paycheckToMonthly } from '@/lib/calculations/core';
 import { FinancialStep, StepStatus, UrgencyLevel } from '@/lib/constants/financialSteps';
 import {
   HIGH_INTEREST_THRESHOLD,
@@ -224,10 +225,13 @@ export function calculateStepStatus(
         }
         case 'emergency-full': {
           const needed = profile.preferences.necessaryExpenses * profile.preferences.emergencyFundMonths;
-          const monthlyNeeded = Math.max(0, (needed - profile.preferences.currentEmergencyFund) / 12);
+          // The transfer figure is the allocation's own monthly amount, so the
+          // list never quotes a figure the card's header does not show.
           return [
             `Calculate total needed: ${formatCurrency(needed)}`,
-            `Set automatic transfer for ${formatCurrency(monthlyNeeded)}/month`,
+            allocation
+              ? `Set automatic transfer for ${formatCurrency(allocation.monthlyEquivalent ?? paycheckToMonthly(allocation.amount, profile.income.frequency))}/month`
+              : 'Set an automatic transfer to the fund',
             "Park funds in a high-yield savings account"
           ];
         }
@@ -326,7 +330,7 @@ export function calculateStepStatus(
         }
 
         case 'emergency-full':
-          if (isComplete) return `Emergency fund complete (${profile.preferences.emergencyFundMonths} months)`;
+          if (isComplete) return `Emergency fund complete (${profile.preferences.emergencyFundMonths} ${profile.preferences.emergencyFundMonths === 1 ? 'month' : 'months'})`;
           if (profile.preferences.necessaryExpenses <= 0) return NO_EXPENSE_TARGET;
           return allocation ? `Building emergency fund` : `Complete ${profile.preferences.emergencyFundMonths}-month emergency fund`;
 

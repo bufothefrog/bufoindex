@@ -14,7 +14,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { FinancialStepCard } from '@/components/paycheck-allocator/FinancialStepCard';
 import { ResultsSection } from '@/components/paycheck-allocator/ResultsSection';
 import { calculateOptimalAllocation } from '@/lib/calculations/core';
+import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
+import { engineInputsFor } from '@/lib/calculators/runtime';
 import { FINANCIAL_STEPS } from '@/lib/constants/financialSteps';
+import { applyProfileWrites, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import type { PaycheckProfile } from '@/lib/types';
 import { calculateStepStatus } from '@/lib/utils/stepStatusUtils';
@@ -81,6 +84,26 @@ describe('FinancialStepCard: HSA limit (bug 4)', () => {
     // 8,750 / 12 = $729.17.
     expect(screen.getByText('$0 of $8,750')).toBeInTheDocument();
     expect(screen.getByText('$729')).toBeInTheDocument();
+  });
+});
+
+describe('FinancialStepCard: Emergency Fund on the zero-cash default', () => {
+  it('quotes the same monthly figure in the header and in How to Implement', async () => {
+    // Default profile with the emergency fund answered 0: 1,026.92 per bi-weekly paycheck,
+    // 1,026.92 x 26 / 12 = $2,225/month, toward a 3 x 3,000 = $9,000 target.
+    const writes = [{ path: 'cash.emergencyFundBalance', value: 0 }];
+    const { profile: stored, accepted } = applyProfileWrites(getDefaultFinancialProfile(), writes);
+    const profile = engineInputsFor(PAYCHECK_CALCULATOR, { ...stored, provided: [...stored.provided, ...accepted] });
+    const steps = calculateStepStatus(FINANCIAL_STEPS, calculateOptimalAllocation(profile).allocations, profile);
+    const step = steps.find((candidate) => candidate.id === 'emergency-full')!;
+    render(<FinancialStepCard step={step} profile={profile} expanded onToggle={() => {}} />);
+
+    expect(screen.getByText('$1,027')).toBeInTheDocument();
+    expect(screen.getByText('$2,225/month')).toBeInTheDocument();
+    const howTo = screen.getByRole('list');
+    expect(within(howTo).getByText('Calculate total needed: $9,000')).toBeInTheDocument();
+    expect(within(howTo).getByText('Set automatic transfer for $2,225/month')).toBeInTheDocument();
+    expect(screen.queryByText(/\$750\/month/)).not.toBeInTheDocument();
   });
 });
 

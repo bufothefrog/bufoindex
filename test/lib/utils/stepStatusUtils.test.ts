@@ -915,22 +915,39 @@ describe('calculateStepStatus — implementation guidance', () => {
     expect(status.implementationSteps[1]).toBe('Increase contribution to 5%')
   })
 
-  it('sizes the emergency fund transfer over twelve months', () => {
-    // 6 × $3,000 = $18,000 target; ($18,000 − $6,000) / 12 = $1,000/mo.
+  it('quotes the emergency allocation\'s own monthly amount as the transfer', () => {
+    // 6 x $3,000 = $18,000 target. The card's header shows the allocation, so the transfer line
+    // quotes the same figure: 1,026.92 per bi-weekly paycheck = 1,026.92 x 26 / 12 = $2,225/month.
+    const profile = buildProfile({
+      preferences: { currentEmergencyFund: 6000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
+    })
+    const allocation = createAllocation({
+      account: 'Emergency Fund',
+      category: 'emergency_fund',
+      amount: 1026.92,
+      monthlyEquivalent: (1026.92 * 26) / 12,
+    })
+    const status = statusFor('emergency-full', profile, [allocation])
+
+    expect(status.implementationSteps[0]).toBe('Calculate total needed: $18,000')
+    expect(status.implementationSteps[1]).toBe('Set automatic transfer for $2,225/month')
+  })
+
+  it('quotes no transfer figure without an emergency allocation', () => {
     const status = statusFor('emergency-full', buildProfile({
       preferences: { currentEmergencyFund: 6000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
     }))
 
-    expect(status.implementationSteps[0]).toBe('Calculate total needed: $18,000')
-    expect(status.implementationSteps[1]).toBe('Set automatic transfer for $1,000/month')
+    expect(status.implementationSteps[1]).toBe('Set an automatic transfer to the fund')
+    expect(status.implementationSteps.join(' ')).not.toMatch(/\$1,000/)
   })
 
-  it('floors the emergency fund transfer at zero when already overfunded', () => {
+  it('says "1 month", not "1 months", for a complete 1-month fund', () => {
     const status = statusFor('emergency-full', buildProfile({
-      preferences: { currentEmergencyFund: 30000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
+      preferences: { currentEmergencyFund: 3000, necessaryExpenses: 3000, emergencyFundMonths: 1 },
     }))
 
-    expect(status.implementationSteps[1]).toBe('Set automatic transfer for $0/month')
+    expect(status.recommendation).toBe('Emergency fund complete (1 month)')
   })
 
   it('states the additional 401k percentage needed', () => {
