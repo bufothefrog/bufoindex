@@ -18,6 +18,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PortfolioRebalancingCalculatorPage, { metadata } from '@/app/tools/portfolio-rebalancing-calculator/page';
 import { NO_REBALANCED_ACCOUNT_MESSAGE } from '@/lib/calculators/portfolio/definition';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
+import { MIGRATION_EXAMPLES } from '@/test/factories/profile-90ef4ed-v2';
 import { usePortfolioRebalancingStore } from '@/lib/store/portfolioRebalancingStore';
 import { PROFILE_STORAGE_KEY, useProfileStore } from '@/lib/store/profileStore';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
@@ -241,6 +243,44 @@ describe('PortfolioRebalancingCalculator page', () => {
     render(<PortfolioRebalancingCalculatorPage />);
     expect(screen.getAllByText(NO_REBALANCED_ACCOUNT_MESSAGE).length).toBeGreaterThan(0);
     expect(screen.queryByText('Drift Reduction')).not.toBeInTheDocument();
+  });
+
+  it('leads from the empty state of typed IRA balances (example 4a) to a plan with visible controls only', async () => {
+    const user = userEvent.setup();
+    useProfileStore.setState({ profile: migrateProfile(MIGRATION_EXAMPLES['4a'](), 2) });
+    render(<PortfolioRebalancingCalculatorPage />);
+
+    // Nothing is rebalanced: no targets, no holdings, the empty state.
+    expect(screen.queryByRole('region', { name: 'Target allocation' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Holdings' })).not.toBeInTheDocument();
+    expect(screen.getAllByText(NO_REBALANCED_ACCOUNT_MESSAGE).length).toBeGreaterThan(0);
+    expect(section(NEW_CASH_TITLE)).toHaveTextContent(
+      'Not rebalanced: Traditional IRA (no holdings entered), Roth IRA (no holdings entered).'
+    );
+
+    // Edit on the account list shows "List holdings instead".
+    const accounts = section(ACCOUNTS_TITLE);
+    await user.click(within(accounts).getByRole('button', { name: 'Edit Traditional IRA' }));
+    await user.click(within(accounts).getByRole('button', { name: 'List holdings instead' }));
+
+    // The Holdings card appears with one blank holding in that account.
+    const holdings = within(section('Holdings')).getByRole('region', { name: 'Traditional IRA holdings' });
+    expect(within(holdings).getAllByRole('textbox', { name: /Traditional IRA holding 1/ }).length).toBeGreaterThan(0);
+    expect(section('Target allocation')).toBeInTheDocument();
+
+    // A known ticker (it fills its price, $375 for VTI) and shares give a plan.
+    await user.type(within(holdings).getByRole('combobox', { name: /Ticker/ }), 'VTI');
+    await user.tab();
+    fireEvent.change(within(holdings).getByRole('textbox', { name: 'Shares, Traditional IRA holding 1' }), {
+      target: { value: '10' },
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+    expect(store.getState().inputs?.accounts.map((a) => a.id)).toEqual(['acc-trad-ira']);
+    expect(store.getState().results?.totalValueBefore).toBe(3750);
+    expect(results()).toHaveTextContent('Drift Reduction');
+    expect(screen.queryByText(NO_REBALANCED_ACCOUNT_MESSAGE)).not.toBeInTheDocument();
   });
 
   it('shows the class targets for the custom mix and keeps the last results while they miss 100%', async () => {
