@@ -137,7 +137,9 @@ it touches a behaviour-frozen engine and was not approved.
 - Each slice is written by a builder agent with exclusive file ownership, then integrated,
   gated and reviewed before its phase PR opens (docs/agents.md).
 - Stacked PRs do not target main, so the CI workflow's pull_request trigger is widened to
-  `claude/**` base branches on the first phase branch. No gate is added or changed.
+  `claude/**` base branches on the first phase branch. No gate is added or changed. The
+  follow-up stack (PR 1 of next-1-cleanup-and-fixes) adds the staging branch `next` to the push
+  and pull_request triggers.
 
 --------------------------------------------------------------------------------
 
