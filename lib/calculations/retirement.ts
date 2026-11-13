@@ -15,8 +15,6 @@ import {
   scheduleFutureValue,
   splitSchedule,
 } from './contributionSchedule';
-// Import to register retirement formulas
-import '@/lib/formulas/retirement-formulas';
 
 // TDF building-block assumptions (long-run capital market estimates):
 // stocks ~10% return / 18% volatility, bonds ~4% return / 6% volatility.
