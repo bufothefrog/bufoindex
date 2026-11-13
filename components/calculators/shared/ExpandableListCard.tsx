@@ -62,8 +62,10 @@ export function ExpandableListCard({
       )}
     >
       <CardContent className="p-4">
+        {/* flex-wrap with a 12rem basis on the title column: on a narrow screen the
+            right column drops below the title instead of squeezing it under the figures. */}
         <div
-          className="flex items-center justify-between"
+          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
           onClick={onToggle}
           role={isExpandable ? 'button' : undefined}
           tabIndex={isExpandable ? 0 : undefined}
@@ -74,7 +76,7 @@ export function ExpandableListCard({
             }
           } : undefined}
         >
-          <div className="flex items-center space-x-3 min-w-0">
+          <div className="flex items-center space-x-3 min-w-0 flex-1 basis-48">
             {Icon && (
               <Icon className={cn('w-5 h-5 shrink-0', iconClass(tone))} />
             )}
