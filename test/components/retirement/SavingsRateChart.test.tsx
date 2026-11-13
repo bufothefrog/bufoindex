@@ -2,9 +2,10 @@
  * The Savings Rate Impact chart's two marker labels at phone width: the
  * dashed current-rate line separates "Your savings rate" from "Retire at N"
  * and crosses neither, whether the planned-age dot sits under the line or
- * over it. The planned-age label stays above the x-axis line (so clear of
- * the tick labels) and inside the SVG at every plotted age, at both phone
- * widths and at desktop width.
+ * over it. The planned-age label stays above the x-axis line and right of
+ * the y-axis line (so clear of both axes' tick labels) and inside the SVG,
+ * in a table of ages, profiles and widths that reaches every placement the
+ * chart uses, at both phone widths and at desktop width.
  */
 
 import React from 'react';
@@ -70,9 +71,11 @@ function draw(inputs: SavingsRateMarkerInputs, width = WIDTH, height = HEIGHT) {
   const line = container.querySelector('.recharts-reference-line line');
   const dot = container.querySelector('.recharts-reference-dot circle');
   const axis = container.querySelector('.recharts-xAxis .recharts-cartesian-axis-line');
-  if (!line || !dot || !axis) throw new Error('markers not drawn');
+  const yAxis = container.querySelector('.recharts-yAxis .recharts-cartesian-axis-line');
+  if (!line || !dot || !axis || !yAxis) throw new Error('markers not drawn');
   return {
     axisY: Number(axis.getAttribute('y1')),
+    yAxisX: Number(yAxis.getAttribute('x1')),
     lineY: Number(line.getAttribute('y1')),
     dotY: Number(dot.getAttribute('cy')),
     rateLabel: textBox(/^Your savings rate/),
@@ -147,39 +150,54 @@ describe('SavingsRateChart marker labels', () => {
 
   // Savings of $0 (the line on the axis), 2.4%, 24% and 60% of income, and a
   // starting balance that makes the late ages need nothing.
-  const PROFILES: Array<[string, Partial<SavingsRateMarkerInputs>]> = [
-    ['no savings', { monthlySavings: 0 }],
-    ['2.4% saved', { monthlySavings: 200 }],
-    ['24% saved', {}],
-    ['60% saved', { monthlySavings: 5000 }],
-    ['a funded late curve', { startingBalance: 400000 }],
-  ];
-  const AGES = Array.from({ length: 26 }, (_, i) => 45 + i);
+  const PROFILES = {
+    'no savings': { monthlySavings: 0 },
+    '2.4% saved': { monthlySavings: 200 },
+    '24% saved': {},
+    '60% saved': { monthlySavings: 5000 },
+    'a funded late curve': { startingBalance: 400000 },
+  } satisfies Record<string, Partial<SavingsRateMarkerInputs>>;
+  type Profile = keyof typeof PROFILES;
+  type Case = [page: string, width: number, profile: Profile, retirementAge: number];
 
-  describe.each([
-    ['390 px page', WIDTH],
-    ['360 px page', NARROW_WIDTH],
-    ['desktop', DESKTOP_WIDTH],
-  ])('at every plotted age on a %s', (_page, width) => {
-    describe.each(PROFILES)('with %s', (_name, change) => {
-      it.each(AGES)('retiring at %i', retirementAge => {
-        const y = draw({ ...BASE, ...change, retirementAge }, width, TALL_HEIGHT);
-        // (a) above the x-axis line, so clear of it and of the tick labels.
-        expect(y.dotLabel.bottom).toBeLessThan(y.axisY);
-        // (b) inside the SVG.
-        expect(y.dotLabel.left).toBeGreaterThanOrEqual(0);
-        expect(y.dotLabel.right).toBeLessThanOrEqual(width);
-        expect(y.dotLabel.top).toBeGreaterThanOrEqual(0);
-        // (c) off the dashed line and off its label.
-        expect(y.dotLabel.bottom <= y.lineY - 1 || y.dotLabel.top >= y.lineY + 1).toBe(true);
-        const apart =
-          y.dotLabel.right <= y.rateLabel.left ||
-          y.rateLabel.right <= y.dotLabel.left ||
-          y.dotLabel.bottom <= y.rateLabel.top ||
-          y.rateLabel.bottom <= y.dotLabel.top;
-        expect(apart).toBe(true);
-      });
-    });
+  // One row per placement the chart reaches (the dot label above or below,
+  // centered or anchored at an edge; the rate label on the far side of the
+  // line or stacked over the dot label; the dot under or over the line):
+  // every profile at the first age, the last ages (67 and 68 are where a
+  // larger label font stops fitting) and the last age on the narrowest
+  // plot, plus the rows that reach the remaining placements on the 390 px
+  // page and on desktop.
+  const NARROW_CASES = (Object.keys(PROFILES) as Profile[]).flatMap(profile =>
+    [45, 67, 68, 70].map((age): Case => ['360 px page', NARROW_WIDTH, profile, age])
+  );
+  const CASES: Case[] = [
+    ...NARROW_CASES,
+    ['360 px page', NARROW_WIDTH, '2.4% saved', 64],
+    ['390 px page', WIDTH, '2.4% saved', 67],
+    ['390 px page', WIDTH, '2.4% saved', 69],
+    ['desktop', DESKTOP_WIDTH, '24% saved', 45],
+    ['desktop', DESKTOP_WIDTH, '24% saved', 50],
+    ['desktop', DESKTOP_WIDTH, 'no savings', 70],
+  ];
+
+  it.each(CASES)('on a %s (%i px) with %s, retiring at %i', (_page, width, profile, retirementAge) => {
+    const y = draw({ ...BASE, ...PROFILES[profile], retirementAge }, width, TALL_HEIGHT);
+    // (a) above the x-axis line, so clear of it and of the tick labels.
+    expect(y.dotLabel.bottom).toBeLessThan(y.axisY);
+    // (b) inside the SVG, and right of the y-axis line, so clear of the
+    // y-axis tick labels.
+    expect(y.dotLabel.left).toBeGreaterThanOrEqual(0);
+    expect(y.dotLabel.left).toBeGreaterThanOrEqual(y.yAxisX);
+    expect(y.dotLabel.right).toBeLessThanOrEqual(width);
+    expect(y.dotLabel.top).toBeGreaterThanOrEqual(0);
+    // (c) off the dashed line and off its label.
+    expect(y.dotLabel.bottom <= y.lineY - 1 || y.dotLabel.top >= y.lineY + 1).toBe(true);
+    const apart =
+      y.dotLabel.right <= y.rateLabel.left ||
+      y.rateLabel.right <= y.dotLabel.left ||
+      y.dotLabel.bottom <= y.rateLabel.top ||
+      y.rateLabel.bottom <= y.dotLabel.top;
+    expect(apart).toBe(true);
   });
 });
 
