@@ -53,8 +53,12 @@ export interface CalculatorPageProps<E, R> {
   inputsPlacement?: InputsPlacement;
 }
 
-/** The input cards as one row from lg up (two across, three from xl). */
-const INPUTS_ROW_CLASS = 'lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:items-start lg:gap-6 lg:space-y-0';
+/**
+ * The input cards as one row from lg up (two across, three from xl). From lg
+ * to below xl a last card alone in its row spans the row, as on /overview.
+ */
+const INPUTS_ROW_CLASS =
+  'lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:items-start lg:gap-6 lg:space-y-0 lg:max-xl:*:last:odd:col-span-2';
 
 const startCollapsed = () => true;
 
