@@ -20,6 +20,7 @@ import { toChartRow } from '@/app/tools/leverage-comparison/components/DcaPathCh
 import { LeverageResults } from '@/app/tools/leverage-comparison/components/LeverageResults';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { displayDollars } from '@/lib/utils/displayDollars';
+import { createSeededRng } from '@/lib/utils/random';
 import {
   dcaEffectSentence,
   relativeGapNoisePoints,
@@ -252,6 +253,87 @@ describe('dcaEffectSentence', () => {
       'The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.'
     );
     expect(sentence).not.toMatch(/0\.0 percentage points|comes from when the money goes in/);
+  });
+
+  it('does not call two gaps that print 0.1 apart the same (1x, $100 a month, 10 years)', () => {
+    // A real form input, default seed and 500 paths: the gaps print as -6.0% and -6.1%. Their
+    // unrounded difference is under 0.05 points, but the sentence may only state what the two
+    // printed numbers show.
+    const inputs = {
+      ...DEFAULT_DCA_COMPARISON_INPUTS,
+      leverageRatio: 1,
+      monthlyContribution: 100,
+      years: 10,
+      startingBalance: 5000,
+      indexMeanReturn: 0.1,
+      indexVolatility: 0.16,
+    };
+    const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '1x', inputs);
+    expect(sentence).toContain('(−6.0% of the index median)');
+    expect(sentence).toContain('gives a gap of −$1.9k (−6.1%)');
+    expect(sentence).toContain(
+      'The two relative gaps differ by about 0.1 percentage points, so at these settings the timing barely changes the comparison.'
+    );
+    expect(sentence).not.toMatch(/gaps are the same|does not change the comparison|comes from when the money goes in/);
+  });
+
+  it('says the same to one decimal place when both gaps print the same (1x, $100 a month, 5 years)', () => {
+    // A real form input, default seed and 500 paths: both gaps print as -3.3%.
+    const inputs = {
+      ...DEFAULT_DCA_COMPARISON_INPUTS,
+      leverageRatio: 1,
+      monthlyContribution: 100,
+      years: 5,
+      startingBalance: 5000,
+      indexMeanReturn: 0.1,
+      indexVolatility: 0.16,
+    };
+    const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '1x', inputs);
+    expect(sentence).toContain('(−3.3% of the index median)');
+    expect(sentence).toContain('(−3.3%). The two relative gaps are the same to one decimal place');
+  });
+
+  it('never says the gaps are the same when the two printed gaps differ (seeded grid at 1x)', () => {
+    // 1x has no noise threshold, so near-equal gaps reach the near-zero branch. 120 seeded
+    // inputs across the form's ranges, 200 paths each.
+    const rng = createSeededRng(5150);
+    const printed = (sentence: string) => {
+      const toNumber = (text: string) => Number(text.replace('−', '-').replace('+', ''));
+      const monthly = sentence.match(/\(([+−]?\d+\.\d)% of the index median\)/);
+      const yearStart = sentence.match(/gives a gap of [^(]*\(([+−]?\d+\.\d)%\)/);
+      return { monthly: monthly![1], yearStart: yearStart![1], points: Math.abs(toNumber(monthly![1]) - toNumber(yearStart![1])) };
+    };
+    let same = 0;
+    let aboutOneTenth = 0;
+    for (let k = 0; k < 120; k++) {
+      const inputs = {
+        ...DEFAULT_DCA_COMPARISON_INPUTS,
+        leverageRatio: 1,
+        paths: 200,
+        seed: 1 + Math.floor(rng() * 1e6),
+        years: 1 + Math.floor(rng() * 40),
+        monthlyContribution: 50 + Math.floor(rng() * 2000),
+        startingBalance: Math.floor(rng() * 50000),
+        indexMeanReturn: -0.05 + rng() * 0.17,
+        indexVolatility: 0.02 + rng() * 0.3,
+      };
+      const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '1x', inputs);
+      const gaps = printed(sentence);
+      if (gaps.monthly !== gaps.yearStart) {
+        expect(sentence, JSON.stringify(inputs)).not.toMatch(/gaps are the same|does not change the comparison/);
+      }
+      if (sentence.includes('the same to one decimal place')) {
+        same++;
+        expect(gaps.monthly, JSON.stringify(inputs)).toBe(gaps.yearStart);
+      }
+      if (sentence.includes('differ by about 0.1 percentage points')) {
+        aboutOneTenth++;
+        expect(gaps.points, JSON.stringify(inputs)).toBeCloseTo(0.1, 9);
+      }
+    }
+    // The grid reaches both wordings of the near-zero branch.
+    expect(same).toBeGreaterThan(0);
+    expect(aboutOneTenth).toBeGreaterThan(0);
   });
 
   it('says the two timings are the same when the monthly contribution is 0', () => {

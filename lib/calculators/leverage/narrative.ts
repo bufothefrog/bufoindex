@@ -103,11 +103,13 @@ export function dcaEffectSentence(
   const diffPoints = (dcaRel - yearStartRel) * 100;
   const pointsText = `${Math.abs(diffPoints).toFixed(1)} percentage points`;
   const noise = relativeGapNoisePoints(inputs);
+  const dcaRelText = formatPercent(dcaRel, SIGNED_ONE_DECIMAL);
+  const yearStartRelText = formatPercent(yearStartRel, SIGNED_ONE_DECIMAL);
   const gaps =
     `With monthly contributions the ${L} fund's median ends ${direction(dcaGap)} the index fund's ` +
-    `median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} (${formatPercent(dcaRel, SIGNED_ONE_DECIMAL)} of the index median). ` +
+    `median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} (${dcaRelText} of the index median). ` +
     `Investing the same ${formatCurrency(12 * Math.max(0, inputs.monthlyContribution), COMPACT)} a year at the start of each year gives a gap of ` +
-    `${formatCurrency(display(yearStartGap), COMPACT_SIGNED)} (${formatPercent(yearStartRel, SIGNED_ONE_DECIMAL)}).`;
+    `${formatCurrency(display(yearStartGap), COMPACT_SIGNED)} (${yearStartRelText}).`;
 
   if (noise > 0 && Math.abs(diffPoints) < noise) {
     return (
@@ -116,8 +118,15 @@ export function dcaEffectSentence(
     );
   }
   if (Math.abs(diffPoints) < 0.05) {
-    // The difference prints as 0.0 points: nothing to attribute to timing.
-    return `${gaps} The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.`;
+    // The difference rounds to 0.0 points: nothing to attribute to timing.
+    // The sentence may only state what the two printed gaps show. Each gap
+    // is rounded on its own, so they can print one step apart; two values
+    // less than 0.05 apart round at most 0.1 apart (each rounding moves a
+    // value by at most 0.05), so "about 0.1" agrees with the printed gaps.
+    if (dcaRelText === yearStartRelText) {
+      return `${gaps} The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.`;
+    }
+    return `${gaps} The two relative gaps differ by about 0.1 percentage points, so at these settings the timing barely changes the comparison.`;
   }
   const sign = diffPoints >= 0 ? '+' : MINUS;
   const noiseNote =
