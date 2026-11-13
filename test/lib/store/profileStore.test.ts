@@ -454,6 +454,29 @@ describe('rehydration from localStorage', () => {
     expect(profile.provided).not.toContain('investing.investedBalance');
   });
 
+  it('loads a v2 profile whose lists hold a null entry, keeping its answers and dropping only the null rows', async () => {
+    const base = defaultPayloadAt90ef4ed().portfolio as { accounts: unknown[]; holdings: unknown[]; securities: unknown[] };
+    const v2 = {
+      ...defaultPayloadAt90ef4ed(),
+      person: { ...(defaultPayloadAt90ef4ed().person as Record<string, unknown>), age: 41 },
+      portfolio: {
+        ...base,
+        accounts: [null, ...base.accounts],
+        holdings: [...base.holdings, null],
+        securities: [null, ...base.securities],
+      },
+      provided: ['person.age', 'portfolio.accounts', 'portfolio.holdings', 'portfolio.securities'],
+    };
+    await rehydrateWith(storedAt90ef4ed(v2));
+    const { profile, hasHydrated } = getState();
+    expect(hasHydrated).toBe(true);
+    expect(profile.person.age).toBe(41);
+    expect(profile.portfolio.accounts.map((a) => a.id)).toEqual(['acc-roth', 'acc-brok']);
+    expect(profile.portfolio.holdings).toEqual(base.holdings);
+    expect(readPersisted()?.version).toBe(3);
+    expect(readPersisted()?.state.profile).toEqual(profile);
+  });
+
   it('reads a payload saved by a later version but never overwrites it', async () => {
     const saved = {
       ...getDefaultFinancialProfile(),

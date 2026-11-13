@@ -184,6 +184,36 @@ describe('example 4: IRA balances answered', () => {
   });
 });
 
+describe('a typed IRA balance at or below the holdings of its kind', () => {
+  it('adds no rest row: a Roth IRA typed 3,000 next to Roth IRA holdings worth 4,100 keeps 4,100', () => {
+    const out = migrateV2Payload(
+      v2With({ 'ira.roth': true, 'ira.rothBalance': 3000 }, [
+        'ira.roth',
+        'ira.rothBalance',
+        'portfolio.accounts',
+        'portfolio.holdings',
+      ])
+    );
+    expect((out.portfolio as Record<string, unknown>).accounts).toEqual([
+      account('acc-roth', 'roth-ira', 'Roth IRA', 0),
+      account('acc-brok', 'brokerage', 'Brokerage', 0),
+    ]);
+    expect(iraBalances(getOf(out))).toEqual({ traditional: 0, roth: 4100 });
+  });
+
+  it('adds no rest row when the typed balance equals the holdings (4,100)', () => {
+    const out = migrateV2Payload(
+      v2With({ 'ira.roth': true, 'ira.rothBalance': 4100 }, [
+        'ira.roth',
+        'ira.rothBalance',
+        'portfolio.accounts',
+        'portfolio.holdings',
+      ])
+    );
+    expect((out.portfolio as { accounts: { id: string }[] }).accounts.map((a) => a.id)).toEqual(['acc-roth', 'acc-brok']);
+  });
+});
+
 describe('example 5: has401k and hsa.eligible answered yes', () => {
   it('keeps the unanswered v3 example and suggests an HSA', () => {
     const { out, portfolio } = migrated('5');
@@ -358,6 +388,36 @@ describe('robustness', () => {
     // A non-finite balance is unanswered: the example lists stay.
     expect((out.portfolio as Record<string, unknown>).accounts).toEqual(EXAMPLE.accounts);
     expect(out.provided).toEqual([]);
+  });
+
+  it('drops a null entry in the accounts, holdings and an answered securities list instead of throwing', () => {
+    const base = defaultPayloadAt90ef4ed().portfolio as { accounts: unknown[]; holdings: unknown[]; securities: unknown[] };
+    const payload = v2With(
+      {
+        'person.age': 41,
+        'investing.investedBalance': 30000,
+        'portfolio.accounts': [null, ...base.accounts, 7],
+        'portfolio.holdings': [null, ...base.holdings, 'x'],
+        'portfolio.securities': [null, ...base.securities],
+      },
+      ['person.age', 'investing.investedBalance', 'portfolio.accounts', 'portfolio.holdings', 'portfolio.securities']
+    );
+    const out = migrateV2Payload(payload);
+    const portfolio = out.portfolio as Record<string, unknown>;
+    expect(getAt(out, 'person.age')).toBe(41);
+    expect((portfolio.accounts as { id: string }[]).map((a) => a.id)).toEqual(['acc-roth', 'acc-brok', 'acc-other']);
+    expect(portfolio.holdings).toEqual(base.holdings);
+    expect(portfolio.securities).toEqual(base.securities);
+    // 4,100 + 8,775 + the rest 17,125 = 30,000.
+    expect(investedBalance(getOf(out))).toBe(30000);
+  });
+
+  it('drops a null entry of an answered securities list when the lists are unanswered', () => {
+    const base = defaultPayloadAt90ef4ed().portfolio as { securities: unknown[] };
+    const out = migrateV2Payload(
+      v2With({ 'portfolio.securities': [null, ...base.securities] }, ['portfolio.securities'])
+    );
+    expect((out.portfolio as Record<string, unknown>).securities).toEqual(EXAMPLE.securities);
   });
 
   it('does not mutate its input', () => {

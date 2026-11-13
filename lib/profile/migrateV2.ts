@@ -30,7 +30,7 @@
  */
 
 import { getAt, isRecord, makeGet } from '@/lib/fields/paths';
-import { isFiniteNumber, listRows } from '@/lib/fields/runtime';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 import { ACCOUNT_KINDS, accountValue, exampleAccountLists, holdingsValue } from './accounts';
 import type { AccountKind, AccountRow } from './accountTypes';
 
@@ -118,11 +118,16 @@ function freeId(base: string, taken: ReadonlySet<unknown>): string {
   return `${base}-${n}`;
 }
 
+/** The record entries of a raw list (null, numbers and other non-records dropped); [] when it is not a list. */
+function records(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
 /** The example securities with the prices of an answered v2 securities list. */
 function registryFrom(rawSecurities: unknown, securitiesAnswered: boolean): Record<string, unknown>[] {
   const example = exampleAccountLists().securities as unknown as Record<string, unknown>[];
   if (!securitiesAnswered) return example;
-  const raw = listRows(rawSecurities);
+  const raw = records(rawSecurities);
   return example.map((security) => {
     if (!EXAMPLE_SECURITY_IDS.has(security.id as string)) return security;
     const stored = raw.find((row) => row.id === security.id);
@@ -135,7 +140,7 @@ function registryFrom(rawSecurities: unknown, securitiesAnswered: boolean): Reco
 function migratedAccounts(rawAccounts: unknown): { rows: AccountRow[]; deposits: Map<string, unknown> } {
   const rows: AccountRow[] = [];
   const deposits = new Map<string, unknown>();
-  for (const raw of listRows(rawAccounts)) {
+  for (const raw of records(rawAccounts)) {
     const id = raw.id;
     if (typeof id !== 'string' || id.trim() === '' || deposits.has(id)) continue;
     const name = typeof raw.name === 'string' ? raw.name : '';
@@ -186,15 +191,16 @@ export function migrateV2Payload(raw: unknown): Record<string, unknown> {
     let deposits = new Map<string, unknown>();
     if (owned) {
       ({ rows, deposits } = migratedAccounts(portfolio.accounts));
-      portfolio.holdings = Array.isArray(portfolio.holdings) ? portfolio.holdings : [];
-      portfolio.securities = Array.isArray(portfolio.securities) ? portfolio.securities : [];
+      // Non-record entries (a stored null) are dropped here, as normalization drops them.
+      portfolio.holdings = records(portfolio.holdings);
+      portfolio.securities = records(portfolio.securities);
     } else {
       portfolio.holdings = [];
       portfolio.securities = registry;
     }
-    const holdings = portfolio.holdings as unknown[];
+    const holdings = portfolio.holdings as Record<string, unknown>[];
     const lists = () => makeGet({ portfolio: { accounts: rows, holdings, securities: portfolio.securities } });
-    const taken = () => new Set<unknown>([...rows.map((r) => r.id), ...listRows(holdings).map((h) => h.accountId)]);
+    const taken = () => new Set<unknown>([...rows.map((r) => r.id), ...holdings.map((h) => h.accountId)]);
 
     // 4. A typed IRA balance above the holdings of the rows of its kind adds the rest.
     const addIraRest = (typedBalance: number | null, kind: AccountKind, restName: string) => {
