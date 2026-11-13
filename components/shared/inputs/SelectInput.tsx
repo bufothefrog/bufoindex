@@ -63,6 +63,7 @@ export function SelectInput({
     onChange(e.target.value);
   };
   const { describedBy } = fieldMessageIds(name, help, error);
+  const showsPlaceholder = Boolean(placeholder) && value === '';
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -95,6 +96,8 @@ export function SelectInput({
             "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             "hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
             "appearance-none pr-10", // Remove default arrow, add padding for custom arrow
+            // Nothing chosen: the placeholder shows muted, like an input's placeholder.
+            showsPlaceholder && "text-muted-foreground",
             error && "border-destructive focus-visible:ring-destructive"
           )}
         >
@@ -108,6 +111,7 @@ export function SelectInput({
               key={option.value}
               value={option.value}
               disabled={option.disabled}
+              className="text-foreground"
             >
               {option.label}
             </option>

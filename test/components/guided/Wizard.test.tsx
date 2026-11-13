@@ -793,7 +793,9 @@ describe('Wizard, blank fields (nothing pre-filled)', () => {
     expect(screen.getByLabelText('Fixture percent')).toHaveValue('');
     expect(screen.getByLabelText('Fixture percent')).toHaveAttribute('placeholder', '4.0');
     expect(screen.getByLabelText('Fixture select')).toHaveValue('');
-    expect(screen.getByLabelText('Fixture select')).toHaveDisplayValue('Select');
+    // A blank select shows its typical option's label, muted, with nothing chosen.
+    expect(screen.getByLabelText('Fixture select')).toHaveDisplayValue('Every two weeks');
+    expect(screen.getByLabelText('Fixture select')).toHaveClass('text-muted-foreground');
     expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveValue('');
     expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveAttribute('placeholder', 'Select');
 

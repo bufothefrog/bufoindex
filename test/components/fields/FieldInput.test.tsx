@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FieldInput } from '@/components/fields';
 import type { CustomRenderer, CustomRendererProps, FieldInputProps } from '@/components/fields';
+import { BLANK_SELECT_LABEL, type FieldDisplay } from '@/components/fields/FieldInput';
 import type { FieldSpec } from '@/lib/fields/types';
 import { FieldHarness, ResizeObserverStub, writeSpy } from './harness';
 
@@ -478,5 +479,69 @@ describe('FieldInput: word units', () => {
     renderField({ ...AGE, unit: { suffix: 'x' } }, { person: { age: 30 } });
     expect(screen.getByRole('textbox', { name: 'Age' })).toHaveAccessibleDescription('Your age today');
     expect(screen.getByText('x')).toBeVisible();
+  });
+});
+
+describe('FieldInput: a blank select (the wizard display layer)', () => {
+  const HSA_COVERAGE: FieldSpec = {
+    path: 'hsa.coverage',
+    kind: 'select',
+    label: 'HSA coverage',
+    tier: 'details',
+    options: [
+      { value: 'individual', label: 'Individual' },
+      { value: 'family', label: 'Family' },
+    ],
+  };
+
+  function renderBlank(display: FieldDisplay, onWrite = writeSpy()) {
+    render(
+      <FieldHarness initial={{ hsa: { coverage: 'family' } }} onWrite={onWrite}>
+        {({ get, onWrite: write }) => <FieldInput spec={HSA_COVERAGE} get={get} onWrite={write} display={display} />}
+      </FieldHarness>
+    );
+    return onWrite;
+  }
+
+  it('shows the typical option label in the closed control, muted, and stays unanswered', () => {
+    const onWrite = renderBlank({ blank: true, typical: 'family', typicalTag: true });
+    const select = screen.getByRole('combobox', { name: 'HSA coverage' });
+    // Nothing is chosen: the empty placeholder option is selected and shows the typical label.
+    expect(select).toHaveValue('');
+    expect(select).toHaveDisplayValue('Family');
+    expect(select).toHaveClass('text-muted-foreground');
+    // The open list still tags the typical option, in the normal text color.
+    const typicalOption = screen.getByRole('option', { name: 'Family (typical)' });
+    expect(typicalOption).toHaveClass('text-foreground');
+    expect((typicalOption as HTMLOptionElement).selected).toBe(false);
+    // Rendering writes nothing, so the field does not count as answered.
+    expect(onWrite).not.toHaveBeenCalled();
+  });
+
+  it('shows the typical label without the tag when the caller does not tag options', () => {
+    renderBlank({ blank: true, typical: 'individual' });
+    const select = screen.getByRole('combobox', { name: 'HSA coverage' });
+    expect(select).toHaveValue('');
+    expect(select).toHaveDisplayValue('Individual');
+    expect(screen.queryByRole('option', { name: /\(typical\)/ })).not.toBeInTheDocument();
+  });
+
+  it('still shows "Select" when there is no typical value', () => {
+    for (const typical of [undefined, 'not-an-option']) {
+      renderBlank({ blank: true, typical });
+      const select = screen.getByRole('combobox', { name: 'HSA coverage' });
+      expect(select).toHaveValue('');
+      expect(select).toHaveDisplayValue(BLANK_SELECT_LABEL);
+      expect(select).toHaveClass('text-muted-foreground');
+      cleanup();
+    }
+  });
+
+  it('shows an answered value in the normal text color', () => {
+    renderBlank({ blank: false, typical: 'individual', typicalTag: true });
+    const select = screen.getByRole('combobox', { name: 'HSA coverage' });
+    expect(select).toHaveValue('family');
+    expect(select).toHaveDisplayValue('Family');
+    expect(select).not.toHaveClass('text-muted-foreground');
   });
 });

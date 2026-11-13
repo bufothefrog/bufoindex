@@ -32,8 +32,10 @@ import type { FieldInputProps, FieldListProps, FieldSize } from './types';
 export interface FieldDisplay {
   /**
    * Render the field with no value: money, number, percent and text inputs
-   * empty with the typical value as the placeholder, a select or state with
-   * its empty "Select" option, a choice with nothing selected. List, custom
+   * empty with the typical value as the placeholder, a select with nothing
+   * chosen and its typical option's label (or "Select" without one) muted in
+   * the closed control, a state with its empty "Select" option, a choice
+   * with nothing selected. List, custom
    * and slider fields ignore it.
    */
   blank: boolean;
@@ -257,6 +259,11 @@ export function FieldInput({
       case 'select': {
         const options = resolveOptions(spec, get);
         const typicalOption = display?.typicalTag && isOptionValue(typical) ? typical : undefined;
+        // A blank select shows the label of the option Next would take as its
+        // placeholder (muted, like a blank number input's typical value).
+        // It is the placeholder option, so the value stays '' (unanswered).
+        const typicalLabel =
+          blank && isOptionValue(typical) ? options.find((option) => option.value === typical)?.label : undefined;
         return (
           <TestIdBox testId={testId}>
             <SelectInput
@@ -274,7 +281,7 @@ export function FieldInput({
                 value: String(option.value),
                 label: typicalOption === option.value ? `${option.label} ${TYPICAL_OPTION_SUFFIX}` : option.label,
               }))}
-              placeholder={blank ? (spec.placeholder ?? BLANK_SELECT_LABEL) : spec.placeholder}
+              placeholder={blank ? (typicalLabel ?? spec.placeholder ?? BLANK_SELECT_LABEL) : spec.placeholder}
               size={inputSize}
             />
           </TestIdBox>
