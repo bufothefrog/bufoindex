@@ -39,7 +39,7 @@ The traditional IRA, Roth IRA and taxable parts of Auto monthly investing can ea
 - **Month 0.** The simulation has no calendar. Simulated year k covers months [12k, 12k + 12) from today, so the first yearly amount lands at month 0, then every 12 months; N years get N yearly amounts, the same dollars as 12N monthly amounts. This year's deposit, if already made, is in today's balance, and the month-0 amount stands for next year's, placed up to 11 months early (up to +7.3% on the yearly stream at 8%). Retirement ages are whole, so no yearly amount lands at retirement and the last one grows a full year.
 - **Proration.** Where the horizon ends inside a year (the leverage engine, or a fractional age in the custom closed form), the last yearly amount is prorated: yearStart x months left / 12 (`yearStartDeposit`, `scheduleFutureValue`), so both timings put in the same total.
 - **Placement per engine.** Retirement and the paycheck projections place monthly money at the END of each month (per year: add the yearly amount, then 12 times grow and add the monthly amount). The leverage engine places money at the START of each month: in month m the monthly stream does dca = (dca + c) x G_m and the start-of-year stream ys = (ys + yearStartDeposit(12c, m - 1, months)) x G_m. Both placements are kept from before, so a visitor with every part monthly sees the same numbers.
-- **Solvers.** Coast, the inflation breakeven and the savings-rate curve take the share of the yearly total that lands at the start of the year from `yearStartShareOf(monthlySavings, yearStartSavings)` and divide by `scheduleFactor(r, months, share)`. Minimum savings solves for the monthly part with the yearly part kept as it is.
+- **Solvers.** The savings-rate curve takes the share of the yearly total that lands at the start of the year from `yearStartShareOf(monthlySavings, yearStartSavings)` and divides by `scheduleFactor(r, months, share)`. Minimum savings solves for the monthly part with the yearly part kept as it is.
 - **The leverage card** always computes both timings: monthly (the headline, chart and tails) and the same yearly amount at the start of each year (the comparison row). The paycheck allocator does not read the timing leaves.
 
 **One monthly-rate convention.** Wherever a balance compounds monthly, i = `monthlyRateOf(r)` = (1 + r)^(1/12) - 1, so twelve months compound to exactly 1 + r, the rule that also grows the starting balance, and monthly and yearly streams are compared at the same annual rate. Every place that turns a yearly return into a monthly one:
@@ -49,15 +49,12 @@ The traditional IRA, Roth IRA and taxable parts of Auto monthly investing can ea
 3. `retirement.ts` `calculateRetirementAnalysis`, TDF `netWorthByAge` loop: effective, via `growOneYear`.
 4. `retirement.ts` `calculateRetirementAnalysis`, custom `netWorthByAge`: effective, via `scheduleFutureValue`.
 5. `retirement.ts` `calculateMinimumSavingsNeeded`: effective.
-6. `coastFire.ts` `findCoastFireAge`: effective.
-7. `coastFire.ts` `calculateMonthlyContributionsForCoastFire`: effective.
-8. `inflationAdjustment.ts` `calculateInflationBreakeven`: effective.
-9. `leverageComparison.ts` `simulateDcaComparison`: the same rule in log space, (ln(1 + mu) - sigma^2 / 2) / 12.
-10. `savingsRate.ts` `requiredSavingsCurve`: effective since PR 5 (r / 12 before).
-11. `analysis.ts` `calculateTwentyYearDebtOpportunityCost`: effective since PR 5 (r / 12 before).
-12. `projections.ts` `projectTenYearNetWorth` and `calculateFIAge`: each yearly stream is 12 end-of-month deposits at `monthlyRateOf(r)` since PR 5 (one deposit at year end before).
+6. `leverageComparison.ts` `simulateDcaComparison`: the same rule in log space, (ln(1 + mu) - sigma^2 / 2) / 12.
+7. `savingsRate.ts` `requiredSavingsCurve`: effective since PR 5 (r / 12 before).
+8. `analysis.ts` `calculateTwentyYearDebtOpportunityCost`: effective since PR 5 (r / 12 before).
+9. `projections.ts` `projectTenYearNetWorth` and `calculateFIAge`: each yearly stream is 12 end-of-month deposits at `monthlyRateOf(r)` since PR 5 (one deposit at year end before).
 
-Not compounding, so they stay a plain / 12: monthly shares of annual dollar figures (`analysis.ts`, `optimization.ts`, the `core.ts` bonus). Compounding yearly with no monthly rate: `futureValueOfAnnuity` in the Conservative legacy, `core.ts` `calculateCompoundGrowth`, `analysis.ts` `calculateCompoundOpportunityCost`, `coastFire.ts` `calculateCoastFireBalance`. The methodology page's "Contribution Timing" entry shows the formula and a worked example.
+Not compounding, so they stay a plain / 12: monthly shares of annual dollar figures (`analysis.ts`, `optimization.ts`, the `core.ts` bonus). Compounding yearly with no monthly rate: `futureValueOfAnnuity` in the Conservative legacy, `core.ts` `calculateCompoundGrowth` and `analysis.ts` `calculateCompoundOpportunityCost`. The methodology page's "Contribution Timing" entry shows the formula and a worked example.
 
 ## Paycheck allocator
 

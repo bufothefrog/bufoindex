@@ -4,9 +4,6 @@
  */
 
 import { RetirementConstants } from '@/lib/constants/retirement';
-import { ScenarioAnalysis, analyzeRetirementScenarios, determineRetirementStatus } from './scenarioAnalysis';
-import { CoastFireAnalysis, calculateCoastFireAnalysis } from './coastFire';
-import { InflationAnalysis, analyzeInflationImpact } from './inflationAdjustment';
 import { formatCurrency } from '@/lib/format';
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random';
 import {
@@ -153,17 +150,12 @@ export interface RetirementResults {
   scenarios: RetirementScenario[];
   netWorthByAge: { [age: number]: number };
   withdrawalsByAge: { [age: number]: number };
-  insights: string[];
   /**
    * The plan's implied first-year withdrawal rate: inflation-adjusted target
    * income at retirement divided by the projected balance. This is a property
    * of the plan, not a recommendation — compare it against the 4% guideline.
    */
   initialWithdrawalRate: number;
-  // Enhanced scenario analysis
-  scenarioAnalysis?: ScenarioAnalysis;
-  coastFireAnalysis?: CoastFireAnalysis;
-  inflationAnalysis?: InflationAnalysis;
 }
 
 /**
@@ -488,7 +480,8 @@ function simulateSingleRetirementPath(
 }
 
 /**
- * Calculate complete retirement analysis with advanced scenario analysis
+ * Calculate the complete retirement analysis: scenarios, net worth and
+ * withdrawals by age, and the initial withdrawal rate
  */
 export function calculateRetirementAnalysis(inputs: RetirementInputs): RetirementResults {
   const validationErrors = validateRetirementInputs(inputs);
@@ -570,122 +563,31 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
     }
   }
 
-  // Generate basic insights
-  const basicInsights = generateRetirementInsights(inputs, scenarios);
   const initialWithdrawalRate = calculateInitialWithdrawalRate(inputs);
-
-  // Enhanced scenario analysis
-  const scenarioAnalysis = analyzeRetirementScenarios(inputs);
-  const coastFireAnalysis = calculateCoastFireAnalysis(inputs);
-  const inflationAnalysis = analyzeInflationImpact(inputs);
-
-  // Combine all insights with prioritization
-  const allInsights = [
-    ...basicInsights,
-    ...scenarioAnalysis.recommendations,
-    ...coastFireAnalysis.insights,
-    ...inflationAnalysis.insights
-  ];
-
-  // Prioritize and limit insights to maximum of 3
-  const insights = prioritizeInsights(allInsights);
 
   return {
     scenarios,
     netWorthByAge,
     withdrawalsByAge,
-    insights,
     initialWithdrawalRate,
-    scenarioAnalysis,
-    coastFireAnalysis,
-    inflationAnalysis
   };
 }
 
 /**
- * Generate insights based on retirement analysis
+ * Classify the plan by its projected-to-required balance ratio and its Monte
+ * Carlo success rate. The status picks which scenarios are generated.
  */
-function generateRetirementInsights(inputs: RetirementInputs, scenarios: RetirementScenario[]): string[] {
-  const insights: string[] = [];
-
-  const primaryScenario = scenarios.find(s => s.retirementAge === inputs.retirementAge);
-  if (!primaryScenario) return insights;
-
-  const savingsRate = (inputs.monthlySavings * 12) / inputs.currentIncome;
-  const balanceRatio = primaryScenario.projectedBalance / primaryScenario.requiredBalance;
-
-  // Only return the MOST critical insight
-  // Priority 1: Critical failures (low success probability or insufficient balance)
-  if (primaryScenario.successProbability < 0.7) {
-    insights.push(`⚠️ ${Math.round((1 - primaryScenario.successProbability) * 100)}% chance of running out of money. Increase savings by $${Math.round(((primaryScenario.requiredBalance - primaryScenario.projectedBalance) / ((inputs.retirementAge - inputs.startingAge) * 12)))}/month or work ${Math.ceil((primaryScenario.requiredBalance - primaryScenario.projectedBalance) / (inputs.monthlySavings * 12 * Math.pow(1 + inputs.accumulationReturn, 1)))} years longer.`);
-    return insights; // Only return critical warning
+function determineRetirementStatus(
+  balanceRatio: number,
+  successRate: number
+): 'exceeding' | 'onTrack' | 'falling' {
+  if (balanceRatio >= 1.2 && successRate > 0.85) {
+    return 'exceeding';
   }
-
-  // Priority 2: Major opportunities (significant oversaving)
-  if (balanceRatio > 1.5) {
-    const extraYears = Math.floor((primaryScenario.projectedBalance - primaryScenario.requiredBalance) / (inputs.targetIncome * 1.5));
-    insights.push(`✅ You could retire ${extraYears} years earlier or increase spending by $${Math.round((primaryScenario.projectedBalance - primaryScenario.requiredBalance) / (inputs.lifeExpectancy - inputs.retirementAge))}/year.`);
-    return insights;
+  if (balanceRatio >= 0.9 && successRate >= 0.70) {
+    return 'onTrack';
   }
-
-  // Priority 3: Very low savings rate warning (actionable)
-  if (savingsRate < 0.10) {
-    const targetSavings = Math.max(inputs.currentIncome * 0.15 / 12, inputs.monthlySavings * 1.5);
-    insights.push(`💰 Savings rate of ${Math.round(savingsRate * 100)}% may be insufficient. Target $${Math.round(targetSavings)}/month (${Math.round(targetSavings * 12 / inputs.currentIncome * 100)}% of income).`);
-    return insights;
-  }
-
-  // If none of the above, return empty (let other modules provide insights)
-  return insights;
-}
-
-/**
- * Prioritize insights and limit to most important ones
- */
-function prioritizeInsights(allInsights: string[]): string[] {
-  if (allInsights.length <= 3) {
-    return allInsights; // If already 3 or fewer, return all
-  }
-
-  const prioritizedInsights: { insight: string; priority: number }[] = [];
-
-  allInsights.forEach(insight => {
-    let priority = 0;
-
-    // Highest priority: Critical warnings (⚠️, 🔥)
-    if (insight.includes('⚠️') || insight.includes('🔥')) {
-      priority = 10;
-    }
-    // High priority: Major opportunities (🎯, ✅, 🎉)
-    else if (insight.includes('🎯') || insight.includes('✅') || insight.includes('🎉')) {
-      priority = 8;
-    }
-    // Medium priority: Actionable insights (💰, ⚡, 🏖️)
-    else if (insight.includes('💰') || insight.includes('⚡') || insight.includes('🏖️')) {
-      priority = 6;
-    }
-    // Lower priority: General analysis (⚖️, 📊)
-    else if (insight.includes('⚖️') || insight.includes('📊')) {
-      priority = 4;
-    }
-    // Lowest priority: Everything else
-    else {
-      priority = 2;
-    }
-
-    // Boost priority for certain keywords
-    if (insight.includes('running out of money') || insight.includes('years earlier')) {
-      priority += 2;
-    }
-
-    prioritizedInsights.push({ insight, priority });
-  });
-
-  // Sort by priority (highest first) and take top 3
-  return prioritizedInsights
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, 3)
-    .map(item => item.insight);
+  return 'falling';
 }
 
 /**

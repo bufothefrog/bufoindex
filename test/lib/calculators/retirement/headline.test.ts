@@ -44,7 +44,6 @@ const results = (scenarios: RetirementScenario[], initialWithdrawalRate = 0.032)
   scenarios,
   netWorthByAge: {},
   withdrawalsByAge: {},
-  insights: [],
   initialWithdrawalRate,
 });
 

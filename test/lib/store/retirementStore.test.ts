@@ -33,11 +33,10 @@ const profileWith = (writes: Write[] = []): FinancialProfile =>
   applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
 
 /** Minimal structurally-valid results object with a distinguishing marker. */
-const fakeResults = (marker: string): RetirementResults => ({
+const fakeResults = (marker: number): RetirementResults => ({
   scenarios: [],
-  netWorthByAge: {},
+  netWorthByAge: { 0: marker },
   withdrawalsByAge: {},
-  insights: [marker],
   initialWithdrawalRate: 0.04,
 });
 
@@ -153,8 +152,8 @@ describe('errors keep the last results', () => {
 
 describe('stale-response dropping', () => {
   it('never applies a superseded run, even transiently', async () => {
-    const resultsA = fakeResults('A');
-    const resultsB = fakeResults('B');
+    const resultsA = fakeResults(1);
+    const resultsB = fakeResults(2);
     analysisSpy.mockImplementationOnce(() => resultsA).mockImplementationOnce(() => resultsB);
 
     // Every results value the store publishes: without the sequence guard the

@@ -703,11 +703,7 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     expect(result.scenarios.length).toBeGreaterThan(0)
     expect(typeof result.netWorthByAge).toBe('object')
     expect(typeof result.withdrawalsByAge).toBe('object')
-    expect(Array.isArray(result.insights)).toBe(true)
     expect(typeof result.initialWithdrawalRate).toBe('number')
-    expect(result.scenarioAnalysis).toBeDefined()
-    expect(result.coastFireAnalysis).toBeDefined()
-    expect(result.inflationAnalysis).toBeDefined()
   })
 
   it('is deterministic across repeated runs (seeded Monte Carlo)', () => {
@@ -716,12 +712,6 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     expect(a.scenarios.map((s) => s.successProbability)).toEqual(
       b.scenarios.map((s) => s.successProbability),
     )
-  })
-
-  it('limits insights to a maximum of 3 entries', () => {
-    // The prioritizeInsights cap is 3 by design; verify the contract.
-    const result = calculateRetirementAnalysis(makeInputs())
-    expect(result.insights.length).toBeLessThanOrEqual(3)
   })
 
   it('emits a netWorthByAge entry for every age from start to lifeExpectancy', () => {
@@ -940,7 +930,7 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       targetIncome: 200000, // wildly out of reach
     })
     const result = calculateRetirementAnalysis(inputs)
-    expect(result.scenarioAnalysis?.status).toBe('falling')
+    expect(result.scenarios.some((s) => s.id === 'current-plan-falling-short')).toBe(true)
     // Falling-short branch always emits the reality scenarios.
     expect(result.scenarios.some((s) => s.id === 'reality-age')).toBe(true)
     expect(result.scenarios.some((s) => s.id === 'reality-income')).toBe(true)
@@ -953,7 +943,12 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       targetIncome: 30000,
     })
     const result = calculateRetirementAnalysis(inputs)
-    expect(result.scenarioAnalysis?.status).toBe('exceeding')
+    expect(result.scenarios.some((s) => s.id === 'current-plan-exceeding')).toBe(true)
+  })
+
+  it('drives an "on track" status when the plan roughly meets its target', () => {
+    const result = calculateRetirementAnalysis(makeInputs({ riskProfile: 'tdf' }))
+    expect(result.scenarios.some((s) => s.id === 'current-plan-baseline')).toBe(true)
   })
 
   it('gives the "live on affordable income" scenario a high success probability (4% rule, no double inflation)', () => {
@@ -976,7 +971,7 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       riskProfile: 'custom',
     })
     const result = calculateRetirementAnalysis(inputs)
-    expect(result.scenarioAnalysis?.status).toBe('falling')
+    expect(result.scenarios.some((s) => s.id === 'current-plan-falling-short')).toBe(true)
 
     const reality = result.scenarios.find((s) => s.id === 'reality-income')
     expect(reality).toBeDefined()
