@@ -72,14 +72,14 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 const EVERY_LEAF: readonly string[] = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS];
 
 /** Each card's title, tier, description and the line its collapsed body shows. */
-function collapsedLines(form: FormSpec, get: Get) {
+function collapsedLines(form: FormSpec, get: Get, provided: readonly string[] = EVERY_LEAF) {
   render(
     <FieldSections
       form={form}
       get={get}
       errors={{}}
       onWrite={() => {}}
-      provided={EVERY_LEAF}
+      provided={provided}
       initiallyCollapsed={() => true}
     />
   );
@@ -126,5 +126,27 @@ describe('collapsed cards across the calculators', () => {
       '$7,250 gross twice a month, $5,100 take-home',
       '$6,200 a month',
     ]);
+  });
+});
+
+describe('collapsed cards with nothing answered', () => {
+  it('show the description on core cards, not the placeholder defaults', () => {
+    const cards = collapsedLines(FORMS.paycheck, profileGet(), []);
+    const core = cards.filter((card) => card.tier === 'core');
+    expect(core.length).toBeGreaterThan(0);
+    for (const card of core) expect(card.line, card.title).toBe(card.description ?? '');
+    expect(core[0].line).not.toContain('30, TX');
+  });
+
+  it('show the summary once one field on a core card is answered', () => {
+    const lines = collapsedLines(FORMS.paycheck, profileGet(), ['person.age']).map((card) => card.line);
+    expect(lines[0]).toBe('30, TX, single');
+  });
+
+  it('still show values on assumption cards', () => {
+    const cards = collapsedLines(FORMS.paycheck, profileGet(), []);
+    for (const card of cards.filter((each) => each.tier === 'assumption')) {
+      expect(card.line, card.title).not.toBe(card.description ?? '');
+    }
   });
 });

@@ -40,6 +40,11 @@ export function FieldSections({
     }
     return screen.tier === 'assumption';
   };
+  // A core screen with no answered field holds only placeholder defaults, so
+  // its collapsed line shows the description rather than those defaults
+  // (coreSummary leaves unanswered facts out the same way).
+  const summarize = (screen: ScreenSpec): boolean =>
+    screen.tier !== 'core' || visibleScreenFields(form, screen, get).some((spec) => answered.has(spec.path));
   const isCollapsed = (screen: ScreenSpec) => pinned[screen.id] ?? startsCollapsed(screen);
   const isShownCollapsed = (screen: ScreenSpec) => isCollapsed(screen) && !screenHasError(form, screen, get, errors);
 
@@ -67,6 +72,7 @@ export function FieldSections({
           onWrite={(writes) => handleWrite(screen, writes)}
           renderers={renderers}
           collapsed={isCollapsed(screen)}
+          summarize={summarize(screen)}
           onToggle={() => setPinned({ ...pinned, [screen.id]: !isShownCollapsed(screen) })}
           onRestoreDefaults={onRestoreDefaults ? () => onRestoreDefaults(screen) : undefined}
         />

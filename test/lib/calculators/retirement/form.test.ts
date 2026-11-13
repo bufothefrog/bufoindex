@@ -169,8 +169,11 @@ describe('retirement form: screens', () => {
 
   it('summarizes the collapsed core cards with their values; take-home pay is not on them', () => {
     const summary = (id: string, get = fromDefaults()) => summarizeScreen(RETIREMENT_FORM, screen(id), get);
-    // The filing status shows only when it runs here as single (the form's own FILING summary).
-    expect(summary('about')).toBe('30, TX');
+    // The filing status always shows; it says so when it runs here as single (the form's own FILING summary).
+    expect(summary('about')).toBe('30, TX, single');
+    expect(summary('about', fromDefaults({ 'person.filingStatus': 'marriedJoint' }))).toBe(
+      '30, TX, married filing jointly'
+    );
     expect(summary('about', fromDefaults({ 'person.filingStatus': 'marriedSeparate' }))).toBe(
       '30, TX, married filing separately, run here as single'
     );

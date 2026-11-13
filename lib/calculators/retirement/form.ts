@@ -18,6 +18,7 @@ import {
   RETIREMENT_AFTER_AGE,
   RETIREMENT_AGE,
   STATE,
+  filingStatusSummary,
   intakeDerivedWrites,
   withOverrides,
 } from '@/lib/fields/shared';
@@ -56,12 +57,15 @@ const MUST_PAY = withOverrides(NECESSARY_MONTHLY, {
 /**
  * O10: the filing status says when the saved one runs as single, whatever
  * the results column shows (none yet, out of date, or a failed run): in full
- * as a note on the open card, and in the collapsed card's summary.
+ * as a note on the open card, and in the collapsed card's summary. A status
+ * that runs as-is shows as the shared summary piece ("single").
  */
 const FILING = withOverrides(FILING_STATUS, {
   summary: (value) => {
     const status = value as FilingStatus;
-    return retirementFilingStatus(status) === status ? null : `${FILING_STATUS_META[status].phrase}, run here as single`;
+    return retirementFilingStatus(status) === status
+      ? filingStatusSummary(status)
+      : `${FILING_STATUS_META[status].phrase}, run here as single`;
   },
 });
 

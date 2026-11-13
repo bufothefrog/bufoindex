@@ -33,7 +33,7 @@
  *   over a relation error on the same path.
  */
 
-import { formatCount } from '@/lib/format';
+import { formatCount, formatCurrency } from '@/lib/format';
 import { joinPath } from './paths';
 import type {
   CrossFieldRule,
@@ -337,7 +337,8 @@ function countNoun(label: string, count: number): string {
  *   "no debts");
  * - a nullable field holding null: "<label>: Auto";
  * - a value that matches an option: "<label>: <option label>";
- * - a number: "<label>: <formatFieldValue>" ("Your age: 30", "Rate: 4.5%");
+ * - a number: "<label>: <formatFieldValue>" ("Your age: 30", "Rate: 4.5%"),
+ *   money in whole dollars as elsewhere on the site ("Cash: $12,042");
  * - a boolean without options: "<label>: Yes" or "No";
  * - a non-blank string: "<label>: <string>".
  *
@@ -352,7 +353,9 @@ export function fallbackSummary(spec: FieldSpec, value: unknown, get: Get): stri
   if (isEmptyValue(value)) return null;
   const option = resolveOptions(spec, get).find((candidate) => candidate.value === value);
   if (option) return `${spec.label}: ${option.label}`;
-  if (isFiniteNumber(value)) return `${spec.label}: ${formatFieldValue(spec, value)}`;
+  if (isFiniteNumber(value)) {
+    return `${spec.label}: ${spec.kind === 'money' ? formatCurrency(value) : formatFieldValue(spec, value)}`;
+  }
   if (typeof value === 'boolean') return `${spec.label}: ${value ? 'Yes' : 'No'}`;
   if (typeof value === 'string') return `${spec.label}: ${value.trim()}`;
   return null;

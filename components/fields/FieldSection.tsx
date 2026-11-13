@@ -62,6 +62,7 @@ export function FieldSection({
   onWrite,
   renderers,
   collapsed = false,
+  summarize = true,
   onToggle,
   onRestoreDefaults,
 }: FieldSectionProps) {
@@ -139,7 +140,7 @@ export function FieldSection({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {summarizeScreen(form, screen, get) || screen.description}
+              {(summarize && summarizeScreen(form, screen, get)) || screen.description}
             </p>
           )}
         </div>

@@ -605,7 +605,8 @@ describe('fallbackSummary', () => {
     expect(fallbackSummary(FILING, 'marriedJoint', get)).toBe('Filing status: Married filing jointly');
     expect(fallbackSummary(MATCH, 0.035, get)).toBe('Employer match: 3.5%');
     expect(fallbackSummary(AGE, 30, get)).toBe('Age: 30');
-    expect(fallbackSummary(GROSS, 1234.5, get)).toBe('Gross pay: $1,234.5');
+    expect(fallbackSummary(GROSS, 1234.5, get)).toBe('Gross pay: $1,235');
+    expect(fallbackSummary(GROSS, 3631.62, get)).toBe('Gross pay: $3,632');
     expect(fallbackSummary(flag, true, get)).toBe('Invested: Yes');
     expect(fallbackSummary(flag, false, get)).toBe('Invested: No');
     expect(fallbackSummary(text, ' Car loan ', get)).toBe('Note: Car loan');
