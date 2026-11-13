@@ -217,4 +217,57 @@ describe('LeverageComparison page', () => {
     expect(profile.assumptions.leverage.indexMeanReturn).toBe(0.1);
     expect(profile.provided).not.toContain('assumptions.leverage.indexMeanReturn');
   });
+
+  describe('the inputs row from lg', () => {
+    /** matchMedia that matches Tailwind's lg ('(min-width: 64rem)') and nothing else. */
+    function desktop() {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query === '(min-width: 64rem)',
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+    }
+    const sections = () => [
+      screen.getByRole('region', { name: 'Contributions' }),
+      screen.getByRole('region', { name: 'What do you have saved and invested?' }),
+      screen.getByRole('region', { name: 'Assumptions' }),
+    ];
+    const toggleOf = (section: HTMLElement) =>
+      within(within(section).getByRole('group', { name: /^Controls for / })).getByRole('button', { name: /^(Show|Hide|Edit|Done) / });
+
+    it('starts every card collapsed to its summary line once lg matches', () => {
+      desktop();
+      render(page());
+      const [contributions, accounts, market] = sections();
+      for (const section of sections()) expect(toggleOf(section)).toHaveAttribute('aria-expanded', 'false');
+      expect(contributions).toHaveTextContent('$500/mo, 40 years, $25,000 start, 2x fund');
+      expect(within(contributions).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(accounts).toHaveTextContent('Brokerage');
+      expect(market).toHaveTextContent('10.0% return, 16.0% volatility, 4.50% financing');
+    });
+
+    it('keeps the tier defaults below lg: Contributions open, Assumptions collapsed', () => {
+      render(page());
+      const [contributions, , market] = sections();
+      expect(toggleOf(contributions)).toHaveAttribute('aria-expanded', 'true');
+      expect(within(contributions).getByLabelText('Leverage ratio')).toBeInTheDocument();
+      expect(toggleOf(market)).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('keeps a card the visitor opened open while they edit it, and the others collapsed', async () => {
+      desktop();
+      const user = userEvent.setup();
+      render(page());
+      const [contributions, accounts, market] = sections();
+      await user.click(toggleOf(contributions));
+      expect(toggleOf(contributions)).toHaveAttribute('aria-expanded', 'true');
+
+      await user.selectOptions(screen.getByLabelText('Leverage ratio'), '3x (UPRO-like daily-reset fund)');
+      expect(useProfileStore.getState().profile.strategy.leverageRatio).toBe(3);
+      expect(toggleOf(contributions)).toHaveAttribute('aria-expanded', 'true');
+      expect(toggleOf(accounts)).toHaveAttribute('aria-expanded', 'false');
+      expect(toggleOf(market)).toHaveAttribute('aria-expanded', 'false');
+    });
+  });
 });

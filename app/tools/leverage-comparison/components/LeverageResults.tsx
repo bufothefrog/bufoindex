@@ -153,7 +153,7 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground lg:max-w-prose">
           {dollars.caption} {AS_ENTERED}
         </p>
         <DollarModeToggle value={dollars.mode} onChange={dollars.setMode} />
@@ -167,66 +167,73 @@ export function LeverageResults({ result, inputs }: LeverageResultsProps) {
           columns={1}
           fullWidth={['behind']}
           size="lg"
-          className="gap-4 md:grid-cols-2"
+          // Three in a row from lg, where the results take the full width.
+          className="gap-4 md:grid-cols-2 lg:grid-cols-3 lg:*:col-span-1"
         />
       </div>
 
       <ResultCard title="Balance over time" icon={LineChart}>
         <ChartFrame
           deferUntilVisible
+          // The full-width chart keeps its caption at reading width.
+          className="lg:[&>figcaption]:max-w-prose"
           caption={`Balances ${dollars.chartCaption}. Lines are the median balance across ${inputs.paths} simulated paths; shaded bands span the 10th to 90th percentile. Both funds receive the same contributions on the same dates.`}
         >
           <DcaPathChart points={result.medianPath} leverageRatio={inputs.leverageRatio} />
         </ChartFrame>
       </ResultCard>
 
-      <ResultCard title="Monthly vs start of each year" icon={Scale}>
-        <div className="space-y-4">
-          <DataTable
-            caption={`Median ending balances ${dollars.chartCaption} for the index fund and the ${L} fund with the same yearly amount invested monthly or at the start of each year; contributions as entered`}
-            columns={timingColumns}
-            rows={timingRows}
-            rowKey={(row) => row.label}
-          />
-          <p className="text-sm text-muted-foreground">{dcaEffectSentence(result, L, inputs, atHorizon)}</p>
-          <p className="text-sm text-muted-foreground">
-            Paths where the {L} fund ends behind: {formatPercent(result.probLeveragedBehindDca, WHOLE)} with
-            monthly contributions, {formatPercent(result.probLeveragedBehindYearStart, WHOLE)} at the
-            start of each year. {yearStartScaleSentence(result, L)}
-          </p>
-        </div>
-      </ResultCard>
+      {/* The two comparison cards side by side from lg. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <ResultCard title="Monthly vs start of each year" icon={Scale}>
+          <div className="space-y-4">
+            <DataTable
+              caption={`Median ending balances ${dollars.chartCaption} for the index fund and the ${L} fund with the same yearly amount invested monthly or at the start of each year; contributions as entered`}
+              columns={timingColumns}
+              rows={timingRows}
+              rowKey={(row) => row.label}
+            />
+            <p className="text-sm text-muted-foreground">{dcaEffectSentence(result, L, inputs, atHorizon)}</p>
+            <p className="text-sm text-muted-foreground">
+              Paths where the {L} fund ends behind: {formatPercent(result.probLeveragedBehindDca, WHOLE)} with
+              monthly contributions, {formatPercent(result.probLeveragedBehindYearStart, WHOLE)} at the
+              start of each year. {yearStartScaleSentence(result, L)}
+            </p>
+          </div>
+        </ResultCard>
 
-      <ResultCard title="Tail and drawdown" icon={TrendingDown}>
-        <div className="space-y-4">
-          <DataTable
-            caption={`Drawdown and low-percentile outcomes for the index fund and the ${L} fund, balances ${dollars.chartCaption}`}
-            columns={measureColumns}
-            rows={measureRows}
-            rowKey={(row) => row.label}
-          />
-          <KeyValueList
-            items={[
-              {
-                id: 'months-behind',
-                label: `Months the ${L} balance trailed`,
-                subtitle: `Median across paths, out of ${months} months`,
-                value: `${monthsBehind} mo`,
-              },
-            ]}
-          />
-          <p className="text-sm text-muted-foreground">
-            Recovering from the median {L} drawdown ({formatPercent(mddLeveraged, WHOLE)}) needs a gain of{' '}
-            {recoveryGain(mddLeveraged)}; for the index fund ({formatPercent(mddIndex, WHOLE)}) it needs{' '}
-            {recoveryGain(mddIndex)}. With monthly contributions, money added during a drawdown buys
-            in at the lower price, which is part of why monthly and start-of-year contributions end at
-            different balances.
-          </p>
-        </div>
-      </ResultCard>
+        <ResultCard title="Tail and drawdown" icon={TrendingDown}>
+          <div className="space-y-4">
+            <DataTable
+              caption={`Drawdown and low-percentile outcomes for the index fund and the ${L} fund, balances ${dollars.chartCaption}`}
+              columns={measureColumns}
+              rows={measureRows}
+              rowKey={(row) => row.label}
+            />
+            <KeyValueList
+              items={[
+                {
+                  id: 'months-behind',
+                  label: `Months the ${L} balance trailed`,
+                  subtitle: `Median across paths, out of ${months} months`,
+                  value: `${monthsBehind} mo`,
+                },
+              ]}
+            />
+            <p className="text-sm text-muted-foreground">
+              Recovering from the median {L} drawdown ({formatPercent(mddLeveraged, WHOLE)}) needs a gain of{' '}
+              {recoveryGain(mddLeveraged)}; for the index fund ({formatPercent(mddIndex, WHOLE)}) it needs{' '}
+              {recoveryGain(mddIndex)}. With monthly contributions, money added during a drawdown buys
+              in at the lower price, which is part of why monthly and start-of-year contributions end at
+              different balances.
+            </p>
+          </div>
+        </ResultCard>
+      </div>
 
       <ResultCard title="Model and caveats" icon={Info}>
-        <div className="space-y-4 text-sm text-muted-foreground">
+        {/* Two text columns from lg; no block splits across them. */}
+        <div className="space-y-4 text-sm text-muted-foreground lg:columns-2 lg:gap-8 *:break-inside-avoid">
           <p>
             Each of the {inputs.paths} paths draws one index return per month from a lognormal
             distribution with a {formatPercent(inputs.indexMeanReturn, { digits: 1 })} expected annual return and{' '}
