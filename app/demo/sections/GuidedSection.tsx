@@ -7,6 +7,7 @@ import { CoreSummary } from '@/components/guided/CoreSummary';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { OptionCard } from '@/components/guided/OptionCard';
 import { ProgressDots } from '@/components/guided/ProgressDots';
+import { ReviewTopicRow } from '@/components/guided/ReviewTopicRow';
 import { CalculatorLinks } from '@/components/shared/CalculatorLinks';
 import { CORE_PATHS } from '@/lib/constants/intake';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
@@ -88,6 +89,31 @@ export function GuidedSection() {
           <div className="max-w-xl">
             <CoreSummary profile={DEMO_CORE_PROFILE} />
           </div>
+        </DemoEntry>
+        <DemoEntry
+          name="ReviewTopicRow"
+          description="One topic on the review page (/start/review): the title, a one-line summary of the answers given and a link to edit that topic alone, whose accessible name includes the topic. A topic with no answer reads 'Not answered' and its link 'Answer'."
+        >
+          <ul className="max-w-xl divide-y divide-border rounded-lg border border-border px-3">
+            <li>
+              <ReviewTopicRow
+                anchorId="demo-topic-pay"
+                title="What does a typical paycheck look like?"
+                summary="$3,500 gross every 2 weeks, $2,600 take-home"
+                status="answered"
+                href="/start/review/pay"
+              />
+            </li>
+            <li>
+              <ReviewTopicRow
+                anchorId="demo-topic-debts"
+                title="Debts"
+                summary="Not answered"
+                status="unanswered"
+                href="/start/review/debts"
+              />
+            </li>
+          </ul>
         </DemoEntry>
       </DemoBlock>
     </DemoSection>

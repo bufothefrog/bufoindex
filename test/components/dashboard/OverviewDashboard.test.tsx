@@ -127,10 +127,30 @@ describe('ProfileCompletenessCard', () => {
       '-What do you have to pay each month?',
       '-What are you investing today?',
       '-When would you like to retire?',
-      '-Social Security and healthcare',
       '-Fun money and bonuses',
+      '-Emergency fund',
     ]);
     expect(screen.getByText(`and ${total - 1 - 6} more.`)).toBeInTheDocument();
+  });
+
+  it('leaves the optional Social Security and healthcare screen out of the count, answered or not', () => {
+    const optional = [
+      'retirementIncome.socialSecurityBenefit',
+      'retirementIncome.socialSecurityAge',
+      'retirementIncome.annualHealthcareCost',
+    ];
+    const rest = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => !optional.includes(path));
+    const { total } = profileCompleteness(withProvided([]));
+    for (const provided of [rest, [...rest, ...optional]]) {
+      const { unmount } = render(<ProfileCompletenessCard profile={withProvided(provided)} />);
+      expect(screen.getByText(`${total} of ${total}`)).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: 'Profile topics answered' })).toHaveAttribute('aria-valuenow', String(total));
+      expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+      unmount();
+    }
+    // With only the basics answered, the optional screen is not listed as missing either.
+    render(<ProfileCompletenessCard profile={withProvided(['person.age', 'person.state', 'person.filingStatus'])} />);
+    expect(screen.queryByText('Social Security and healthcare')).not.toBeInTheDocument();
   });
 
   it('is complete for a visitor who answered every profile path', () => {

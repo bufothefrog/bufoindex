@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { INTAKE_DESTINATION } from '@/components/calculators/renderers';
 import { Wizard } from '@/components/guided/Wizard';
 import { FORMS, PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
-import { CORE_PATHS, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
+import { CORE_PATHS, getIntakeScreens, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
+import { makeGet } from '@/lib/fields/paths';
 import { intakePaths } from '@/test/utils/intakeFixture';
 import type { FieldOption, FormSpec, Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
@@ -191,12 +192,11 @@ describe('Wizard, remaining questions of an intent', () => {
     expect(screen.queryByRole('button', { name: /Next|Finish/ })).not.toBeInTheDocument();
   });
 
-  it('labels profile screens with their section and finishes at the overview', async () => {
+  it('labels profile screens with their section, asks the optional screen last, and finishes at the overview', async () => {
     const user = userEvent.setup();
-    // Everything answered but one retirement screen and the last two paycheck
-    // screens. The paycheck form asks the emergency fund, so the cash section
-    // is the strategy screen alone; the paycheck section is the last one with
-    // two screens left.
+    // Everything answered but the optional retirement screen and the last two
+    // paycheck screens. The optional screen comes after every section, under
+    // "Optional", and is not counted among the screens left.
     const paycheckLeft = ['ira-taxable', 'debts'];
     const unanswered = new Set(
       [
@@ -205,36 +205,40 @@ describe('Wizard, remaining questions of an intent', () => {
       ].flatMap((s) => s.fields)
     );
     answer(intakePaths('profile').filter((path) => !unanswered.has(path)));
-    const left = remainingIntakeScreens('profile', useProfileStore.getState().profile);
-    expect(left.map((s) => [s.id, profileFormSection(s.id)])).toEqual([
-      ['ss-healthcare', 'retirement'],
+    const { profile } = useProfileStore.getState();
+    const asked = getIntakeScreens('profile', makeGet(profile), { mode: 'remaining', provided: profile.provided });
+    expect(asked.map((s) => [s.id, profileFormSection(s.id)])).toEqual([
       ['ira-taxable', 'paycheck'],
       ['debts', 'paycheck'],
+      ['ss-healthcare', 'optional'],
     ]);
-    const cashAt = left.findIndex((s) => profileFormSection(s.id) === 'paycheck');
-    expect(cashAt).toBeGreaterThan(0);
+    expect(remainingIntakeScreens('profile', profile).map((s) => s.id)).toEqual(paycheckLeft);
     render(<Wizard flow="profile" />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Finish your profile' })).toBeInTheDocument();
     expect(screen.getByText('Saves your answers in this browser and opens your overview.')).toBeInTheDocument();
     const label = (i: number) =>
-      `${PROFILE_FORM_SECTION_LABELS[profileFormSection(left[i].id)!]} · Step ${i + 1} of ${left.length}`;
-    for (let i = 0; i < cashAt; i += 1) {
-      expect(screen.getByText(label(i))).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: /Next/ }));
-    }
-    expect(screen.getByText(label(cashAt))).toBeInTheDocument();
-    expect(label(cashAt).startsWith('Paycheck \u00b7 ')).toBe(true);
+      `${PROFILE_FORM_SECTION_LABELS[profileFormSection(asked[i].id)!]} \u00b7 Step ${i + 1} of ${asked.length}`;
+    expect(screen.getByText(label(0))).toBeInTheDocument();
+    expect(label(0).startsWith('Paycheck \u00b7 ')).toBe(true);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByText(label(1))).toBeInTheDocument();
     await skip(user);
-    expect(screen.getByText(label(cashAt + 1))).toBeInTheDocument();
+    expect(screen.getByText('Optional \u00b7 Step 3 of 3')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What will Social Security and healthcare look like?' })).toBeInTheDocument();
+    // A nullable field on Auto stays on Auto.
+    expect(screen.getByRole('group', { name: 'Annual healthcare cost' })).toHaveTextContent(
+      'Typical cost the model uses: $7,500'
+    );
     await skip(user);
 
     expect(replace).toHaveBeenCalledWith('/overview');
     expect(push).not.toHaveBeenCalled();
-    const { provided } = useProfileStore.getState().profile;
-    for (const screen of left.slice(0, cashAt)) expect(provided).toEqual(expect.arrayContaining([...screen.fields]));
-    expect(provided).not.toContain('debts');
-    expect(provided).not.toContain('ira.traditional');
+    const saved = useProfileStore.getState().profile.provided;
+    // Next on the IRA screen marks its visible fields answered.
+    expect(saved).toEqual(expect.arrayContaining(['ira.traditional', 'ira.roth', 'investing.taxableMonthlyContribution']));
+    expect(saved).not.toContain('debts');
+    expect(saved).not.toContain('retirementIncome.socialSecurityBenefit');
   });
 });
 

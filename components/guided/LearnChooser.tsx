@@ -134,12 +134,12 @@ export function LearnChooser({ className }: LearnChooserProps) {
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
-            Your answers are saved only in this browser. To change a saved answer,{' '}
+            Your answers are saved only in this browser. To see or change a saved answer,{' '}
             <Link
               href="/start/review"
               className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-foreground"
             >
-              review all answers
+              review your answers
             </Link>
             .
           </p>

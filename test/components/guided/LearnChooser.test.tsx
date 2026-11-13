@@ -46,9 +46,9 @@ describe('LearnChooser', () => {
       '/start/leverage',
     ]);
     expect(links[0]).toHaveTextContent('Finish your profile');
-    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 14 more questions.');
+    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 13 more questions.');
     expect(links[2]).toHaveTextContent('See if I am on track to retire');
-    expect(links[2]).toHaveTextContent('4 more questions.');
+    expect(links[2]).toHaveTextContent('3 more questions.');
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -85,6 +85,20 @@ describe('LearnChooser', () => {
     expect(first).toHaveTextContent('See your overview');
     expect(first).toHaveTextContent('Every topic is saved. The overview runs each calculator from your profile.');
     expect(screen.queryByText('Finish your profile')).not.toBeInTheDocument();
+  });
+
+  it('does not wait for the optional screen: the overview is offered with it unanswered', () => {
+    const optional = [
+      'retirementIncome.socialSecurityBenefit',
+      'retirementIncome.socialSecurityAge',
+      'retirementIncome.annualHealthcareCost',
+    ];
+    answer(intakePaths('profile').filter((path) => !optional.includes(path)));
+    render(<LearnChooser />);
+
+    expect(optionLinks()[0]).toHaveAttribute('href', '/overview');
+    // The retirement intent does not ask it either: only its assumptions are left.
+    expect(optionLinks()[2]).toHaveTextContent('1 more question.');
   });
 
   it('counts the topics still on typical values when a skipped basic is all that is left', () => {

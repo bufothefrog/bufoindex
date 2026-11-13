@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Route } from 'next';
 import { AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { FieldInput } from '@/components/fields/FieldInput';
 import { ScreenNotes } from '@/components/fields/ScreenNotes';
 import type { CustomRenderers } from '@/components/fields/types';
 import { PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
+import { REVIEW_PATH, reviewTopicReturnHref } from '@/lib/calculators/profileReview';
 import {
   BLANK_FIELDS_NOTE,
   EXAMPLE_ROWS_NOTE,
@@ -30,7 +32,7 @@ import {
 } from '@/lib/constants/intake';
 import { applyWrites, getAt, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, listRows, relationErrors, visibleScreenFields } from '@/lib/fields/runtime';
-import type { FieldErrors, FieldSpec, Get, Write } from '@/lib/fields/types';
+import type { FieldErrors, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
@@ -61,6 +63,13 @@ export interface WizardProps {
   mode?: IntakeMode;
   /** Core flow only: the intent to continue to (an IntakeIntent); otherwise the chooser. */
   next?: string;
+  /**
+   * Single-screen mode (the profile flow's /start/review/<id>): asks only the
+   * screen with this id, in 'all' mode, with Save and Cancel in place of Skip
+   * and Next. Save checks and saves the screen as Next does, then returns to
+   * the review page at that topic's row; Cancel returns without saving.
+   */
+  onlyScreen?: string;
 }
 
 // The basics can be finished with questions skipped (skipped answers keep
@@ -183,14 +192,24 @@ function WizardSkeleton() {
 interface WizardHeaderProps {
   flow: IntakeFlow;
   next?: string;
+  onlyScreen?: string;
 }
 
-/** Page heading for the flow (the basics, or the intent the visitor picked) and one short line. */
-function WizardHeader({ flow, next }: WizardHeaderProps) {
+/**
+ * Page heading for the flow (the basics, or the intent the visitor picked)
+ * and one short line; in single-screen mode, the review page's name and the
+ * topic's section.
+ */
+function WizardHeader({ flow, next, onlyScreen }: WizardHeaderProps) {
+  let eyebrow = 'Guided start';
   let title: string;
-  let line: string;
+  let line: string | undefined;
 
-  if (flow === 'core') {
+  if (onlyScreen !== undefined) {
+    const section = profileFormSection(onlyScreen);
+    eyebrow = 'Review your answers';
+    title = section ? PROFILE_FORM_SECTION_LABELS[section] : 'Your answers';
+  } else if (flow === 'core') {
     title = 'A few basics';
     line =
       next && isIntakeIntent(next)
@@ -205,10 +224,10 @@ function WizardHeader({ flow, next }: WizardHeaderProps) {
   return (
     <header className="space-y-1">
       <p className="text-xs font-medium uppercase tracking-wide text-sage-600 dark:text-sage-300">
-        Guided start
+        {eyebrow}
       </p>
       <h1 className="text-base font-medium text-foreground">{title}</h1>
-      <p className="text-sm text-muted-foreground">{line}</p>
+      {line && <p className="text-sm text-muted-foreground">{line}</p>}
     </header>
   );
 }
@@ -220,10 +239,27 @@ interface WizardFlowProps {
   flow: IntakeFlow;
   mode: IntakeMode;
   next?: string;
+  onlyScreen?: string;
   initialProfile: FinancialProfile;
 }
 
-function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
+/**
+ * The flow's screens in form order, or in single-screen mode that one screen
+ * of the form, visible or not (the gate checks it is visible on arrival; its
+ * fields are filtered for visibility as on any screen).
+ */
+function flowScreens(
+  flow: IntakeFlow,
+  get: Get,
+  mode: IntakeMode,
+  provided: readonly string[],
+  onlyScreen?: string
+): ScreenSpec[] {
+  if (onlyScreen !== undefined) return intakeForm(flow, mode).screens.filter((screen) => screen.id === onlyScreen);
+  return getIntakeScreens(flow, get, { mode, provided });
+}
+
+function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlowProps) {
   const router = useRouter();
   const setValues = useProfileStore((state) => state.setValues);
 
@@ -251,15 +287,16 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
   const [initiallyProvided] = useState<readonly string[]>(() => initialProfile.provided);
   const form = intakeForm(flow, mode);
   const renderers = renderersFor(flow);
+  const single = onlyScreen !== undefined;
   const screensAt = (values: FinancialProfile) =>
-    getIntakeScreens(flow, makeGet(values), { mode, provided: initiallyProvided });
+    flowScreens(flow, makeGet(values), mode, initiallyProvided, onlyScreen);
 
   const answers = progress.answers;
   const get = useMemo(() => makeGet(answers), [answers]);
   const arrival = useMemo(() => makeGet(seed), [seed]);
   const screens = useMemo(
-    () => getIntakeScreens(flow, get, { mode, provided: initiallyProvided }),
-    [flow, mode, initiallyProvided, get]
+    () => flowScreens(flow, get, mode, initiallyProvided, onlyScreen),
+    [flow, mode, initiallyProvided, get, onlyScreen]
   );
   const step = Math.min(index, screens.length - 1);
   const screen = screens[step];
@@ -371,6 +408,11 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
     save(confirmed);
     clearErrors();
 
+    if (single) {
+      setSubmitting(true);
+      router.push(reviewTopicReturnHref(current.id) as Route);
+      return;
+    }
     if (step >= nextScreens.length - 1) finish();
     else setIndex(step + 1);
   };
@@ -456,11 +498,13 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
-      <div className="flex min-h-11 items-center gap-3">
-        {/* The site-wide header already links home, so the first screen has no Back. */}
-        {step > 0 && <BackControl onBack={back} />}
-        <ProgressDots total={screens.length} current={step} label={sectionLabel} className="ml-auto justify-end" />
-      </div>
+      {!single && (
+        <div className="flex min-h-11 items-center gap-3">
+          {/* The site-wide header already links home, so the first screen has no Back. */}
+          {step > 0 && <BackControl onBack={back} />}
+          <ProgressDots total={screens.length} current={step} label={sectionLabel} className="ml-auto justify-end" />
+        </div>
+      )}
 
       <div className="space-y-2">
         <h2
@@ -511,7 +555,8 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
       )}
 
       {/* Sticky on phones so the primary action stays under the thumb. Two
-          actions on every screen: Skip, and Next (Finish on the last). */}
+          actions on every screen: Skip, and Next (Finish on the last); in
+          single-screen mode, Cancel and Save. */}
       <div
         className={cn(
           'sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/95 px-4 pt-3 backdrop-blur-sm',
@@ -520,12 +565,27 @@ function WizardFlow({ flow, mode, next, initialProfile }: WizardFlowProps) {
         )}
       >
         <div className="mb-1 flex items-center">
-          <button type="button" onClick={skip} disabled={submitting} className={SKIP_BUTTON_CLASS}>
-            Skip
-          </button>
+          {single ? (
+            <Link href={reviewTopicReturnHref(screen.id) as Route} className={cn(SKIP_BUTTON_CLASS, 'inline-flex items-center')}>
+              Cancel
+            </Link>
+          ) : (
+            <button type="button" onClick={skip} disabled={submitting} className={SKIP_BUTTON_CLASS}>
+              Skip
+            </button>
+          )}
         </div>
         <Button type="submit" disabled={submitting} className="h-12 w-full text-base">
-          {submitting ? (
+          {single ? (
+            submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                Saving
+              </>
+            ) : (
+              'Save'
+            )
+          ) : submitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
               Opening
@@ -546,6 +606,7 @@ interface WizardGateProps {
   flow: IntakeFlow;
   mode: IntakeMode;
   next?: string;
+  onlyScreen?: string;
   initialProfile: FinancialProfile;
 }
 
@@ -556,10 +617,16 @@ interface WizardGateProps {
  * when nothing is left to ask (so an empty wizard never renders). Frozen at
  * mount so the save on finish does not re-trigger a redirect.
  */
-function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
+function WizardGate({ flow, mode, next, onlyScreen, initialProfile }: WizardGateProps) {
   const router = useRouter();
   const [profileOnArrival] = useState(initialProfile);
   const [redirect] = useState<string | null>(() => {
+    if (onlyScreen !== undefined) {
+      // A topic the saved answers hide (the match terms without a 401(k))
+      // has nothing to edit: back to the review list.
+      const shown = getIntakeScreens(flow, makeGet(profileOnArrival), { mode });
+      return shown.some((screen) => screen.id === onlyScreen) ? null : REVIEW_PATH;
+    }
     if (mode !== 'remaining') return null;
     if (flow !== 'core' && intentNeedsCore(flow) && !isCoreReady(profileOnArrival)) return coreStartLink(flow);
     const screens = getIntakeScreens(flow, makeGet(profileOnArrival), {
@@ -574,7 +641,7 @@ function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
   }, [redirect, router]);
 
   if (redirect) return <WizardSkeleton />;
-  return <WizardFlow flow={flow} mode={mode} next={next} initialProfile={profileOnArrival} />;
+  return <WizardFlow flow={flow} mode={mode} next={next} onlyScreen={onlyScreen} initialProfile={profileOnArrival} />;
 }
 
 /**
@@ -585,23 +652,27 @@ function WizardGate({ flow, mode, next, initialProfile }: WizardGateProps) {
  * screens and the form's derived values to the profile. The core flow then continues to the chosen intent or the
  * "What do you want to learn?" chooser; an intent opens the matching
  * calculator at its `?from=profile` handoff link (or the overview for 'profile'),
- * replacing its own history entry so Back returns to the chooser.
+ * replacing its own history entry so Back returns to the chooser. In
+ * single-screen mode (`onlyScreen`, the /start/review/<id> page) it asks that
+ * one screen and Save returns to the review page.
  */
-export function Wizard({ flow, mode, next }: WizardProps) {
+export function Wizard({ flow, mode, next, onlyScreen }: WizardProps) {
   const hasHydrated = useProfileStore((state) => state.hasHydrated);
   const profile = useProfileStore((state) => state.profile);
-  const resolvedMode = resolveMode(flow, mode);
+  // Single-screen mode always asks its screen, answered or not.
+  const resolvedMode = onlyScreen !== undefined ? 'all' : resolveMode(flow, mode);
   const nextIntent = flow === 'core' && next && isIntakeIntent(next) ? next : undefined;
 
   return (
     <div className="space-y-6">
-      <WizardHeader flow={flow} next={nextIntent} />
+      <WizardHeader flow={flow} next={nextIntent} onlyScreen={onlyScreen} />
       {hasHydrated ? (
         <WizardGate
-          key={`${flow}:${resolvedMode}:${nextIntent ?? ''}`}
+          key={`${flow}:${resolvedMode}:${nextIntent ?? ''}:${onlyScreen ?? ''}`}
           flow={flow}
           mode={resolvedMode}
           next={nextIntent}
+          onlyScreen={onlyScreen}
           initialProfile={profile}
         />
       ) : (
