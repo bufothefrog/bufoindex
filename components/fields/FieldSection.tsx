@@ -25,7 +25,11 @@ const TIER_TOGGLE: Record<Tier, { expand: string; collapse: string; icon: 'edit'
   assumption: { expand: 'Show', collapse: 'Hide', icon: 'chevron' },
 };
 
-/** Kinds that take the full width of the two-column field grid. */
+/**
+ * Kinds that take the full width of the two-column field grid. The grid has
+ * two columns from md up while the card body is at least @sm (24rem) wide,
+ * so a card in a narrow column (a row of cards) keeps one field column.
+ */
 const WIDE_KINDS: ReadonlySet<FieldKind> = new Set(['choice', 'list', 'custom']);
 
 /** The collapsed line of a card with neither a summary nor a description. */
@@ -121,13 +125,13 @@ export function FieldSection({
         contentClassName={CARD_CONTENT_CLASS}
         actions={actions}
       >
-        <div id={bodyId}>
+        <div id={bodyId} className="@container">
           {open ? (
             <div className="space-y-6">
               {screen.description && <p className="text-sm text-muted-foreground">{screen.description}</p>}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 md:@sm:grid-cols-2">
                 {fields.map((spec) => (
-                  <div key={spec.path} className={cn('min-w-0', WIDE_KINDS.has(spec.kind) && 'md:col-span-2')}>
+                  <div key={spec.path} className={cn('min-w-0', WIDE_KINDS.has(spec.kind) && 'md:@sm:col-span-2')}>
                     <FieldInput
                       spec={spec}
                       get={get}

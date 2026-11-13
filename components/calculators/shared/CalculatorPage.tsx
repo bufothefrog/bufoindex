@@ -7,6 +7,8 @@ import { FieldSections } from '@/components/fields';
 import type { CustomRenderers } from '@/components/fields';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import type { InputsPlacement } from '@/components/ui/layouts/ResponsiveGrid';
+import { LG_MEDIA_QUERY, useMediaQuery } from '@/components/ui/layouts/useMediaQuery';
 import { calculatorDisclaimer, calculatorMeta } from '@/lib/calculators/registry';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { makeGet } from '@/lib/fields/paths';
@@ -43,7 +45,18 @@ export interface CalculatorPageProps<E, R> {
   renderResults: (args: CalculatorResultsArgs<E, R>) => React.ReactNode;
   /** Rendered after the layout (the retirement methodology link). */
   afterLayout?: React.ReactNode;
+  /**
+   * From lg up, the inputs beside the results (the default) or in a row of
+   * cards above them, each card starting collapsed to its summary line.
+   * Below lg both are the same.
+   */
+  inputsPlacement?: InputsPlacement;
 }
+
+/** The input cards as one row from lg up (two across, three from xl). */
+const INPUTS_ROW_CLASS = 'lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:items-start lg:gap-6 lg:space-y-0';
+
+const startCollapsed = () => true;
 
 /** The run store's key for an error that belongs to no field (createCalculatorStore). */
 const RUN_ERROR_PATH = 'calculation';
@@ -106,6 +119,7 @@ export default function CalculatorPage<E, R>({
   renderers,
   renderResults,
   afterLayout,
+  inputsPlacement = 'beside',
 }: CalculatorPageProps<E, R>) {
   const meta = calculatorMeta(definition.id);
   const { ready, arrivedFromProfile } = useCalculatorBootstrap(definition, store);
@@ -116,6 +130,12 @@ export default function CalculatorPage<E, R>({
   const errors = store((state) => state.errors);
   const stale = store((state) => state.stale);
   const provided = values.provided;
+  // From lg up (after hydration, since the server snapshot is false) a row
+  // of cards above the results starts collapsed, so it shows each card's
+  // summary; below lg the tier defaults hold. Before the first edit or
+  // toggle, crossing lg re-applies the matching default.
+  const inputsAbove = inputsPlacement === 'above';
+  const isDesktop = useMediaQuery(LG_MEDIA_QUERY);
 
   // The bootstrap's immediate submit already covers the first ready render;
   // this repeat is a memo hit (or joins the run in flight).
@@ -171,6 +191,7 @@ export default function CalculatorPage<E, R>({
         description={meta.description}
         resultsLabel={meta.liveResultsLabel}
         showResultsKey={arrivedFromProfile ? 'profile' : undefined}
+        inputsPlacement={inputsPlacement}
         inputSections={
           <FieldSections
             form={definition.form}
@@ -180,6 +201,8 @@ export default function CalculatorPage<E, R>({
             renderers={renderers}
             provided={provided}
             onRestoreDefaults={restoreDefaults}
+            className={inputsAbove ? INPUTS_ROW_CLASS : undefined}
+            initiallyCollapsed={inputsAbove && isDesktop ? startCollapsed : undefined}
           />
         }
         resultSection={resultSection}

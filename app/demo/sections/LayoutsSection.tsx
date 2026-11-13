@@ -20,9 +20,9 @@ export interface LayoutsSectionProps {
 }
 
 export function LayoutsSection({ idPrefix }: LayoutsSectionProps) {
-  const inputs = (name: string) => (
-    <InputCard title="Inputs">
-      <MoneyInput name={`${idPrefix}-${name}`} label="Monthly income" value={5000} onChange={() => {}} />
+  const inputs = (name: string, title = 'Inputs', label = 'Monthly income', value = 5000) => (
+    <InputCard title={title}>
+      <MoneyInput name={`${idPrefix}-${name}`} label={label} value={value} onChange={() => {}} />
     </InputCard>
   );
 
@@ -45,6 +45,30 @@ export function LayoutsSection({ idPrefix }: LayoutsSectionProps) {
               resultSection={<StatGrid stats={RESULTS} />}
               resultFooter={<p className="text-sm text-muted-foreground">The resultFooter slot (NextSteps on a calculator page).</p>}
               disclaimer="Layout demonstration, not financial advice."
+            />
+          </div>
+        </DemoEntry>
+        <DemoEntry
+          name="Inputs above"
+          description={<>From lg the inputs sit in one row above full-width results; used where the inputs are short. Set with <Code>inputsPlacement=&quot;above&quot;</Code>; below lg it is the same tab layout.</>}
+        >
+          <div className="rounded-lg bg-muted/30 p-2 sm:p-4">
+            <CalculatorLayout
+              title="Inputs above"
+              description="A row of short input cards over the results."
+              resultsLabel="Inputs above results"
+              inputsPlacement="above"
+              inputSections={
+                // The gallery column is narrow, so the demo row follows its
+                // own width; a calculator uses lg / xl columns.
+                <div className="@container">
+                  <div className="space-y-4 @md:grid @md:grid-cols-2 @md:items-start @md:gap-6 @md:space-y-0">
+                    {inputs('above-income', 'Income')}
+                    {inputs('above-spending', 'Spending', 'Monthly spending', 4000)}
+                  </div>
+                </div>
+              }
+              resultSection={<StatGrid stats={RESULTS} />}
             />
           </div>
         </DemoEntry>

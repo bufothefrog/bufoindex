@@ -3,7 +3,9 @@
  * Standardized layout for all BufoIndex calculators
  *
  * Results follow the inputs on their own (O8): there is no Calculate button.
- * Desktop (lg and up): a two-column grid, inputs and results. Below lg: an
+ * Desktop (lg and up): a two-column grid, inputs and results, or with
+ * inputsPlacement="above" one column, the inputs above full-width results
+ * (DOM order stays inputs, then results). Below lg: an
  * Inputs | Results tab bar that sticks to the top of the viewport and a
  * sticky bottom action bar whose one action is "See results" / "Edit
  * inputs". The mobile view switches to Results only when asked (the bar, the
@@ -21,7 +23,14 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Disclaimer } from '@/components/ui/results';
 import { ArrowLeft, ArrowRight, Calculator } from 'lucide-react';
-import { ResponsiveGrid, InputSection, ResultSection, EmptyStateSection, Container } from './ResponsiveGrid';
+import {
+  ResponsiveGrid,
+  InputSection,
+  ResultSection,
+  EmptyStateSection,
+  Container,
+  type InputsPlacement,
+} from './ResponsiveGrid';
 
 /** Which panel the mobile (below lg) view shows. */
 type CalculatorMobileTab = 'inputs' | 'results';
@@ -87,6 +96,12 @@ export interface CalculatorLayoutProps {
    * are no errors), e.g. after the `?from=profile` handoff from the intake.
    */
   showResultsKey?: string | number;
+  /**
+   * From lg up: the inputs 'beside' the results (two columns, the default)
+   * or 'above' them (one column, results at full width). Fixed per
+   * calculator in code; below lg both look the same.
+   */
+  inputsPlacement?: InputsPlacement;
 }
 
 export function CalculatorLayout({
@@ -101,9 +116,12 @@ export function CalculatorLayout({
   className,
   testId,
   showResultsKey,
+  inputsPlacement = 'beside',
 }: CalculatorLayoutProps) {
   const hasErrors = Object.keys(errors).length > 0;
   const hasResults = !!resultSection;
+  // In one column a span would create an implicit second column.
+  const beside = inputsPlacement === 'beside';
 
   const [mobileTab, setMobileTab] = useState<CalculatorMobileTab>('inputs');
   // Bumped whenever the mobile view should scroll back to the tab bar.
@@ -196,10 +214,10 @@ export function CalculatorLayout({
           </div>
 
           {/* Main Grid Layout */}
-          <ResponsiveGrid hasResults={hasResults}>
+          <ResponsiveGrid hasResults={hasResults} inputsPlacement={inputsPlacement}>
             {/* Input Section */}
             <InputSection
-              span={hasResults ? 1 : 2}
+              span={beside ? (hasResults ? 1 : 2) : undefined}
               className={cn(
                 !showInputsOnMobile && 'hidden lg:block',
                 // Keep focused fields clear of the sticky bottom bar on mobile.
@@ -219,7 +237,7 @@ export function CalculatorLayout({
             {/* Results Section */}
             {hasResults ? (
               <ResultSection
-                span={1}
+                span={beside ? 1 : undefined}
                 className={cn(!showResultsOnMobile && 'hidden lg:block')}
               >
                 <div
