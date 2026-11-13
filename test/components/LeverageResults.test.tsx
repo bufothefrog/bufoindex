@@ -21,8 +21,10 @@ import { LeverageResults } from '@/app/tools/leverage-comparison/components/Leve
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { displayDollars } from '@/lib/utils/displayDollars';
 import { createSeededRng } from '@/lib/utils/random';
+import { formatPercent } from '@/lib/format';
 import {
   dcaEffectSentence,
+  relativeGap,
   relativeGapNoisePoints,
   yearStartScaleSentence,
 } from '@/lib/calculators/leverage/narrative';
@@ -291,6 +293,107 @@ describe('dcaEffectSentence', () => {
     const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '1x', inputs);
     expect(sentence).toContain('(−3.3% of the index median)');
     expect(sentence).toContain('(−3.3%). The two relative gaps are the same to one decimal place');
+  });
+
+  it('states the difference of the two printed gaps, not the unrounded one (1x, $200 a month, 5 years)', () => {
+    // A real form input, default seed and 500 paths: the gaps print as -2.8% and -3.2%, so the
+    // stated difference is +0.4 points. The unrounded difference is under 0.35 and printed as
+    // +0.3 before.
+    const inputs = {
+      ...DEFAULT_DCA_COMPARISON_INPUTS,
+      leverageRatio: 1,
+      monthlyContribution: 200,
+      years: 5,
+      startingBalance: 5000,
+      indexMeanReturn: 0.07,
+      indexVolatility: 0.16,
+    };
+    const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '1x', inputs);
+    expect(sentence).toContain('(\u22122.8% of the index median)');
+    expect(sentence).toContain('(\u22123.2%). Both timings use the same simulated markets');
+    expect(sentence).toContain('(+0.4 percentage points) comes from when the money goes in');
+  });
+
+  it('does not say gaps that print 0.1 apart differ by 0.0 points within sampling error (3x)', () => {
+    // A real form input found by a seeded search, default seed and 500 paths: 3x, $1,450 a
+    // month, 19 years, $19,000 start, return 9%, volatility 15%. The gaps print as -6.7% and
+    // -6.8%; the unrounded difference is under 0.05 and printed as 0.0 before.
+    const inputs = {
+      ...DEFAULT_DCA_COMPARISON_INPUTS,
+      leverageRatio: 3,
+      monthlyContribution: 1450,
+      years: 19,
+      startingBalance: 19000,
+      indexMeanReturn: 0.09,
+      indexVolatility: 0.15,
+    };
+    const sentence = dcaEffectSentence(simulateDcaComparison(inputs), '3x', inputs);
+    expect(sentence).toContain('(\u22126.7% of the index median)');
+    expect(sentence).toContain(
+      '(\u22126.8%). The two relative gaps differ by 0.1 percentage points, which is within the sampling error of 500 simulated paths'
+    );
+    expect(sentence).not.toMatch(/0\.0 percentage points/);
+  });
+
+  it('states only what the two printed gaps show, in every branch (seeded loop at 1x, 2x and 3x)', () => {
+    // 330 seeded inputs across the form's ranges, 200 paths each. Every stated difference must
+    // equal the difference of the two printed gaps, its sign must be the sign of that
+    // difference, "the same" must appear exactly when the two gaps print the same, and no
+    // sentence may state 0.0 points.
+    const rng = createSeededRng(4242);
+    const tenths = (text: string) => Math.round(Number(text.replace('\u2212', '-').replace('+', '')) * 10);
+    const branches = { noiseDiffer: 0, noiseSame: 0, same: 0, aboutOneTenth: 0, attribution: 0 };
+    const failures: string[] = [];
+    for (let k = 0; k < 330; k++) {
+      const leverageRatio = [1, 2, 3][k % 3];
+      const inputs = {
+        ...DEFAULT_DCA_COMPARISON_INPUTS,
+        leverageRatio,
+        paths: 200,
+        seed: 1 + Math.floor(rng() * 1e6),
+        years: 1 + Math.floor(rng() * 40),
+        monthlyContribution: 50 + Math.floor(rng() * 2000),
+        startingBalance: Math.floor(rng() * 50000),
+        indexMeanReturn: -0.05 + rng() * 0.17,
+        indexVolatility: 0.02 + rng() * 0.3,
+      };
+      const result = simulateDcaComparison(inputs);
+      const sentence = dcaEffectSentence(result, `${leverageRatio}x`, inputs);
+      const fail = (why: string) => failures.push(`${why}: ${JSON.stringify(inputs)} ${sentence}`);
+      const monthly = sentence.match(/\(([+\u2212]?\d+\.\d)% of the index median\)/);
+      const yearStart = sentence.match(/gives a gap of [^(]*\(([+\u2212]?\d+\.\d)%\)/);
+      if (!monthly || !yearStart) {
+        fail('no printed gaps');
+        continue;
+      }
+      // The printed gaps are the table's figures.
+      const tableText = (gap: number, base: number) => formatPercent(relativeGap(gap, base), { digits: 1, signed: true });
+      if (`${monthly[1]}%` !== tableText(result.dcaEffect.dcaGap, result.index.dca.p50)) fail('monthly gap is not the table figure');
+      if (`${yearStart[1]}%` !== tableText(result.dcaEffect.yearStartGap, result.index.yearStart.p50)) {
+        fail('start-of-year gap is not the table figure');
+      }
+      const printedDiff = tenths(monthly[1]) - tenths(yearStart[1]);
+      const stated = [
+        ...Array.from(sentence.matchAll(/differ by (?:about )?(\d+\.\d) percentage points/g), (m) => ({ sign: '', value: m[1] })),
+        ...Array.from(sentence.matchAll(/\(([+\u2212])(\d+\.\d) percentage points\)/g), (m) => ({ sign: m[1], value: m[2] })),
+      ];
+      for (const figure of stated) {
+        if (tenths(figure.value) !== Math.abs(printedDiff)) fail(`states ${figure.value}`);
+        if (figure.sign && figure.sign !== (printedDiff > 0 ? '+' : '\u2212')) fail(`states sign ${figure.sign}`);
+      }
+      if (/(?<![\d.])0\.0 percentage points/.test(sentence)) fail('states 0.0 points');
+      const saysSame = sentence.includes('the same to one decimal place');
+      if (saysSame !== (printedDiff === 0)) fail(saysSame ? 'says the same' : 'does not say the same');
+      if (sentence.includes('within the sampling error')) branches.noiseDiffer++;
+      else if (sentence.includes('this run does not separate the two timings')) branches.noiseSame++;
+      else if (sentence.includes('the timing does not change the comparison')) branches.same++;
+      else if (sentence.includes('barely changes the comparison')) branches.aboutOneTenth++;
+      else if (sentence.includes('comes from when the money goes in')) branches.attribution++;
+      else fail('no branch');
+    }
+    expect(failures).toEqual([]);
+    // The loop reaches every wording of every branch.
+    for (const count of Object.values(branches)) expect(count, JSON.stringify(branches)).toBeGreaterThan(0);
   });
 
   it('never says the gaps are the same when the two printed gaps differ (seeded grid at 1x)', () => {

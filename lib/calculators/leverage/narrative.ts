@@ -76,6 +76,28 @@ export function relativeGapNoisePoints(inputs: NoiseInputs): number {
 }
 
 /**
+ * A fraction as formatPercent(fraction, SIGNED_ONE_DECIMAL) prints it, in
+ * whole tenths of a percentage point (0.0952 -> 95, -0.0315 -> -32). Whole
+ * tenths keep the difference of two printed gaps free of rounding error.
+ */
+function printedTenths(fraction: number): number {
+  const tenths = Math.round(Number((Math.abs(fraction) * 100).toFixed(1)) * 10);
+  return fraction < 0 ? -tenths : tenths;
+}
+
+/** Whole tenths as one-decimal text: 95 -> "9.5". */
+function tenthsText(tenths: number): string {
+  return (tenths / 10).toFixed(1);
+}
+
+/** Whole tenths with the sign formatPercent prints: "+9.5", "\u22123.2", and "0.0" without one. */
+function signedTenthsText(tenths: number): string {
+  if (tenths > 0) return `+${tenthsText(tenths)}`;
+  if (tenths < 0) return `${MINUS}${tenthsText(-tenths)}`;
+  return tenthsText(tenths);
+}
+
+/**
  * `display` converts an ending-balance gap for display (the results pass the
  * active dollar mode); the yearly amount is money paid in and is printed as
  * entered. The relative gaps and the noise test read the engine figures.
@@ -100,35 +122,45 @@ export function dcaEffectSentence(
     );
   }
   const yearStartRel = relativeGap(yearStartGap, result.index.yearStart.p50);
+  // Which branch applies is decided from the engine's unrounded values.
   const diffPoints = (dcaRel - yearStartRel) * 100;
-  const pointsText = `${Math.abs(diffPoints).toFixed(1)} percentage points`;
   const noise = relativeGapNoisePoints(inputs);
-  const dcaRelText = formatPercent(dcaRel, SIGNED_ONE_DECIMAL);
-  const yearStartRelText = formatPercent(yearStartRel, SIGNED_ONE_DECIMAL);
+  // Every figure the sentence states comes from the two gaps as printed:
+  // each gap is rounded once, and both its text and the stated difference
+  // are built from that rounded value, so they cannot disagree.
+  const dcaTenths = printedTenths(dcaRel);
+  const yearStartTenths = printedTenths(yearStartRel);
+  const printedDiffTenths = dcaTenths - yearStartTenths;
+  const pointsText = `${tenthsText(Math.abs(printedDiffTenths))} percentage points`;
   const gaps =
     `With monthly contributions the ${L} fund's median ends ${direction(dcaGap)} the index fund's ` +
-    `median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} (${dcaRelText} of the index median). ` +
+    `median by ${formatCurrency(Math.abs(display(dcaGap)), COMPACT)} (${signedTenthsText(dcaTenths)}% of the index median). ` +
     `Investing the same ${formatCurrency(12 * Math.max(0, inputs.monthlyContribution), COMPACT)} a year at the start of each year gives a gap of ` +
-    `${formatCurrency(display(yearStartGap), COMPACT_SIGNED)} (${yearStartRelText}).`;
+    `${formatCurrency(display(yearStartGap), COMPACT_SIGNED)} (${signedTenthsText(yearStartTenths)}%).`;
 
   if (noise > 0 && Math.abs(diffPoints) < noise) {
+    if (printedDiffTenths === 0) {
+      return (
+        `${gaps} The two relative gaps are the same to one decimal place; with the sampling error of ` +
+        `${inputs.paths} simulated paths, this run does not separate the two timings.`
+      );
+    }
     return (
       `${gaps} The two relative gaps differ by ${pointsText}, which is within the sampling error of ` +
       `${inputs.paths} simulated paths, so at these settings this run does not separate the two timings.`
     );
   }
+  if (printedDiffTenths === 0) {
+    return `${gaps} The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.`;
+  }
   if (Math.abs(diffPoints) < 0.05) {
-    // The difference rounds to 0.0 points: nothing to attribute to timing.
-    // The sentence may only state what the two printed gaps show. Each gap
-    // is rounded on its own, so they can print one step apart; two values
-    // less than 0.05 apart round at most 0.1 apart (each rounding moves a
-    // value by at most 0.05), so "about 0.1" agrees with the printed gaps.
-    if (dcaRelText === yearStartRelText) {
-      return `${gaps} The two relative gaps are the same to one decimal place, so at these settings the timing does not change the comparison.`;
-    }
+    // The unrounded difference rounds to 0.0 points, so nothing is attributed
+    // to timing, but the two gaps print one step apart: each rounding moves a
+    // value by at most 0.05, so values less than 0.05 apart print at most 0.1
+    // apart, and "about 0.1" agrees with the printed gaps.
     return `${gaps} The two relative gaps differ by about 0.1 percentage points, so at these settings the timing barely changes the comparison.`;
   }
-  const sign = diffPoints >= 0 ? '+' : MINUS;
+  const sign = printedDiffTenths > 0 ? '+' : MINUS;
   const noiseNote =
     noise > 0 ? ` With ${inputs.paths} paths that figure still carries sampling error of a few percentage points.` : '';
   return (
