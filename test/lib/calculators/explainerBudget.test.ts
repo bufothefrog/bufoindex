@@ -168,9 +168,16 @@ describe('the explainer budget counter', () => {
   });
 
   it('counts a row field once per row', () => {
+    // No list row of the forms carries a text since the account row's unrendered balance hint went, so
+    // the counter runs on the account list spec with a hint put back on its balance.
     const accounts = FORMS.portfolio.fields.find((field) => field.path === 'portfolio.accounts')!;
+    expect(fieldTexts(accounts, fromDefaults())).toEqual([]);
+    const withHint: FieldSpec = {
+      ...accounts,
+      row: accounts.row!.map((row) => (row.path === 'balance' ? { ...row, hint: 'A row hint.' } : row)),
+    };
     const rows = listRows(fromDefaults()('portfolio.accounts')).length;
     expect(rows).toBeGreaterThan(1);
-    expect(fieldTexts(accounts, fromDefaults())).toHaveLength(rows);
+    expect(fieldTexts(withHint, fromDefaults())).toEqual(Array(rows).fill('A row hint.'));
   });
 });
