@@ -190,7 +190,7 @@ function AccountLine({ account, label, suggested, get, onWrite, open, onToggle, 
       </div>
 
       {open && (
-        <div id={editorId} className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:@sm:grid-cols-2">
+        <div id={editorId} className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:@min-[22rem]:grid-cols-2">
           <SelectInput
             name={`${idPrefix}-${account.id}-kind`}
             label="Kind"
@@ -217,10 +217,10 @@ function AccountLine({ account, label, suggested, get, onWrite, open, onToggle, 
               label="Holds my emergency fund"
               checked={account.holdsEmergencyFund}
               onChange={(on) => write(setHoldsEmergencyFund(get, account.id, on))}
-              className="sm:@sm:col-span-2"
+              className="sm:@min-[22rem]:col-span-2"
             />
           )}
-          <div className="flex flex-wrap gap-2 sm:@sm:col-span-2">
+          <div className="flex flex-wrap gap-2 sm:@min-[22rem]:col-span-2">
             {count > 0 ? (
               <Button type="button" variant="outline" size="sm" onClick={oneBalance} className="min-h-11">
                 Use one balance instead
