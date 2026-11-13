@@ -4,7 +4,8 @@
  * profile form, the profile wizard, the review page, the completeness figure
  * or any /start/<intent> intake, and it is shown on its calculator page. The
  * four calculator-only screens with profile leaves are the retirement monthly
- * investing (Auto from the contribution answers) and claiming age, the
+ * investing (Auto from the contribution answers, with the timing of its IRA
+ * and taxable parts) and claiming age, the
  * rebalancer's new cash for this run, and the leverage comparison (the
  * leverage ratio and the three overrides).
  */
@@ -42,6 +43,9 @@ describe('calculator-only screens', () => {
     ]);
     expect(CALCULATOR_ONLY_PATHS).toEqual([
       'investing.monthlyContribution',
+      'ira.traditionalTiming',
+      'ira.rothTiming',
+      'investing.taxableTiming',
       'retirementIncome.socialSecurityAge',
       'portfolio.newCash',
       'leverage.monthlyContribution',
@@ -109,6 +113,9 @@ describe('calculator-only screens', () => {
     const profile = getDefaultFinancialProfile();
     expect(profile.strategy.leverageRatio).toBe(2);
     expect(profile.retirementIncome.socialSecurityAge).toBe(67);
+    expect(profile.ira.traditionalTiming).toBe('monthly');
+    expect(profile.ira.rothTiming).toBe('monthly');
+    expect(profile.investing.taxableTiming).toBe('monthly');
   });
 });
 

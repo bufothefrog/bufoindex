@@ -13,6 +13,9 @@ import { describe, expect, it } from 'vitest';
 import {
   EFFECTIVE_TAX_RATE,
   ANNUAL_HEALTHCARE_COST,
+  IRA_ROTH_TIMING,
+  IRA_TRADITIONAL_TIMING,
+  TAXABLE_TIMING,
   SOCIAL_SECURITY_BENEFIT,
   TARGET_RETIREMENT_INCOME,
   tdfProfileFor,
@@ -38,6 +41,10 @@ import {
   intakePaths,
   type OldQuestion,
 } from '@/test/utils/intakeFixture';
+import { makeGet } from '@/lib/fields/paths';
+import { visibleScreenFields } from '@/lib/fields/runtime';
+import { normalizeProfile } from '@/lib/profile/defaults';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 
 const ids = (overrides: Record<string, unknown> = {}) =>
   getIntakeScreens('retirement', fromDefaults(overrides)).map((s) => s.id);
@@ -144,7 +151,8 @@ describe('retirement form: screens', () => {
       pay: ['income.grossPerPaycheck', 'income.frequency'],
       'must-pay': ['spending.necessaryMonthly'],
       accounts: ['portfolio.accounts'],
-      'monthly-investing': ['investing.monthlyContribution'],
+      // The default runs only the taxable part of Auto monthly investing (500), so only its timing shows.
+      'monthly-investing': ['investing.monthlyContribution', 'investing.taxableTiming'],
       target: ['person.retirementAge', 'spending.targetRetirementIncome', 'person.lifeExpectancy'],
       'ss-healthcare': ['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost'],
       claiming: ['retirementIncome.socialSecurityAge'],
@@ -420,5 +428,73 @@ describe('retirement form: placeholders', () => {
 
   it('gives the Social Security benefit no placeholder from the old 30,000 default', () => {
     expect(SOCIAL_SECURITY_BENEFIT.placeholder).toBeUndefined();
+  });
+});
+
+describe('retirement form: contribution timing on the Monthly investing card', () => {
+  const visibleOn = (get: ReturnType<typeof fromDefaults>) =>
+    visibleScreenFields(RETIREMENT_FORM, screen('monthly-investing'), get).map((spec) => spec.path);
+  const owner = () => makeGet(normalizeProfile(ownerRaw()));
+
+  it('puts the three timing choices on the calculator-only monthly-investing screen, after monthly investing', () => {
+    expect(screen('monthly-investing').fields).toEqual([
+      'investing.monthlyContribution',
+      'ira.traditionalTiming',
+      'ira.rothTiming',
+      'investing.taxableTiming',
+    ]);
+    const formPaths = RETIREMENT_FORM.fields.map((spec) => spec.path);
+    const at = formPaths.indexOf('investing.monthlyContribution');
+    expect(formPaths.slice(at, at + 4)).toEqual(screen('monthly-investing').fields);
+    for (const spec of [IRA_TRADITIONAL_TIMING, IRA_ROTH_TIMING, TAXABLE_TIMING]) {
+      expect(spec).toMatchObject({ kind: 'choice', tier: 'details' });
+      expect(spec.help).toBeUndefined();
+      expect(spec.hint).toBeUndefined();
+      expect(spec.question).toBeUndefined();
+    }
+    expect([IRA_TRADITIONAL_TIMING, IRA_ROTH_TIMING, TAXABLE_TIMING].map((spec) => spec.label)).toEqual([
+      'Traditional IRA',
+      'Roth IRA',
+      'Taxable investing',
+    ]);
+  });
+
+  it('shows the parts in use while Auto is on: taxable for the default, Roth and taxable for the owner', () => {
+    expect(visibleOn(fromDefaults())).toEqual(['investing.monthlyContribution', 'investing.taxableTiming']);
+    expect(visibleOn(owner())).toEqual(['investing.monthlyContribution', 'ira.rothTiming', 'investing.taxableTiming']);
+    expect(
+      visibleOn(fromDefaults({ 'ira.traditional': true, 'ira.traditionalMonthly': 100, 'investing.taxableMonthlyContribution': 0 }))
+    ).toEqual(['investing.monthlyContribution', 'ira.traditionalTiming']);
+    // An IRA switched on with nothing in it, or an amount with the IRA off, shows nothing.
+    expect(visibleOn(fromDefaults({ 'ira.roth': true, 'ira.rothMonthly': 0 }))).not.toContain('ira.rothTiming');
+    expect(visibleOn(fromDefaults({ 'ira.roth': false, 'ira.rothMonthly': 625 }))).not.toContain('ira.rothTiming');
+  });
+
+  it('hides all three under a Custom monthly investing figure (it is all monthly)', () => {
+    expect(visibleOn(fromDefaults({ 'investing.monthlyContribution': 1500 }))).toEqual(['investing.monthlyContribution']);
+    const ownerCustom = (path: string) => (path === 'investing.monthlyContribution' ? 1500 : owner()(path));
+    expect(visibleOn(ownerCustom)).toEqual(['investing.monthlyContribution']);
+  });
+
+  it('labels the yearly option with 12 x the part', () => {
+    expect(resolveOptions(IRA_ROTH_TIMING, owner())).toEqual([
+      { value: 'monthly', label: 'Monthly' },
+      { value: 'yearStart', label: 'Once a year, at the start: $7,500' },
+    ]);
+    expect(resolveOptions(TAXABLE_TIMING, fromDefaults()).map((o) => o.label)).toEqual([
+      'Monthly',
+      'Once a year, at the start: $6,000',
+    ]);
+    // A negative amount reads as 0.
+    expect(
+      resolveOptions(IRA_TRADITIONAL_TIMING, fromDefaults({ 'ira.traditionalMonthly': -5 })).map((o) => o.label)
+    ).toEqual(['Monthly', 'Once a year, at the start: $0']);
+  });
+
+  it('keeps the card summary on monthly, and names a yearly part', () => {
+    expect(summarizeScreen(RETIREMENT_FORM, screen('monthly-investing'), fromDefaults())).toBe('saving $1,540/mo');
+    expect(
+      summarizeScreen(RETIREMENT_FORM, screen('monthly-investing'), fromDefaults({ 'investing.taxableTiming': 'yearStart' }))
+    ).toBe('saving $1,540/mo, Taxable investing once a year, at the start');
   });
 });

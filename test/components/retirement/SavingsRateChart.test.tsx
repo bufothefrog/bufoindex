@@ -14,6 +14,10 @@ import { ResponsiveContainer } from 'recharts';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import SavingsRateChart from '@/app/tools/retirement-calculator/components/SavingsRateChart';
 import type { SavingsRateMarkerInputs } from '@/app/tools/retirement-calculator/components/savingsRateMarkers';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { normalizeProfile } from '@/lib/profile/defaults';
+import { ownerYearStartRaw } from '@/test/factories/accountsFixtures';
 
 // The plot inside a 390 px page: 16 px gutters and the card padding; the
 // plot inside a 360 px page; a desktop plot. ChartFrame's tall height is h-96.
@@ -107,9 +111,11 @@ describe('SavingsRateChart marker labels', () => {
   });
 
   it('keep both labels clear of the line when the dot sits just under it', () => {
-    // Retiring at 51 needs a little less than the 24% saved, so the dot is a
-    // few pixels under the dashed line.
-    const y = draw({ ...BASE, retirementAge: 51 });
+    // Retiring at 52 needs a little less than the 24% saved (21.2% at the
+    // effective monthly rate; PR 5 moved 51 from 22.2% to 23.2%, too close
+    // to the line for both labels to sit outside it), so the dot is a few
+    // pixels under the dashed line.
+    const y = draw({ ...BASE, retirementAge: 52 });
     expect(y.dotY).toBeGreaterThan(y.lineY);
     expect(y.dotY - y.lineY).toBeLessThan(20);
     expect(y.rateLabel.bottom).toBeLessThan(y.lineY);
@@ -174,5 +180,32 @@ describe('SavingsRateChart marker labels', () => {
         expect(apart).toBe(true);
       });
     });
+  });
+});
+
+describe('SavingsRateChart: contribution timing (PR 5)', () => {
+  it('draws the planned point with the start-of-year share of yearStartSavings', () => {
+    // The owner with the Roth IRA once a year, retiring at 45: 7.13% with the
+    // share 7,500 / (12 x 3,195), 7.19% with every part monthly. A higher
+    // rate sits higher on the chart (a smaller SVG y).
+    const owner = { ...engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerYearStartRaw())), retirementAge: 45 };
+    expect(owner.yearStartSavings).toBe(7500);
+    const dotY = (inputs: SavingsRateMarkerInputs) => {
+      const { container } = render(
+        <ThemeProvider>
+          <ResponsiveContainer width={WIDTH} height={HEIGHT}>
+            <SavingsRateChart inputs={inputs} />
+          </ResponsiveContainer>
+        </ThemeProvider>
+      );
+      const dot = container.querySelector('.recharts-reference-dot circle');
+      if (!dot) throw new Error('no planned-point dot');
+      const y = Number(dot.getAttribute('cy'));
+      cleanup();
+      return y;
+    };
+    const withShare = dotY(owner);
+    const allMonthly = dotY({ ...owner, yearStartSavings: 0 });
+    expect(withShare - allMonthly).toBeGreaterThan(0.1);
   });
 });

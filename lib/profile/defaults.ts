@@ -20,6 +20,7 @@ import { PAY_FREQUENCY_OPTIONS } from '@/lib/constants/frequency';
 import {
   ACCOUNT_KIND_OPTIONS,
   BONUS_FREQUENCY_OPTIONS,
+  CONTRIBUTION_TIMING_OPTIONS,
   CONTRIBUTION_TYPE_OPTIONS,
   FILING_STATUS_OPTIONS,
   HSA_COVERAGE_OPTIONS,
@@ -169,11 +170,14 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       roth: false,
       traditionalMonthly: 0,
       rothMonthly: 0,
+      traditionalTiming: 'monthly',
+      rothTiming: 'monthly',
     },
     investing: {
       // Auto: the sum of the normal contributions (monthlyInvestingAuto).
       monthlyContribution: null,
       taxableMonthlyContribution: 500,
+      taxableTiming: 'monthly',
       targetMix: '80-20',
     },
     retirementIncome: {
@@ -295,6 +299,9 @@ export const PROFILE_ENUM_VALUES: Readonly<Record<string, readonly string[]>> = 
   'income.bonusFrequency': optionValues(BONUS_FREQUENCY_OPTIONS),
   'workplace.contributionType': optionValues(CONTRIBUTION_TYPE_OPTIONS),
   'hsa.coverage': optionValues(HSA_COVERAGE_OPTIONS),
+  'ira.traditionalTiming': optionValues(CONTRIBUTION_TIMING_OPTIONS),
+  'ira.rothTiming': optionValues(CONTRIBUTION_TIMING_OPTIONS),
+  'investing.taxableTiming': optionValues(CONTRIBUTION_TIMING_OPTIONS),
   'investing.targetMix': TARGET_MIX_PRESETS,
   'assumptions.retirement.riskProfile': RISK_PROFILES,
   'assumptions.paycheck.riskTolerance': optionValues(RISK_TOLERANCE_OPTIONS),

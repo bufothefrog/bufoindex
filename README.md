@@ -11,7 +11,7 @@ Interactive personal-finance calculators that show their work. Every number on s
 - **[Paycheck Allocator](https://bufoindex.com/tools/paycheck-allocator)** — allocates a monthly paycheck across fixed costs, tax-advantaged accounts, and flex spending, with bracket-aware federal and state tax math (2026 IRS and state figures, sourced in `lib/constants/`).
 - **[Retirement Calculator](https://bufoindex.com/tools/retirement-calculator)** — Monte Carlo retirement modeling that genuinely models Social Security timing and benefits, healthcare cost growth, and a target-date-fund glide path, with side-by-side scenario comparison. Results can be viewed in today's dollars or future (nominal) dollars via a display toggle.
 - **[Portfolio Rebalancer](https://bufoindex.com/tools/portfolio-rebalancing-calculator)** — multi-account rebalancing with custom asset classes, a securities registry shared across accounts, and tax-aware placement advice.
-- **[Leverage Comparison](https://bufoindex.com/tools/leverage-comparison)** - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded random paths, with the lump-sum framing alongside.
+- **[Leverage Comparison](https://bufoindex.com/tools/leverage-comparison)** - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded random paths, with the same yearly amount invested at the start of each year alongside.
 
 The guided intake lives at [/start](https://bufoindex.com/start) and the dashboard at [/overview](https://bufoindex.com/overview).
 

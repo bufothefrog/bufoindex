@@ -26,7 +26,12 @@ export function applyWrites(raw: RawPayload, writes: readonly Write[]): RawPaylo
   return writes.reduce<RawPayload>((out, write) => setAt(out, write.path, write.value), raw);
 }
 
-/** The v3 default profile as a raw object, nothing answered. */
+/**
+ * The v3 default profile as a raw object, nothing answered. It is the payload
+ * a browser stored at ec300fd: it holds none of the three contribution
+ * timing leaves PR 5 adds (ira.traditionalTiming, ira.rothTiming,
+ * investing.taxableTiming); normalization fills them with 'monthly'.
+ */
 export function v3DefaultRaw(): RawPayload {
   const v2 = defaultPayloadAt90ef4ed() as Record<string, Record<string, unknown>> & RawPayload;
   const ira = { ...v2.ira };
@@ -114,6 +119,11 @@ export function ownerRaw(): RawPayload {
       { id: 'hld-rh-boxx', accountId: 'acc-rh', securityId: 'sec-boxx', shares: 90 },
     ],
   });
+}
+
+/** The owner fixture with the Roth IRA paid once a year at the start (12 x 625 = 7,500), answered. */
+export function ownerYearStartRaw(): RawPayload {
+  return rawWith({ 'ira.rothTiming': 'yearStart' }, ['ira.rothTiming'], ownerRaw());
 }
 
 /**

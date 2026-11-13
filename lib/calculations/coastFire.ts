@@ -4,6 +4,7 @@
  * without any additional contributions, allowing you to "coast" to retirement.
  */
 
+import { scheduleFactor, scheduleFutureValue, splitSchedule, yearStartShareOf } from './contributionSchedule';
 import { RetirementInputs, calculateRequiredBalance, futureValue } from './retirement';
 
 export interface CoastFireResult {
@@ -67,7 +68,12 @@ export function calculateCoastFire(inputs: RetirementInputs): CoastFireResult {
   // Calculate monthly contributions needed to reach Coast FIRE by target age
   const shortfall = currentBalanceNeeded - inputs.startingBalance;
   const monthlyContributionsUntilCoast = yearsToCoast ? 
-    calculateMonthlyContributionsForCoastFire(shortfall, inputs.accumulationReturn, yearsToCoast) : 
+    calculateMonthlyContributionsForCoastFire(
+      shortfall,
+      inputs.accumulationReturn,
+      yearsToCoast,
+      yearStartShareOf(inputs.monthlySavings, inputs.yearStartSavings)
+    ) :
     undefined;
   
   return {
@@ -123,15 +129,18 @@ function calculateCoastFireBalance(
 }
 
 /**
- * Find the age at which Coast FIRE is achievable with current savings
+ * Find the age at which Coast FIRE is achievable with current savings. The
+ * contributions follow the visitor's schedule: the monthly part at the end of
+ * each month, the yearly part (yearStartSavings) at the start of each year.
+ * Exported for tests.
  */
-function findCoastFireAge(inputs: RetirementInputs): number | undefined {
+export function findCoastFireAge(inputs: RetirementInputs): number | undefined {
   const maxAge = Math.min(inputs.retirementAge - 1, inputs.startingAge + 40); // Don't go beyond reasonable limits
+  const schedule = splitSchedule(inputs.monthlySavings, inputs.yearStartSavings);
 
   for (let age = inputs.startingAge; age <= maxAge; age++) {
     const yearsFromStart = age - inputs.startingAge;
     const monthsFromStart = yearsFromStart * 12;
-    const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
 
     // Calculate projected balance at this age
     const growthOfStartingBalance = futureValue(
@@ -141,7 +150,7 @@ function findCoastFireAge(inputs: RetirementInputs): number | undefined {
     );
 
     const growthOfContributions = inputs.monthlySavings > 0 ?
-      inputs.monthlySavings * ((Math.pow(1 + monthlyRate, monthsFromStart) - 1) / monthlyRate) :
+      scheduleFutureValue(schedule, inputs.accumulationReturn, monthsFromStart) :
       0;
 
     const projectedBalanceAtAge = growthOfStartingBalance + growthOfContributions;
@@ -168,22 +177,19 @@ function findCoastFireAge(inputs: RetirementInputs): number | undefined {
 }
 
 /**
- * Calculate monthly contributions needed to reach Coast FIRE balance
+ * Calculate the monthly-equivalent contributions needed to reach the Coast
+ * FIRE balance: the shortfall over the future value per monthly-equivalent
+ * dollar, with `yearStartShare` (0..1) of each year's total at the start of
+ * the year. At share 0 this is PMT = FV x i / ((1 + i)^n - 1). Exported for
+ * tests.
  */
-function calculateMonthlyContributionsForCoastFire(
+export function calculateMonthlyContributionsForCoastFire(
   shortfall: number,
   annualReturn: number,
-  yearsAvailable: number
+  yearsAvailable: number,
+  yearStartShare = 0
 ): number {
-  const monthsAvailable = yearsAvailable * 12;
-  const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
-  
-  if (monthlyRate === 0) {
-    return shortfall / monthsAvailable;
-  }
-  
-  // PMT formula: PMT = FV * r / ((1 + r)^n - 1)
-  return shortfall * monthlyRate / (Math.pow(1 + monthlyRate, monthsAvailable) - 1);
+  return shortfall / scheduleFactor(annualReturn, yearsAvailable * 12, yearStartShare);
 }
 
 /**

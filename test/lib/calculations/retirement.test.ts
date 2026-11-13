@@ -17,6 +17,7 @@ import {
   calculateEffectiveTaxRate,
   calculateHealthcareCosts,
   calculateInitialWithdrawalRate,
+  calculateMinimumSavingsNeeded,
   calculateProjectedBalance,
   calculateRequiredBalance,
   calculateRetirementAnalysis,
@@ -1187,5 +1188,153 @@ describe('Edge cases and boundary conditions', () => {
       100000 * Math.pow(1.07, 30),
       2,
     )
+  })
+})
+
+describe('contribution timing: the yearly part (yearStartSavings)', () => {
+  it('E2, custom: 1,200 a year at the start of each year against the same 1,200 paid monthly', () => {
+    const base = makeInputs({ startingAge: 30, retirementAge: 33, startingBalance: 0, accumulationReturn: 0.1, riskProfile: 'custom' })
+    // Monthly: 100 x (1.331 - 1) / (1.1^(1/12) - 1) = 4,150.917618659306.
+    expect(calculateProjectedBalance({ ...base, monthlySavings: 100 })).toBeCloseTo(4150.917618659306, 8)
+    // Yearly: 1,200 x (1.331 + 1.21 + 1.1) = 4,369.20.
+    expect(calculateProjectedBalance({ ...base, monthlySavings: 100, yearStartSavings: 1200 })).toBeCloseTo(4369.2, 8)
+  })
+
+  it('mixed custom: 100 a month total with 480 a year at the start, 8%, 3 years = 4,104.855904', () => {
+    // Split {60 monthly, 480 yearly}: 60 x (1.259712 - 1) / i8 + 480 x (1.259712 + 1.1664 + 1.08).
+    const inputs = makeInputs({
+      startingAge: 30,
+      retirementAge: 33,
+      startingBalance: 0,
+      monthlySavings: 100,
+      yearStartSavings: 480,
+      accumulationReturn: 0.08,
+      riskProfile: 'custom',
+    })
+    expect(calculateProjectedBalance(inputs)).toBeCloseTo(4104.855904, 5)
+  })
+
+  it('E6, TDF ages 25 to 27: 1,200 a year at the start against 100 a month', () => {
+    expect(calculateTDFReturnForAge(25)).toBeCloseTo(0.094, 12)
+    expect(calculateTDFReturnForAge(26)).toBeCloseTo(0.094, 12)
+    const base = makeInputs({ startingAge: 25, retirementAge: 27, startingBalance: 0, monthlySavings: 100, riskProfile: 'tdf' })
+    // 1200 x 1.094 = 1312.8; (1312.8 + 1200) x 1.094 = 2,749.0032.
+    expect(calculateProjectedBalance({ ...base, yearStartSavings: 1200 })).toBeCloseTo(2749.0032, 6)
+    // 100 x (1.094^2 - 1) / (1.094^(1/12) - 1) = 2,619.3039.
+    expect(calculateProjectedBalance(base)).toBeCloseTo(2619.3039, 4)
+  })
+
+  it('netWorthByAge follows the yearly part for both profiles, and equals the projection at retirement', () => {
+    for (const riskProfile of ['tdf', 'custom'] as const) {
+      const inputs = makeInputs({ riskProfile, monthlySavings: 2000, yearStartSavings: 6000 })
+      const result = calculateRetirementAnalysis(inputs)
+      expect(result.netWorthByAge[inputs.retirementAge]).toBeCloseTo(calculateProjectedBalance(inputs), 6)
+      const monthly = calculateRetirementAnalysis({ ...inputs, yearStartSavings: 0 })
+      expect(result.netWorthByAge[inputs.startingAge + 1]).toBeGreaterThan(monthly.netWorthByAge[inputs.startingAge + 1])
+    }
+  })
+
+  it('with yearStartSavings 0 (or NaN) the analysis deep-equals the one without the field, tdf and custom', () => {
+    for (const riskProfile of ['tdf', 'custom'] as const) {
+      const without = makeInputs({ riskProfile })
+      const expected = calculateRetirementAnalysis(without)
+      expect(calculateRetirementAnalysis({ ...without, yearStartSavings: 0 })).toEqual(expected)
+      expect(calculateRetirementAnalysis({ ...without, yearStartSavings: NaN })).toEqual(expected)
+    }
+  })
+
+  it('a falling-short plan: the scenarios with yearStartSavings 0 deep-equal those without', () => {
+    const without = makeInputs({ startingBalance: 0, monthlySavings: 100, targetIncome: 200000 })
+    expect(calculateRetirementAnalysis({ ...without, yearStartSavings: 0 }).scenarios).toEqual(
+      calculateRetirementAnalysis(without).scenarios,
+    )
+  })
+
+  it('caps the yearly part at 12 x the total', () => {
+    const base = makeInputs({ startingAge: 30, retirementAge: 33, startingBalance: 0, accumulationReturn: 0.1, riskProfile: 'custom' })
+    expect(calculateProjectedBalance({ ...base, monthlySavings: 100, yearStartSavings: 5000 })).toBeCloseTo(4369.2, 8)
+  })
+
+  it('a "work until" age below the current age keeps the ec300fd balance (custom, all monthly)', () => {
+    // maxAge = min(49 - 5, 75) = 44 < startingAge 47, so the scenario runs over -3 years.
+    // At a 0% return: 364,246 + 5,513.37 x (-36) = 364,246 - 198,481.32 = 165,764.68, as at ec300fd.
+    const inputs = makeInputs({
+      startingAge: 47,
+      retirementAge: 49,
+      lifeExpectancy: 49,
+      riskProfile: 'custom',
+      accumulationReturn: 0,
+      monthlySavings: 5513.37,
+      startingBalance: 364246,
+    })
+    expect(calculateProjectedBalance({ ...inputs, retirementAge: 44 })).toBeCloseTo(165764.68, 6)
+    const reality = calculateRetirementAnalysis(inputs).scenarios.find((s) => s.id === 'reality-age')
+    expect(reality?.name).toBe('Work until age 44')
+    expect(reality?.projectedBalance).toBeCloseTo(165764.68, 6)
+  })
+})
+
+describe('calculateMinimumSavingsNeeded (E16)', () => {
+  const inputs = makeInputs({
+    startingAge: 30,
+    retirementAge: 33,
+    startingBalance: 0,
+    accumulationReturn: 0.1,
+    monthlySavings: 100,
+    currentIncome: 100000,
+    riskProfile: 'custom',
+  })
+
+  it('keeps the yearly part and solves the monthly stream for the rest: 238.28126 in total', () => {
+    // Split {50, 600}. Yearly FV = 600 x 1.1 x 0.331 / 0.1 = 2,184.60; rest = 7,815.40;
+    // factor = 0.331 / i10 = 41.50917618659306; 7,815.40 / 41.509176 = 188.28126; + 600 / 12 = 238.28126.
+    expect(calculateMinimumSavingsNeeded({ ...inputs, yearStartSavings: 600 }, 10000)).toBeCloseTo(238.28126, 4)
+  })
+
+  it('with no yearly part is 10,000 / 41.50917618659306 = 240.91059', () => {
+    expect(calculateMinimumSavingsNeeded(inputs, 10000)).toBeCloseTo(240.91059, 4)
+    expect(calculateMinimumSavingsNeeded({ ...inputs, yearStartSavings: 0 }, 10000)).toBe(
+      calculateMinimumSavingsNeeded(inputs, 10000),
+    )
+  })
+
+  it('is the yearly part alone when it covers the gap, 0 when the balance does, and capped at half of income', () => {
+    // 6,000 a year: 6,000 x 1.1 x 3.31 = 21,846 > 10,000, so the monthly stream needs 0; result 6,000 / 12 = 500.
+    expect(calculateMinimumSavingsNeeded({ ...inputs, monthlySavings: 500, yearStartSavings: 6000 }, 10000)).toBe(500)
+    expect(calculateMinimumSavingsNeeded({ ...inputs, startingBalance: 1e6 }, 10000)).toBe(0)
+    // Cap: 100,000 x 0.5 / 12 = 4,166.67.
+    expect(calculateMinimumSavingsNeeded(inputs, 1e7)).toBeCloseTo((100000 * 0.5) / 12, 9)
+  })
+})
+
+describe('scenario titles carry their figures as data', () => {
+  it('splits the Conservative name into parts with each figure dated and based', () => {
+    const inputs = makeInputs({ startingBalance: 2_000_000, monthlySavings: 3000, targetIncome: 40000 })
+    const conservative = calculateRetirementAnalysis(inputs).scenarios.find((s) => s.id === 'conservative-wealth-building')!
+    expect(conservative.title).toHaveLength(5)
+    const [lead, income, middle, legacy, tail] = conservative.title!
+    expect([lead, middle, tail]).toEqual(['Conservative: ', '/month, leave ', ' legacy'])
+    // 40,000 x 0.8 / 12 = 2,666.67 in today's dollars, retirement 35 years away.
+    expect(income).toEqual({ amount: (40000 * 0.8) / 12, basis: 'today', yearsFromNow: 35, roundTo: 100 })
+    expect(legacy).toMatchObject({ basis: 'nominal', yearsFromNow: 60, roundTo: 1000 })
+    const legacyAmount = (legacy as { amount: number }).amount
+    expect(conservative.name).toBe(
+      `Conservative: $2,700/month, leave $${(Math.round(legacyAmount / 1000) * 1000).toLocaleString('en-US')} legacy`,
+    )
+  })
+
+  it('titles the falling-short income scenario without the dollar-basis literal, which the name keeps', () => {
+    const inputs = makeInputs({ startingBalance: 0, monthlySavings: 100, targetIncome: 200000 })
+    const scenarios = calculateRetirementAnalysis(inputs).scenarios
+    const income = scenarios.find((s) => s.id === 'reality-income')!
+    expect(income.name).toContain("(today's dollars)")
+    expect(income.title).toHaveLength(3)
+    expect(income.title![0]).toBe('Live on ')
+    expect(income.title![1]).toMatchObject({ basis: 'today', yearsFromNow: 35, roundTo: 100 })
+    expect(income.title![2]).toBe('/month at 65')
+    // Money paid in, or no figure: plain names.
+    for (const id of ['modest-fix', 'reality-age', 'current-plan-falling-short']) {
+      expect(scenarios.find((s) => s.id === id)!.title).toBeUndefined()
+    }
   })
 })

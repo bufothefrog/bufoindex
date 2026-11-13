@@ -28,8 +28,8 @@ vi.mock('recharts', async (importOriginal) => {
   };
 });
 
-// $2,000 x 12 / $100,000 = 24%; retiring at 60 needs 9.69% on the curve
-// (test/components/retirement/savingsRateMarkers.test.ts).
+// $2,000 x 12 / $100,000 = 24%; retiring at 60 needs 10.37% on the curve
+// (9.69% before PR 5; test/components/retirement/savingsRateMarkers.test.ts).
 const SAVINGS_CAPTION =
   "contributions start today \u2014 shown in today's dollars in either display mode. " +
   'Your current savings rate is 24%. Retiring at 60 needs about 10%.';
@@ -216,5 +216,36 @@ describe('ResultsSection', () => {
     expect(
       screen.getByRole('figure', { name: SAVINGS_CAPTION })
     ).toBeInTheDocument();
+  });
+
+  it('converts a scenario title with title parts to the dollar mode; a name with none stays as it is', () => {
+    // 2,733.33 of today's income a month, 35 years out at 3%: x 2.813862 = 7,691.89,
+    // rounded to 100 gives $7,700. The legacy, nominal 65 years out at 3%
+    // (1.03^65 = 6.829983): 7,248,462.75 / 6.829983 = 1,061,271.02 -> $1,061,000.
+    const titled: RetirementResults = {
+      ...RESULTS,
+      scenarios: [
+        {
+          ...RESULTS.scenarios[0],
+          id: 'conservative-wealth-building',
+          name: 'Conservative: $2,700/month, leave $7,248,000 legacy',
+          title: [
+            'Conservative: ',
+            { amount: 41000 * 0.8 / 12, basis: 'today', yearsFromNow: 35, roundTo: 100 },
+            '/month, leave ',
+            { amount: 7248462.75, basis: 'nominal', yearsFromNow: 65, roundTo: 1000 },
+            ' legacy',
+          ],
+        },
+        RESULTS.scenarios[2],
+      ],
+    };
+    renderResults(titled);
+    expect(scenarioHeader('Conservative')).toHaveTextContent(/^Conservative: \$2,700\/month, leave \$1,061,000 legacyRetire/);
+    expect(scenarioHeader('Work until age 66')).toBeInTheDocument();
+
+    act(() => usePreferencesStore.setState({ displayMode: 'nominal' }));
+    expect(scenarioHeader('Conservative')).toHaveTextContent(/^Conservative: \$7,700\/month, leave \$7,248,000 legacyRetire/);
+    expect(scenarioHeader('Work until age 66')).toBeInTheDocument();
   });
 });

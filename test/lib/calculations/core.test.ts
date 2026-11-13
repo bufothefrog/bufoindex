@@ -22,6 +22,12 @@ import type { PaycheckProfile } from '@/lib/types'
 // Side-effect import: registers the toBeCloseToCurrency custom matcher.
 import '@/test/utils/financial-test-helpers'
 import { createPaycheckProfile, createDebtData } from '@/test/factories/test-data-factory'
+import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition'
+import { engineInputsFor } from '@/lib/calculators/runtime'
+import { FINANCIAL_STEPS } from '@/lib/constants/financialSteps'
+import type { Write } from '@/lib/fields/types'
+import { applyProfileWrites, getDefaultFinancialProfile } from '@/lib/profile/defaults'
+import { calculateStepStatus } from '@/lib/utils/stepStatusUtils'
 
 describe('Core Paycheck Optimization', () => {
   describe('FREQUENCY_MULTIPLIERS', () => {
@@ -449,9 +455,8 @@ describe('Core Paycheck Optimization', () => {
     })
 
     it('should handle debt payoff scenarios', () => {
-      // Give the profile a fully-funded 1-month emergency cushion so the
-      // Financial Order of Operations advances past Step 1 and debt_payoff
-      // (Step 3) becomes the binding priority.
+      // One month of expenses in cash. High-interest debt runs before the
+      // emergency step, so debt_payoff is the binding priority either way.
       const profileWithDebt = createPaycheckProfile({
         ...mockProfile,
         preferences: {
@@ -708,8 +713,11 @@ describe('Core Paycheck Optimization', () => {
     })
 
     it('should emit allocations in non-decreasing priority order', () => {
-      // A profile that lights up most of the order: no emergency fund, a live
-      // employer match, 22% debt, HSA room, Roth room and 401k room.
+      // A profile that lights up most of the order: an emergency fund below
+      // target, a live employer match, a small 22% debt, HSA room, Roth room
+      // and 401k room. (With the one-month step gone, a 9,000 card and a 500
+      // fund left nothing past the emergency step, so the debt and the fund
+      // gap are smaller here.)
       const richProfile = createPaycheckProfile({
         ...mockProfile,
         income: {
@@ -721,16 +729,17 @@ describe('Core Paycheck Optimization', () => {
         preferences: {
           ...mockProfile.preferences,
           necessaryExpenses: 2000,
-          currentEmergencyFund: 500,
+          currentEmergencyFund: 5500,
           funMoney: { min: 100, max: 300, current: 200 },
         },
         debts: [
-          createDebtData({ name: 'Credit Card', balance: 9000, interestRate: 0.22, minimumPayment: 200 }),
+          createDebtData({ name: 'Credit Card', balance: 1000, interestRate: 0.22, minimumPayment: 200 }),
         ],
       })
 
       const result = calculateOptimalAllocation(richProfile)
-      expect(result.allocations.length).toBeGreaterThan(2)
+      expect(result.allocations.length).toBeGreaterThan(3)
+      expect(result.allocations.map(a => a.id)).toContain('emergency-fund-completion')
 
       const priorities = result.allocations.map(a => a.priority)
       const sorted = [...priorities].sort((a, b) => a - b)
@@ -860,5 +869,143 @@ describe('Core Paycheck Optimization', () => {
         expect(calculateOpportunityCost(10000, 0)).toBe(0)
       })
     })
+  })
+})
+
+/**
+ * PR 5: one emergency step to the target months, run after the employer match
+ * and high-interest debt, on the site default profile through the paycheck
+ * binding (2,550 net per bi-weekly paycheck, 3,000 necessary, 300 fun money,
+ * a 3-month target). Traces from the build contract, section 8.
+ */
+describe('the single emergency step on the site default profile', () => {
+  /** The default profile with the writes applied and marked answered (a typed value replaces a derived one). */
+  const profileWith = (writes: Write[]) => {
+    const { profile, accepted } = applyProfileWrites(getDefaultFinancialProfile(), writes)
+    expect(accepted).toEqual(writes.map((write) => write.path))
+    return { ...profile, provided: [...profile.provided, ...accepted] }
+  }
+  const defaultWith = (writes: Write[]) =>
+    calculateOptimalAllocation(engineInputsFor(PAYCHECK_CALCULATOR, profileWith(writes)))
+  const STARTER = /1-month|one month of expenses provides|starter/i
+  const statusesOf = (result: ReturnType<typeof calculateOptimalAllocation>, writes: Write[]) =>
+    calculateStepStatus(FINANCIAL_STEPS, result.allocations, engineInputsFor(PAYCHECK_CALCULATOR, profileWith(writes)))
+
+  it('default: amounts unchanged, no emergency step (the 9,000 fund meets 3 x 3,000)', () => {
+    const result = defaultWith([])
+    expect(result.allocations.map((a) => [a.account, Math.round(a.amount * 100) / 100])).toEqual([
+      ['Roth IRA', 288.46],
+      ['Roth 401k', 622.31],
+      ['Taxable Investment', 116.15],
+    ])
+    expect(result.remainingAmount).toBeCloseTo(0, 9)
+    expect(result.optimizationScore.overall).toBe(80)
+  })
+
+  it('E12, zero cash: Emergency Fund 1,026.92 toward the 3-month fund, 7,973 more needed', () => {
+    // available = 2550 - 3000 / (26/12) - 300 / (26/12) = 1026.92; 9000 - 1026.92 = 7973.08
+    const writes: Write[] = [{ path: 'cash.emergencyFundBalance', value: 0 }]
+    const result = defaultWith(writes)
+    expect(result.allocations).toHaveLength(1)
+    const [emergency] = result.allocations
+    expect(emergency.id).toBe('emergency-fund-completion')
+    expect(emergency.account).toBe('Emergency Fund')
+    expect(emergency.category).toBe('emergency_fund')
+    expect(emergency.amount).toBeCloseTo(1026.923077, 5)
+    expect(emergency.implementation).toBe(
+      'Save $1,027 per paycheck toward the 3-month emergency fund ($7,973 more needed)'
+    )
+    expect(emergency.reasoning).toBe('Builds cash from 0.0 to 3 months of necessary expenses, held at 4.0% APY.')
+    const card = statusesOf(result, writes).find((step) => step.id === 'emergency-full')!
+    expect(card.name).toBe('Emergency Fund')
+    expect(card.allocation).toBe(emergency)
+    expect(card.urgencyLevel).toBe('important')
+    expect(card.recommendation).toBe('Building emergency fund')
+    // The funded emergency step is not also listed as deprioritized.
+    expect(result.skippedItems.map((item) => item.id)).not.toContain('no-emergency-fund')
+  })
+
+  it('fund 1,000: 6,973 more needed', () => {
+    const result = defaultWith([{ path: 'cash.emergencyFundBalance', value: 1000 }])
+    expect(result.allocations[0].amount).toBeCloseTo(1026.923077, 5)
+    // 9000 - 1000 - 1026.92 = 6973.08
+    expect(result.allocations[0].implementation).toContain('($6,973 more needed)')
+  })
+
+  it('E17, zero cash plus a 24% card (8,000, minimum 200): the card first, then the emergency fund', () => {
+    // minimum per paycheck = 200 x 12 / 26 = 92.3077; debt extra = 1026.92 - 92.31 = 934.62;
+    // the emergency step receives the 92.31 the minimum leaves in availableAmount (the known
+    // limit of section 8): 9000 - 92.31 = 8907.69.
+    const writes: Write[] = [
+      { path: 'cash.emergencyFundBalance', value: 0 },
+      {
+        path: 'debts',
+        value: [{ id: 'card', name: 'Card', balance: 8000, interestRate: 0.24, minimumPayment: 200, extraPayment: 0, taxDeductible: false }],
+      },
+    ]
+    const result = defaultWith(writes)
+    // formatPercent prints a whole rate without decimals: 'Card (24%)'.
+    expect(result.allocations.map((a) => a.account)).toEqual(['Card (24%)', 'Emergency Fund'])
+    expect(result.allocations[0].amount).toBeCloseTo(1026.923077 - (200 * 12) / 26, 5)
+    expect(result.allocations[0].amount).toBeCloseTo(934.62, 2)
+    expect(result.allocations[1].amount).toBeCloseTo((200 * 12) / 26, 9)
+    expect(result.allocations[1].implementation).toBe(
+      'Save $92 per paycheck toward the 3-month emergency fund ($8,908 more needed)'
+    )
+  })
+
+  it('below one month with a 6-month target: the one step can take everything the later steps used to get', () => {
+    // Monthly pay 10,000 net, 2,000 necessary, no fun money, no match, no HSA, no debt:
+    // available = 10,000 - 2,000 = 8,000. Target 6 x 2,000 = 12,000, cash 0, so the step
+    // takes min(12,000, 8,000) = 8,000 and nothing flows to the IRA or taxable steps
+    // (at ec300fd the one-month step took 2,000 and the rest flowed down).
+    const profile = createPaycheckProfile({
+      income: { ...createPaycheckProfile().income, frequency: 'monthly', netPaycheck: 10000, grossPaycheck: 12000 },
+      debts: [],
+      benefits: {
+        ...createPaycheckProfile().benefits,
+        employer401k: { ...createPaycheckProfile().benefits.employer401k, available: false },
+        hsa: { ...createPaycheckProfile().benefits.hsa, eligible: false },
+      },
+      preferences: {
+        ...createPaycheckProfile().preferences,
+        necessaryExpenses: 2000,
+        currentEmergencyFund: 0,
+        emergencyFundMonths: 6,
+        funMoney: { min: 0, max: 0, current: 0 },
+      },
+    })
+    const result = calculateOptimalAllocation(profile)
+    expect(result.allocations.map((a) => [a.account, a.amount])).toEqual([['Emergency Fund', 8000]])
+    expect(result.allocations[0].implementation).toBe(
+      'Save $8,000 per paycheck toward the 6-month emergency fund ($4,000 more needed)'
+    )
+    expect(result.remainingAmount).toBe(0)
+  })
+
+  it('a fund above target (20,000): unchanged amounts', () => {
+    const result = defaultWith([{ path: 'cash.emergencyFundBalance', value: 20000 }])
+    expect(result.allocations.map((a) => Math.round(a.amount * 100) / 100)).toEqual([288.46, 622.31, 116.15])
+  })
+
+  it('no allocation, step name or status text names a one-month or starter step', () => {
+    expect(FINANCIAL_STEPS).toHaveLength(8)
+    expect(FINANCIAL_STEPS.map((step) => step.id)).not.toContain('emergency-1month')
+    for (const writes of [
+      [],
+      [{ path: 'cash.emergencyFundBalance', value: 0 }],
+      [{ path: 'cash.emergencyFundBalance', value: 1000 }],
+    ] as Write[][]) {
+      const result = defaultWith(writes)
+      for (const a of result.allocations) {
+        expect(a.id).not.toBe('1-month-emergency')
+        expect(`${a.account} ${a.reasoning} ${a.implementation}`).not.toMatch(STARTER)
+      }
+      for (const step of statusesOf(result, writes)) {
+        expect(
+          [step.name, step.recommendation, step.whyItMatters, ...step.implementationSteps].join(' ')
+        ).not.toMatch(STARTER)
+      }
+    }
   })
 })

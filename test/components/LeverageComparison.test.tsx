@@ -52,7 +52,7 @@ describe('LeverageComparison page', () => {
     expect(metadata).toEqual({
       title: 'Leverage Comparison',
       description:
-        'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the lump-sum framing shown side by side.',
+        'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the same yearly amount invested at the start of each year, side by side.',
     });
   });
 
@@ -80,13 +80,57 @@ describe('LeverageComparison page', () => {
       '$265,000 contributed to each over 40 years, 500 paths'
     );
     expect(results()).toHaveTextContent('Index fund, median ending balance');
-    expect(results()).toHaveTextContent('Cash flow vs lump sum');
+    expect(results()).toHaveTextContent('Monthly vs start of each year');
     expect(
       screen.getByRole('figure', { name: /Lines are the median balance across 500 simulated paths/ })
     ).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: /under monthly contributions and a lump sum/ })).toHaveTextContent(
-      '$500/mo + $25.0k start'
+    expect(
+      screen.getByRole('table', { name: /with the same yearly amount invested monthly or at the start of each year/ })
+    ).toHaveTextContent('$500/mo + $25.0k start');
+  });
+
+  it('compares monthly with the same yearly amount at the start of each year, at the default profile', () => {
+    render(page());
+    const card = screen.getByRole('table', {
+      name: "Median ending balances in today's dollars for the index fund and the 2x fund with the same yearly amount invested monthly or at the start of each year; contributions as entered",
+    });
+    expect(within(card).getByRole('columnheader', { name: 'Timing' })).toBeInTheDocument();
+    const rows = within(card)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => Array.from(row.querySelectorAll('th, td')).map((cell) => cell.textContent ?? ''));
+    // Today's dollars = nominal / 1.03^40 (3.26204). Monthly (unchanged):
+    // 2,533,597.60 / 3,008,809.28 -> $776,692 / $922,371, gap +$145,679 (+18.8%).
+    // Start of each year: 2,595,327.26 / 3,096,306.82 -> $795,615 / $949,194,
+    // gap +$153,579 (+19.3%). The table prints compact figures.
+    expect(rows).toEqual([
+      ['Monthly$500/mo + $25.0k start', '$777k', '$922k', '+$146k+18.8%'],
+      ['Start of each year$6.0k/yr + $25.0k start', '$796k', '$949k', '+$154k+19.3%'],
+    ]);
+    // The two relative gaps differ by 0.55 points, under the 5.66-point noise
+    // threshold at 40 years (4 x sqrt(40 / 20)).
+    expect(
+      screen.getByText(
+        "With monthly contributions the 2x fund's median ends above the index fund's median by $146k (+18.8% of the index median). " +
+          'Investing the same $6.0k a year at the start of each year gives a gap of +$154k (+19.3%). ' +
+          'The two relative gaps differ by 0.5 percentage points, which is within the sampling error of 500 simulated paths, ' +
+          'so at these settings this run does not separate the two timings.'
+      )
+    ).toBeInTheDocument();
+    expect(results()).toHaveTextContent(
+      'Paths where the 2x fund ends behind: 40% with monthly contributions, 40% at the start of each year.'
     );
+    expect(results()).toHaveTextContent(
+      "Each year's amount goes in at the start of the year, before most of the monthly amounts, and at these settings that makes its median balance larger than the monthly median under both funds."
+    );
+  });
+
+  it('renders no lump-sum wording anywhere on the page', () => {
+    const { container } = render(page());
+    expect(results()).toHaveTextContent('Monthly vs start of each year');
+    expect(container.textContent ?? '').not.toMatch(/lump/i);
+    expect(document.title).not.toMatch(/lump/i);
+    expect(metadata.description ?? '').not.toMatch(/lump/i);
   });
 
   it('has live results and no Calculate button', () => {

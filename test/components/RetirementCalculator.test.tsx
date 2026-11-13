@@ -333,3 +333,46 @@ describe('RetirementCalculator: the Social Security claiming age', () => {
     expect(within(card).queryByRole('textbox', { name: 'Social Security age' })).not.toBeInTheDocument();
   });
 });
+
+describe('RetirementCalculator: contribution timing on the Monthly investing card', () => {
+  const monthly = () => screen.getByRole('region', { name: 'Monthly investing' });
+
+  it('shows one choice for the default visitor, taxable investing, on Monthly', async () => {
+    renderWithProfile(<RetirementCalculator />);
+    await findResults();
+    const group = within(monthly()).getByRole('radiogroup', { name: 'Taxable investing' });
+    expect(within(group).getByRole('radio', { name: 'Monthly' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Once a year, at the start: $6,000' })).not.toBeChecked();
+    expect(within(monthly()).queryByRole('radiogroup', { name: 'Roth IRA' })).not.toBeInTheDocument();
+    expect(within(monthly()).queryByRole('radiogroup', { name: 'Traditional IRA' })).not.toBeInTheDocument();
+    expect(useRetirementStore.getState().inputs?.yearStartSavings).toBe(0);
+  });
+
+  it('runs the taxable part at the start of each year once chosen', async () => {
+    renderWithProfile(<RetirementCalculator />);
+    await findResults();
+    await userEvent.setup().click(within(monthly()).getByRole('radio', { name: 'Once a year, at the start: $6,000' }));
+    const { profile } = useProfileStore.getState();
+    expect(profile.investing.taxableTiming).toBe('yearStart');
+    expect(profile.provided).toContain('investing.taxableTiming');
+    await waitFor(() => expect(useRetirementStore.getState().inputs?.yearStartSavings).toBe(6000));
+    expect(useRetirementStore.getState().inputs?.monthlySavings).toBe(1540);
+  });
+
+  it('shows the Roth IRA choice while the Roth IRA is in use', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { ira: { roth: true, rothMonthly: 625 } } });
+    await findResults();
+    expect(
+      within(monthly()).getByRole('radiogroup', { name: 'Roth IRA' })
+    ).toHaveTextContent('Once a year, at the start: $7,500');
+  });
+
+  it('hides every timing choice under a Custom monthly investing figure', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { investing: { monthlyContribution: 2750 } } });
+    await findResults();
+    for (const name of ['Traditional IRA', 'Roth IRA', 'Taxable investing']) {
+      expect(within(monthly()).queryByRole('radiogroup', { name })).not.toBeInTheDocument();
+    }
+    expect(within(monthly()).queryByText(/Once a year/)).not.toBeInTheDocument();
+  });
+});

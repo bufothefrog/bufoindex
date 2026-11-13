@@ -18,15 +18,8 @@ import { formatCurrency, formatPercent, paycheckToMonthly, monthlyToPaycheck } f
  * account-prioritization score in projections.ts, which uses a stable sort)
  * rank by array position instead of by the plan, and the winner of the tie
  * depends on which step happened to be pushed first.
- *
- * CONSTRAINT — lib/utils/stepStatusUtils.ts splits the two emergency-fund
- * allocations at a priority 2-vs-3 boundary: the `emergency-1month` step
- * matches `priority <= 2` and the `emergency-full` step matches
- * `priority >= 3`. Keep `oneMonthEmergency` at 2 or below and
- * `emergencyFundCompletion` at 3 or above, or the two steps swap allocations.
  */
 export const ALLOCATION_PRIORITY = {
-  oneMonthEmergency: 1,
   employerMatch: 2,
   highInterestDebt: 3,
   emergencyFundCompletion: 4,
@@ -73,70 +66,28 @@ function preTaxDeferralShare(benefits: EmployerBenefits): number {
 }
 
 /**
- * Calculate 1-month emergency fund (FOO Step 1)
- * Now works with per-paycheck amounts
- */
-export function calculate1MonthEmergency(
-  profile: PaycheckProfile,
-  availableAmount: number
-): AllocationItem | null {
-  const monthlyExpenses = profile.preferences.necessaryExpenses;
-  const currentEmergencyFund = profile.preferences.currentEmergencyFund;
-  const targetAmount = monthlyExpenses; // 1 month of expenses
-
-  // A non-positive target means monthly expenses have not been entered yet.
-  // A $0 goal is not a funded emergency fund, so make no allocation rather
-  // than letting `0 >= 0` read as "already complete".
-  if (!(targetAmount > 0)) return null;
-
-  // If already have 1+ months, skip this step
-  if (currentEmergencyFund >= targetAmount) return null;
-
-  const amountNeededTotal = targetAmount - currentEmergencyFund;
-  const actualAllocation = Math.min(amountNeededTotal, availableAmount);
-  
-  if (actualAllocation <= 0) return null;
-  
-  const frequency = profile.income.frequency;
-  const monthlyEquivalent = paycheckToMonthly(actualAllocation, frequency);
-  
-  return {
-    id: '1-month-emergency',
-    account: '1-Month Emergency Fund',
-    amount: actualAllocation, // Per-paycheck amount
-    percentage: actualAllocation / profile.income.netPaycheck,
-    priority: ALLOCATION_PRIORITY.oneMonthEmergency,
-    reasoning: 'Build basic financial security before optimization. One month of expenses provides essential protection.',
-    taxImpact: 0, // No tax impact for emergency fund
-    category: 'emergency_fund',
-    monthlyEquivalent,
-    annualEquivalent: monthlyEquivalent * 12,
-    implementation: actualAllocation >= amountNeededTotal 
-      ? `Save ${formatCurrency(actualAllocation)} per paycheck to complete 1-month emergency fund`
-      : `Save ${formatCurrency(actualAllocation)} per paycheck toward emergency fund (${formatCurrency(amountNeededTotal - actualAllocation)} more needed)`,
-  };
-}
-
-/**
- * Calculate emergency fund completion (FOO Step 4)
- * Now works with per-paycheck amounts
+ * The emergency-fund step: builds cash to the target months of necessary
+ * expenses (preferences.emergencyFundMonths, 3 by default). It is the only
+ * emergency step; it runs after the employer match and high-interest debt.
+ * Amounts are per paycheck.
  */
 export function calculateEmergencyFundCompletion(
-  profile: PaycheckProfile, 
+  profile: PaycheckProfile,
   availableAmount: number
 ): AllocationItem | null {
   const monthlyExpenses = profile.preferences.necessaryExpenses;
   const currentEmergencyFund = profile.preferences.currentEmergencyFund;
   const targetMonths = profile.preferences.emergencyFundMonths;
   const targetAmount = monthlyExpenses * targetMonths;
-  
-  // If already at target, skip
+
+  // A non-positive target means expenses or the target months are 0. A $0
+  // goal is not a funded emergency fund, so make no allocation rather than
+  // letting `0 >= 0` read as "already complete".
+  if (!(targetAmount > 0)) return null;
+
+  // Already at target
   if (currentEmergencyFund >= targetAmount) return null;
-  
-  // Make sure we have at least 1 month before moving to full fund
-  const oneMonthAmount = monthlyExpenses;
-  if (currentEmergencyFund < oneMonthAmount) return null; // Should be handled by Step 1
-  
+
   const amountNeededTotal = targetAmount - currentEmergencyFund;
   const actualAllocation = Math.min(amountNeededTotal, availableAmount);
   
@@ -144,6 +95,7 @@ export function calculateEmergencyFundCompletion(
   
   const currentMonths = currentEmergencyFund / monthlyExpenses;
   const apy = profile.preferences.emergencyFundAPY;
+  const apyLabel = `${(apy * 100).toFixed(1)}%`;
   const frequency = profile.income.frequency;
   const monthlyEquivalent = paycheckToMonthly(actualAllocation, frequency);
   
@@ -153,14 +105,14 @@ export function calculateEmergencyFundCompletion(
     amount: actualAllocation, // Per-paycheck amount
     percentage: actualAllocation / profile.income.netPaycheck,
     priority: ALLOCATION_PRIORITY.emergencyFundCompletion,
-    reasoning: `Build from ${currentMonths.toFixed(1)} to ${targetMonths} months expenses. ${apy >= 0.04 ? 'Good HYSA rate' : 'Consider higher-yield savings'}`,
+    reasoning: `Builds cash from ${currentMonths.toFixed(1)} to ${targetMonths} months of necessary expenses, held at ${apyLabel} APY.`,
     taxImpact: 0,
     category: 'emergency_fund',
     monthlyEquivalent,
     annualEquivalent: monthlyEquivalent * 12,
-    implementation: actualAllocation >= amountNeededTotal 
-      ? `Save ${formatCurrency(actualAllocation)} per paycheck to complete ${targetMonths}-month emergency fund`
-      : `Save ${formatCurrency(actualAllocation)} per paycheck toward emergency fund target`,
+    implementation: actualAllocation >= amountNeededTotal
+      ? `Save ${formatCurrency(actualAllocation)} per paycheck to complete the ${targetMonths}-month emergency fund`
+      : `Save ${formatCurrency(actualAllocation)} per paycheck toward the ${targetMonths}-month emergency fund (${formatCurrency(amountNeededTotal - actualAllocation)} more needed)`,
   };
 }
 
@@ -384,6 +336,29 @@ export function determineRothVsTraditional(profile: PaycheckProfile): 'roth' | '
 }
 
 /**
+ * The two brackets the Roth-vs-Traditional rule compares, as printed in the
+ * step texts: today's federal bracket and the retirement bracket
+ * determineRothVsTraditional uses (the entered one, or 0.8 x today's).
+ */
+export function bracketComparison(profile: PaycheckProfile): string {
+  const currentBracket = profile.taxes.federalBracket;
+  const entered = profile.preferences.expectedRetirementBracket;
+  const retirementBracket = entered || currentBracket * 0.8;
+  const cur = (currentBracket * 100).toFixed(0);
+  const ret = (retirementBracket * 100).toFixed(0);
+  if (cur === ret) return `${cur}% bracket now and expected in retirement`;
+  return entered
+    ? `${cur}% bracket now, ${ret}% expected in retirement`
+    : `${cur}% bracket now, ${ret}% assumed in retirement`;
+}
+
+/** 'Age N (under 30); ' on the under-30 branch of determineRothVsTraditional, else ''. */
+function ageLead(profile: PaycheckProfile): string {
+  const age = profile.preferences.age;
+  return age < 30 && !profile.preferences.isPeakEarnings ? `Age ${age} (under 30); ` : '';
+}
+
+/**
  * Calculate Roth IRA contribution with smart Roth vs Traditional logic
  */
 export function calculateRothIRA(
@@ -435,20 +410,12 @@ export function calculateRothIRA(
     return null; // Will be handled by Traditional IRA function instead
   }
   
-  const currentBracket = profile.taxes.federalBracket;
-
-  let reasoning = '';
-  if (recommendation === 'roth') {
-    if (profile.preferences.age < 30 && !profile.preferences.isPeakEarnings) {
-      reasoning = 'Young + not peak earnings = Roth for maximum tax-free growth';
-    } else if (currentBracket <= 0.12) {
-      reasoning = 'Low tax bracket makes Roth optimal for tax-free growth';
-    } else {
-      reasoning = 'Roth provides tax diversification and future flexibility';
-    }
-  } else { // mixed
-    reasoning = 'Tax diversification recommended - consider splitting with Traditional';
-  }
+  const cmp = bracketComparison(profile);
+  // The three 'roth' branches of determineRothVsTraditional (under 30, a low
+  // bracket, the rest) share one sentence; only the age branch leads with it.
+  const reasoning = recommendation === 'roth'
+    ? `${ageLead(profile)}${cmp}. Roth pays the tax now; Traditional defers it.`
+    : `${cmp}. Split between Roth and Traditional, the tax is paid partly now and partly in retirement.`;
   
   const monthlyEquivalent = paycheckToMonthly(paycheckContribution, frequency);
 
@@ -519,17 +486,19 @@ export function calculateAdditional401k(
   let reasoning: string;
   let taxImpact: number;
   
+  const cmp = bracketComparison(profile);
+
   if (recommendation === 'roth') {
     accountType = 'Roth 401k';
-    reasoning = 'Roth 401k recommended for tax-free growth and retirement flexibility';
+    reasoning = `${ageLead(profile)}${cmp}. Roth 401k pays the tax now; Traditional defers it.`;
     taxImpact = 0; // Roth contributions are after-tax
   } else if (recommendation === 'traditional') {
     accountType = 'Traditional 401k';
-    reasoning = 'Traditional 401k recommended for current tax savings';
+    reasoning = `${cmp}. Traditional 401k defers the tax; Roth would pay it now.`;
     taxImpact = -recommendedContribution * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state);
   } else { // mixed
     accountType = '401k (Roth + Traditional)';
-    reasoning = 'Consider splitting between Roth and Traditional 401k for tax diversification';
+    reasoning = `${cmp}. Split between Roth and Traditional 401k, the tax is paid partly now and partly in retirement.`;
     taxImpact = -recommendedContribution * 0.5 * calculateIncomeTaxRate(profile.taxes.federalBracket, profile.taxes.state);
   }
   
@@ -615,7 +584,7 @@ export function calculateMegaBackdoorRoth(
     amount: recommendedContribution,
     percentage: recommendedContribution / profile.income.netPaycheck,
     priority: ALLOCATION_PRIORITY.megaBackdoorRoth, // After regular 401k but before taxable
-    reasoning: 'Convert after-tax 401k contributions to Roth for tax-free growth (high earner strategy)',
+    reasoning: 'After-tax 401k contributions converted to Roth grow untaxed.',
     taxImpact: 0, // After-tax contributions, no immediate tax benefit
     // 'tax_optimization' is the taxonomy the mega-backdoor step uses in
     // lib/constants/financialSteps.ts and lib/utils/stepStatusUtils.ts; tagging
@@ -644,12 +613,12 @@ export function calculateTaxableInvestment(
     amount: availableAmount,
     percentage: availableAmount / profile.income.netPaycheck,
     priority: ALLOCATION_PRIORITY.taxableInvestment,
-    reasoning: 'Build wealth with tax-efficient index funds (VTI/VTSAX)',
+    reasoning: 'Money left after the tax-advantaged steps above, invested in a taxable account.',
     taxImpact: 0, // No immediate tax impact
     category: 'investment',
     monthlyEquivalent,
     annualEquivalent: monthlyEquivalent * 12,
-    implementation: `Invest ${formatCurrency(availableAmount)} per paycheck in low-cost index funds`,
+    implementation: `Invest ${formatCurrency(availableAmount)} per paycheck in a taxable account`,
   };
 }
 

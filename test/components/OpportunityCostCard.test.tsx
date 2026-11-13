@@ -16,6 +16,8 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { OpportunityCostCard } from '@/components/shared/cards/OpportunityCostCard';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import type { SkippedItem } from '@/lib/types';
+import { identifySkippedOptimizations } from '@/lib/calculations/analysis';
+import { createPaycheckProfile, createUserPreferences } from '@/test/factories/test-data-factory';
 
 function createSkippedItem(overrides: Partial<SkippedItem> = {}): SkippedItem {
   return {
@@ -99,7 +101,7 @@ describe('OpportunityCostCard', () => {
       item: 'Insufficient Emergency Fund',
       reason: 'Less than 1 month of expenses saved increases financial risk',
       opportunityCost: { monthly: 0, annual: 0 },
-      alternative: 'Build 1-month emergency fund first',
+      alternative: 'Build cash toward your 3-month target ($9,000)',
       riskLevel: 'high',
     });
 
@@ -132,7 +134,7 @@ describe('OpportunityCostCard', () => {
       ).toBeInTheDocument();
       expect(screen.getByText('Do this instead')).toBeInTheDocument();
       expect(
-        screen.getByText('Build 1-month emergency fund first')
+        screen.getByText('Build cash toward your 3-month target ($9,000)')
       ).toBeInTheDocument();
     });
 
@@ -182,6 +184,23 @@ describe('OpportunityCostCard', () => {
       expect(highlighted()).toBe(nominal);
       expect(screen.getByText(`cost over ${years} years (future $)`)).toBeInTheDocument();
       expect(today).not.toBe(nominal);
+    });
+
+    it("engine output: the Why This Matters text names no figure; the headline alone follows the mode", () => {
+      // A 21,000 fund against a 9,000 target: the 12,000 excess at 4.5% APY
+      // costs 12000 * (1.07^10 - 1.045^10) = 4,970.18 over 10 years.
+      const item = identifySkippedOptimizations(
+        createPaycheckProfile({ preferences: createUserPreferences({ currentEmergencyFund: 21000 }) })
+      ).find((skipped) => skipped.id === 'excessive-emergency-fund')!;
+      renderCard(item);
+      const why = screen.getByText(/the 10-year cost is shown above/);
+      expect(why.textContent).not.toContain('$');
+      // today's dollars: 4,970.18 / 1.03^10 = 3,698.25
+      expect(screen.getByText('$3,698')).toBeInTheDocument();
+      expect(screen.queryByText(/4,970/)).not.toBeInTheDocument();
+      act(() => usePreferencesStore.getState().setDisplayMode('nominal'));
+      expect(screen.getByText('$4,970')).toBeInTheDocument();
+      expect(screen.getByText(/the 10-year cost is shown above/).textContent).not.toContain('$');
     });
 
     it('leaves an annual cost and the monthly and annual rows as computed (current-year money)', () => {

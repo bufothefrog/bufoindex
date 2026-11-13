@@ -179,13 +179,81 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
       "Equal payments made at the end of each period (ordinary annuity)",
       "Constant interest rate throughout all periods",
       "All payments are made as scheduled without interruption",
-      "Interest is compounded at the same frequency as payments"
+      "Interest is compounded at the same frequency as payments",
+      "Monthly rate convention: wherever a calculator compounds monthly, a yearly return r becomes i = (1 + r)^(1/12) - 1. Twelve months then compound to exactly 1 + r, the same effective annual rate that grows the starting balance, and monthly and once-a-year contributions are compared at the same annual rate (r / 12 would compound to 8.30% a year at r = 8%)"
     ],
     limitations: [
       "Does not account for payment increases due to inflation",
       "Assumes perfect investment conditions with no losses",
       "Does not consider varying interest rates over time",
       "Ignores taxes on investment gains and fees"
+    ]
+  },
+  {
+    name: "Contribution Timing",
+    functionName: "scheduleFutureValue",
+    category: "core",
+    // Four short rows (the yearly annuity factor A on a row of its own) so
+    // each fits the formula box on a 360 px screen.
+    latex: "\\begin{aligned} FV &= m\\frac{(1+i)^{12n}-1}{i} \\\\ &\\quad + Y(1+r)A \\\\ A &= \\frac{(1+r)^n-1}{r} \\\\ i &= (1+r)^{1/12}-1 \\end{aligned}",
+    variables: {
+      m: {
+        symbol: "m",
+        description: "Dollars paid monthly, at the end of each month",
+        unit: "$/month",
+        constraints: "Must be >= 0"
+      },
+      Y: {
+        symbol: "Y",
+        description: "Dollars paid once a year, at the start of each simulated year: 12 times the monthly figure of each part set to once a year",
+        unit: "$/year",
+        constraints: "Must be >= 0"
+      },
+      r: {
+        symbol: "r",
+        description: "Annual return (effective); i is the monthly rate that compounds to exactly 1 + r over 12 months",
+        unit: "decimal"
+      },
+      n: {
+        symbol: "n",
+        description: "Years of saving (retirement age - current age)",
+        unit: "years",
+        constraints: "Must be > 0"
+      },
+      A: {
+        symbol: "A",
+        description: "Annuity factor of the n yearly amounts, before the extra year of growth (1+r) from paying at the start of each year"
+      }
+    },
+    description: "Future value of the contributions when part of them is paid monthly and part once a year, at the start of each simulated year. The traditional IRA, Roth IRA and taxable parts of Auto monthly investing can each be set to once a year on the Monthly investing card; everything else is monthly.",
+    purpose: "Grow the same yearly dollars on the schedule they are actually paid, so the projected balance, the scenarios, coast, the savings-rate curve and the inflation breakeven reflect when the money goes in",
+    example: {
+      inputs: { m: 0, Y: 1200, r: 0.10, n: 3 },
+      output: 4369.20,
+      explanation: "$1,200 a year paid at the start of each year at 10% grows to $4,369.20 after 3 years. The same $1,200 a year paid as $100 at the end of each month (m = 100, Y = 0) grows to $4,150.92.",
+      stepByStep: [
+        "Year 1: $1,200 x 1.10 = $1,320",
+        "Year 2: ($1,320 + $1,200) x 1.10 = $2,772",
+        "Year 3: ($2,772 + $1,200) x 1.10 = $4,369.20",
+        "Closed form: $1,200 x 1.10 x (1.10^3 - 1) / 0.10 = $1,200 x 1.10 x 3.31 = $4,369.20",
+        "Monthly for comparison: i = 1.10^(1/12) - 1 = 0.0079741; $100 x (1.10^3 - 1) / 0.0079741 = $4,150.92"
+      ]
+    },
+    sources: [
+      "BufoIndex source: scheduleFutureValue, growOneYear and monthlyRateOf (lib/calculations/contributionSchedule.ts)",
+      "BufoIndex source: yearStartInvesting (lib/profile/accounts.ts), the one reader of the timing choices"
+    ],
+    assumptions: [
+      "The simulation has no calendar: year 0 starts the day the calculation runs, so the first yearly amount lands at month 0 and then every 12 months. n years of saving get n yearly amounts, the same dollars as 12n monthly amounts",
+      "This year's deposit, if already made, is in today's balance; the month-0 amount stands for next year's deposit, placed up to 11 months early (up to +7.3% on the yearly stream at 8%)",
+      "401(k), employer match and HSA are payroll money and are modeled monthly, at month end; for bi-weekly pay this understates by about 0.17% at 8%",
+      "A Custom monthly investing figure is all monthly",
+      "The yearly amount is 12 times the monthly figure entered for that part (625 a month is 7,500 once a year)"
+    ],
+    limitations: [
+      "No yearly amount lands at the retirement date; the last one grows a full year",
+      "Under the target-date profile each simulated year uses that year's glide-path return in place of one fixed r",
+      "The yearly amount is not checked against contribution limits"
     ]
   },
   {

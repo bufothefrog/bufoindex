@@ -205,6 +205,33 @@ describe('analyzeInflationImpact', () => {
     expect(analysis.breakeven.savingsRateAdjustment).toBeCloseTo(0.190775, 5)
   })
 
+  it('share 0 equals the ec300fd expression within 1e-9 relative (PR 5)', () => {
+    const inputs = makeInputs()
+    const i = Math.pow(1.07, 1 / 12) - 1
+    const corpus = (60000 * Math.pow(1.03, 35)) / 0.04 - 60000 / 0.04
+    const before = (((corpus * i) / (Math.pow(1 + i, 420) - 1)) * 12) / 100000
+    for (const yearStartSavings of [undefined, 0, Number.NaN, -100]) {
+      const after = analyzeInflationImpact({ ...inputs, yearStartSavings }).breakeven.savingsRateAdjustment
+      expect(Math.abs(after - before) / before).toBeLessThan(1e-9)
+    }
+  })
+
+  it('with every part once a year divides by the start-of-year factor (PR 5)', () => {
+    // 1,500 a month = 18,000 a year at the start of each year, share 1:
+    // 12 x 1.07 x (1.07^35 - 1) / 0.07 = 1,774.95 per monthly-equivalent dollar,
+    // 2,720,793.68 / 1,774.95 = 1,532.87 a month, x 12 / 100,000 = 0.183945.
+    const analysis = analyzeInflationImpact(makeInputs({ yearStartSavings: 18000 }))
+    expect(analysis.breakeven.savingsRateAdjustment).toBeCloseTo(0.183945, 5)
+  })
+
+  it('a negative return keeps the straight /months branch at any share (PR 5)', () => {
+    // 2,720,793.68 / 420 x 12 / 100,000 = 0.777370.
+    for (const yearStartSavings of [0, 18000]) {
+      const analysis = analyzeInflationImpact(makeInputs({ accumulationReturn: -0.02, yearStartSavings }))
+      expect(analysis.breakeven.savingsRateAdjustment).toBeCloseTo(0.77737, 5)
+    }
+  })
+
   it('prioritizes the high-inflation insight above 4% inflation', () => {
     const analysis = analyzeInflationImpact(makeInputs({ inflationRate: 0.05 }))
 

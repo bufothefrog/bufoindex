@@ -89,16 +89,16 @@ export const CALCULATORS: Readonly<Record<CalculatorId, CalculatorEntry>> = {
     shortTitle: 'Leverage Comparison',
     path: '/tools/leverage-comparison',
     description:
-      'Monthly contributions into a plain index fund versus the same contributions into a daily-reset leveraged fund, across simulated markets, alongside the usual lump-sum framing on the same dollars.',
+      'Monthly contributions into a plain index fund versus the same contributions into a daily-reset leveraged fund, across simulated markets, alongside the same yearly amount invested at the start of each year.',
     metaDescription:
-      'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the lump-sum framing shown side by side.',
+      'Simulate monthly contributions into a plain index fund and a daily-reset leveraged fund on the same dates, with ending-balance percentiles, drawdowns, and the same yearly amount invested at the start of each year, side by side.',
     disclaimer: [DISCLAIMER.base, DISCLAIMER.simulated, DISCLAIMER.leveragedEtfs, DISCLAIMER.advice],
     liveResultsLabel: 'Leverage comparison results',
     dollarDisplay: 'fixed',
     card: {
       title: 'Leverage Comparison',
       summary:
-        'Cash-flow dollar-cost averaging into a 2x fund versus a plain index fund, with the lump-sum framing side by side and the drawdowns shown.',
+        'Cash-flow dollar-cost averaging into a 2x fund versus a plain index fund, with start-of-year contributions side by side and the drawdowns shown.',
       action: 'Compare Strategies',
     },
   },

@@ -1,59 +1,47 @@
 /**
- * The display text of an allocation item (PR 3, second fix round): the
- * engine's starter step is shown as the starter fund, never as a one-month
- * goal; every other item is shown as the engine wrote it.
+ * The step catalogue (PR 5): the allocator has one emergency step, to the
+ * target months, so the catalogue has no one-month or starter step and the
+ * 'emergency-full' entry is named plainly 'Emergency Fund'. Allocation texts
+ * are shown as the engine writes them (no display relabelling).
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  ENGINE_STARTER_FUND_ACCOUNT,
-  STARTER_FUND_LABEL,
-  STARTER_FUND_REASONING,
-  allocationDisplayLabel,
-  allocationDisplayText,
-} from '@/lib/constants/financialSteps';
+import * as financialSteps from '@/lib/constants/financialSteps';
+import { FINANCIAL_STEPS } from '@/lib/constants/financialSteps';
 
-describe('allocationDisplayLabel', () => {
-  it('shows the engine starter step as the starter emergency fund', () => {
-    expect(ENGINE_STARTER_FUND_ACCOUNT).toBe('1-Month Emergency Fund');
-    expect(allocationDisplayLabel('1-Month Emergency Fund')).toBe('Starter Emergency Fund');
+describe('FINANCIAL_STEPS', () => {
+  it('has eight steps in the allocator order, the emergency fund after the match and high-interest debt', () => {
+    expect(FINANCIAL_STEPS.map((step) => [step.id, step.priority])).toEqual([
+      ['employer-match', 2],
+      ['high-interest-debt', 3],
+      ['emergency-full', 4],
+      ['hsa-max', 5],
+      ['roth-ira', 6],
+      ['additional-401k', 7],
+      ['mega-backdoor', 8],
+      ['taxable-investment', 9],
+    ]);
   });
 
-  it.each(['Emergency Fund', 'Roth IRA', 'Roth 401k', 'Employer 401k Match', 'Taxable Investment', ''])(
-    'leaves %j unchanged',
-    (name) => {
-      expect(allocationDisplayLabel(name)).toBe(name);
+  it("names the one emergency step 'Emergency Fund'", () => {
+    expect(FINANCIAL_STEPS.find((step) => step.id === 'emergency-full')?.name).toBe('Emergency Fund');
+  });
+
+  it('names no starter or one-month step', () => {
+    for (const step of FINANCIAL_STEPS) {
+      expect(`${step.id} ${step.name}`).not.toMatch(/1-?month|starter|one month/i);
     }
-  );
-});
-
-describe('allocationDisplayText', () => {
-  it('replaces the one-month account, reasoning and implementation text of the starter step', () => {
-    const text = allocationDisplayText({
-      account: '1-Month Emergency Fund',
-      reasoning: 'Build basic financial security before optimization. One month of expenses provides essential protection.',
-      implementation: 'Save $500 per paycheck to complete 1-month emergency fund',
-    });
-    expect(text).toEqual({
-      account: STARTER_FUND_LABEL,
-      reasoning: STARTER_FUND_REASONING,
-      implementation: 'Save $500 per paycheck to complete the starter emergency fund',
-    });
-    expect(JSON.stringify(text)).not.toMatch(/one month|1-month/i);
   });
 
-  it('keeps a partial-progress implementation as written', () => {
-    expect(
-      allocationDisplayText({
-        account: '1-Month Emergency Fund',
-        reasoning: 'x',
-        implementation: 'Save $100 per paycheck toward emergency fund ($1,900 more needed)',
-      }).implementation
-    ).toBe('Save $100 per paycheck toward emergency fund ($1,900 more needed)');
-  });
-
-  it('returns any other item unchanged', () => {
-    const item = { account: 'Roth IRA', reasoning: 'r', implementation: 'i' };
-    expect(allocationDisplayText(item)).toEqual(item);
+  it('no longer exports the starter-step display helpers', () => {
+    for (const name of [
+      'ENGINE_STARTER_FUND_ACCOUNT',
+      'STARTER_FUND_LABEL',
+      'STARTER_FUND_REASONING',
+      'allocationDisplayLabel',
+      'allocationDisplayText',
+    ]) {
+      expect(financialSteps).not.toHaveProperty(name);
+    }
   });
 });

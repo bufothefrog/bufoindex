@@ -25,9 +25,45 @@ The retirement simulation lives in `lib/calculations/retirement.ts`, with random
 
 What is and isn't randomized:
 
-- **Accumulation phase: deterministic.** The balance at retirement comes from `calculateProjectedBalance` (monthly compounding; under the TDF profile, an age-based glide path blends stock/bond return assumptions).
+- **Accumulation phase: deterministic.** The balance at retirement comes from `calculateProjectedBalance`: the starting balance grows at (1 + r) a year, and the contributions grow as two streams, a monthly stream at month end and a yearly stream at the start of each simulated year (see "Contribution timing" below), both at the monthly rate `monthlyRateOf(r)` = (1 + r)^(1/12) - 1. Under the TDF profile an age-based glide path blends stock/bond return assumptions and sets r year by year.
 - **Per-year schedules: deterministic.** Withdrawals (target income + healthcare − Social Security, floored at 0), mean returns, and volatilities are precomputed once per retirement year. Under the TDF profile the mean/volatility follow the glide path; custom profiles use user-supplied values.
 - **Retirement-phase returns: randomized.** Each simulated path draws one normal annual return per year, applies it, subtracts that year's withdrawal, and fails if the balance hits zero before life expectancy. The success probability is `successfulPaths / runs`.
+
+## Contribution timing
+
+The traditional IRA, Roth IRA and taxable parts of Auto monthly investing can each be paid monthly (the default) or once a year, at the start of each simulated year. The shared helper is `lib/calculations/contributionSchedule.ts` (pure, no imports): `ContributionTiming`, `ContributionSchedule` ({ monthly: dollars per month, yearStart: dollars per year }), `monthlyRateOf`, `splitSchedule`, `yearStartShareOf`, `growOneYear`, `scheduleFutureValue`, `scheduleFactor` and `yearStartDeposit`.
+
+- **Where it is set.** Three profile leaves, `ira.traditionalTiming`, `ira.rothTiming` and `investing.taxableTiming` (default `'monthly'`; a stored profile without them normalizes to `'monthly'`, the profile stays version 3). Their FieldSpecs (`IRA_TRADITIONAL_TIMING`, `IRA_ROTH_TIMING`, `TAXABLE_TIMING` in `lib/calculators/retirement/fields.ts`) sit on the retirement form's calculator-only 'monthly-investing' screen, so they are never in the profile form, the wizard, the review page, completeness or an intake. Each shows only on Auto and only while its part is in use.
+- **The one reader.** `yearStartInvesting(get)` (`lib/profile/accounts.ts`) returns the dollars per year that land at the start of each year: round2(12 x the sum of the parts whose leaf is `'yearStart'`). The retirement binding feeds it to `RetirementInputs.yearStartSavings`; `monthlySavings` stays the total monthly-equivalent contribution. Every retirement-side reader (the page, the worker, the savings-rate markers, the overview card and its "+$500" lever) gets it from that binding. 401(k), match and HSA are payroll money and always monthly.
+- **Custom.** A Custom monthly investing figure (`investing.monthlyContribution` is a number) is all monthly: `yearStartInvesting` returns 0 and the three controls are hidden.
+- **Month 0.** The simulation has no calendar. Simulated year k covers months [12k, 12k + 12) from today, so the first yearly amount lands at month 0, then every 12 months; N years get N yearly amounts, the same dollars as 12N monthly amounts. This year's deposit, if already made, is in today's balance, and the month-0 amount stands for next year's, placed up to 11 months early (up to +7.3% on the yearly stream at 8%). Retirement ages are whole, so no yearly amount lands at retirement and the last one grows a full year.
+- **Proration.** Where the horizon ends inside a year (the leverage engine, or a fractional age in the custom closed form), the last yearly amount is prorated: yearStart x months left / 12 (`yearStartDeposit`, `scheduleFutureValue`), so both timings put in the same total.
+- **Placement per engine.** Retirement and the paycheck projections place monthly money at the END of each month (per year: add the yearly amount, then 12 times grow and add the monthly amount). The leverage engine places money at the START of each month: in month m the monthly stream does dca = (dca + c) x G_m and the start-of-year stream ys = (ys + yearStartDeposit(12c, m - 1, months)) x G_m. Both placements are kept from before, so a visitor with every part monthly sees the same numbers.
+- **Solvers.** Coast, the inflation breakeven and the savings-rate curve take the share of the yearly total that lands at the start of the year from `yearStartShareOf(monthlySavings, yearStartSavings)` and divide by `scheduleFactor(r, months, share)`. Minimum savings solves for the monthly part with the yearly part kept as it is.
+- **The leverage card** always computes both timings: monthly (the headline, chart and tails) and the same yearly amount at the start of each year (the comparison row). The paycheck allocator does not read the timing leaves.
+
+**One monthly-rate convention.** Wherever a balance compounds monthly, i = `monthlyRateOf(r)` = (1 + r)^(1/12) - 1, so twelve months compound to exactly 1 + r, the rule that also grows the starting balance, and monthly and yearly streams are compared at the same annual rate. Every place that turns a yearly return into a monthly one:
+
+1. `retirement.ts` `calculateProjectedBalanceTDF`: effective, via `growOneYear`.
+2. `retirement.ts` `calculateProjectedBalance` (custom): effective, via `scheduleFutureValue`.
+3. `retirement.ts` `calculateRetirementAnalysis`, TDF `netWorthByAge` loop: effective, via `growOneYear`.
+4. `retirement.ts` `calculateRetirementAnalysis`, custom `netWorthByAge`: effective, via `scheduleFutureValue`.
+5. `retirement.ts` `calculateMinimumSavingsNeeded`: effective.
+6. `coastFire.ts` `findCoastFireAge`: effective.
+7. `coastFire.ts` `calculateMonthlyContributionsForCoastFire`: effective.
+8. `inflationAdjustment.ts` `calculateInflationBreakeven`: effective.
+9. `leverageComparison.ts` `simulateDcaComparison`: the same rule in log space, (ln(1 + mu) - sigma^2 / 2) / 12.
+10. `savingsRate.ts` `requiredSavingsCurve`: effective since PR 5 (r / 12 before).
+11. `analysis.ts` `calculateTwentyYearDebtOpportunityCost`: effective since PR 5 (r / 12 before).
+12. `projections.ts` `projectTenYearNetWorth` and `calculateFIAge`: each yearly stream is 12 end-of-month deposits at `monthlyRateOf(r)` since PR 5 (one deposit at year end before).
+
+Not compounding, so they stay a plain / 12: monthly shares of annual dollar figures (`analysis.ts`, `optimization.ts`, the `core.ts` bonus). Compounding yearly with no monthly rate: `futureValueOfAnnuity` in the Conservative legacy, `core.ts` `calculateCompoundGrowth`, `analysis.ts` `calculateCompoundOpportunityCost`, `coastFire.ts` `calculateCoastFireBalance`. The methodology page's "Contribution Timing" entry shows the formula and a worked example.
+
+## Paycheck allocator
+
+- **One emergency step.** `calculateEmergencyFundCompletion` (`lib/calculations/optimization.ts`, priority 4, after the employer match and high-interest debt) funds `cash.targetMonths` x necessary expenses (3 by default) and is skipped only when the target is 0 or met. There is no separate one-month step. Known limit: the debt step removes only its extra payment from the money left, so a card's minimum payment can flow on to the emergency step.
+- **Net worth.** `estimateCurrentNetWorth` (`lib/calculations/projections.ts`) = max(0, emergency fund + `preferences.investedBalance` - debts). The paycheck binding fills `investedBalance` from `investedBalance(get)` (every account in effect except emergency-fund accounts, the IRAs included); when the field is absent, the traditional and Roth IRA balances stand in.
+- **Ten-year projection.** Each yearly stream is 12 end-of-month deposits at `monthlyRateOf(r)`; the FI age is n = ln((T - W) x 12 x i / A + 1) / ln(1 + r), with W's own growth left out.
 
 ## Shared profile and run stores
 

@@ -1,9 +1,10 @@
 /**
  * Projections Module Test Suite
  *
- * Tests lib/calculations/projections.ts: progressive federal tax, annuity
- * future value for contribution streams, and the current-vs-optimized path
- * projections built from per-paycheck AllocationItems.
+ * Tests lib/calculations/projections.ts: progressive federal tax, the
+ * ten-year value of yearly contribution streams (12 end-of-month deposits at
+ * the effective monthly rate), the FI-age solve, and the current-vs-optimized
+ * path projections built from per-paycheck AllocationItems.
  *
  * Units (verified by reading the source):
  *   - `profile.income.gross` / `.net` are MONTHLY; annual income = gross * 12.
@@ -18,9 +19,16 @@ import {
   calculateProjections,
   calculateOptimizationScore,
   calculateAnnualFederalTax,
-  calculateAnnuityFutureValue,
+  calculateFIAge,
+  estimateCurrentNetWorth,
+  debtStreamFutureValue,
 } from '@/lib/calculations/projections'
+import { monthlyRateOf, scheduleFutureValue } from '@/lib/calculations/contributionSchedule'
 import { calculateOptimalAllocation, getDefaultProfile } from '@/lib/calculations/core'
+import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition'
+import { engineInputsFor } from '@/lib/calculators/runtime'
+import { applyProfileWrites, getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults'
+import { ownerRaw } from '@/test/factories/accountsFixtures'
 import { getBracketsForStatus, STANDARD_DEDUCTIONS_2026 } from '@/lib/constants/irs-2026'
 import type { AllocationItem } from '@/lib/types'
 import {
@@ -36,9 +44,14 @@ import {
 
 // Hand-computation reference used in the comments below:
 //   1.07^10 = 1.9671513573 (10-year growth factor)
-//   annuity factor  @7%   = (1.07^10  - 1) / 0.07  = 13.8164479613  (invested dollars)
-//   annuity factor  @4.5% = (1.045^10 - 1) / 0.045 = 12.2882093718  (cash / emergency fund)
-//   annuity factor  @18%  = (1.18^10  - 1) / 0.18  = 23.5213086322  (extra debt principal)
+//   A yearly stream of S dollars is paid as 12 end-of-month deposits of S/12 at
+//   the effective monthly rate i = (1 + r)^(1/12) - 1 (the one monthly-rate
+//   convention), so its 10-year value is S x F(r), F(r) = ((1 + r)^10 - 1) / (12 i):
+//   F(7%)   = 0.9671513573 / (12 x 0.0056541454) = 14.2543109380  (invested dollars)
+//   F(4.5%) = 0.5529694217 / (12 x 0.0036748094) = 12.5396395086  (cash / emergency fund)
+//   F(18%)  = 4.2338383552 / (12 x 0.0138884303) = 25.4038520288  (extra debt principal)
+//   (One deposit at each year end gave 13.8164479613, 12.2882093718 and
+//   23.5213086322 before PR 5.)
 //
 // Both projected paths are built from the same universe of dollars: today's net
 // worth, the payroll deferral (and the employer match it earns) already in
@@ -142,22 +155,118 @@ describe('projections.ts — tax model and growth projections', () => {
     })
   })
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Annuity future value (fix for FV-of-single-year contribution stream)
-  // ────────────────────────────────────────────────────────────────────────
-  describe('calculateAnnuityFutureValue', () => {
-    it('grows a $10,000/yr stream at 7% for 10 years to $138,164.48', () => {
-      // FV = 10,000 × ((1.07^10 − 1) / 0.07) = 10,000 × 13.8164479613 = 138,164.48
-      expect(calculateAnnuityFutureValue(10000, 0.07, 10)).toBeCloseTo(138164.48, 1)
+  // ------------------------------------------------------------------------
+  // The stream and FI conventions (E8, E9)
+  // ------------------------------------------------------------------------
+  describe('yearly streams and the FI solve at the effective monthly rate', () => {
+    it('E8: 12,000 a year for 10 years at 7% is 171,051.73 as 12 monthly deposits', () => {
+      // i7 = 1.07^(1/12) - 1 = 0.005654145387405274
+      // 1000 x (1.07^10 - 1) / i7 = 1000 x 0.9671513573 / i7 = 171,051.7313
+      // (one deposit at each year end: 12000 x 0.9671513573 / 0.07 = 165,797.3755; ratio 1.031691)
+      expect(monthlyRateOf(0.07)).toBeCloseTo(0.005654145387405274, 15)
+      expect(scheduleFutureValue({ monthly: 1000, yearStart: 0 }, 0.07, 120)).toBeCloseTo(171051.7313, 3)
     })
 
-    it('reduces to contribution × years at 0% return', () => {
-      expect(calculateAnnuityFutureValue(10000, 0, 10)).toBe(100000)
+    it('E8 through the projection: a 12,000-a-year current path stream adds 171,051.73', () => {
+      // No net worth, no 401(k): discretionary (5,000 - 0 - 0) x 12 = 60,000, 10% saved = 6,000;
+      // two profiles differing only by that stream differ by 6,000 x F(7%).
+      const profile = createPaycheckProfile({
+        income: createIncomeData({ gross: 6000, monthlyGross: 6000, net: 5000, monthlyNet: 5000, frequency: 'monthly' }),
+        preferences: createUserPreferences({
+          necessaryExpenses: 0,
+          currentEmergencyFund: 0,
+          funMoney: { min: 0, max: 0, current: 0 },
+        }),
+        benefits: {
+          employer401k: createEmployerBenefits({ available: false }),
+          hsa: createHSABenefits({ eligible: false }),
+          ira: createIRAData({ currentContributions: { traditional: 0, roth: 0 }, currentBalances: { traditional: 0, roth: 0 } }),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+        debts: [],
+      })
+      // 6,000 x 14.2543109380 = 85,525.87 (half of E8's 171,051.73)
+      expect(calculateProjections(profile, []).currentPath.tenYear).toBeCloseTo(171051.7313 / 2, 2)
     })
 
-    it('returns 0 for zero or negative contributions', () => {
-      expect(calculateAnnuityFutureValue(0, 0.07, 10)).toBe(0)
-      expect(calculateAnnuityFutureValue(-500, 0.07, 10)).toBe(0)
+    it('E9: T - W = 500,000, A = 20,000 a year at 7% reaches FI in 14.6598 years', () => {
+      // ln(500000 x 12 x i7 / 20000 + 1) / ln 1.07 = 14.6598
+      // (one deposit at each year end: ln 2.75 / ln 1.07 = 14.9515)
+      expect(calculateFIAge(20000, 500000, 0, 0)).toBeCloseTo(14.6598, 4)
+      expect(calculateFIAge(20000, 600000, 100000, 30)).toBeCloseTo(44.6598, 4)
+    })
+
+    it('keeps the FI sentinels: already there, no saving, and the 99 cap', () => {
+      expect(calculateFIAge(20000, 500000, 600000, 40)).toBe(40)
+      expect(calculateFIAge(0, 500000, 0, 40)).toBe(99)
+      expect(calculateFIAge(1, 1e9, 0, 40)).toBe(99)
+    })
+  })
+
+  // ------------------------------------------------------------------------
+  // The site default and the owner fixture through the paycheck binding:
+  // net worth counts every invested account (investedBalance), and the
+  // streams use the effective monthly rate.
+  // ------------------------------------------------------------------------
+  describe('site default and owner profiles (PR 5: invested net worth, monthly-rate streams)', () => {
+    const withoutInvested = <T extends { preferences: { investedBalance?: number } }>(engine: T): T => {
+      const preferences = { ...engine.preferences }
+      delete preferences.investedBalance
+      return { ...engine, preferences }
+    }
+
+    it('default: net worth 34,000 (9,000 fund + 25,000 invested), 9,000 without investedBalance', () => {
+      const engine = engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile())
+      expect(engine.preferences.investedBalance).toBe(25000)
+      expect(estimateCurrentNetWorth(engine)).toBe(34000)
+      expect(estimateCurrentNetWorth(withoutInvested(engine))).toBe(9000)
+    })
+
+    it('default: the 10-year paths and the FI gap', () => {
+      // Before PR 5: current 227,023.55, recommended 559,032.79, improvement 332,009.24,
+      // fiYearsEarlier 16.3275. The convention alone gives 233,657.17 / 576,188.26;
+      // the invested 25,000 adds 25,000 x 1.07^10 = 49,178.78 to both paths.
+      const { projections } = calculateOptimalAllocation(
+        engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile())
+      )
+      expect(projections.currentPath.tenYear).toBeCloseTo(282835.9568587162, 6)
+      expect(projections.optimizedPath.tenYear).toBeCloseTo(625367.0486991273, 6)
+      expect(projections.improvement.tenYear).toBeCloseTo(342531.09184041107, 6)
+      expect(projections.improvement.fiYearsEarlier).toBeCloseTo(16.247422225138287, 6)
+
+      // The convention alone (no investedBalance: the IRA balances, 0 here)
+      const alone = calculateOptimalAllocation(
+        withoutInvested(engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()))
+      ).projections
+      expect(alone.currentPath.tenYear).toBeCloseTo(233657.17, 1)
+      expect(alone.optimizedPath.tenYear).toBeCloseTo(576188.26, 1)
+      expect(projections.currentPath.tenYear - alone.currentPath.tenYear).toBeCloseTo(25000 * 1.07 ** 10, 6)
+    })
+
+    it('owner: net worth 116,150 (10,350 fund + 105,800 invested), 20,400 without investedBalance', () => {
+      const engine = engineInputsFor(PAYCHECK_CALCULATOR, normalizeProfile(ownerRaw()))
+      expect(engine.preferences.investedBalance).toBeCloseTo(105800, 6)
+      expect(estimateCurrentNetWorth(engine)).toBeCloseTo(116150, 6)
+      expect(estimateCurrentNetWorth(withoutInvested(engine))).toBeCloseTo(20400, 6)
+    })
+
+    it('owner: the 10-year paths and the FI gap', () => {
+      // Before PR 5: 378,771.03 / 711,911.84, improvement 333,140.81, fiYearsEarlier 12.2413.
+      // The convention alone gives 389,503.05 / 733,201.57; the invested 95,750 beyond the
+      // IRA adds 95,750 x 1.07^10 = 188,354.74 to both paths.
+      const { projections } = calculateOptimalAllocation(
+        engineInputsFor(PAYCHECK_CALCULATOR, normalizeProfile(ownerRaw()))
+      )
+      expect(projections.currentPath.tenYear).toBeCloseTo(577857.79, 1)
+      expect(projections.optimizedPath.tenYear).toBeCloseTo(921556.31, 1)
+      expect(projections.improvement.tenYear).toBeCloseTo(343698.52, 1)
+      expect(projections.improvement.fiYearsEarlier).toBeCloseTo(12.2449, 3)
+
+      const alone = calculateOptimalAllocation(
+        withoutInvested(engineInputsFor(PAYCHECK_CALCULATOR, normalizeProfile(ownerRaw())))
+      ).projections
+      expect(alone.currentPath.tenYear).toBeCloseTo(389503.05, 1)
+      expect(alone.optimizedPath.tenYear).toBeCloseTo(733201.57, 1)
     })
   })
 
@@ -214,16 +323,16 @@ describe('projections.ts — tax model and growth projections', () => {
 
     it('current path: annuity-FV of the contribution stream plus compounded net worth', () => {
       const result = calculateProjections(buildProfile(), [])
-      // tenYear = 30,000 × 1.07^10 + (80 × 12) × 13.8164479613
-      //         = 59,014.54 + 13,263.79 = 72,278.33
-      expect(result.currentPath.tenYear).toBeCloseTo(72278.33, 1)
+      // tenYear = 30,000 x 1.07^10 + (80 x 12) x 14.2543109380
+      //         = 59,014.54 + 13,684.14 = 72,698.68
+      expect(result.currentPath.tenYear).toBeCloseTo(72698.68, 1)
       // taxesOwed: progressive single tax on $60k gross = 5,020 (not 60,000 × 0.22 = 13,200)
       expect(result.currentPath.taxesOwed).toBeCloseTo(5020, 2)
       // FI: expenses = 48,000 − 960 = 47,040 → target 47,040 / 0.04 = 1,176,000
-      //   years = ln((1,176,000 − 30,000) × 0.07 / 960 + 1) / ln(1.07)
-      //         = ln(84.5625) / ln(1.07) = 4.4375658 / 0.0676586 = 65.5865
-      //   fiAge = 28 (profile age) + 65.5865 = 93.59
-      expect(result.currentPath.fiAge).toBeCloseTo(93.59, 1)
+      //   years = ln((1,176,000 - 30,000) x 12 x i7 / 960 + 1) / ln(1.07)
+      //         = ln(81.9956) / ln(1.07) = 65.1309  (i7 = 0.0056541454)
+      //   fiAge = 28 (profile age) + 65.1309 = 93.13
+      expect(result.currentPath.fiAge).toBeCloseTo(93.13, 1)
       expect(result.currentPath.fiAge).toBeLessThanOrEqual(99)
     })
 
@@ -231,15 +340,15 @@ describe('projections.ts — tax model and growth projections', () => {
       const allocations = [makeAllocation({ amount: 100, taxImpact: 0 })]
       const biWeekly = calculateProjections(buildProfile(), allocations)
       // Bi-weekly: $100/paycheck × 26 = $2,600/yr
-      // tenYear = 59,014.54 + 2,600 × 13.8164479613 = 59,014.54 + 35,922.76 = 94,937.31
-      expect(biWeekly.optimizedPath.tenYear).toBeCloseTo(94937.31, 1)
+      // tenYear = 59,014.54 + 2,600 x 14.2543109380 = 59,014.54 + 37,061.21 = 96,075.75
+      expect(biWeekly.optimizedPath.tenYear).toBeCloseTo(96075.75, 1)
 
       const monthlyProfile = buildProfile()
       monthlyProfile.income.frequency = 'monthly'
       const monthly = calculateProjections(monthlyProfile, allocations)
       // Monthly: $100/paycheck × 12 = $1,200/yr
-      // tenYear = 59,014.54 + 1,200 × 13.8164479613 = 59,014.54 + 16,579.74 = 75,594.28
-      expect(monthly.optimizedPath.tenYear).toBeCloseTo(75594.28, 1)
+      // tenYear = 59,014.54 + 1,200 x 14.2543109380 = 59,014.54 + 17,105.17 = 76,119.71
+      expect(monthly.optimizedPath.tenYear).toBeCloseTo(76119.71, 1)
     })
 
     it('models tax savings as additional invested principal, not a return boost', () => {
@@ -252,19 +361,19 @@ describe('projections.ts — tax model and growth projections', () => {
       ]
       const result = calculateProjections(buildProfile(), allocations)
       // Invested stream = 100 × 26 + 22 × 26 = 2,600 + 572 = 3,172/yr at a plain 7%
-      //   → 3,172 × 13.8164479613 = 43,825.77
+      //   -> 3,172 x 14.2543109380 = 45,214.67
       // Cash stream    = 50 × 26 = 1,300/yr at the profile's 4.5% APY
-      //   → 1,300 × 12.2882093718 = 15,974.67
-      // tenYear = 59,014.54 + 43,825.77 + 15,974.67 = 118,814.99
-      expect(result.optimizedPath.tenYear).toBeCloseTo(118814.99, 1)
+      //   -> 1,300 x 12.5396395086 = 16,301.53
+      // tenYear = 59,014.54 + 45,214.67 + 16,301.53 = 120,530.75
+      expect(result.optimizedPath.tenYear).toBeCloseTo(120530.75, 1)
 
       // Versus the same allocations without tax savings, the difference is exactly
-      // the annuity FV of the reinvested savings: 572 × 13.8164479613 = 7,903.01
+      // the stream value of the reinvested savings: 572 x 14.2543109380 = 8,153.47
       const noSavings = calculateProjections(buildProfile(), [
         makeAllocation({ amount: 100, taxImpact: 0 }),
         makeAllocation({ id: 'ef', amount: 50, taxImpact: 0, category: 'emergency_fund' }),
       ])
-      expect(result.optimizedPath.tenYear - noSavings.optimizedPath.tenYear).toBeCloseTo(7903.01, 1)
+      expect(result.optimizedPath.tenYear - noSavings.optimizedPath.tenYear).toBeCloseTo(8153.47, 1)
     })
 
     it('counts emergency-fund savings at the cash rate instead of dropping them', () => {
@@ -275,9 +384,9 @@ describe('projections.ts — tax model and growth projections', () => {
         makeAllocation({ amount: 100, taxImpact: 0, category: 'tax_advantaged' }),
         makeAllocation({ id: 'ef', amount: 50, taxImpact: 0, category: 'emergency_fund' }),
       ])
-      // 59,014.54 + 2,600 × 13.8164479613 + 1,300 × 12.2882093718
-      //   = 59,014.54 + 35,922.76 + 15,974.67 = 110,911.98
-      expect(withCash.optimizedPath.tenYear).toBeCloseTo(110911.98, 1)
+      // 59,014.54 + 2,600 x 14.2543109380 + 1,300 x 12.5396395086
+      //   = 59,014.54 + 37,061.21 + 16,301.53 = 112,377.28
+      expect(withCash.optimizedPath.tenYear).toBeCloseTo(112377.28, 1)
       expect(withCash.improvement.tenYear).toBeGreaterThan(0)
     })
 
@@ -291,12 +400,17 @@ describe('projections.ts — tax model and growth projections', () => {
       const result = calculateProjections(profile, [
         makeAllocation({ id: 'debt', amount: 100, taxImpact: 0, category: 'debt_payoff' }),
       ])
-      // current  = 49,178.78 + 960 × 13.8164479613 = 49,178.78 + 13,263.79 = 62,442.57
-      // optimized= 49,178.78 + 2,600 × 23.5213086322 = 49,178.78 + 61,155.40 = 110,334.19
-      expect(result.currentPath.tenYear).toBeCloseTo(62442.57, 1)
-      expect(result.optimizedPath.tenYear).toBeCloseTo(110334.19, 1)
-      // The shared net-worth term cancels, so the improvement is unchanged
-      expect(result.improvement.tenYear).toBeCloseTo(47891.61, 1)
+      // current  = 49,178.78 + 960 x 14.2543109380 = 49,178.78 + 13,684.14 = 62,862.92
+      // optimized: 2,600 a year = 216.67 a month clears the 5,000 in 5,000 / 216.67 = 23.0769 months.
+      //   At 18% until then: 216.67 x (1.18^(23.0769/12) - 1) / 0.0138884 = 216.67 x 0.3747845 / 0.0138884 = 5,846.83,
+      //   grown 96.9231 months at 7%: x 1.07^(96.9231/12) = x 1.7271518 = 10,098.37;
+      //   then 216.67 a month at 7%: 216.67 x 0.7271518 / 0.00565415 = 27,864.43. Debt stream 37,962.80.
+      //   optimized = 49,178.78 + 37,962.80 = 87,141.58
+      // (2,600 a year at 18% for all ten years, 66,050.02, counted interest on a balance already paid off.)
+      expect(result.currentPath.tenYear).toBeCloseTo(62862.92, 1)
+      expect(result.optimizedPath.tenYear).toBeCloseTo(87141.58, 1)
+      // The shared net-worth term cancels: 37,962.80 - 13,684.14 = 24,278.66
+      expect(result.improvement.tenYear).toBeCloseTo(24278.66, 1)
     })
 
     it('treats a positive taxImpact as a cost, never as a saving', () => {
@@ -380,13 +494,13 @@ describe('projections.ts — tax model and growth projections', () => {
       //   match earned  = min(1,200, 60,000 × 0.06) × 0.5 = 600/yr
       //   discretionary = 960/yr
       //   invested      = 1,200 + 600 + 960 = 2,760/yr
-      //   tenYear = 59,014.54 + 2,760 × 13.8164479613 = 59,014.54 + 38,133.40 = 97,147.94
+      //   tenYear = 59,014.54 + 2,760 x 14.2543109380 = 59,014.54 + 39,341.90 = 98,356.44
       //
       // Optimized path — the same deferral, plus a $100/paycheck top-up:
       //   extra deferral = 100 × 26 = 2,600/yr → total deferral 3,800/yr
       //   match earned   = min(3,800, 3,600) × 0.5 = 1,800/yr  (match limit reached)
       //   invested       = 1,200 + 1,800 + 2,600 = 5,600/yr
-      //   tenYear = 59,014.54 + 5,600 × 13.8164479613 = 59,014.54 + 77,372.11 = 136,386.65
+      //   tenYear = 59,014.54 + 5,600 x 14.2543109380 = 59,014.54 + 79,824.14 = 138,838.68
       const result = calculateProjections(buildMatchProfile(), [
         makeAllocation({
           id: 'employer-match',
@@ -396,10 +510,10 @@ describe('projections.ts — tax model and growth projections', () => {
         }),
       ])
 
-      expect(result.currentPath.tenYear).toBeCloseTo(97147.94, 1)
-      expect(result.optimizedPath.tenYear).toBeCloseTo(136386.65, 1)
-      // (5,600 − 2,760) × 13.8164479613 = 39,238.71
-      expect(result.improvement.tenYear).toBeCloseTo(39238.71, 1)
+      expect(result.currentPath.tenYear).toBeCloseTo(98356.44, 1)
+      expect(result.optimizedPath.tenYear).toBeCloseTo(138838.68, 1)
+      // (5,600 - 2,760) x 14.2543109380 = 40,482.24
+      expect(result.improvement.tenYear).toBeCloseTo(40482.24, 1)
       expect(result.improvement.tenYear).toBeGreaterThan(0)
       expect(result.optimizedPath.tenYear).toBeGreaterThan(result.currentPath.tenYear)
     })
@@ -415,9 +529,9 @@ describe('projections.ts — tax model and growth projections', () => {
 
       const result = calculateProjections(profile, [])
       // deferral 3,600 + match 1,800 = 5,400/yr
-      // tenYear = 59,014.54 + 5,400 × 13.8164479613 = 59,014.54 + 74,608.82 = 133,623.36
-      expect(result.currentPath.tenYear).toBeCloseTo(133623.36, 1)
-      expect(result.optimizedPath.tenYear).toBeCloseTo(133623.36, 1)
+      // tenYear = 59,014.54 + 5,400 x 14.2543109380 = 59,014.54 + 76,973.28 = 135,987.82
+      expect(result.currentPath.tenYear).toBeCloseTo(135987.82, 1)
+      expect(result.optimizedPath.tenYear).toBeCloseTo(135987.82, 1)
       expect(result.improvement.tenYear).toBeCloseTo(0, 6)
     })
 
@@ -451,12 +565,12 @@ describe('projections.ts — tax model and growth projections', () => {
       const result = calculateProjections(profile, [
         makeAllocation({ amount: 10, taxImpact: 0, category: 'investment' }),
       ])
-      // current   = 59,014.54 + 960 × 13.8164479613 = 72,278.33
-      // optimized = 59,014.54 + 260 × 13.8164479613 = 62,606.82
-      expect(result.currentPath.tenYear).toBeCloseTo(72278.33, 1)
-      expect(result.optimizedPath.tenYear).toBeCloseTo(62606.82, 1)
-      // (260 − 960) × 13.8164479613 = −9,671.51
-      expect(result.improvement.tenYear).toBeCloseTo(-9671.51, 1)
+      // current   = 59,014.54 + 960 x 14.2543109380 = 72,698.68
+      // optimized = 59,014.54 + 260 x 14.2543109380 = 62,720.66
+      expect(result.currentPath.tenYear).toBeCloseTo(72698.68, 1)
+      expect(result.optimizedPath.tenYear).toBeCloseTo(62720.66, 1)
+      // (260 - 960) x 14.2543109380 = -9,978.02
+      expect(result.improvement.tenYear).toBeCloseTo(-9978.02, 1)
       expect(result.improvement.tenYear).toBeLessThan(0)
     })
 
@@ -572,8 +686,9 @@ describe('projections.ts — tax model and growth projections', () => {
     // fun-money floor, no 401k. Net worth = 10,000 EF + 20,000 IRA = 30,000.
     //   discretionary  = (4,000 − 1,000) × 12 = 36,000/yr, baseline saves 3,600
     //   expenses       = 48,000 − 3,600 = 44,400 → FI target 44,400 / 0.04 = 1,110,000
-    //   years to FI    = ln((1,110,000 − 30,000) × 0.07 / 3,600 + 1) / ln(1.07)
-    //                  = ln(22) / ln(1.07) = 3.0910425 / 0.0676586 = 45.6858
+    //   years to FI    = ln((1,110,000 - 30,000) x 12 x i7 / 3,600 + 1) / ln(1.07)
+    //                  = ln(21.3549) / ln(1.07) = 45.2460  (i7 = 0.0056541454;
+    //                  one deposit at each year end gave ln(22) / ln(1.07) = 45.6858)
     const buildAgeProfile = (age: number, currentEmergencyFund = 10000) =>
       createPaycheckProfile({
         income: createIncomeData({
@@ -599,12 +714,12 @@ describe('projections.ts — tax model and growth projections', () => {
       })
 
     it('adds the years-to-FI to the profile age instead of to 30', () => {
-      // A 25-year-old reaches FI at 25 + 45.6858 = 70.69; the same numbers for a
-      // 40-year-old land at 85.69. Both used to report 75.69 (30 + 45.6858).
+      // A 25-year-old reaches FI at 25 + 45.2460 = 70.25; the same numbers for a
+      // 40-year-old land at 85.25. Both used to report 30 + the years to FI.
       expect(calculateProjections(buildAgeProfile(25), []).currentPath.fiAge)
-        .toBeCloseTo(70.69, 2)
+        .toBeCloseTo(70.246, 2)
       expect(calculateProjections(buildAgeProfile(40), []).currentPath.fiAge)
-        .toBeCloseTo(85.69, 2)
+        .toBeCloseTo(85.246, 2)
       // The gap between the two is exactly the age difference
       const younger = calculateProjections(buildAgeProfile(25), []).currentPath.fiAge
       const older = calculateProjections(buildAgeProfile(40), []).currentPath.fiAge
@@ -747,5 +862,49 @@ describe('projections.ts — tax model and growth projections', () => {
       expect(optimizationScore.comparison).toBe(76)
       expect(optimizationScore.overall).toBeGreaterThanOrEqual(optimizationScore.comparison)
     })
+  })
+})
+
+describe('debtStreamFutureValue: extra debt principal earns the debt rate only until the balance is paid', () => {
+  it('pays off a 3,000 balance in 3 months at 1,000 a month, then invests at 7%', () => {
+    // i_d = 1.24^(1/12) - 1 = 0.0180876; 3 months: 1,000 x (1.24^(1/4) - 1) / i_d = 1,000 x 0.0552501 / 0.0180876 = 3,054.59.
+    // That grows 117 months at 7%: x 1.07^(117/12) = x 1.9341575 = 5,908.06.
+    // The 1,000 a month after payoff, 117 months at i_m = 1.07^(1/12) - 1 = 0.00565415:
+    // 1,000 x (1.9341575 - 1) / 0.00565415 = 165,216.39. Total 171,124.45.
+    expect(debtStreamFutureValue(12000, 0.24, 3000)).toBeCloseTo(171124.45, 1)
+  })
+
+  it('keeps the whole stream at the debt rate when ten years of payments do not clear the balance', () => {
+    // 120 months < 200,000 / 1,000: 1,000 x (1.24^10 - 1) / i_d = 1,000 x 7.5944 / 0.0180876 = 419,869.57.
+    expect(debtStreamFutureValue(12000, 0.24, 200000)).toBeCloseTo(419869.57, 1)
+    expect(debtStreamFutureValue(12000, 0.24, 200000)).toBe(
+      scheduleFutureValue({ monthly: 1000, yearStart: 0 }, 0.24, 120)
+    )
+  })
+
+  it('is 0 for an empty stream', () => {
+    expect(debtStreamFutureValue(0, 0.24, 3000)).toBe(0)
+    expect(debtStreamFutureValue(NaN, 0.24, 3000)).toBe(0)
+  })
+
+  it('zero cash plus a 24% card (8,000): the payoff no longer compounds at 24% for ten years', () => {
+    // 934.62 per bi-weekly paycheck = 24,300 a year, 2,025 a month; 8,000 / 2,025 = 3.95 months
+    // at 24%, then 7%. Uncapped it was 24,300 a year at 24% for 120 months = 850,235.88.
+    const writes = [
+      { path: 'cash.emergencyFundBalance', value: 0 },
+      {
+        path: 'debts',
+        value: [{ id: 'card', name: 'Card', balance: 8000, interestRate: 0.24, minimumPayment: 200, extraPayment: 0, taxDeductible: false }],
+      },
+    ]
+    const { profile, accepted } = applyProfileWrites(getDefaultFinancialProfile(), writes)
+    const result = calculateOptimalAllocation(
+      engineInputsFor(PAYCHECK_CALCULATOR, { ...profile, provided: [...profile.provided, ...accepted] })
+    )
+    expect(debtStreamFutureValue(24300, 0.24, 8000)).toBeCloseTo(346666.45, 1)
+    expect(result.projections.currentPath.tenYear).toBeCloseTo(249394.38, 1)
+    // Optimized 1,090,910.44 before the cap; 1,090,910.44 - 850,235.88 + 346,666.45 = 587,341.00.
+    expect(result.projections.optimizedPath.tenYear).toBeCloseTo(587341.0, 1)
+    expect(result.projections.improvement.tenYear).toBeCloseTo(337946.62, 1)
   })
 })

@@ -14,6 +14,10 @@ import {
   calculateProjectedBalance,
   type RetirementInputs,
 } from '@/lib/calculations/retirement'
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition'
+import { engineInputsFor } from '@/lib/calculators/runtime'
+import { normalizeProfile } from '@/lib/profile/defaults'
+import { ownerYearStartRaw } from '@/test/factories/accountsFixtures'
 // Side-effect import: registers the toBeCloseToCurrency custom matcher.
 import '@/test/utils/financial-test-helpers'
 
@@ -146,5 +150,28 @@ describe('analyzeRetirementScenarios', () => {
     const analysis = analyzeRetirementScenarios(makeInputs())
     expect(Array.isArray(analysis.recommendations)).toBe(true)
     expect(analysis.recommendations.length).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('contribution timing (PR 5)', () => {
+  it('the owner +500 projection keeps the yearly part and adds the 500 to the monthly stream', () => {
+    const ownerInputs = engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerYearStartRaw()))
+    expect(ownerInputs.monthlySavings).toBe(3195)
+    expect(ownerInputs.yearStartSavings).toBe(7500)
+    const analysis = analyzeRetirementScenarios(ownerInputs)
+    const expected = calculateProjectedBalance({ ...ownerInputs, monthlySavings: 3695, yearStartSavings: 7500 })
+    expect(analysis.withExtra500.projectedBalance).toBe(expected)
+    // 15,069,908.04 with every part monthly (before).
+    expect(analysis.withExtra500.projectedBalance).toBeCloseTo(15170282.2, 1)
+    expect(
+      analyzeRetirementScenarios({ ...ownerInputs, yearStartSavings: 0 }).withExtra500.projectedBalance
+    ).toBeCloseTo(15069908.04, 1)
+  })
+
+  it('with no yearly part the analysis equals the analysis without the field', () => {
+    const inputs = makeInputs()
+    const without: RetirementInputs = { ...inputs }
+    delete without.yearStartSavings
+    expect(analyzeRetirementScenarios({ ...inputs, yearStartSavings: 0 })).toEqual(analyzeRetirementScenarios(without))
   })
 })

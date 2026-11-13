@@ -4,6 +4,7 @@
  * showing both current and future dollar values for clear understanding.
  */
 
+import { monthlyRateOf, scheduleFactor, yearStartShareOf } from './contributionSchedule';
 import { RetirementInputs } from './retirement';
 import { boxMullerRandom } from '@/lib/utils/random';
 
@@ -113,13 +114,17 @@ function calculateInflationBreakeven(inputs: RetirementInputs, yearsToRetirement
   
   // Calculate additional monthly savings needed (simplified)
   const monthsToRetirement = yearsToRetirement * 12;
-  const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
+  const monthlyRate = monthlyRateOf(inputs.accumulationReturn);
   
   let additionalMonthlySavings = 0;
   if (monthlyRate > 0) {
-    // PMT formula for future value of annuity
-    additionalMonthlySavings = additionalCorpusNeeded * monthlyRate / 
-      (Math.pow(1 + monthlyRate, monthsToRetirement) - 1);
+    // PMT over the future value per monthly-equivalent dollar, with the
+    // visitor's start-of-year share (all monthly: i / ((1 + i)^n - 1)).
+    additionalMonthlySavings = additionalCorpusNeeded / scheduleFactor(
+      inputs.accumulationReturn,
+      monthsToRetirement,
+      yearStartShareOf(inputs.monthlySavings, inputs.yearStartSavings)
+    );
   } else {
     additionalMonthlySavings = additionalCorpusNeeded / monthsToRetirement;
   }

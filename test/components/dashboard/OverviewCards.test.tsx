@@ -6,7 +6,9 @@
  * captured once (with the 3bb0132 Social Security benefit of $30,000 answered) from the dashboard before slice d1 and must not move; the
  * leverage figures are the comparison page's own (the card now runs the
  * calculator's inputs: the invested balance as the starting balance and 500
- * paths), and the cash-drag return is O16's 7%.
+ * paths), and the cash-drag return is O16's 7%. PR 5 rewrote the allocation
+ * texts (one emergency step to the target months, neutral Roth/Traditional
+ * and taxable texts); every amount stays as captured.
  */
 
 import React from 'react';
@@ -130,34 +132,32 @@ describe('PaycheckCard', () => {
     [
       'basics',
       'Take-home $2,600 per bi-weekly paycheck: $1,385 necessary expenses, $138 fun money (the minimum), and $1,077 to allocate.',
-      [['Emergency FundBuild from 1.7 to 3 months expenses. Good HYSA rate', '$1,077']],
+      [['Emergency FundBuilds cash from 1.7 to 3 months of necessary expenses, held at 4.0% APY.', '$1,077']],
     ],
     [
       'example',
       'Take-home $2,550 per bi-weekly paycheck: $1,385 necessary expenses, $138 fun money (the minimum), and $1,027 to allocate.',
       [
-        ['Roth IRAYoung + not peak earnings = Roth for maximum tax-free growth', '$288'],
-        ['Roth 401kRoth 401k recommended for tax-free growth and retirement flexibility', '$622'],
-        ['Taxable InvestmentBuild wealth with tax-efficient index funds (VTI/VTSAX)', '$116'],
+        ['Roth IRAAge 25 (under 30); 22% bracket now, 12% expected in retirement. Roth pays the tax now; Traditional defers it.', '$288'],
+        ['Roth 401kAge 25 (under 30); 22% bracket now, 12% expected in retirement. Roth 401k pays the tax now; Traditional defers it.', '$622'],
+        ['Taxable InvestmentMoney left after the tax-advantaged steps above, invested in a taxable account.', '$116'],
       ],
     ],
     [
       'rich',
       'Take-home $1,750 per weekly paycheck: $969 necessary expenses, $69 fun money (the minimum), and $712 to allocate.',
       [
-        ['Roth IRALow tax bracket makes Roth optimal for tax-free growth', '$144'],
-        ['Roth 401kRoth 401k recommended for tax-free growth and retirement flexibility', '$279'],
-        ['Taxable InvestmentBuild wealth with tax-efficient index funds (VTI/VTSAX)', '$288'],
+        ['Roth IRA12% bracket now and expected in retirement. Roth pays the tax now; Traditional defers it.', '$144'],
+        ['Roth 401k12% bracket now and expected in retirement. Roth 401k pays the tax now; Traditional defers it.', '$279'],
+        ['Taxable InvestmentMoney left after the tax-advantaged steps above, invested in a taxable account.', '$288'],
       ],
     ],
     [
       'lean',
       'Take-home $3,900 per monthly paycheck: $3,500 necessary expenses, $300 fun money (the minimum), and $100 to allocate.',
       [
-        [
-          'Starter Emergency FundA first cash buffer for small surprises, built before the steps below and before the full emergency fund target.',
-          '$100',
-        ],
+        // PR 5: the one emergency step, to the 2-month target (1,500 of 3,500 a month is 0.4 months).
+        ['Emergency FundBuilds cash from 0.4 to 2 months of necessary expenses, held at 1.0% APY.', '$100'],
       ],
     ],
   ])('%s: the paycheck flow and the first allocation steps', async (name, flow, rows) => {
@@ -381,7 +381,8 @@ describe('AutomationChecklistCard', () => {
       'basics',
       [
         '401(k) payroll deferral$2106% of grossPayroll election at 6% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
-        'Emergency Fund$1,077Save $1,077 per paycheck toward emergency fund target',
+        // 9,000 - 5,000 - 1,076.92 = 2,923.08
+        'Emergency Fund$1,077Save $1,077 per paycheck toward the 3-month emergency fund ($2,923 more needed)',
       ],
       '0 of 2 set up.',
     ],
@@ -391,7 +392,7 @@ describe('AutomationChecklistCard', () => {
         '401(k) payroll deferral$3208% of grossPayroll election at 8% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
         'Roth IRA$288Contribute $288 per paycheck to Roth IRA ($7,500 annually)',
         'Roth 401k$622+15.6% of grossIncrease Roth 401k contribution by $622 per paycheck',
-        'Taxable Investment$116Invest $116 per paycheck in low-cost index funds',
+        'Taxable Investment$116Invest $116 per paycheck in a taxable account',
       ],
       '0 of 4 set up.',
     ],
@@ -401,7 +402,7 @@ describe('AutomationChecklistCard', () => {
         '401(k) payroll deferral$1928% of grossPayroll election at 8% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
         'Roth IRA$144Contribute $144 per paycheck to Roth IRA ($7,500 annually)',
         'Roth 401k$279+11.6% of grossIncrease Roth 401k contribution by $279 per paycheck',
-        'Taxable Investment$288Invest $288 per paycheck in low-cost index funds',
+        'Taxable Investment$288Invest $288 per paycheck in a taxable account',
       ],
       '0 of 4 set up.',
     ],
@@ -409,7 +410,8 @@ describe('AutomationChecklistCard', () => {
       'lean',
       [
         '401(k) payroll deferral$3126% of grossPayroll election at 6% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
-        'Starter Emergency Fund$100Save $100 per paycheck toward emergency fund ($1,900 more needed)',
+        // 7,000 - 1,500 - 100 = 5,400
+        'Emergency Fund$100Save $100 per paycheck toward the 2-month emergency fund ($5,400 more needed)',
       ],
       '0 of 2 set up.',
     ],

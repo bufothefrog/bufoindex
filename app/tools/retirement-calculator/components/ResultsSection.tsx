@@ -11,7 +11,12 @@ import { StatusAlert } from '@/components/calculators/shared/StatusAlert';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { useDollarDisplay } from '@/components/shared/useDollarDisplay';
 import type { RetirementInputs, RetirementResults } from '@/lib/calculations/retirement';
-import { scenarioCountStat, successTone, withdrawalRateStat } from '@/lib/calculators/retirement/headline';
+import {
+  scenarioCountStat,
+  scenarioTitle,
+  successTone,
+  withdrawalRateStat,
+} from '@/lib/calculators/retirement/headline';
 import { formatCurrency, formatPercent } from '@/lib/format';
 import { savingsRateMarkers } from './savingsRateMarkers';
 
@@ -75,7 +80,7 @@ export function ResultsSection({ results, inputs }: ResultsSectionProps) {
             <ExpandableListCard
               key={scenario.id}
               icon={scenarioIcon(scenario.successProbability)}
-              title={scenario.name}
+              title={scenarioTitle(scenario, dollars.mode, inputs.inflationRate)}
               subtitle={`Retire at ${scenario.retirementAge} \u2022 ${success} success rate`}
               value={formatCurrency(dollars.fromReal(scenario.monthlyWithdrawal, yearsToRetirement))}
               valueSubtext="monthly"

@@ -2,8 +2,9 @@
  * Leverage Comparison Test Suite
  *
  * Covers simulateDcaComparison (monthly lognormal model with common random
- * numbers across index DCA, leveraged DCA, index lump sum and leveraged lump
- * sum), estimateAnnualDrag, horizonMonths and percentileSorted.
+ * numbers across index DCA, leveraged DCA, and the index and leveraged
+ * start-of-year streams), estimateAnnualDrag, horizonMonths and
+ * percentileSorted.
  *
  * Model under test, per month:
  *   z ~ Normal((ln(1 + mu) - sigma^2 / 2) / 12, sigma / sqrt(12))
@@ -11,6 +12,7 @@
  *   leveraged log return = L z + ((L - L^2) / 2) sigma^2 / 12
  *                          - ((L - 1) financingRate + expenseRatio) / 12
  *   DCA balance          = (balance + contribution) * exp(log return)
+ *   start-of-year balance = (balance + yearStartDeposit(12 c, m - 1, months)) * exp(log return)
  */
 
 import { describe, expect, it } from 'vitest';
@@ -161,23 +163,24 @@ describe('simulateDcaComparison: deterministic (zero volatility)', () => {
     expect(result.index.dca.p50).toBeCloseTo(1264.0537, 3);
   });
 
-  it('(a) lump sum grows the full total for twelve months', () => {
+  it('(a) the start-of-year stream puts the one yearly amount in at month 0 and grows it twelve months', () => {
+    // One year: 12 * 100 = 1200 at month index 0.
     // index: 1200 * 1.1 = 1320; leveraged: 1200 * 1.21 * exp(-0.0539) = 1375.8090
-    expectAllEqual(result.index.lumpSum, 1320, 6);
-    expectAllEqual(result.leveraged.lumpSum, 1200 * Math.exp(12 * g), 6);
-    expect(result.leveraged.lumpSum.p50).toBeCloseTo(1375.809, 2);
+    expectAllEqual(result.index.yearStart, 1320, 6);
+    expectAllEqual(result.leveraged.yearStart, 1200 * Math.exp(12 * g), 6);
+    expect(result.leveraged.yearStart.p50).toBeCloseTo(1375.809, 2);
   });
 
   it('has no drawdowns, never trails, and reports the gaps exactly', () => {
     expect(result.medianMaxDrawdown).toEqual({ index: 0, leveraged: 0 });
     expect(result.medianMonthsBehind).toBe(0);
     expect(result.probLeveragedBehindDca).toBe(0);
-    expect(result.probLeveragedBehindLumpSum).toBe(0);
+    expect(result.probLeveragedBehindYearStart).toBe(0);
     expect(result.dcaEffect.dcaGap).toBeCloseTo(
       closedFormDca(100, 0, g, 12) - closedFormDca(100, 0, gIndex, 12),
       6,
     );
-    expect(result.dcaEffect.lumpSumGap).toBeCloseTo(1200 * Math.exp(12 * g) - 1320, 6);
+    expect(result.dcaEffect.yearStartGap).toBeCloseTo(1200 * Math.exp(12 * g) - 1320, 6);
   });
 
   it('median path at month 1 is one contribution grown one month', () => {
@@ -191,6 +194,9 @@ describe('simulateDcaComparison: deterministic (zero volatility)', () => {
     const withStart = simulateDcaComparison({ ...inputs, startingBalance: 1000 });
     expect(withStart.leveraged.dca.p50).toBeCloseTo(closedFormDca(100, 1000, g, 12), 6);
     expect(withStart.totalContributed).toBe(2200);
+    // Start-of-year: (1000 + 1200) grown twelve months; index 2200 * 1.1 = 2420.
+    expectAllEqual(withStart.index.yearStart, 2420, 6);
+    expectAllEqual(withStart.leveraged.yearStart, 2200 * Math.exp(12 * g), 6);
   });
 
   it('a falling index produces a measurable drawdown and leveraged trailing', () => {
@@ -201,7 +207,7 @@ describe('simulateDcaComparison: deterministic (zero volatility)', () => {
     expect(falling.medianMaxDrawdown.leveraged).toBeCloseTo(1 - 0.81 * Math.exp(-0.0539), 9);
     expect(falling.medianMonthsBehind).toBe(12);
     expect(falling.probLeveragedBehindDca).toBe(1);
-    expect(falling.probLeveragedBehindLumpSum).toBe(1);
+    expect(falling.probLeveragedBehindYearStart).toBe(1);
   });
 });
 
@@ -211,12 +217,12 @@ describe('simulateDcaComparison: equivalences and reproducibility', () => {
       makeInputs({ leverageRatio: 1, expenseRatio: 0.0003, indexExpenseRatio: 0.0003 }),
     );
     expect(result.leveraged.dca).toEqual(result.index.dca);
-    expect(result.leveraged.lumpSum).toEqual(result.index.lumpSum);
+    expect(result.leveraged.yearStart).toEqual(result.index.yearStart);
     expect(result.medianMaxDrawdown.leveraged).toBe(result.medianMaxDrawdown.index);
     expect(result.probLeveragedBehindDca).toBe(0);
-    expect(result.probLeveragedBehindLumpSum).toBe(0);
+    expect(result.probLeveragedBehindYearStart).toBe(0);
     expect(result.medianMonthsBehind).toBe(0);
-    expect(result.dcaEffect).toEqual({ dcaGap: 0, lumpSumGap: 0 });
+    expect(result.dcaEffect).toEqual({ dcaGap: 0, yearStartGap: 0 });
     for (const point of result.medianPath) {
       expect(point.leveragedDca).toBe(point.indexDca);
       expect(point.leveragedDcaP10).toBe(point.indexDcaP10);
@@ -238,13 +244,14 @@ describe('simulateDcaComparison: equivalences and reproducibility', () => {
     expect(a.index.dca.p50).not.toBe(b.index.dca.p50);
   });
 
-  it('(d) totalContributed is start + contribution * months and seeds the lump sum', () => {
+  it('(d) totalContributed is start + contribution * months, the same for both timings', () => {
     const inputs = makeInputs({ startingBalance: 5000, monthlyContribution: 900, years: 20 });
     const result = simulateDcaComparison(inputs);
     // 5000 + 900 * 240 = 221000
     expect(result.totalContributed).toBe(221000);
 
-    // With zero volatility and zero return/costs the lump sum stays at the total.
+    // With zero volatility and zero return/costs both timings end at the total:
+    // 5000 + 20 yearly amounts of 10,800 = 221000.
     const flat = simulateDcaComparison({
       ...inputs,
       indexMeanReturn: 0,
@@ -254,8 +261,8 @@ describe('simulateDcaComparison: equivalences and reproducibility', () => {
       indexExpenseRatio: 0,
       paths: 5,
     });
-    expectAllEqual(flat.index.lumpSum, 221000, 6);
-    expectAllEqual(flat.leveraged.lumpSum, 221000, 6);
+    expectAllEqual(flat.index.yearStart, 221000, 6);
+    expectAllEqual(flat.leveraged.yearStart, 221000, 6);
     expectAllEqual(flat.index.dca, 221000, 6);
   });
 
@@ -278,7 +285,7 @@ describe('simulateDcaComparison: default inputs', () => {
   const result = simulateDcaComparison(DEFAULT_DCA_COMPARISON_INPUTS);
 
   it('(f) probabilities and drawdowns are fractions, medianPath has months + 1 points', () => {
-    for (const p of [result.probLeveragedBehindDca, result.probLeveragedBehindLumpSum]) {
+    for (const p of [result.probLeveragedBehindDca, result.probLeveragedBehindYearStart]) {
       expect(p).toBeGreaterThanOrEqual(0);
       expect(p).toBeLessThanOrEqual(1);
     }
@@ -305,7 +312,7 @@ describe('simulateDcaComparison: default inputs', () => {
   });
 
   it('percentiles are ordered and the final median-path point matches the ending stats', () => {
-    for (const stats of [result.index.dca, result.leveraged.dca, result.index.lumpSum, result.leveraged.lumpSum]) {
+    for (const stats of [result.index.dca, result.leveraged.dca, result.index.yearStart, result.leveraged.yearStart]) {
       expect(stats.p10).toBeLessThanOrEqual(stats.p50);
       expect(stats.p50).toBeLessThanOrEqual(stats.p90);
     }
@@ -315,7 +322,7 @@ describe('simulateDcaComparison: default inputs', () => {
     expect(last.leveragedDcaP10).toBe(result.leveraged.dca.p10);
     expect(last.indexDcaP90).toBe(result.index.dca.p90);
     expect(result.dcaEffect.dcaGap).toBe(result.leveraged.dca.p50 - result.index.dca.p50);
-    expect(result.dcaEffect.lumpSumGap).toBe(result.leveraged.lumpSum.p50 - result.index.lumpSum.p50);
+    expect(result.dcaEffect.yearStartGap).toBe(result.leveraged.yearStart.p50 - result.index.yearStart.p50);
   });
 
   it('the index DCA median is near the deterministic median-growth path', () => {
@@ -337,5 +344,93 @@ describe('simulateDcaComparison: default inputs', () => {
     simulateDcaComparison(DEFAULT_DCA_COMPARISON_INPUTS);
     const elapsed = performance.now() - t0;
     expect(elapsed).toBeLessThan(2000);
+  });
+});
+
+/**
+ * Contract section 11, E11 and E15: L = 1, a 10% index return, no costs, no
+ * volatility, no starting balance, 100 a month. Each month grows by
+ * g = 1.1^(1/12) (the log drift ln(1.1) / 12).
+ */
+describe('simulateDcaComparison: start of each year against monthly (E11, E15)', () => {
+  const base = makeInputs({
+    monthlyContribution: 100,
+    startingBalance: 0,
+    leverageRatio: 1,
+    indexMeanReturn: 0.1,
+    indexVolatility: 0,
+    financingRate: 0,
+    expenseRatio: 0,
+    indexExpenseRatio: 0,
+    paths: 5,
+  });
+  const g = Math.pow(1.1, 1 / 12);
+  const dcaClosedForm = (months: number) => (100 * g * (Math.pow(g, months) - 1)) / (g - 1);
+
+  it('E11, 24 months: monthly 2654.5127, start of each year 1200 x 1.21 + 1200 x 1.1 = 2772.00', () => {
+    const result = simulateDcaComparison({ ...base, years: 2 });
+    expect(dcaClosedForm(24)).toBeCloseTo(2654.5127, 3);
+    expectAllEqual(result.index.dca, 2654.5127, 3);
+    expectAllEqual(result.leveraged.dca, 2654.5127, 3);
+    expectAllEqual(result.index.yearStart, 2772, 6);
+    expectAllEqual(result.leveraged.yearStart, 2772, 6);
+    expect(result.totalContributed).toBe(2400);
+  });
+
+  it('E11, 18 months: the final yearly amount is prorated (1200 at month 0, 600 at month 12)', () => {
+    const result = simulateDcaComparison({ ...base, years: 1.5 });
+    // (1200 x 1.1 + 600) x 1.1^0.5 = 1920 x 1.0488088 = 2013.7130
+    expectAllEqual(result.index.dca, 1942.7207, 3);
+    expectAllEqual(result.index.yearStart, 2013.713, 3);
+    expect(result.index.yearStart.p50).toBeCloseTo(1920 * Math.sqrt(1.1), 6);
+    expect(result.totalContributed).toBe(1800);
+    // With no growth both timings pay in the same 1,800.
+    const flat = simulateDcaComparison({ ...base, years: 1.5, indexMeanReturn: 0 });
+    expectAllEqual(flat.index.yearStart, 1800, 9);
+    expectAllEqual(flat.index.dca, 1800, 9);
+  });
+
+  it('E15, 6 months: one prorated deposit of 600 at month 0', () => {
+    const result = simulateDcaComparison({ ...base, years: 0.5 });
+    // monthly 100 g (g^6 - 1) / (g - 1) = 616.9700; start of year 600 x 1.1^0.5 = 629.2853
+    expectAllEqual(result.index.dca, 616.97, 3);
+    expectAllEqual(result.index.yearStart, 629.2853, 3);
+    expect(result.totalContributed).toBe(600);
+  });
+});
+
+/**
+ * The default profile's leverage inputs (500 a month, 40 years, 25,000 start,
+ * 2x, 500 paths, the fixed seed). The monthly stream is the one the engine had
+ * before the start-of-year stream replaced the whole-total-at-month-0 lump sum:
+ * the figures below were measured at ec300fd (the builder also checked the
+ * whole monthly result, medianPath included, bit for bit against the ec300fd
+ * module). The start-of-year figures are contract section 7.
+ */
+describe('simulateDcaComparison: default profile inputs', () => {
+  const inputs = makeInputs({ monthlyContribution: 500, years: 40, startingBalance: 25_000, paths: 500 });
+  const result = simulateDcaComparison(inputs);
+
+  it('keeps the monthly stream of ec300fd', () => {
+    expect(result.index.dca.p10).toBeCloseTo(1_025_373.1480083336, 4);
+    expect(result.index.dca.p50).toBeCloseTo(2_533_597.5967643997, 4);
+    expect(result.index.dca.p90).toBeCloseTo(7_916_993.070988794, 4);
+    expect(result.index.dca.mean).toBeCloseTo(3_772_792.131937432, 4);
+    expect(result.leveraged.dca.p10).toBeCloseTo(530_895.3720385887, 4);
+    expect(result.leveraged.dca.p50).toBeCloseTo(3_008_809.2754472755, 4);
+    expect(result.leveraged.dca.p90).toBeCloseTo(29_466_998.99180678, 3);
+    expect(result.leveraged.dca.mean).toBeCloseTo(14_770_605.475430474, 3);
+    expect(result.probLeveragedBehindDca).toBe(0.404);
+    expect(result.medianPath).toHaveLength(481);
+    expect(result.medianPath[480].indexDca).toBe(result.index.dca.p50);
+    expect(result.medianPath[480].leveragedDcaP90).toBe(result.leveraged.dca.p90);
+  });
+
+  it('adds the start-of-year stream: same total, p50 2,595,327.26 and 3,096,306.82, 40.4% behind', () => {
+    expect(result.totalContributed).toBe(265_000);
+    expect(result.index.yearStart.p50).toBeCloseTo(2_595_327.256646754, 2);
+    expect(result.leveraged.yearStart.p50).toBeCloseTo(3_096_306.821326349, 2);
+    expect(result.probLeveragedBehindYearStart).toBe(0.404);
+    expect(result.dcaEffect.yearStartGap).toBeCloseTo(500_979.56, 2);
   });
 });

@@ -17,7 +17,6 @@ import {
   type RetirementResults,
 } from '@/lib/calculations/retirement';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
-import { allocationDisplayText } from '@/lib/constants/financialSteps';
 import { RetirementConstants } from '@/lib/constants/retirement';
 import { makeGet } from '@/lib/fields/paths';
 import { formatPercent } from '@/lib/format';
@@ -171,15 +170,14 @@ export function buildChecklistRows(
   }
 
   for (const allocation of sortAllocations(allocations)) {
-    const text = allocationDisplayText(allocation);
     rows.push({
       id: allocation.id,
-      account: text.account,
+      account: allocation.account,
       perPaycheck: allocation.amount,
       percentOfGross:
         is401kAccount(allocation.account) && gross > 0 ? allocation.amount / gross : undefined,
       percentIsIncrease: is401kAccount(allocation.account),
-      implementation: text.implementation,
+      implementation: allocation.implementation,
     });
   }
 

@@ -11,6 +11,7 @@ import {
   getBracketsForStatus,
   getStandardDeductionForStatus,
 } from '../constants/irs-2026';
+import { monthlyRateOf, scheduleFutureValue } from './contributionSchedule';
 
 /**
  * Progressive federal income tax on annual gross income:
@@ -34,18 +35,17 @@ export function calculateAnnualFederalTax(
 }
 
 /**
- * Future value of a level annual contribution stream (ordinary annuity):
- * FV = payment * ((1 + r)^n - 1) / r
+ * Ten-year value of a stream of `annualContribution` dollars a year paid as 12
+ * equal end-of-month deposits at the effective monthly rate monthlyRateOf(rate)
+ * (the one monthly-rate convention). A non-positive or non-finite stream is 0.
  */
-export function calculateAnnuityFutureValue(
-  annualContribution: number,
-  rate: number,
-  years: number
-): number {
+function annualStreamFutureValue(annualContribution: number, rate: number): number {
   if (!Number.isFinite(annualContribution) || annualContribution <= 0) return 0;
-  const validYears = Number.isFinite(years) ? Math.max(0, years) : 0;
-  if (rate === 0) return annualContribution * validYears;
-  return annualContribution * ((Math.pow(1 + rate, validYears) - 1) / rate);
+  return scheduleFutureValue(
+    { monthly: annualContribution / 12, yearStart: 0 },
+    rate,
+    PROJECTION_YEARS * 12
+  );
 }
 
 /** Number of paychecks per year for a pay frequency (26 for bi-weekly, etc.) */
@@ -104,6 +104,39 @@ function debtReturn(profile: PaycheckProfile): number {
   return highest > 0 ? highest : MARKET_RETURN;
 }
 
+/** Balance of the highest-rate debt, the one calculateHighInterestDebt pays down (0 with no debts). */
+function highestRateDebtBalance(profile: PaycheckProfile): number {
+  let best: { rate: number; balance: number } | null = null;
+  for (const debt of profile.debts) {
+    const rate = finite(debt.interestRate);
+    if (best === null || rate > best.rate) best = { rate, balance: Math.max(0, finite(debt.balance)) };
+  }
+  return best ? best.balance : 0;
+}
+
+/**
+ * Ten-year value of a stream of extra debt principal (`annualContribution` a
+ * year, 12 end-of-month payments p). The payments earn the debt's rate only
+ * until they have covered `balance`, which takes k = balance / p months. From
+ * then on the debt is gone: the value reached at month k grows at
+ * MARKET_RETURN, and the same payment p is invested at MARKET_RETURN for the
+ * months left. A balance the stream does not clear within ten years keeps the
+ * whole stream at the debt's rate. Exported for tests.
+ */
+export function debtStreamFutureValue(annualContribution: number, debtRate: number, balance: number): number {
+  if (!Number.isFinite(annualContribution) || annualContribution <= 0) return 0;
+  const payment = annualContribution / 12;
+  const horizonMonths = PROJECTION_YEARS * 12;
+  const payoffMonths = Math.max(0, finite(balance)) / payment;
+  if (!(payoffMonths < horizonMonths)) return annualStreamFutureValue(annualContribution, debtRate);
+  const monthsLeft = horizonMonths - payoffMonths;
+  const atPayoff = scheduleFutureValue({ monthly: payment, yearStart: 0 }, debtRate, payoffMonths);
+  return (
+    atPayoff * Math.pow(1 + MARKET_RETURN, monthsLeft / 12) +
+    scheduleFutureValue({ monthly: payment, yearStart: 0 }, MARKET_RETURN, monthsLeft)
+  );
+}
+
 /**
  * Grow a set of streams for ten years on top of today's net worth. Existing net
  * worth is identical on both paths, so it cancels out of the improvement and is
@@ -116,9 +149,9 @@ function projectTenYearNetWorth(
 ): number {
   return (
     calculateCompoundGrowth(currentNetWorth, MARKET_RETURN, PROJECTION_YEARS) +
-    calculateAnnuityFutureValue(streams.market, MARKET_RETURN, PROJECTION_YEARS) +
-    calculateAnnuityFutureValue(streams.cash, cashReturn(profile), PROJECTION_YEARS) +
-    calculateAnnuityFutureValue(streams.debt, debtReturn(profile), PROJECTION_YEARS)
+    annualStreamFutureValue(streams.market, MARKET_RETURN) +
+    annualStreamFutureValue(streams.cash, cashReturn(profile)) +
+    debtStreamFutureValue(streams.debt, debtReturn(profile), highestRateDebtBalance(profile))
   );
 }
 
@@ -498,30 +531,33 @@ function describeCurrentBehavior(profile: PaycheckProfile): AllocationItem[] {
 
 /**
  * Starting net worth, built only from balances the profile actually collects:
- * the emergency fund, IRA balances if the user entered any, less debt
- * balances.
+ * the emergency fund plus the invested total of the account list
+ * (preferences.investedBalance, emergency-fund accounts excluded; it already
+ * holds the IRAs, so nothing counts twice), less debt balances. Without an
+ * investedBalance the IRA balances stand in for it (the earlier model).
+ * Exported for tests.
  *
- * There is no 401k-balance input, so no term stands in for one. The previous
- * model added `gross * 12 * 0.5` as "estimated existing retirement savings",
- * which put six months of gross pay — $150,000 for a $300k earner, $295,073 of
- * the ten-year figure once compounded — into both headline balances before a
- * single contribution. The term was identical on both paths, so `improvement`
- * is unaffected either way; the headline levels drop to what the inputs
- * support.
+ * Only reported balances count: an earlier model added `gross * 12 * 0.5` as
+ * "estimated existing retirement savings", six months of gross pay that no
+ * input supported. The term is identical on both paths, so `improvement` does
+ * not depend on it.
  */
-function estimateCurrentNetWorth(profile: PaycheckProfile): number {
+export function estimateCurrentNetWorth(profile: PaycheckProfile): number {
   const emergencyFund = Math.max(0, finite(profile.preferences.currentEmergencyFund));
 
+  const invested = profile.preferences.investedBalance;
   const balances = profile.benefits.ira?.currentBalances;
-  const iraBalances =
-    Math.max(0, finite(balances?.traditional)) + Math.max(0, finite(balances?.roth));
+  const investedTotal =
+    typeof invested === 'number' && Number.isFinite(invested)
+      ? invested
+      : Math.max(0, finite(balances?.traditional)) + Math.max(0, finite(balances?.roth));
 
   const liabilities = profile.debts.reduce(
     (sum, debt) => sum + Math.max(0, finite(debt.balance)),
     0
   );
 
-  return Math.max(0, emergencyFund + iraBalances - liabilities);
+  return Math.max(0, emergencyFund + investedTotal - liabilities);
 }
 
 /** Age this profile is projected from; `preferences.age` is collected by the UI. */
@@ -534,8 +570,14 @@ function profileAge(profile: PaycheckProfile): number {
  * own age rather than a hardcoded 30 (which reported an FI date 25 years in the
  * past for a 55-year-old, and made `fiYearsEarlier` wrong for everyone who is
  * not exactly 30). 99 is the sentinel for "not reached in this model".
+ *
+ * The yearly saving is paid as 12 end-of-month deposits at the effective
+ * monthly rate i = monthlyRateOf(r), so solving
+ * W + (A / 12) ((1 + i)^(12n) - 1) / i = T for n gives
+ * n = ln((T - W) * 12 * i / A + 1) / ln(1 + r). The growth of today's net worth
+ * W is left out of the solve, as before. Exported for tests.
  */
-function calculateFIAge(
+export function calculateFIAge(
   annualInvestment: number,
   fiTarget: number,
   currentNetWorth: number,
@@ -546,7 +588,7 @@ function calculateFIAge(
   if (annualInvestment <= 0) return 99; // Never reach FI
 
   const yearsToFI =
-    Math.log(((fiTarget - currentNetWorth) * MARKET_RETURN) / annualInvestment + 1) /
+    Math.log(((fiTarget - currentNetWorth) * 12 * monthlyRateOf(MARKET_RETURN)) / annualInvestment + 1) /
     Math.log(1 + MARKET_RETURN);
 
   if (!Number.isFinite(yearsToFI)) return 99;
@@ -623,8 +665,7 @@ function calculateEmergencyFundScore(profile: PaycheckProfile, skippedItems: Ski
  * Ordering score. The tests are relative — does the match come before
  * discretionary saving, does high-rate debt — rather than "is it first in the
  * list". Absolute positions are not a fair test once the same rubric grades a
- * short current-behaviour list against a longer recommended one, and a 1-month
- * emergency allocation legitimately sits ahead of the match in the ordering.
+ * short current-behaviour list against a longer recommended one.
  */
 function calculateAccountPrioritizationScore(allocations: AllocationItem[]): number {
   let score = 70; // Base score

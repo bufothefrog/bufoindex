@@ -25,11 +25,18 @@ export function LatexRenderer({
     ? 'inline-block'
     : 'block text-center my-4 overflow-x-auto';
   const label = `Mathematical formula: ${latex}`;
+  // A display formula wider than its box scrolls sideways inside the box (the
+  // page itself does not), so it takes a tab stop: keyboard users can then
+  // scroll it with the arrow keys. Its accessible name is the LaTeX source.
+  const focusProps = inline ? {} : { tabIndex: 0 };
+  const focusClasses = inline
+    ? ''
+    : ' focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
   if (html === null) {
     // KaTeX failed on the server: show the source as plain text.
     return (
-      <div className={`${baseClasses} ${className} text-negative font-mono`} role="img" aria-label={label}>
+      <div className={`${baseClasses}${focusClasses} ${className} text-negative font-mono`} role="img" aria-label={label} {...focusProps}>
         {latex}
       </div>
     );
@@ -37,9 +44,10 @@ export function LatexRenderer({
 
   return (
     <div
-      className={`${baseClasses} ${className}`}
+      className={`${baseClasses}${focusClasses} ${className}`}
       role="img"
       aria-label={label}
+      {...focusProps}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

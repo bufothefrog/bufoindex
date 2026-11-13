@@ -103,6 +103,8 @@ export interface UserPreferences {
   age: number; // 18-100
   hasTaxableAccount: boolean; // Has brokerage/investment account
   taxableAccountContribution: number; // Monthly contribution to taxable accounts
+  /** Invested total of the account list, emergency-fund accounts excluded (investedBalance(get)). Absent: IRA balances (ec300fd). */
+  investedBalance?: number;
   isPeakEarnings: boolean; // Are they in/approaching peak earning years?
   expectedRetirementBracket?: number; // Optional expected retirement tax bracket
   riskTolerance: 'conservative' | 'moderate' | 'optimizer';

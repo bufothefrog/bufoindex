@@ -503,6 +503,33 @@ export function monthlyInvesting(get: Get): number {
   return isFiniteNumber(leaf) ? leaf : monthlyInvestingAuto(get);
 }
 
+/** The timing leaves of the parts that may be paid once a year, and the contributionParts part each one times. */
+const TIMING_PARTS: readonly { path: string; part: keyof ContributionParts }[] = [
+  { path: 'ira.traditionalTiming', part: 'iraTraditional' },
+  { path: 'ira.rothTiming', part: 'iraRoth' },
+  { path: 'investing.taxableTiming', part: 'taxable' },
+];
+
+/**
+ * Dollars per YEAR landing at the start of each simulated year:
+ * round2(12 x the sum of the contributionParts parts iraTraditional, iraRoth
+ * and taxable whose timing leaf is 'yearStart'). 401(k), match and HSA are
+ * payroll money and always monthly. Returns 0 while
+ * investing.monthlyContribution is a finite number (Custom: all monthly).
+ *
+ * Read order (load-bearing for test/lib/calculators/formBindings.test.ts,
+ * which records reads under the default profile, where both IRAs are off):
+ * 'investing.monthlyContribution' first; on Auto, all three timing leaves
+ * unconditionally, then contributionParts. A leaf value other than
+ * 'yearStart' counts as monthly.
+ */
+export function yearStartInvesting(get: Get): number {
+  if (isFiniteNumber(get('investing.monthlyContribution'))) return 0;
+  const yearly = TIMING_PARTS.map(({ path }) => get(path) === 'yearStart');
+  const parts = contributionParts(get);
+  return round2(12 * sum(TIMING_PARTS.map(({ part }, i) => (yearly[i] ? parts[part] : 0))));
+}
+
 /**
  * The normal new cash of one account: round2 of the parts routed to it.
  * Each part goes to the first row in list order of its kind, emergency-fund

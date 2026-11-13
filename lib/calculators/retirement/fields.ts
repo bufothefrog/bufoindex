@@ -15,9 +15,11 @@ import {
   calculateTDFReturnForAge,
   calculateTDFVolatilityForAge,
 } from '@/lib/calculations/retirement';
+import { CONTRIBUTION_TIMING_LABELS } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
 import { formatCurrency, formatPercent } from '@/lib/format';
 import { AGE, FILING_STATUS, RETIREMENT_AGE } from '@/lib/fields/shared';
+import { isFiniteNumber } from '@/lib/fields/runtime';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 import { retirementFilingStatus } from './bindings';
@@ -70,6 +72,61 @@ export const LIFE_EXPECTANCY_AFTER_RETIREMENT: CrossFieldRule = {
   checkOn: LIFE_EXPECTANCY.path,
   message: 'Life expectancy needs to be at least your retirement age.',
 };
+
+// ---------------------------------------------------------------------------
+// Contribution timing (calculator-only, on the Monthly investing card)
+// ---------------------------------------------------------------------------
+
+/** A finite number of 0 or more, else 0. */
+const nonNegative = (value: unknown): number => (isFiniteNumber(value) ? Math.max(0, value) : 0);
+
+/** Auto monthly investing: timing applies only then (a Custom figure is all monthly). */
+const isAutoInvesting = (get: Get): boolean => !isFiniteNumber(get('investing.monthlyContribution'));
+
+/**
+ * One timing choice for a part of Auto monthly investing: 'Monthly', or
+ * 'Once a year, at the start: $X' with X = 12 x the part's monthly amount.
+ * Shown while Auto is on and the part is in use (yearStartInvesting in
+ * lib/profile/accounts.ts reads the leaf).
+ */
+function timingField(path: string, label: string, amountPath: string, inUse: (get: Get) => boolean): FieldSpec {
+  return {
+    path,
+    kind: 'choice',
+    label,
+    options: (get) => [
+      { value: 'monthly', label: CONTRIBUTION_TIMING_LABELS.monthly },
+      {
+        value: 'yearStart',
+        label: `${CONTRIBUTION_TIMING_LABELS.yearStart}: ${formatCurrency(12 * nonNegative(get(amountPath)))}`,
+      },
+    ],
+    tier: 'details',
+    visibleWhen: (get) => isAutoInvesting(get) && inUse(get),
+    summary: (value) => (value === 'yearStart' ? `${label} once a year, at the start` : null),
+  };
+}
+
+export const IRA_TRADITIONAL_TIMING: FieldSpec = timingField(
+  'ira.traditionalTiming',
+  'Traditional IRA',
+  'ira.traditionalMonthly',
+  (get) => get('ira.traditional') === true && nonNegative(get('ira.traditionalMonthly')) > 0
+);
+
+export const IRA_ROTH_TIMING: FieldSpec = timingField(
+  'ira.rothTiming',
+  'Roth IRA',
+  'ira.rothMonthly',
+  (get) => get('ira.roth') === true && nonNegative(get('ira.rothMonthly')) > 0
+);
+
+export const TAXABLE_TIMING: FieldSpec = timingField(
+  'investing.taxableTiming',
+  'Taxable investing',
+  'investing.taxableMonthlyContribution',
+  (get) => nonNegative(get('investing.taxableMonthlyContribution')) > 0
+);
 
 // ---------------------------------------------------------------------------
 // Social Security and healthcare

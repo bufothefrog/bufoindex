@@ -9,6 +9,12 @@ import { CoastFireAnalysis, calculateCoastFireAnalysis } from './coastFire';
 import { InflationAnalysis, analyzeInflationImpact } from './inflationAdjustment';
 import { formatCurrency } from '@/lib/format';
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random';
+import {
+  growOneYear,
+  scheduleFactor,
+  scheduleFutureValue,
+  splitSchedule,
+} from './contributionSchedule';
 // Import to register retirement formulas
 import '@/lib/formulas/retirement-formulas';
 
@@ -98,6 +104,7 @@ export interface RetirementInputs {
   currentIncome: number; // Always annual — derived from incomeAmount × period multiplier
   incomeAmount: number;  // Raw user-entered income value
   incomePeriod: IncomePeriod; // Pay period for the entered amount
+  /** The TOTAL monthly-equivalent contribution (monthly and yearly parts together). */
   monthlySavings: number;
   necessaryMonthlyExpenses: number;
   accumulationReturn: number;
@@ -112,10 +119,27 @@ export interface RetirementInputs {
   riskProfile: 'tdf' | 'custom'; // Risk profile: Target Date Fund or Custom
   effectiveTaxRate: number | null;           // null = auto-calculate from income/filing
   estimatedAnnualHealthcareCost: number | null; // null = use default model
+  /**
+   * Of monthlySavings x 12, the dollars per year that land at the start of
+   * each simulated year (lib/calculations/contributionSchedule.ts). Absent,
+   * NaN or <= 0 = all monthly. Clamped to [0, 12 x max(0, monthlySavings)]
+   * by splitSchedule.
+   */
+  yearStartSavings?: number;
 }
+
+/**
+ * One piece of a scenario title: literal text, or a dollar figure with the
+ * basis it is computed in and how far from today it is dated, so the display
+ * layer can convert it to the active dollar mode before formatting.
+ */
+export type ScenarioTitlePart =
+  | string
+  | { amount: number; basis: 'today' | 'nominal'; yearsFromNow: number; roundTo?: 100 | 1000 };
 
 export interface RetirementScenario {
   id: string;
+  /** The title with every figure formatted as computed (kept byte-identical for the same inputs). */
   name: string;
   retirementAge: number;
   requiredBalance: number;
@@ -123,6 +147,8 @@ export interface RetirementScenario {
   monthlyWithdrawal: number;
   successProbability: number;
   yearsOfIncome: number;
+  /** The title as parts, present when the name embeds an output figure. */
+  title?: readonly ScenarioTitlePart[];
 }
 
 export interface RetirementResults {
@@ -232,15 +258,11 @@ export function calculateRequiredBalance(
  * Calculate projected balance at retirement with TDF glide path
  */
 function calculateProjectedBalanceTDF(inputs: RetirementInputs): number {
+  const schedule = splitSchedule(inputs.monthlySavings, inputs.yearStartSavings);
   let currentBalance = inputs.startingBalance;
   for (let year = 0; year < (inputs.retirementAge - inputs.startingAge); year++) {
     const currentAge = inputs.startingAge + year;
-    const annualReturn = calculateTDFReturnForAge(currentAge);
-    const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
-    for (let month = 0; month < 12; month++) {
-      currentBalance = currentBalance * (1 + monthlyRate);
-      currentBalance += inputs.monthlySavings;
-    }
+    currentBalance = growOneYear(currentBalance, calculateTDFReturnForAge(currentAge), schedule);
   }
   return currentBalance;
 }
@@ -257,7 +279,6 @@ export function calculateProjectedBalance(inputs: RetirementInputs): number {
   // Standard calculation for custom risk profile
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
   const monthsToRetirement = yearsToRetirement * 12;
-  const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
 
   // Growth of starting balance
   const growthOfStartingBalance = futureValue(
@@ -266,10 +287,11 @@ export function calculateProjectedBalance(inputs: RetirementInputs): number {
     yearsToRetirement
   );
 
-  // Growth of monthly contributions
-  const growthOfContributions = futureValueOfAnnuity(
-    inputs.monthlySavings,
-    monthlyRate,
+  // Growth of the contributions: the monthly part at the end of each month,
+  // the yearly part at the start of each year
+  const growthOfContributions = scheduleFutureValue(
+    splitSchedule(inputs.monthlySavings, inputs.yearStartSavings),
+    inputs.accumulationReturn,
     monthsToRetirement
   );
 
@@ -500,6 +522,7 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
   // retirementAge + 1 onward, carrying the balance forward year over year.
   // withdrawalsByAge[age] is the net portfolio withdrawal during the year that
   // ends at `age` (income need + healthcare − Social Security, floored at 0).
+  const schedule = splitSchedule(inputs.monthlySavings, inputs.yearStartSavings);
   if (inputs.riskProfile === 'tdf') {
     // TDF calculation with year-by-year glide path
     let currentBalance = inputs.startingBalance;
@@ -510,11 +533,7 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
       const annualReturn = calculateTDFReturnForAge(age - 1);
       if (age <= inputs.retirementAge) {
         // Accumulation phase with monthly compounding (matches calculateProjectedBalanceTDF)
-        const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1;
-        for (let month = 0; month < 12; month++) {
-          currentBalance = currentBalance * (1 + monthlyRate);
-          currentBalance += inputs.monthlySavings;
-        }
+        currentBalance = growOneYear(currentBalance, annualReturn, schedule);
         netWorthByAge[age] = currentBalance;
       } else {
         const yearWithdrawal = calculateNetAnnualWithdrawal(inputs, age - inputs.retirementAge - 1);
@@ -529,7 +548,6 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
     }
   } else {
     // Standard calculation for custom risk profile
-    const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
     let currentBalance = inputs.startingBalance;
     netWorthByAge[inputs.startingAge] = currentBalance;
 
@@ -539,7 +557,7 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
         const yearsFromStart = age - inputs.startingAge;
         currentBalance =
           futureValue(inputs.startingBalance, inputs.accumulationReturn, yearsFromStart) +
-          futureValueOfAnnuity(inputs.monthlySavings, monthlyRate, yearsFromStart * 12);
+          scheduleFutureValue(schedule, inputs.accumulationReturn, yearsFromStart * 12);
         netWorthByAge[age] = currentBalance;
       } else {
         const yearWithdrawal = calculateNetAnnualWithdrawal(inputs, age - inputs.retirementAge - 1);
@@ -740,6 +758,11 @@ function generateSophisticatedScenarios(
       scenarios.push({
         id: 'enhanced-lifestyle',
         name: `Enhanced lifestyle: ${formatCurrency(Math.round(enhancedIncome / 12 / 100) * 100)}/month`,
+        title: [
+          'Enhanced lifestyle: ',
+          { amount: enhancedIncome / 12, basis: 'today', yearsFromNow: yearsToRetirement, roundTo: 100 },
+          '/month',
+        ],
         retirementAge: inputs.retirementAge,
         requiredBalance: calculateRequiredBalance(enhancedInflated),
         projectedBalance: baseProjectedBalance,
@@ -764,6 +787,18 @@ function generateSophisticatedScenarios(
     scenarios.push({
       id: 'conservative-wealth-building',
       name: `Conservative: ${formatCurrency(Math.round(conservativeWithdrawal / 12 / 100) * 100)}/month, leave ${formatCurrency(Math.round(Math.max(0, totalExtraWealth) / 1000) * 1000)} legacy`,
+      title: [
+        'Conservative: ',
+        { amount: conservativeWithdrawal / 12, basis: 'today', yearsFromNow: yearsToRetirement, roundTo: 100 },
+        '/month, leave ',
+        {
+          amount: Math.max(0, totalExtraWealth),
+          basis: 'nominal',
+          yearsFromNow: inputs.lifeExpectancy - inputs.startingAge,
+          roundTo: 1000,
+        },
+        ' legacy',
+      ],
       retirementAge: inputs.retirementAge,
       requiredBalance: calculateRequiredBalance(conservativeInflated),
       projectedBalance: baseProjectedBalance,
@@ -774,7 +809,14 @@ function generateSophisticatedScenarios(
 
     // SCENARIO 4: Coast option - reduce current savings
     const reducedSavings = Math.max(500, inputs.monthlySavings * 0.5); // Cut savings in half, minimum $500
-    const coastInputs = { ...inputs, monthlySavings: reducedSavings };
+    // The yearly share is kept: the yearly part shrinks in proportion
+    // (splitSchedule clamps it to the reduced total).
+    const yearStartSavings = inputs.yearStartSavings ?? 0;
+    const coastInputs: RetirementInputs = {
+      ...inputs,
+      monthlySavings: reducedSavings,
+      yearStartSavings: inputs.monthlySavings > 0 ? (yearStartSavings * reducedSavings) / inputs.monthlySavings : 0,
+    };
     const coastBalance = calculateProjectedBalance(coastInputs);
     const monthlySavingsReduction = inputs.monthlySavings - reducedSavings;
 
@@ -828,6 +870,13 @@ function generateSophisticatedScenarios(
     scenarios.push({
       id: 'conservative-buffer',
       name: `Conservative: ${formatCurrency(Math.round(conservativeWithdrawal / 12 / 100) * 100)}/month with ${formatCurrency(bufferAmount)} annual buffer`,
+      title: [
+        'Conservative: ',
+        { amount: conservativeWithdrawal / 12, basis: 'today', yearsFromNow: yearsToRetirement, roundTo: 100 },
+        '/month with ',
+        { amount: bufferAmount, basis: 'today', yearsFromNow: yearsToRetirement },
+        ' annual buffer',
+      ],
       retirementAge: inputs.retirementAge,
       requiredBalance: calculateRequiredBalance(conservativeInflated),
       projectedBalance: baseProjectedBalance,
@@ -876,6 +925,11 @@ function generateSophisticatedScenarios(
     scenarios.push({
       id: 'reality-income',
       name: `Live on ${formatCurrency(Math.round(affordableIncomeToday / 12 / 100) * 100)}/month (today's dollars) at ${inputs.retirementAge}`,
+      title: [
+        'Live on ',
+        { amount: affordableIncomeToday / 12, basis: 'today', yearsFromNow: yearsToRetirement, roundTo: 100 },
+        `/month at ${inputs.retirementAge}`,
+      ],
       retirementAge: inputs.retirementAge,
       requiredBalance: calculateRequiredBalance(affordableIncomeAtRetirement),
       projectedBalance: baseProjectedBalance, // This stays the same - it's what we can afford with current balance
@@ -979,12 +1033,17 @@ function findActualRetirementAge(inputs: RetirementInputs, targetIncome: number)
 }
 
 /**
- * Calculate minimum monthly savings needed to hit target
+ * The TOTAL monthly-equivalent savings needed for the projected balance to
+ * reach `requiredBalance` (custom-return closed form), capped at half of the
+ * monthly income. The yearly part (yearStartSavings) is kept as it is: its
+ * future value comes off the gap first, the monthly stream covers the rest,
+ * and the result adds the yearly part back as its monthly equivalent. With no
+ * yearly part this is the plain annuity solve. 0 when the starting balance
+ * alone reaches the target.
  */
-function calculateMinimumSavingsNeeded(inputs: RetirementInputs, requiredBalance: number): number {
+export function calculateMinimumSavingsNeeded(inputs: RetirementInputs, requiredBalance: number): number {
   const yearsToRetirement = inputs.retirementAge - inputs.startingAge;
   const monthsToRetirement = yearsToRetirement * 12;
-  const monthlyRate = Math.pow(1 + inputs.accumulationReturn, 1/12) - 1;
 
   // Account for growth of existing balance
   const growthOfStartingBalance = futureValue(inputs.startingBalance, inputs.accumulationReturn, yearsToRetirement);
@@ -992,14 +1051,12 @@ function calculateMinimumSavingsNeeded(inputs: RetirementInputs, requiredBalance
 
   if (additionalNeeded <= 0) return 0;
 
-  // Calculate required monthly savings using future value of annuity
-  let requiredMonthlySavings = 0;
-  if (monthlyRate === 0) {
-    requiredMonthlySavings = additionalNeeded / monthsToRetirement;
-  } else {
-    const denominator = (Math.pow(1 + monthlyRate, monthsToRetirement) - 1) / monthlyRate;
-    requiredMonthlySavings = additionalNeeded / denominator;
-  }
+  const schedule = splitSchedule(inputs.monthlySavings, inputs.yearStartSavings);
+  const rest =
+    additionalNeeded -
+    scheduleFutureValue({ monthly: 0, yearStart: schedule.yearStart }, inputs.accumulationReturn, monthsToRetirement);
+  const monthlyNeeded = rest > 0 ? rest / scheduleFactor(inputs.accumulationReturn, monthsToRetirement, 0) : 0;
+  const requiredMonthlySavings = schedule.yearStart > 0 ? monthlyNeeded + schedule.yearStart / 12 : monthlyNeeded;
 
   // Cap at reasonable maximum (50% of income)
   const maxReasonableSavings = (inputs.currentIncome * 0.5) / 12;

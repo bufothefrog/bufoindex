@@ -3,7 +3,7 @@
  * value feeds each RetirementInputs leaf. The golden fixture in
  * test/lib/calculators/retirement/bindings.test.ts pins the result. Pure.
  *
- * Five leaves are derived:
+ * Six leaves are derived:
  *
  * - Income. The engine takes an amount and a period (incomeAmount,
  *   incomePeriod) and the annual figure (currentIncome); the profile holds the
@@ -17,6 +17,9 @@
  *   emergency fund left out (investedBalance in lib/profile/accounts.ts).
  * - Monthly savings: the Custom monthly investing figure, or on Auto the
  *   sum of the normal contributions (monthlyInvesting).
+ * - Year-start savings: of that total, the dollars per year paid once at the
+ *   start of each year (yearStartInvesting); 0 on Custom. The one reader of
+ *   the timing leaves.
  */
 
 import type { RetirementInputs } from '@/lib/calculations/retirement';
@@ -31,7 +34,7 @@ import {
   RETIREMENT_AGE,
   STATE,
 } from '@/lib/fields/shared';
-import { investedBalance, monthlyInvesting } from '@/lib/profile/accounts';
+import { investedBalance, monthlyInvesting, yearStartInvesting } from '@/lib/profile/accounts';
 import type { FilingStatus } from '@/lib/profile/types';
 import { GROSS_PATH, incomeEntry, yearlyGrossPay } from './income';
 import { SOCIAL_SECURITY_BENEFIT_PATH, resolveSocialSecurityBenefit } from './socialSecurity';
@@ -70,6 +73,7 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   },
   { engine: 'incomePeriod', read: (get) => incomeEntry(get).period },
   { engine: 'monthlySavings', read: monthlyInvesting, errorPath: MONTHLY_INVESTING.path },
+  { engine: 'yearStartSavings', read: yearStartInvesting, errorPath: MONTHLY_INVESTING.path },
   { profile: NECESSARY_MONTHLY.path, engine: 'necessaryMonthlyExpenses' },
   { profile: 'assumptions.retirement.accumulationReturn', engine: 'accumulationReturn' },
   { profile: 'assumptions.retirement.retirementReturn', engine: 'retirementReturn' },
@@ -103,4 +107,5 @@ export const RETIREMENT_ENGINE_ONLY: Readonly<Record<string, string>> = {
   incomePeriod: 'Derived from income.frequency; weekly pay enters as a yearly amount.',
   startingBalance: 'Derived: the invested total of portfolio.accounts, the emergency fund left out (investedBalance).',
   monthlySavings: 'Derived: investing.monthlyContribution when Custom, else the normal contributions (monthlyInvesting).',
+  yearStartSavings: 'Derived: the parts paid once a year at the start (yearStartInvesting).',
 };

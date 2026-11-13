@@ -11,11 +11,16 @@ import {
   currentPlanScenario,
   retirementHeadline,
   scenarioCountStat,
+  scenarioTitle,
   successTone,
   withdrawalRateStat,
   withdrawalRateTone,
 } from '@/lib/calculators/retirement/headline';
 import { formatStatValue, type StatSpec } from '@/lib/design-system/stat';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
+import { ownerRaw, ownerYearStartRaw } from '@/test/factories/accountsFixtures';
 
 const INPUTS = {
   startingAge: 25,
@@ -148,5 +153,60 @@ describe('scenarioCountStat', () => {
       tone: 'info',
       hint: 'retirement options',
     });
+  });
+});
+
+describe('scenarioTitle: scenario titles follow the dollar mode (PR 5)', () => {
+  const conservativeOf = (profile: ReturnType<typeof getDefaultFinancialProfile>) => {
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, profile);
+    const results = RETIREMENT_CALCULATOR.calculate(inputs);
+    const found = results.scenarios.find((each) => each.id === 'conservative-wealth-building');
+    if (!found) throw new Error('no conservative scenario');
+    return { scenario: found, inflationRate: inputs.inflationRate };
+  };
+
+  it('E14, the default profile: the name keeps the computed figures; the title converts them', () => {
+    // Legacy 7,248,462.75 nominal at 65 years: / 1.03^65 (6.829983) = 1,061,271.02 -> $1,061,000.
+    // Income 2,733.33 of today's dollars at 40 years: x 1.03^40 (3.262038) = 8,916.24 -> $8,900.
+    const { scenario, inflationRate } = conservativeOf(getDefaultFinancialProfile());
+    expect(scenario.name).toBe('Conservative: $2,700/month, leave $7,248,000 legacy');
+    expect(scenarioTitle(scenario, 'today', inflationRate)).toBe('Conservative: $2,700/month, leave $1,061,000 legacy');
+    expect(scenarioTitle(scenario, 'nominal', inflationRate)).toBe('Conservative: $8,900/month, leave $7,248,000 legacy');
+  });
+
+  it('the owner with the Roth IRA once a year', () => {
+    const { scenario, inflationRate } = conservativeOf(normalizeProfile(ownerYearStartRaw()));
+    expect(scenarioTitle(scenario, 'today', inflationRate)).toBe('Conservative: $2,700/month, leave $3,679,000 legacy');
+    expect(scenarioTitle(scenario, 'nominal', inflationRate)).toBe('Conservative: $8,900/month, leave $25,126,000 legacy');
+  });
+
+  it('the owner with timing untouched', () => {
+    const { scenario, inflationRate } = conservativeOf(normalizeProfile(ownerRaw()));
+    expect(scenario.name).toBe('Conservative: $2,700/month, leave $24,893,000 legacy');
+    expect(scenarioTitle(scenario, 'today', inflationRate)).toBe('Conservative: $2,700/month, leave $3,645,000 legacy');
+    expect(scenarioTitle(scenario, 'nominal', inflationRate)).toBe('Conservative: $8,900/month, leave $24,893,000 legacy');
+  });
+
+  it('a scenario with no title returns its name, in both modes', () => {
+    const plain = scenario({ name: 'Retire 5 years early at 60' });
+    expect(scenarioTitle(plain, 'today', 0.03)).toBe('Retire 5 years early at 60');
+    expect(scenarioTitle(plain, 'nominal', 0.03)).toBe('Retire 5 years early at 60');
+  });
+
+  it('an unrounded part prints whole dollars, converted over its own horizon', () => {
+    // 8,000 of today's dollars 10 years out at 2%: x 1.218994 = 9,751.96 -> $9,752.
+    const buffer = scenario({
+      name: 'Conservative: $6,000/month with $8,000 annual buffer',
+      title: [
+        'Conservative: ',
+        { amount: 6000, basis: 'today', yearsFromNow: 10, roundTo: 100 },
+        '/month with ',
+        { amount: 8000, basis: 'today', yearsFromNow: 10 },
+        ' annual buffer',
+      ],
+    });
+    expect(scenarioTitle(buffer, 'today', 0.02)).toBe('Conservative: $6,000/month with $8,000 annual buffer');
+    // 6,000 x 1.218994 = 7,313.96 -> $7,300.
+    expect(scenarioTitle(buffer, 'nominal', 0.02)).toBe('Conservative: $7,300/month with $9,752 annual buffer');
   });
 });

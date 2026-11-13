@@ -2,14 +2,21 @@
  * requiredSavingsCurve: the retirement "Savings Rate Impact" chart's PMT
  * logic, moved out of SavingsRateChart.tsx in rebuild slice c2.
  *
- * The parity fixtures below were captured before the move: the old
- * component's useMemo body was copied verbatim into a scratch test and run on
- * these three inputs, and its output is pinned here point for point. The
- * remaining cases are hand-computed.
+ * The fixtures below were first captured from the old component (r / 12 a
+ * month). PR 5 moved the curve to the one monthly-rate convention,
+ * i = (1 + r)^(1/12) - 1, and the three tables were re-pinned from an
+ * independent re-implementation of that formula (not from the module under
+ * test); the zero-return table did not move. The remaining cases are
+ * hand-computed.
  */
 
 import { describe, expect, it } from 'vitest';
 import type { RetirementInputs } from '@/lib/calculations/retirement';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
+import { yearStartShareOf } from '@/lib/calculations/contributionSchedule';
+import { ownerYearStartRaw } from '@/test/factories/accountsFixtures';
 import { requiredSavingsCurve, type SavingsRateInputs } from '@/lib/calculations/savingsRate';
 
 /** [retirementAge, requiredSavingsRate, requiredMonthlySavings] */
@@ -67,35 +74,37 @@ const DEFAULTS: RetirementInputs = {
   estimatedAnnualHealthcareCost: null,
 };
 
-describe('requiredSavingsCurve: parity with the old SavingsRateChart numbers', () => {
+describe('requiredSavingsCurve: re-pinned tables at the effective monthly rate', () => {
+  // Before PR 5 (r / 12): age 45 39.796048695539085% / 3,316.34; age 60
+  // 9.68914442360643% / 807.43; age 70 3.823944171098586% / 318.66.
   it('the old defaults: ages 45 to 70 at an 8% return', () => {
     expectRowsClose(rows(DEFAULTS), [
-      [45, 39.796048695539085, 3316.3373912949232],
-      [46, 35.97389919186833, 2997.8249326556943],
-      [47, 32.57254728096351, 2714.3789400802925],
-      [48, 29.535318125733657, 2461.2765104778045],
-      [49, 26.81495811333875, 2234.579842778229],
-      [50, 24.371755725197822, 2030.979643766485],
-      [51, 22.172095916945263, 1847.6746597454387],
-      [52, 20.18733559598924, 1682.2779663324366],
-      [53, 18.392919904423994, 1532.7433253686663],
-      [54, 16.76768116687541, 1397.3067639062842],
-      [55, 15.293277869143019, 1274.4398224285849],
-      [56, 13.953742037939682, 1162.8118364949735],
-      [57, 12.735111301424626, 1061.2592751187187],
-      [58, 11.625127662449318, 968.7606385374432],
-      [59, 10.612989245932985, 884.4157704944154],
-      [60, 9.68914442360643, 807.4287019672026],
-      [61, 8.845120075630449, 737.0933396358707],
-      [62, 8.073377531611706, 672.7814609676421],
-      [63, 7.367191094154503, 613.9325911795419],
-      [64, 6.7205450946053125, 560.0454245504427],
-      [65, 6.128046241591053, 510.67052013258774],
-      [66, 5.584848655778667, 465.4040546482222],
-      [67, 5.086589481403171, 423.88245678359755],
-      [68, 4.6293333580859475, 385.77777984049567],
-      [69, 4.209524348967782, 350.79369574731516],
-      [70, 3.823944171098586, 318.6620142582155],
+      [45, 41.196350593962656, 3433.029216163555],
+      [46, 37.31690315934331, 3109.741929945276],
+      [47, 33.85954931208871, 2821.6291093407262],
+      [48, 30.767644527004105, 2563.970377250342],
+      [49, 27.993960185997878, 2332.8300154998233],
+      [50, 25.49880475890128, 2124.9003965751067],
+      [51, 23.24857846353299, 1937.3815386277493],
+      [52, 21.21464900375289, 1767.8874169794074],
+      [53, 19.372468100573442, 1614.3723417144536],
+      [54, 17.700870680632185, 1475.0725567193488],
+      [55, 16.181514090815945, 1348.4595075679954],
+      [56, 14.79842571101344, 1233.2021425844534],
+      [57, 13.537635245496112, 1128.1362704580094],
+      [58, 12.386873725048826, 1032.2394770874023],
+      [59, 11.335325481060558, 944.6104567550465],
+      [60, 10.373422494339026, 864.4518745282522],
+      [61, 9.4926728775152, 791.0560731262667],
+      [62, 8.685517032830486, 723.7930860692072],
+      [63, 7.945206387680927, 662.1005323067438],
+      [64, 7.265700656817977, 605.4750547348314],
+      [65, 6.641580391085933, 553.4650325904944],
+      [66, 6.06797220546005, 505.6643504550041],
+      [67, 5.540484576340542, 461.7070480283785],
+      [68, 5.05515249111309, 421.2627075927575],
+      [69, 4.6083895455746875, 384.032462131224],
+      [70, 4.196946334828646, 349.7455279023872],
     ]);
   });
 
@@ -143,7 +152,8 @@ describe('requiredSavingsCurve: parity with the old SavingsRateChart numbers', (
       accumulationReturn: 0.05,
     };
     expectRowsClose(rows(inputs), [
-      [60, 100, 218.92282893874392],
+      // Before PR 5: 218.92282893874392.
+      [60, 100, 220.2263520239225],
       [61, 0, 0],
       [62, 0, 0],
       [63, 0, 0],
@@ -182,10 +192,11 @@ describe('requiredSavingsCurve: hand-computed cases', () => {
   });
 
   it('uses the annuity payment at a positive return', () => {
-    // 12% a year is 1% a month. $4,000 / 4% = $100,000 needed at 45, 120
-    // months out: 1.01^120 = 3.300387, ((1.01^120) - 1) / 0.01 = 230.03869,
-    // so $100,000 / 230.03869 = $434.71 a month, $5,216.51 a year, 5.2165%
-    // of $100,000.
+    // 12% a year compounds monthly at i = 1.12^(1/12) - 1 = 0.00948879.
+    // $4,000 / 4% = $100,000 needed at 45, 120 months out:
+    // (1.12^10 - 1) / i = 2.1058482 / 0.00948879 = 221.92992, so
+    // $100,000 / 221.92992 = $450.59 a month, $5,407.11 a year, 5.4071% of
+    // $100,000. (At r / 12 before PR 5: $434.71, 5.2165%.)
     const [first] = requiredSavingsCurve({
       ...base,
       startingAge: 35,
@@ -194,8 +205,8 @@ describe('requiredSavingsCurve: hand-computed cases', () => {
       currentIncome: 100000,
     });
     expect(first.retirementAge).toBe(45);
-    expect(first.requiredMonthlySavings).toBeCloseTo(434.71, 2);
-    expect(first.requiredSavingsRate).toBeCloseTo(5.2165, 4);
+    expect(first.requiredMonthlySavings).toBeCloseTo(450.59, 2);
+    expect(first.requiredSavingsRate).toBeCloseTo(5.4071, 4);
   });
 
   it('nets the grown starting balance off the target', () => {
@@ -229,5 +240,79 @@ describe('requiredSavingsCurve: hand-computed cases', () => {
     const [first] = requiredSavingsCurve({ ...base, currentIncome: 0 });
     expect(first.requiredSavingsRate).toBe(100);
     expect(first.requiredMonthlySavings).toBeCloseTo(8333.33, 2);
+  });
+});
+
+describe('requiredSavingsCurve: the effective monthly rate and the start-of-year share (PR 5)', () => {
+  // E7: $40,000 / 4% = $1,000,000, S = 0, 20 years at 8%, income $100,000.
+  const e7: SavingsRateInputs = {
+    startingAge: 25,
+    targetIncome: 40000,
+    startingBalance: 0,
+    accumulationReturn: 0.08,
+    currentIncome: 100000,
+  };
+  const age45 = (inputs: SavingsRateInputs) => requiredSavingsCurve(inputs).find((p) => p.retirementAge === 45)!;
+
+  it('E7 all monthly: A_m = (1.08^20 - 1) / i8 = 568.9991, PMT 1,757.4721 (21.0897%)', () => {
+    // Before PR 5, at r / 12: ((1 + 0.08/12)^240 - 1) / (0.08/12) = 589.0204, PMT 1,697.7340 (20.373%).
+    const point = age45(e7);
+    expect(point.requiredMonthlySavings).toBeCloseTo(1757.4721, 4);
+    expect(point.requiredSavingsRate).toBeCloseTo(21.0897, 4);
+  });
+
+  it('E7 share 1: A_y = 1.08 x 3.660957 / 0.08 = 49.42292 a year, T = 1e6 / (12 x 49.42292) = 1,686.1272 (20.234%)', () => {
+    const point = age45({ ...e7, yearStartShare: 1 });
+    expect(point.requiredMonthlySavings).toBeCloseTo(1686.1272, 4);
+    expect(point.requiredSavingsRate).toBeCloseTo(20.2335, 3);
+  });
+
+  it('a share above 1 or NaN is clamped (to 1 and to 0)', () => {
+    expect(age45({ ...e7, yearStartShare: 3 }).requiredMonthlySavings).toBeCloseTo(1686.1272, 4);
+    expect(age45({ ...e7, yearStartShare: Number.NaN }).requiredMonthlySavings).toBeCloseTo(1757.4721, 4);
+  });
+
+  it('zero-return rows stay (need <= 0 gives 0 at any share)', () => {
+    const curve = requiredSavingsCurve({ ...e7, startingBalance: 2_000_000, yearStartShare: 0.5 });
+    expect(curve.every((p) => p.requiredMonthlySavings === 0 && p.requiredSavingsRate === 0)).toBe(true);
+  });
+
+  it('the default profile: 45 1,596.62 / 18.423%; 55 549.10 / 6.336%; 65 149.60 / 1.726%', () => {
+    // Before PR 5: 45 1,542.35 / 17.796%; 50 897.75; 55 518.96 / 5.988%;
+    // 60 285.70; 65 138.04 / 1.593%; 70 43.03.
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile());
+    expect(yearStartShareOf(inputs.monthlySavings, inputs.yearStartSavings)).toBe(0);
+    const curve = requiredSavingsCurve(inputs);
+    const at = (age: number) => curve.find((p) => p.retirementAge === age)!;
+    expect(at(45).requiredMonthlySavings).toBeCloseTo(1596.62, 2);
+    expect(at(50).requiredMonthlySavings).toBeCloseTo(939.27, 2);
+    expect(at(55).requiredMonthlySavings).toBeCloseTo(549.1, 2);
+    expect(at(60).requiredMonthlySavings).toBeCloseTo(305.88, 2);
+    expect(at(65).requiredMonthlySavings).toBeCloseTo(149.6, 2);
+    expect(at(70).requiredMonthlySavings).toBeCloseTo(47.23, 2);
+    expect(at(45).requiredSavingsRate).toBeCloseTo(18.423, 3);
+    expect(at(55).requiredSavingsRate).toBeCloseTo(6.336, 3);
+    expect(at(65).requiredSavingsRate).toBeCloseTo(1.726, 3);
+  });
+
+  it('the owner with the Roth IRA once a year: share 7,500 / 38,340 = 0.19562; 45 927.07, 50 327.80, 55 to 70 zero', () => {
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerYearStartRaw()));
+    const share = yearStartShareOf(inputs.monthlySavings, inputs.yearStartSavings);
+    expect(share).toBeCloseTo(0.19562, 5);
+    const withShare = requiredSavingsCurve({ ...inputs, yearStartShare: share });
+    const allMonthly = requiredSavingsCurve(inputs);
+    const at = (curve: typeof withShare, age: number) => curve.find((p) => p.retirementAge === age)!;
+    // Before PR 5 (r / 12, all monthly): 902.98 (6.95%) and 315.90 (2.43%).
+    expect(at(withShare, 45).requiredMonthlySavings).toBeCloseTo(927.07, 2);
+    expect(at(withShare, 45).requiredSavingsRate).toBeCloseTo(7.13, 2);
+    expect(at(withShare, 50).requiredMonthlySavings).toBeCloseTo(327.8, 2);
+    expect(at(withShare, 50).requiredSavingsRate).toBeCloseTo(2.52, 2);
+    // The convention alone (share 0).
+    expect(at(allMonthly, 45).requiredMonthlySavings).toBeCloseTo(934.75, 2);
+    expect(at(allMonthly, 50).requiredMonthlySavings).toBeCloseTo(330.51, 2);
+    for (const age of [55, 60, 65, 70]) {
+      expect(at(withShare, age).requiredMonthlySavings).toBe(0);
+      expect(at(allMonthly, age).requiredMonthlySavings).toBe(0);
+    }
   });
 });

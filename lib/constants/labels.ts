@@ -12,6 +12,7 @@ import type { AccountType } from '@/lib/calculations/portfolioRebalancing';
 import type { AccountKind } from '@/lib/profile/accountTypes';
 import type {
   BonusFrequency,
+  ContributionTiming,
   ContributionType,
   FilingStatus,
   HsaCoverage,
@@ -178,6 +179,20 @@ export const CONTRIBUTION_TYPE_LABELS: Readonly<Record<ContributionType, string>
 export const CONTRIBUTION_TYPE_OPTIONS = optionsFrom<ContributionType>(
   ['traditional', 'roth', 'split'],
   CONTRIBUTION_TYPE_LABELS,
+);
+
+// ---------------------------------------------------------------------------
+// Contribution timing (the IRA and taxable parts of Auto monthly investing)
+// ---------------------------------------------------------------------------
+
+export const CONTRIBUTION_TIMING_LABELS: Readonly<Record<ContributionTiming, string>> = {
+  monthly: 'Monthly',
+  yearStart: 'Once a year, at the start',
+};
+
+export const CONTRIBUTION_TIMING_OPTIONS = optionsFrom<ContributionTiming>(
+  ['monthly', 'yearStart'],
+  CONTRIBUTION_TIMING_LABELS,
 );
 
 // ---------------------------------------------------------------------------

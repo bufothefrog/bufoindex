@@ -3,8 +3,8 @@
  *
  * Compares monthly contributions (dollar-cost averaging, "DCA") into a plain
  * index fund against the same contributions into a daily-reset leveraged
- * fund, and repeats both comparisons under the usual lump-sum framing on the
- * same total dollars. All four framings share one set of random draws per
+ * fund, and repeats both comparisons with the same yearly amount invested at
+ * the start of each year. All four streams share one set of random draws per
  * path (common random numbers), so no gap comes from comparing different
  * random markets. The summary statistics still carry sampling error from the
  * finite path set (a few percentage points at 500 paths for the defaults);
@@ -17,6 +17,12 @@
  *   leveraged fund log return  = L z + ((L - L^2) / 2) sigma^2 / 12
  *                                - ((L - 1) financingRate + expenseRatio) / 12
  *
+ * Contribution timing: the monthly stream adds the contribution at the start
+ * of every month, dca = (dca + c) * G_m. The start-of-year stream adds 12 c at
+ * month index 0, 12, 24, ... (prorated in a final partial year by
+ * yearStartDeposit), ys = (ys + yearStartDeposit(12 c, m - 1, months)) * G_m,
+ * so both streams pay in the same total dollars.
+ *
  * The leveraged line comes from the continuous-time result for a fund that
  * rebalances to L times exposure continuously:
  *   d ln F = L d ln S + (L - L^2) sigma^2 / 2 dt - ((L - 1) r + e) dt.
@@ -28,6 +34,7 @@
  */
 
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random';
+import { yearStartDeposit } from '@/lib/calculations/contributionSchedule';
 import {
   DEFAULT_FINANCING_RATE,
   DEFAULT_LEVERAGE_PATHS,
@@ -81,20 +88,21 @@ export interface MedianPathPoint {
 }
 
 export interface DcaComparisonResult {
-  /** startingBalance + monthlyContribution * months. */
+  /** startingBalance + monthlyContribution * months; the same for both timings. */
   totalContributed: number;
-  index: { dca: PathStats; lumpSum: PathStats };
-  leveraged: { dca: PathStats; lumpSum: PathStats };
+  /** dca: monthly contributions; yearStart: the same yearly amount at the start of each year. */
+  index: { dca: PathStats; yearStart: PathStats };
+  leveraged: { dca: PathStats; yearStart: PathStats };
   /** Share of paths where the leveraged DCA balance ends below the index DCA balance. */
   probLeveragedBehindDca: number;
-  /** Share of paths where the leveraged lump sum ends below the index lump sum. */
-  probLeveragedBehindLumpSum: number;
+  /** Share of paths where the leveraged start-of-year balance ends below the index start-of-year balance. */
+  probLeveragedBehindYearStart: number;
   /** Median across paths of each fund's maximum drawdown, as a fraction 0..1. */
   medianMaxDrawdown: { index: number; leveraged: number };
   /** Median across paths of the number of months leveraged DCA trailed index DCA. */
   medianMonthsBehind: number;
-  /** Median gaps (leveraged minus index) under each framing. */
-  dcaEffect: { dcaGap: number; lumpSumGap: number };
+  /** Median gaps (leveraged minus index) under each contribution timing. */
+  dcaEffect: { dcaGap: number; yearStartGap: number };
   /** One point per month (0..months) with p10/p50/p90 of each DCA balance. */
   medianPath: MedianPathPoint[];
   /** ((L^2 - L) / 2) sigma^2 + (L - 1) financingRate + expenseRatio. */
@@ -175,6 +183,7 @@ export function simulateDcaComparison(inputs: DcaComparisonInputs): DcaCompariso
   const contribution = Math.max(0, inputs.monthlyContribution);
   const startingBalance = Math.max(0, inputs.startingBalance);
   const totalContributed = startingBalance + contribution * months;
+  const yearlyContribution = 12 * contribution;
 
   // Monthly log-return parameters for the underlying index.
   const muMonthly = (Math.log(1 + inputs.indexMeanReturn) - (sigma * sigma) / 2) / 12;
@@ -194,20 +203,20 @@ export function simulateDcaComparison(inputs: DcaComparisonInputs): DcaCompariso
 
   const indexDcaEnd = new Float64Array(paths);
   const leveragedDcaEnd = new Float64Array(paths);
-  const indexLumpEnd = new Float64Array(paths);
-  const leveragedLumpEnd = new Float64Array(paths);
+  const indexYearStartEnd = new Float64Array(paths);
+  const leveragedYearStartEnd = new Float64Array(paths);
   const indexMaxDrawdown = new Float64Array(paths);
   const leveragedMaxDrawdown = new Float64Array(paths);
   const monthsBehind = new Float64Array(paths);
 
   let leveragedBehindDcaCount = 0;
-  let leveragedBehindLumpCount = 0;
+  let leveragedBehindYearStartCount = 0;
 
   for (let p = 0; p < paths; p++) {
     let indexDca = startingBalance;
     let leveragedDca = startingBalance;
-    let indexLump = totalContributed;
-    let leveragedLump = totalContributed;
+    let indexYearStart = startingBalance;
+    let leveragedYearStart = startingBalance;
 
     // Cumulative log price of each fund, its running peak, and max drawdown.
     let indexLogPrice = 0;
@@ -231,8 +240,9 @@ export function simulateDcaComparison(inputs: DcaComparisonInputs): DcaCompariso
 
       indexDca = (indexDca + contribution) * indexGrowth;
       leveragedDca = (leveragedDca + contribution) * leveragedGrowth;
-      indexLump *= indexGrowth;
-      leveragedLump *= leveragedGrowth;
+      const deposit = yearStartDeposit(yearlyContribution, m - 1, months);
+      indexYearStart = (indexYearStart + deposit) * indexGrowth;
+      leveragedYearStart = (leveragedYearStart + deposit) * leveragedGrowth;
 
       indexLogPrice += indexLog;
       if (indexLogPrice > indexLogPeak) {
@@ -259,14 +269,14 @@ export function simulateDcaComparison(inputs: DcaComparisonInputs): DcaCompariso
 
     indexDcaEnd[p] = indexDca;
     leveragedDcaEnd[p] = leveragedDca;
-    indexLumpEnd[p] = indexLump;
-    leveragedLumpEnd[p] = leveragedLump;
+    indexYearStartEnd[p] = indexYearStart;
+    leveragedYearStartEnd[p] = leveragedYearStart;
     indexMaxDrawdown[p] = indexWorst;
     leveragedMaxDrawdown[p] = leveragedWorst;
     monthsBehind[p] = behind;
 
     if (leveragedDca < indexDca) leveragedBehindDcaCount++;
-    if (leveragedLump < indexLump) leveragedBehindLumpCount++;
+    if (leveragedYearStart < indexYearStart) leveragedBehindYearStartCount++;
   }
 
   // Month-by-month percentile bands of each DCA balance.
@@ -295,15 +305,15 @@ export function simulateDcaComparison(inputs: DcaComparisonInputs): DcaCompariso
     };
   }
 
-  const index = { dca: pathStats(indexDcaEnd), lumpSum: pathStats(indexLumpEnd) };
-  const leveraged = { dca: pathStats(leveragedDcaEnd), lumpSum: pathStats(leveragedLumpEnd) };
+  const index = { dca: pathStats(indexDcaEnd), yearStart: pathStats(indexYearStartEnd) };
+  const leveraged = { dca: pathStats(leveragedDcaEnd), yearStart: pathStats(leveragedYearStartEnd) };
 
   return {
     totalContributed,
     index,
     leveraged,
     probLeveragedBehindDca: leveragedBehindDcaCount / paths,
-    probLeveragedBehindLumpSum: leveragedBehindLumpCount / paths,
+    probLeveragedBehindYearStart: leveragedBehindYearStartCount / paths,
     medianMaxDrawdown: {
       index: median(indexMaxDrawdown),
       leveraged: median(leveragedMaxDrawdown),
@@ -311,7 +321,7 @@ export function simulateDcaComparison(inputs: DcaComparisonInputs): DcaCompariso
     medianMonthsBehind: median(monthsBehind),
     dcaEffect: {
       dcaGap: leveraged.dca.p50 - index.dca.p50,
-      lumpSumGap: leveraged.lumpSum.p50 - index.lumpSum.p50,
+      yearStartGap: leveraged.yearStart.p50 - index.yearStart.p50,
     },
     medianPath,
     annualDragEstimate: estimateAnnualDrag(L, sigma, inputs.financingRate, inputs.expenseRatio),

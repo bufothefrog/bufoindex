@@ -105,7 +105,6 @@ describe('calculateStepStatus — step mapping', () => {
 
     expect(statuses).toHaveLength(FINANCIAL_STEPS.length)
     expect(statuses.map(s => s.id)).toEqual([
-      'emergency-1month',
       'employer-match',
       'high-interest-debt',
       'emergency-full',
@@ -115,9 +114,9 @@ describe('calculateStepStatus — step mapping', () => {
       'mega-backdoor',
       'taxable-investment',
     ])
-    expect(statuses[1].name).toBe('Employer 401k Match')
-    expect(statuses[1].priority).toBe(2)
-    expect(statuses[1].icon).toBe(FINANCIAL_STEPS[1].icon)
+    expect(statuses[0].name).toBe('Employer 401k Match')
+    expect(statuses[0].priority).toBe(2)
+    expect(statuses[0].icon).toBe(FINANCIAL_STEPS[0].icon)
   })
 
   it('returns an empty array for an empty step list', () => {
@@ -156,24 +155,14 @@ describe('calculateStepStatus — allocation matching', () => {
     expect(statusFor('additional-401k', buildProfile(), [matchAllocation]).allocation).toBeUndefined()
   })
 
-  it('splits emergency-fund allocations by priority at the 2/3 boundary', () => {
+  it('gives the one emergency step any emergency-fund allocation, whatever its priority', () => {
     const profile = buildProfile()
-    const priorityTwo = createAllocation({
-      category: 'emergency_fund',
-      account: 'Emergency Savings',
-      priority: 2,
-    })
-    const priorityThree = createAllocation({
-      category: 'emergency_fund',
-      account: 'Emergency Savings',
-      priority: 3,
-    })
-
-    expect(statusFor('emergency-1month', profile, [priorityTwo]).allocation).toBe(priorityTwo)
-    expect(statusFor('emergency-full', profile, [priorityTwo]).allocation).toBeUndefined()
-
-    expect(statusFor('emergency-full', profile, [priorityThree]).allocation).toBe(priorityThree)
-    expect(statusFor('emergency-1month', profile, [priorityThree]).allocation).toBeUndefined()
+    for (const priority of [1, 2, 3, 4]) {
+      const allocation = createAllocation({ category: 'emergency_fund', account: 'Emergency Fund', priority })
+      expect(statusFor('emergency-full', profile, [allocation]).allocation).toBe(allocation)
+    }
+    const notCash = createAllocation({ category: 'investment', account: 'Emergency Brokerage' })
+    expect(statusFor('emergency-full', profile, [notCash]).allocation).toBeUndefined()
   })
 
   it('matches high-interest debt by either debt category or account name', () => {
@@ -293,36 +282,25 @@ describe('calculateStepStatus — applicability', () => {
 })
 
 describe('calculateStepStatus — completion thresholds', () => {
-  it('completes the 1-month emergency fund at exactly one month of expenses', () => {
-    const atThreshold = statusFor('emergency-1month', buildProfile({
-      preferences: { currentEmergencyFund: 3000, necessaryExpenses: 3000 },
+  it('treats one month of expenses as no milestone: the step completes only at the target', () => {
+    const oneMonth = statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 3000, necessaryExpenses: 3000, emergencyFundMonths: 3 },
     }))
-    expect(atThreshold.isComplete).toBe(true)
-    expect(atThreshold.isUrgent).toBe(false)
-
-    const oneDollarShort = statusFor('emergency-1month', buildProfile({
-      preferences: { currentEmergencyFund: 2999, necessaryExpenses: 3000 },
-    }))
-    expect(oneDollarShort.isComplete).toBe(false)
-    expect(oneDollarShort.isUrgent).toBe(true)
+    expect(oneMonth.isComplete).toBe(false)
+    expect(oneMonth.isUrgent).toBe(false)
+    expect(oneMonth.recommendation).toBe('Complete 3-month emergency fund')
   })
 
   it('never completes an emergency fund whose target is $0', () => {
     // necessaryExpenses = 0 means the input is unanswered, not that a $0 target
     // has been met: `0 >= 0` must not read as a funded fund.
     for (const currentEmergencyFund of [0, 1500]) {
-      const oneMonth = statusFor('emergency-1month', buildProfile({
-        preferences: { currentEmergencyFund, necessaryExpenses: 0 },
-      }))
-      expect(oneMonth.isComplete).toBe(false)
-      expect(oneMonth.isUrgent).toBe(false)
-      expect(oneMonth.isRecommendation).toBe(true)
-      expect(oneMonth.recommendation).not.toMatch(/complete/i)
-
       const full = statusFor('emergency-full', buildProfile({
         preferences: { currentEmergencyFund, necessaryExpenses: 0, emergencyFundMonths: 6 },
       }))
       expect(full.isComplete).toBe(false)
+      expect(full.isUrgent).toBe(false)
+      expect(full.isRecommendation).toBe(true)
       expect(full.recommendation).not.toMatch(/complete/i)
     }
   })
@@ -527,14 +505,23 @@ describe('calculateStepStatus — completion thresholds', () => {
 })
 
 describe('calculateStepStatus — urgency levels', () => {
-  it('flags an underfunded emergency fund, an unmatched 401k, and live high-interest debt as critical', () => {
+  it('flags an unmatched 401k and live high-interest debt as critical; no emergency step is critical', () => {
     const profile = buildProfile({
       preferences: { currentEmergencyFund: 500, necessaryExpenses: 3000 },
       employer401k: { available: true, currentContribution: 0.01, matchLimit: 0.06 },
       debts: [createDebtData({ balance: 6000, interestRate: 0.19 })],
     })
 
-    expect(statusFor('emergency-1month', profile).urgencyLevel).toBe('critical')
+    // Below one month of expenses the emergency step is 'important' (PR 5: the
+    // former one-month step was the only 'critical' emergency case).
+    expect(statusFor('emergency-full', profile).urgencyLevel).toBe('important')
+    for (const currentEmergencyFund of [0, 1, 2999]) {
+      const status = statusFor('emergency-full', buildProfile({
+        preferences: { currentEmergencyFund, necessaryExpenses: 3000 },
+      }))
+      expect(status.urgencyLevel).toBe('important')
+      expect(status.isUrgent).toBe(false)
+    }
     expect(statusFor('employer-match', profile).urgencyLevel).toBe('critical')
     expect(statusFor('high-interest-debt', profile).urgencyLevel).toBe('critical')
   })
@@ -566,7 +553,6 @@ describe('calculateStepStatus — urgency levels', () => {
       preferences: { currentEmergencyFund: 9000, necessaryExpenses: 3000, emergencyFundMonths: 3 },
     })
 
-    expect(statusFor('emergency-1month', profile).urgencyLevel).toBe('none')
     expect(statusFor('emergency-full', profile).urgencyLevel).toBe('none')
   })
 })
@@ -726,7 +712,6 @@ describe('calculateStepStatus — potential savings', () => {
   it('reports zero for steps without a savings model', () => {
     const profile = buildProfile({ employer401k: { afterTaxAvailable: true } })
 
-    expect(statusFor('emergency-1month', profile).potentialSavings).toEqual({ monthly: 0, annual: 0 })
     expect(statusFor('emergency-full', profile).potentialSavings).toEqual({ monthly: 0, annual: 0 })
     expect(statusFor('additional-401k', profile).potentialSavings).toEqual({ monthly: 0, annual: 0 })
     expect(statusFor('mega-backdoor', profile).potentialSavings).toEqual({ monthly: 0, annual: 0 })
@@ -735,16 +720,16 @@ describe('calculateStepStatus — potential savings', () => {
 })
 
 describe('calculateStepStatus — recommendation copy', () => {
-  it('reports the emergency fund balance when funded and the target when not', () => {
-    const funded = statusFor('emergency-1month', buildProfile({
-      preferences: { currentEmergencyFund: 9000, necessaryExpenses: 3000 },
+  it('names no one-month figure and no starter fund below the target', () => {
+    const underfunded = statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 500, necessaryExpenses: 3000, emergencyFundMonths: 3 },
     }))
-    expect(funded.recommendation).toBe('Emergency fund complete ($9,000)')
-
-    const underfunded = statusFor('emergency-1month', buildProfile({
-      preferences: { currentEmergencyFund: 500, necessaryExpenses: 3000 },
-    }))
-    expect(underfunded.recommendation).toBe('Need $3,000 emergency fund')
+    expect(underfunded.recommendation).toBe('Complete 3-month emergency fund')
+    const text = [underfunded.recommendation, underfunded.whyItMatters, ...underfunded.implementationSteps].join(' ')
+    expect(text).not.toMatch(/\$3,000 emergency fund|starter|\$1,000\+|\$100-200/)
+    expect(underfunded.whyItMatters).toBe(
+      'Cash for necessary expenses during a job loss or a large bill, held outside the market.'
+    )
   })
 
   it('names the match percentage the user is leaving on the table', () => {
@@ -791,7 +776,7 @@ describe('calculateStepStatus — recommendation copy', () => {
     const complete = statusFor('emergency-full', buildProfile({
       preferences: { currentEmergencyFund: 18000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
     }))
-    expect(complete.recommendation).toBe('Full emergency fund complete (6 months)')
+    expect(complete.recommendation).toBe('Emergency fund complete (6 months)')
   })
 
   it('switches to present-tense copy once an allocation exists', () => {
@@ -810,7 +795,7 @@ describe('calculateStepStatus — recommendation copy', () => {
     const taxable = createAllocation({ category: 'investment', account: 'Taxable Brokerage' })
 
     expect(statusFor('emergency-full', profile, [emergency]).recommendation)
-      .toBe('Building full emergency fund')
+      .toBe('Building emergency fund')
     expect(statusFor('hsa-max', profile, [hsa]).recommendation)
       .toBe('Maximizing HSA contributions')
     expect(statusFor('roth-ira', profile, [roth]).recommendation)
@@ -898,10 +883,6 @@ describe('calculateStepStatus — recommendation copy', () => {
   it('says the emergency-fund target is unknown when necessary expenses are $0', () => {
     const expected = 'Necessary monthly expenses not set - emergency fund target unknown'
 
-    expect(statusFor('emergency-1month', buildProfile({
-      preferences: { currentEmergencyFund: 1500, necessaryExpenses: 0 },
-    })).recommendation).toBe(expected)
-
     expect(statusFor('emergency-full', buildProfile({
       preferences: { currentEmergencyFund: 1500, necessaryExpenses: 0, emergencyFundMonths: 6 },
     })).recommendation).toBe(expected)
@@ -914,7 +895,6 @@ describe('calculateStepStatus — implementation guidance', () => {
     const times = Object.fromEntries(statuses.map(s => [s.id, s.implementationTime] as const))
 
     expect(times).toEqual({
-      'emergency-1month': '3-6 months',
       'employer-match': '5 minutes',
       'high-interest-debt': '6-24 months',
       'emergency-full': '3-6 months',
@@ -935,22 +915,63 @@ describe('calculateStepStatus — implementation guidance', () => {
     expect(status.implementationSteps[1]).toBe('Increase contribution to 5%')
   })
 
-  it('sizes the emergency fund transfer over twelve months', () => {
-    // 6 × $3,000 = $18,000 target; ($18,000 − $6,000) / 12 = $1,000/mo.
+  it('quotes the emergency allocation\'s own monthly amount as the transfer', () => {
+    // 6 x $3,000 = $18,000 target. The card's header shows the allocation, so the transfer line
+    // quotes the same figure: 1,026.92 per bi-weekly paycheck = 1,026.92 x 26 / 12 = $2,225/month.
+    const profile = buildProfile({
+      preferences: { currentEmergencyFund: 6000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
+    })
+    const allocation = createAllocation({
+      account: 'Emergency Fund',
+      category: 'emergency_fund',
+      amount: 1026.92,
+      monthlyEquivalent: (1026.92 * 26) / 12,
+    })
+    const status = statusFor('emergency-full', profile, [allocation])
+
+    expect(status.implementationSteps[0]).toBe('Calculate total needed: $18,000')
+    expect(status.implementationSteps[1]).toBe('Set automatic transfer for $2,225/month')
+  })
+
+  it('quotes no transfer figure without an emergency allocation', () => {
     const status = statusFor('emergency-full', buildProfile({
       preferences: { currentEmergencyFund: 6000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
     }))
 
-    expect(status.implementationSteps[0]).toBe('Calculate total needed: $18,000')
-    expect(status.implementationSteps[1]).toBe('Set automatic transfer for $1,000/month')
+    expect(status.implementationSteps[1]).toBe('Set an automatic transfer to the fund')
+    expect(status.implementationSteps.join(' ')).not.toMatch(/\$1,000/)
   })
 
-  it('floors the emergency fund transfer at zero when already overfunded', () => {
+  it('has no transfer line for a complete fund', () => {
+    // 6 x $3,000 = $18,000 target, $18,000 in cash: complete, nothing to transfer.
     const status = statusFor('emergency-full', buildProfile({
-      preferences: { currentEmergencyFund: 30000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
+      preferences: { currentEmergencyFund: 18000, necessaryExpenses: 3000, emergencyFundMonths: 6 },
     }))
 
-    expect(status.implementationSteps[1]).toBe('Set automatic transfer for $0/month')
+    expect(status.isComplete).toBe(true)
+    expect(status.implementationSteps).toEqual([
+      'Calculate total needed: $18,000',
+      'Park funds in a high-yield savings account',
+    ])
+  })
+
+  it('has no transfer line for a target of 0 months', () => {
+    const status = statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 0, necessaryExpenses: 3000, emergencyFundMonths: 0 },
+    }))
+
+    expect(status.implementationSteps).toEqual([
+      'Calculate total needed: $0',
+      'Park funds in a high-yield savings account',
+    ])
+  })
+
+  it('says "1 month", not "1 months", for a complete 1-month fund', () => {
+    const status = statusFor('emergency-full', buildProfile({
+      preferences: { currentEmergencyFund: 3000, necessaryExpenses: 3000, emergencyFundMonths: 1 },
+    }))
+
+    expect(status.recommendation).toBe('Emergency fund complete (1 month)')
   })
 
   it('states the additional 401k percentage needed', () => {
