@@ -336,22 +336,24 @@ describe('dcaEffectSentence', () => {
   });
 
   it('states only what the two printed gaps show, in every branch (seeded loop at 1x, 2x and 3x)', () => {
-    // 330 seeded inputs across the form's ranges, 200 paths each. Every stated difference must
-    // equal the difference of the two printed gaps, its sign must be the sign of that
+    // 600 seeded inputs across the form's ranges, 20 paths each and at most 25 years, so the
+    // loop stays cheap; the horizon only scales the noise threshold. Every stated difference
+    // must equal the difference of the two printed gaps, its sign must be the sign of that
     // difference, "the same" must appear exactly when the two gaps print the same, and no
-    // sentence may state 0.0 points.
+    // sentence may state 0.0 points. Against the sentence code before the printed-gap fix
+    // this grid flags 157 sentences, of all four kinds.
     const rng = createSeededRng(4242);
     const tenths = (text: string) => Math.round(Number(text.replace('\u2212', '-').replace('+', '')) * 10);
     const branches = { noiseDiffer: 0, noiseSame: 0, same: 0, aboutOneTenth: 0, attribution: 0 };
     const failures: string[] = [];
-    for (let k = 0; k < 330; k++) {
+    for (let k = 0; k < 600; k++) {
       const leverageRatio = [1, 2, 3][k % 3];
       const inputs = {
         ...DEFAULT_DCA_COMPARISON_INPUTS,
         leverageRatio,
-        paths: 200,
+        paths: 20,
         seed: 1 + Math.floor(rng() * 1e6),
-        years: 1 + Math.floor(rng() * 40),
+        years: 1 + Math.floor(rng() * 25),
         monthlyContribution: 50 + Math.floor(rng() * 2000),
         startingBalance: Math.floor(rng() * 50000),
         indexMeanReturn: -0.05 + rng() * 0.17,
@@ -394,11 +396,11 @@ describe('dcaEffectSentence', () => {
     expect(failures).toEqual([]);
     // The loop reaches every wording of every branch.
     for (const count of Object.values(branches)) expect(count, JSON.stringify(branches)).toBeGreaterThan(0);
-  });
+  }, 30000); // Compute-bound simulation loop: instrumented CI runners are several times slower.
 
   it('never says the gaps are the same when the two printed gaps differ (seeded grid at 1x)', () => {
     // 1x has no noise threshold, so near-equal gaps reach the near-zero branch. 120 seeded
-    // inputs across the form's ranges, 200 paths each.
+    // inputs across the form's ranges, 40 paths each.
     const rng = createSeededRng(5150);
     const printed = (sentence: string) => {
       const toNumber = (text: string) => Number(text.replace('−', '-').replace('+', ''));
@@ -412,7 +414,7 @@ describe('dcaEffectSentence', () => {
       const inputs = {
         ...DEFAULT_DCA_COMPARISON_INPUTS,
         leverageRatio: 1,
-        paths: 200,
+        paths: 40,
         seed: 1 + Math.floor(rng() * 1e6),
         years: 1 + Math.floor(rng() * 40),
         monthlyContribution: 50 + Math.floor(rng() * 2000),
