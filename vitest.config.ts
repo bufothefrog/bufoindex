@@ -67,13 +67,16 @@ export default defineConfig({
         'lib/design-system/types.ts',
         'lib/formulas/types.ts',
       ],
+      // Floors set just under the measured coverage, so a change that drops
+      // tested code or removes tests fails the run.
       thresholds: {
-        // Global floors across all covered lib/ code
-        statements: 55,
-        // Financial logic is held to a higher bar
+        // Across all covered lib/ code
+        statements: 97,
+        branches: 92,
+        // The financial logic, where a wrong number is a bug
         'lib/calculations/**/*.ts': {
-          statements: 80,
-          branches: 65,
+          statements: 96,
+          branches: 90,
         },
       },
     },
