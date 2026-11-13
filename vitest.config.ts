@@ -53,20 +53,16 @@ export default defineConfig({
     maxWorkers: 4,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      // CI uploads coverage/lcov.info; lcov also writes an HTML view in
+      // coverage/lcov-report/.
+      reporter: ['text', 'lcov'],
       reportOnFailure: true,
       include: [
         'lib/**/*.ts',
       ],
       exclude: [
-        'node_modules/',
-        'test/',
-        '.next/',
-        'public/',
-        'docs/',
-        '**/*.config.{js,ts}',
         '**/*.d.ts',
-        // Type-only modules — no executable statements to cover
+        // Type-only modules: no executable statements to cover
         'lib/types/**',
         'lib/design-system/types.ts',
         'lib/formulas/types.ts',
@@ -81,17 +77,11 @@ export default defineConfig({
         },
       },
     },
-    // Enhanced reporting for CI/CD
-    reporters: ['verbose', 'junit', 'json'],
-    outputFile: {
-      junit: './coverage/junit.xml',
-      json: './coverage/test-results.json'
-    }
+    reporters: ['default'],
   },
   resolve: {
     alias: {
       '@': resolve(__dirname, '.'),
-      '@/test': resolve(__dirname, './test'),
     },
   },
 })
