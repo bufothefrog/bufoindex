@@ -1,11 +1,12 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { INTAKE_DESTINATION } from '@/components/calculators/renderers';
 import { Wizard } from '@/components/guided/Wizard';
 import { FORMS, PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
-import { CORE_PATHS, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
+import { CORE_PATHS, getIntakeScreens, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
+import { makeGet } from '@/lib/fields/paths';
 import { intakePaths } from '@/test/utils/intakeFixture';
 import type { FieldOption, FormSpec, Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
@@ -13,6 +14,7 @@ import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 import { answer, typeInto } from '@/test/utils/wizard';
+import { answerBasics, chooseState, fillAbout, next, skip, skipToEnd } from './wizardSteps';
 
 vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory());
 
@@ -67,6 +69,8 @@ describe('Wizard, a saved value the intake does not offer', () => {
     ]);
     expect(screen.getByRole('radio', { name: 'Head of household' })).toHaveAttribute('aria-checked', 'true');
 
+    await typeInto('Your age', '30');
+    await chooseState(user, 'Texas');
     await user.click(screen.getByRole('button', { name: /Next/ }));
     expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
     expect(screen.queryByText(/must be one of the listed options/)).not.toBeInTheDocument();
@@ -79,16 +83,20 @@ describe('Wizard, shared core flow', () => {
     render(<Wizard flow="core" />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'A few basics' })).toBeInTheDocument();
-    expect(screen.getByText('Every calculator shares these answers, so you only give them once.')).toBeInTheDocument();
+    expect(screen.getByText('Every calculator uses these answers.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'A little about you' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
 
-    await typeInto('Your age', '34');
-    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await fillAbout(user, { age: '34' });
+    await next(user);
     expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await typeInto('Gross pay per paycheck', '3500');
+    await user.selectOptions(screen.getByLabelText('How often you are paid'), 'bi-weekly');
+    await typeInto('Take-home pay per paycheck', '2600');
+    await next(user);
     expect(screen.getByRole('heading', { name: 'What do you have to pay each month?' })).toBeInTheDocument();
-    expect(screen.getByText('Good enough to start. You can edit the basics later.')).toBeInTheDocument();
+    expect(screen.queryByText(/Good enough to start/)).not.toBeInTheDocument();
+    await typeInto('Must-pay costs per month', '3000');
     await user.click(screen.getByRole('button', { name: /Finish/ }));
 
     // The basics stay in history (push), so Back from the chooser returns to them.
@@ -104,10 +112,8 @@ describe('Wizard, shared core flow', () => {
     const user = userEvent.setup();
     render(<Wizard flow="core" next="retirement" />);
 
-    expect(screen.getByText('After this: See if I am on track to retire.')).toBeInTheDocument();
-    for (let i = 0; i < 3; i += 1) {
-      await user.click(screen.getByRole('button', { name: /Next|Finish/ }));
-    }
+    expect(screen.getByText('Every calculator uses these. Then: See if I am on track to retire.')).toBeInTheDocument();
+    await answerBasics(user);
     expect(push).toHaveBeenCalledWith('/start/retirement');
   });
 
@@ -115,29 +121,40 @@ describe('Wizard, shared core flow', () => {
     const user = userEvent.setup();
     render(<Wizard flow="core" next="choose" />);
 
-    for (let i = 0; i < 3; i += 1) {
-      await user.click(screen.getByRole('button', { name: /Next|Finish/ }));
-    }
+    expect(screen.getByText('Every calculator uses these answers.')).toBeInTheDocument();
+    await answerBasics(user);
     expect(push).toHaveBeenCalledWith('/start/choose');
   });
 
-  it('prefills saved basics and offers to keep them as they are', () => {
-    useProfileStore.getState().setValues([{ path: 'person.age', value: 52 }], { provide: [...CORE_PATHS] });
-    const { unmount } = render(<Wizard flow="core" next="portfolio" />);
+  it('shows a returning visitor the saved basics, and Next keeps them with no shortcut link', async () => {
+    useProfileStore.getState().setValues(
+      [
+        { path: 'person.age', value: 52 },
+        { path: 'person.state', value: 'OR' },
+        { path: 'person.filingStatus', value: 'marriedJoint' },
+        { path: 'spending.necessaryMonthly', value: 0 },
+      ],
+      { provide: [...CORE_PATHS] }
+    );
+    const user = userEvent.setup();
+    render(<Wizard flow="core" next="portfolio" />);
 
     expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
     expect(screen.getByLabelText('Your age')).toHaveValue('52');
-    expect(screen.getByRole('link', { name: 'Keep them and continue' })).toHaveAttribute('href', '/start/portfolio');
-    unmount();
-
-    render(<Wizard flow="core" />);
-    expect(screen.getByRole('link', { name: 'Keep them and continue' })).toHaveAttribute('href', '/start/choose');
-  });
-
-  it('does not offer the shortcut while a basic is unanswered', () => {
-    answer(CORE_PATHS.filter((path) => path !== 'spending.necessaryMonthly'));
-    render(<Wizard flow="core" />);
+    expect(screen.getByRole('combobox', { name: 'State you live in' })).toHaveValue('Oregon');
+    expect(screen.getByRole('radio', { name: 'Married filing jointly' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByRole('link', { name: 'Keep them and continue' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Grey values/)).not.toBeInTheDocument();
+    await next(user);
+    expect(screen.getByLabelText('Gross pay per paycheck')).toHaveValue('3,500');
+    expect(screen.getByLabelText('How often you are paid')).toHaveValue('bi-weekly');
+    await next(user);
+
+    // A saved 0 shows as 0, not as an empty field.
+    expect(screen.getByLabelText('Must-pay costs per month')).toHaveValue('0');
+    await next(user);
+    expect(push).toHaveBeenCalledWith('/start/portfolio');
+    expect(useProfileStore.getState().profile.person.age).toBe(52);
   });
 });
 
@@ -175,12 +192,11 @@ describe('Wizard, remaining questions of an intent', () => {
     expect(screen.queryByRole('button', { name: /Next|Finish/ })).not.toBeInTheDocument();
   });
 
-  it('labels profile screens with their section and finishes at the overview', async () => {
+  it('labels profile screens with their section, asks the optional screen last, and finishes at the overview', async () => {
     const user = userEvent.setup();
-    // Everything answered but one retirement screen and the last two paycheck
-    // screens. The paycheck form asks the emergency fund, so the cash section
-    // is the strategy screen alone; the paycheck section is the last one with
-    // two screens left.
+    // Everything answered but the optional retirement screen and the last two
+    // paycheck screens. The optional screen comes after every section, under
+    // "Optional", and is not counted among the screens left.
     const paycheckLeft = ['ira-taxable', 'debts'];
     const unanswered = new Set(
       [
@@ -189,34 +205,40 @@ describe('Wizard, remaining questions of an intent', () => {
       ].flatMap((s) => s.fields)
     );
     answer(intakePaths('profile').filter((path) => !unanswered.has(path)));
-    const left = remainingIntakeScreens('profile', useProfileStore.getState().profile);
-    expect(left.map((s) => [s.id, profileFormSection(s.id)])).toEqual([
-      ['ss-healthcare', 'retirement'],
+    const { profile } = useProfileStore.getState();
+    const asked = getIntakeScreens('profile', makeGet(profile), { mode: 'remaining', provided: profile.provided });
+    expect(asked.map((s) => [s.id, profileFormSection(s.id)])).toEqual([
       ['ira-taxable', 'paycheck'],
       ['debts', 'paycheck'],
+      ['ss-healthcare', 'optional'],
     ]);
-    const cashAt = left.findIndex((s) => profileFormSection(s.id) === 'paycheck');
-    expect(cashAt).toBeGreaterThan(0);
+    expect(remainingIntakeScreens('profile', profile).map((s) => s.id)).toEqual(paycheckLeft);
     render(<Wizard flow="profile" />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Finish your profile' })).toBeInTheDocument();
-    expect(screen.getByText('Just the questions your profile still needs.')).toBeInTheDocument();
+    expect(screen.getByText('Saves your answers in this browser and opens your overview.')).toBeInTheDocument();
     const label = (i: number) =>
-      `${PROFILE_FORM_SECTION_LABELS[profileFormSection(left[i].id)!]} · Step ${i + 1} of ${left.length}`;
-    for (let i = 0; i < cashAt; i += 1) {
-      expect(screen.getByText(label(i))).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: /Next/ }));
-    }
-    expect(screen.getByText(label(cashAt))).toBeInTheDocument();
-    expect(label(cashAt).startsWith('Paycheck \u00b7 ')).toBe(true);
-    await user.click(screen.getByRole('button', { name: 'Skip the rest of this section' }));
+      `${PROFILE_FORM_SECTION_LABELS[profileFormSection(asked[i].id)!]} \u00b7 Step ${i + 1} of ${asked.length}`;
+    expect(screen.getByText(label(0))).toBeInTheDocument();
+    expect(label(0).startsWith('Paycheck \u00b7 ')).toBe(true);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByText(label(1))).toBeInTheDocument();
+    await skip(user);
+    expect(screen.getByText('Optional \u00b7 Step 3 of 3')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What will Social Security and healthcare look like?' })).toBeInTheDocument();
+    // A nullable field on Auto stays on Auto.
+    expect(screen.getByRole('group', { name: 'Annual healthcare cost' })).toHaveTextContent(
+      'Typical cost the model uses: $7,500'
+    );
+    await skip(user);
 
     expect(replace).toHaveBeenCalledWith('/overview');
     expect(push).not.toHaveBeenCalled();
-    const { provided } = useProfileStore.getState().profile;
-    for (const screen of left.slice(0, cashAt)) expect(provided).toEqual(expect.arrayContaining([...screen.fields]));
-    expect(provided).not.toContain('debts');
-    expect(provided).not.toContain('ira.traditional');
+    const saved = useProfileStore.getState().profile.provided;
+    // Next on the IRA screen marks its visible fields answered.
+    expect(saved).toEqual(expect.arrayContaining(['ira.traditional', 'ira.roth', 'investing.taxableMonthlyContribution']));
+    expect(saved).not.toContain('debts');
+    expect(saved).not.toContain('retirementIncome.socialSecurityBenefit');
   });
 });
 
@@ -231,7 +253,7 @@ describe('Wizard, every intent finishes on its calculator', () => {
       answer(CORE_PATHS);
       render(<Wizard flow={intent} />);
 
-      await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+      await skipToEnd(user);
 
       expect(push).not.toHaveBeenCalled();
       expect(replace).toHaveBeenCalledTimes(1);
@@ -244,7 +266,7 @@ describe('Wizard, every intent finishes on its calculator', () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="profile" />);
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    await skipToEnd(user);
     expect(replace).toHaveBeenCalledWith('/overview');
   });
 
@@ -259,6 +281,8 @@ describe('Wizard, every intent finishes on its calculator', () => {
     await user.click(screen.getByRole('radio', { name: 'Head of household' }));
     expect(screen.getByRole('radio', { name: 'Head of household' })).toHaveAttribute('aria-checked', 'true');
 
+    await typeInto('Your age', '30');
+    await chooseState(user, 'Texas');
     await user.click(screen.getByRole('button', { name: /Next/ }));
     expect(screen.getByRole('heading', { name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
   });
@@ -266,6 +290,8 @@ describe('Wizard, every intent finishes on its calculator', () => {
   it('does not accept an emptied state, so a blank answer is never saved as the old state', async () => {
     const user = userEvent.setup();
     render(<Wizard flow="core" />);
+    await typeInto('Your age', '30');
+    await user.click(screen.getByRole('radio', { name: 'Single' }));
     const state = screen.getByRole('combobox', { name: 'State you live in' });
     await user.click(state);
     await user.type(state, 'zz');
@@ -277,10 +303,6 @@ describe('Wizard, every intent finishes on its calculator', () => {
     expect(useProfileStore.getState().profile.provided).not.toContain('person.state');
   });
 
-  it('offers no "Skip the rest" in the core flow', () => {
-    render(<Wizard flow="core" />);
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
-  });
 });
 
 const FIXTURE: FormSpec = {
@@ -382,14 +404,18 @@ describe('Wizard mechanics (fixture form)', () => {
     render(<Wizard flow="leverage" mode="all" />);
     expect(heading('Fixture ages?')).not.toHaveFocus();
     expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Previous question' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
 
     const user = await typeInto('Age now', '40');
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     expect(heading('Fixture mix?')).toHaveFocus();
     expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Previous question' }));
+    // Back sits beside the progress display, not in the footer.
+    const back = screen.getByRole('button', { name: 'Back' });
+    expect(back.parentElement).toContainElement(screen.getByText('Step 2 of 4'));
+    expect(back.parentElement).not.toContainElement(screen.getByRole('button', { name: 'Skip' }));
+    await user.click(back);
 
     expect(heading('Fixture ages?')).toHaveFocus();
     expect(screen.getByLabelText('Age now')).toHaveValue('40');
@@ -500,7 +526,7 @@ describe('Wizard mechanics (fixture form)', () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);
     await user.click(screen.getByRole('radio', { name: 'No' }));
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
     expect(screen.getByRole('heading', { level: 2, name: 'Fixture age?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
 
@@ -541,7 +567,7 @@ describe('Wizard mechanics (fixture form)', () => {
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByRole('radio', { name: 'No' }));
     await user.click(screen.getByRole('radio', { name: 'Yes' }));
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
     expect(screen.getByRole('heading', { level: 2, name: 'Fixture age?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
 
@@ -556,21 +582,19 @@ describe('Wizard mechanics (fixture form)', () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);
     expect(screen.queryByText('A fixture note.')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
+    await skip(user);
     expect(screen.getByText('A fixture note.')).toBeInTheDocument();
   });
 
-  it('keeps the default assumptions on the assumption screen, which has no "Skip the rest"', async () => {
+  it('skips the assumption screen like any other: its values stay as they were, unanswered', async () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);
     for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
 
     expect(heading('Fixture assumptions?')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip, use a typical value' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
     await typeInto('Inflation', '5');
-    await user.click(screen.getByRole('button', { name: 'Keep the default assumptions' }));
+    await skip(user);
 
     const { profile } = useProfileStore.getState();
     expect(profile.assumptions.retirement.inflationRate).toBe(getDefaultFinancialProfile().assumptions.retirement.inflationRate);
@@ -583,20 +607,291 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(replace).toHaveBeenCalledTimes(1);
   });
 
-  it('skips the rest: finishes now, saving answered screens and the derived writes only', async () => {
+  it('saves after every Next and Skip, and Back then Skip takes back an earlier answer', async () => {
+    const defaults = getDefaultFinancialProfile();
     render(<Wizard flow="leverage" mode="all" />);
+    const stored = () => useProfileStore.getState().profile;
+
+    // Nothing is saved before the first action.
     const user = await typeInto('Age now', '41');
+    expect(stored().provided).toEqual([]);
+    expect(stored().person.age).toBe(defaults.person.age);
+
+    // Next: the typed age and the typical stop age, answered, with the derived write.
     await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(stored().person).toMatchObject({ age: 41, retirementAge: defaults.person.retirementAge });
+    expect(stored().cash.targetMonths).toBe(7);
+    expect(stored().provided).toEqual(['person.age', 'person.retirementAge']);
+
     await user.click(screen.getByRole('radio', { name: 'All stocks' }));
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    expect(stored().investing.targetMix).toBe(defaults.investing.targetMix);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(stored().investing.targetMix).toBe('100-0');
+    expect(stored().provided).toEqual(['person.age', 'person.retirementAge', 'investing.targetMix']);
+
+    // Back changes nothing saved; Skip on the screen answered earlier takes it back.
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(heading('Fixture mix?')).toBeInTheDocument();
+    expect(stored().investing.targetMix).toBe('100-0');
+    await skip(user);
+    expect(heading('Fixture cash?')).toBeInTheDocument();
+    expect(stored().investing.targetMix).toBe(defaults.investing.targetMix);
+    expect(stored().provided).toEqual(['person.age', 'person.retirementAge']);
+    expect(stored().person.age).toBe(41);
+
+    // Leaving now (the site header) loses nothing: the store already holds it all.
+    expect(replace).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('takes the typical value for each blank field on Next and marks it answered', async () => {
+    const defaults = getDefaultFinancialProfile();
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    expect(screen.getByLabelText('Age now')).toHaveValue('');
+    expect(screen.getByText('Grey values are typical. Next uses them for anything left blank.')).toBeInTheDocument();
+    await next(user);
+    await next(user);
+    await next(user);
+    await next(user);
 
     const { profile } = useProfileStore.getState();
-    expect(profile.person.age).toBe(41);
-    expect(profile.investing.targetMix).toBe(getDefaultFinancialProfile().investing.targetMix);
-    expect(profile.cash.targetMonths).toBe(7);
-    expect(profile.provided).toEqual(['person.age', 'person.retirementAge']);
-    expect(replace).toHaveBeenCalledTimes(1);
+    expect(profile.person).toMatchObject({ age: defaults.person.age, retirementAge: defaults.person.retirementAge });
+    expect(profile.investing.targetMix).toBe(defaults.investing.targetMix);
+    expect(profile.cash.emergencyFundBalance).toBe(defaults.cash.emergencyFundBalance);
+    expect(profile.provided).toEqual([
+      'person.age',
+      'person.retirementAge',
+      'investing.targetMix',
+      'cash.emergencyFundBalance',
+      'assumptions.retirement.inflationRate',
+    ]);
     expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?from=profile');
+  });
+
+  it('saves a typed 0, shows it as 0, and shows it again on Back', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    await skip(user);
+    await skip(user);
+    const cash = screen.getByLabelText('Cash on hand');
+    expect(cash).toHaveValue('');
+    expect(cash).toHaveAttribute('placeholder', '5,000');
+    await user.type(cash, '0');
+    await user.tab();
+    expect(cash).toHaveValue('0');
+    await next(user);
+    expect(useProfileStore.getState().profile.cash.emergencyFundBalance).toBe(0);
+    expect(useProfileStore.getState().profile.provided).toContain('cash.emergencyFundBalance');
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByLabelText('Cash on hand')).toHaveValue('0');
+  });
+
+  it('makes an emptied input blank again, so Next takes the typical value, not 0', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    await skip(user);
+    await skip(user);
+    const cash = screen.getByLabelText('Cash on hand');
+    await user.type(cash, '12');
+    await user.clear(cash);
+    await user.tab();
+    expect(cash).toHaveValue('');
+    expect(cash).toHaveAttribute('placeholder', '5,000');
+    await next(user);
+    expect(useProfileStore.getState().profile.cash.emergencyFundBalance).toBe(5000);
+  });
+});
+
+describe('Wizard, blank fields (nothing pre-filled)', () => {
+  beforeEach(() => {
+    injected.form = {
+      id: 'kinds',
+      fields: [
+        { path: 'income.grossPerPaycheck', kind: 'money', label: 'Fixture money', min: 0, tier: 'details' },
+        { path: 'person.age', kind: 'number', label: 'Fixture number', min: 16, max: 100, step: 1, tier: 'details' },
+        { path: 'cash.emergencyFundApy', kind: 'percent', label: 'Fixture percent', min: 0, max: 0.2, tier: 'details' },
+        {
+          path: 'income.frequency',
+          kind: 'select',
+          label: 'Fixture select',
+          options: [
+            { value: 'weekly', label: 'Weekly' },
+            { value: 'bi-weekly', label: 'Every two weeks' },
+          ],
+          tier: 'details',
+        },
+        { path: 'person.state', kind: 'state', label: 'Fixture state', tier: 'details' },
+        {
+          path: 'person.filingStatus',
+          kind: 'choice',
+          label: 'Fixture choice',
+          options: [
+            { value: 'single', label: 'Single' },
+            { value: 'marriedJoint', label: 'Married filing jointly' },
+          ],
+          tier: 'details',
+        },
+        { path: 'workplace.has401k', kind: 'boolean', label: 'Fixture boolean', tier: 'details' },
+        {
+          path: 'workplace.matchPercent',
+          kind: 'percent',
+          label: 'Fixture follower',
+          min: 0,
+          max: 1,
+          tier: 'details',
+          visibleWhen: (get) => get('workplace.has401k') === true,
+        },
+      ],
+      screens: [
+        {
+          id: 'kinds',
+          title: 'Fixture kinds?',
+          tier: 'details',
+          fields: [
+            'income.grossPerPaycheck',
+            'person.age',
+            'cash.emergencyFundApy',
+            'income.frequency',
+            'person.state',
+            'person.filingStatus',
+            'workplace.has401k',
+            'workplace.matchPercent',
+          ],
+        },
+      ],
+    };
+  });
+
+  it('shows every unanswered field empty, with the typical value grey or tagged', () => {
+    render(<Wizard flow="leverage" mode="all" />);
+
+    expect(screen.getByLabelText('Fixture money')).toHaveValue('');
+    expect(screen.getByLabelText('Fixture money')).toHaveAttribute('placeholder', '3,500');
+    expect(screen.getByLabelText('Fixture number')).toHaveValue('');
+    expect(screen.getByLabelText('Fixture number')).toHaveAttribute('placeholder', '30');
+    expect(screen.getByLabelText('Fixture percent')).toHaveValue('');
+    expect(screen.getByLabelText('Fixture percent')).toHaveAttribute('placeholder', '4.0');
+    expect(screen.getByLabelText('Fixture select')).toHaveValue('');
+    expect(screen.getByLabelText('Fixture select')).toHaveDisplayValue('Select');
+    expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveAttribute('placeholder', 'Select');
+
+    const choice = screen.getByRole('radiogroup', { name: 'Fixture choice' });
+    for (const radio of within(choice).getAllByRole('radio')) expect(radio).toHaveAttribute('aria-checked', 'false');
+    expect(within(choice).getByRole('radio', { name: 'Single' })).toHaveAccessibleDescription('Typical');
+    expect(within(choice).getByRole('radio', { name: 'Married filing jointly' })).not.toHaveAccessibleDescription('Typical');
+    const yesNo = screen.getByRole('radiogroup', { name: 'Fixture boolean' });
+    for (const radio of within(yesNo).getAllByRole('radio')) expect(radio).toHaveAttribute('aria-checked', 'false');
+    expect(within(yesNo).getByRole('radio', { name: 'Yes' })).toHaveAccessibleDescription('Typical');
+
+    // The field that follows the 401(k) answer shows, as the typical Yes would show it.
+    expect(screen.getByLabelText('Fixture follower')).toHaveValue('');
+    expect(screen.getAllByText('Grey values are typical. Next uses them for anything left blank.')).toHaveLength(1);
+  });
+
+  it('shows a value once the visitor chooses, and the follower follows the choice', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    await user.click(screen.getByRole('radio', { name: 'No' }));
+    expect(screen.getByRole('radio', { name: 'No' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByLabelText('Fixture follower')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Fixture select'), 'weekly');
+    expect(screen.getByLabelText('Fixture select')).toHaveValue('weekly');
+  });
+
+  it('shows answered fields with their saved values, and no grey line once nothing is blank', () => {
+    answer(injected.form!.screens[0].fields);
+    render(<Wizard flow="leverage" mode="all" />);
+    expect(screen.getByLabelText('Fixture money')).toHaveValue('3,500');
+    expect(screen.getByLabelText('Fixture select')).toHaveValue('bi-weekly');
+    expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveValue('Texas');
+    expect(screen.getByRole('radio', { name: 'Single' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByText(/Grey values/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Wizard, the basics need the visitor\'s own entry', () => {
+  it('keeps the about screen on Next with a blank field: an error per field, focus on the first, nothing saved', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="core" />);
+    expect(screen.getByText('Grey values are examples.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '30');
+    // No "Typical" tag where Next does not take the typical value.
+    expect(screen.getByRole('radio', { name: 'Single' })).not.toHaveAccessibleDescription('Typical');
+
+    await next(user);
+    expect(screen.getByRole('heading', { level: 2, name: 'A little about you' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Your age')).toHaveAccessibleDescription('Enter your age');
+    expect(screen.getByRole('combobox', { name: 'State you live in' })).toHaveAccessibleDescription('Choose your state');
+    expect(screen.getByRole('radiogroup', { name: 'Tax filing status' })).toHaveAccessibleDescription(
+      'Choose your filing status'
+    );
+    expect(screen.getByLabelText('Your age')).toHaveFocus();
+    expect(useProfileStore.getState().profile.provided).toEqual([]);
+    expect(useProfileStore.getState().profile.updatedAt).toBe(0);
+
+    // Answering two leaves one error; focus goes to it.
+    await typeInto('Your age', '44');
+    await chooseState(user, 'Ohio');
+    await next(user);
+    expect(screen.queryByText('Enter your age')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Single' })).toHaveFocus();
+    expect(useProfileStore.getState().profile.provided).toEqual([]);
+
+    await user.click(screen.getByRole('radio', { name: 'Single' }));
+    await next(user);
+    expect(screen.getByRole('heading', { level: 2, name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
+    expect(useProfileStore.getState().profile.person).toMatchObject({ age: 44, state: 'OH', filingStatus: 'single' });
+    expect(useProfileStore.getState().profile.provided).toEqual(['person.age', 'person.state', 'person.filingStatus']);
+  });
+
+  it('keeps Skip on the basics: a skipped basics screen saves nothing', async () => {
+    const user = userEvent.setup();
+    render(<Wizard flow="core" />);
+    await typeInto('Your age', '44');
+    await skip(user);
+    expect(screen.getByRole('heading', { level: 2, name: 'What does a typical paycheck look like?' })).toBeInTheDocument();
+    const { profile } = useProfileStore.getState();
+    expect(profile.person.age).toBe(getDefaultFinancialProfile().person.age);
+    expect(profile.provided).toEqual([]);
+  });
+});
+
+/** Every Skip-like and primary button on the current screen, by name. */
+function footerActions(): string[] {
+  return screen
+    .getAllByRole('button')
+    .map((button) => button.textContent?.trim() ?? '')
+    .filter((name) => /^(Skip|Next|Finish|Keep|Previous)/.test(name));
+}
+
+describe('Wizard, two actions on every screen', () => {
+  it.each([
+    ['core', {}],
+    ['paycheck', { mode: 'all' }],
+    ['retirement', { mode: 'all' }],
+    ['portfolio', { mode: 'all' }],
+    ['leverage', { mode: 'all' }],
+    ['profile', { mode: 'remaining' }],
+    ['profile', { mode: 'all' }],
+  ] as const)('%s %o: Skip and Next, Finish on the last screen', async (flow, props) => {
+    const user = userEvent.setup();
+    answer(CORE_PATHS);
+    if (flow === 'core') useProfileStore.getState().setValues([], { unprovide: [...CORE_PATHS] });
+    render(<Wizard flow={flow} {...props} />);
+
+    let seen = 0;
+    while (replace.mock.calls.length === 0 && push.mock.calls.length === 0) {
+      const last = screen.queryByRole('button', { name: /^Finish/ }) !== null;
+      expect(footerActions()).toEqual(['Skip', last ? 'Finish' : 'Next']);
+      expect(screen.queryByText(/Good enough to start|Filled in with a typical value/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Keep them and continue/ })).not.toBeInTheDocument();
+      await skip(user);
+      seen += 1;
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });
 

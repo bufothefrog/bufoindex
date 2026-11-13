@@ -11,9 +11,22 @@ import { BaseInputProps } from '@/lib/design-system/types';
 import { DollarSign } from 'lucide-react';
 
 interface MoneyInputProps extends BaseInputProps {
-  value: number;
+  /** null renders the field empty (an unanswered intake field). */
+  value: number | null;
   onChange: (value: number) => void;
   placeholder?: string;
+  /**
+   * A number shown as the placeholder, formatted as the field formats its
+   * value (the intake's typical value); wins over `placeholder`.
+   */
+  placeholderValue?: number;
+  /** Show a committed 0 as "0" instead of an empty field (the intake). */
+  showZero?: boolean;
+  /**
+   * Called instead of onChange(0) when the visitor empties the field, so the
+   * caller can treat it as unanswered again.
+   */
+  onClear?: () => void;
   allowDecimals?: boolean;
   min?: number;
   max?: number;
@@ -30,10 +43,13 @@ interface MoneyInputProps extends BaseInputProps {
 export function MoneyInput({
   name,
   label,
-  value,
+  value: valueOrNull,
   onChange,
   className,
   placeholder = "0",
+  placeholderValue,
+  showZero = false,
+  onClear,
   required = false,
   help,
   error,
@@ -45,31 +61,47 @@ export function MoneyInput({
   testId,
   ariaLabel,
 }: MoneyInputProps) {
+  const value = valueOrNull ?? 0;
+  // Empty: no value (null), or a 0 the field does not show.
+  const isEmpty = valueOrNull === null || (value === 0 && !showZero);
+  const format = (n: number) => formatCurrency(n).replace('$', '');
   const [displayValue, setDisplayValue] = React.useState(
-    value > 0 ? formatCurrency(value).replace('$', '') : ''
+    !isEmpty && value >= 0 ? format(value) : ''
   );
   const [isFocused, setIsFocused] = React.useState(false);
 
   // The rendered text is derived instead of synced in an effect
   // (https://react.dev/learn/you-might-not-need-an-effect): while the field
-  // is being edited the user's raw text always wins — a committed 0 mid-edit
+  // is being edited the user's raw text always wins: a committed 0 mid-edit
   // must not wipe the field (typing '0.5' would otherwise lose keystrokes).
-  // Unfocused, the committed value is authoritative and 0 shows empty.
+  // Unfocused, the committed value is authoritative and 0 shows empty
+  // (or "0" with showZero).
   const shownValue = isFocused
     ? displayValue
-    : value === 0
+    : isEmpty
       ? ''
-      : value > 0
-        ? formatCurrency(value).replace('$', '')
+      : value >= 0
+        ? format(value)
         : displayValue;
 
   const handleFocus = () => {
     setIsFocused(true);
     // Adopt the derived text so edits start from exactly what is shown.
-    if (value > 0) {
-      setDisplayValue(formatCurrency(value).replace('$', ''));
-    } else if (value === 0) {
+    if (isEmpty) {
       setDisplayValue('');
+    } else if (value >= 0) {
+      setDisplayValue(format(value));
+    }
+  };
+
+  /** Commits typed text; an emptied field goes to onClear when there is one. */
+  const commit = (text: string, numericValue: number) => {
+    if (text === '' && onClear) {
+      onClear();
+      return;
+    }
+    if (numericValue >= min && (!max || numericValue <= max)) {
+      onChange(numericValue);
     }
   };
 
@@ -92,19 +124,14 @@ export function MoneyInput({
       setDisplayValue(formattedValue);
       
       const numericValue = parseFloat(cleanValue.replace(/,/g, '')) || 0;
-      if (numericValue >= min && (!max || numericValue <= max)) {
-        onChange(Math.round(numericValue * 100)); // Store as cents
-      }
+      commit(cleanValue, Math.round(numericValue * 100)); // Store as cents
     } else {
       // Only allow digits and commas, no decimals
       const digitsOnly = rawValue.replace(/[^\d]/g, '');
       const formatted = formatNumberWithCommas(digitsOnly);
       setDisplayValue(formatted);
       
-      const numericValue = parseInt(digitsOnly) || 0;
-      if (numericValue >= min && (!max || numericValue <= max)) {
-        onChange(numericValue);
-      }
+      commit(digitsOnly, parseInt(digitsOnly) || 0);
     }
   };
   
@@ -162,8 +189,8 @@ export function MoneyInput({
         ? parseFloat(cleanValue) || 0 
         : parseInt(cleanValue.replace(/\./g, '')) || 0;
         
-      if (numericValue > 0) {
-        setDisplayValue(formatCurrency(numericValue).replace('$', ''));
+      if (numericValue > 0 || (showZero && cleanValue !== '')) {
+        setDisplayValue(format(numericValue));
       } else {
         setDisplayValue('');
       }
@@ -213,7 +240,7 @@ export function MoneyInput({
           onPaste={handlePaste}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          placeholder={placeholder}
+          placeholder={placeholderValue === undefined ? placeholder : format(placeholderValue)}
           className={cn(
             sizeClasses[size],
             "text-right font-mono tabular-nums",

@@ -136,3 +136,29 @@ describe('ChoiceGroup', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Pick a filing status.');
   });
 });
+
+describe('ChoiceGroup typical tag', () => {
+  it('tags the typical option as its description, keeping every name and selecting nothing', async () => {
+    const user = userEvent.setup();
+    render(<Harness typicalValue="marriedJoint" />);
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((radio) => radio.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false']);
+    expect(screen.getByRole('radio', { name: 'Single' })).not.toHaveAccessibleDescription();
+    expect(screen.getByRole('radio', { name: /^Married filing jointly/ })).toHaveAccessibleDescription(
+      'Typical'
+    );
+    expect(screen.getByText('Typical')).toBeInTheDocument();
+
+    // Choosing another option keeps the tag where it was.
+    await user.click(screen.getByRole('radio', { name: 'Head of household' }));
+    expect(screen.getByRole('radio', { name: 'Head of household' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /^Married filing jointly/ })).toHaveAccessibleDescription(
+      'Typical'
+    );
+  });
+
+  it('has no tag without a typical value', () => {
+    render(<Harness initial="single" />);
+    expect(screen.queryByText('Typical')).not.toBeInTheDocument();
+  });
+});

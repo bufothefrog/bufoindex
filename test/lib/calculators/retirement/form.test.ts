@@ -1,6 +1,7 @@
 /**
  * The retirement form (slice c1): the four topic screens after the core
- * (plan sections 2.12 and 2.14), what each asks, its visibility rules,
+ * (plan sections 2.12 and 2.14), of which the intent intake asks three (the
+ * Social Security and healthcare screen is optional), what each asks, its visibility rules,
  * validation and 'remaining' mode, the nullable overrides, and proof that
  * every question the old intake asked is still asked.
  */
@@ -12,13 +13,22 @@ import {
   CORE_PATHS,
   getIntakeScreens,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { fieldMap, resolveOptions, resolveOverrideDefault, summarizeScreen } from '@/lib/fields/runtime';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
-import { OLD_CORE_FLOW, askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/test/utils/intakeFixture';
+import { PROFILE_FORM, profileFormSection } from '@/lib/calculators/forms';
+import { screensFor } from '@/lib/fields/runtime';
+import {
+  OLD_CORE_FLOW,
+  askedScreen,
+  askedScreens,
+  fromDefaults,
+  intakePaths,
+  type OldQuestion,
+} from '@/test/utils/intakeFixture';
 
 const ids = (overrides: Record<string, unknown> = {}) =>
   getIntakeScreens('retirement', fromDefaults(overrides)).map((s) => s.id);
@@ -26,13 +36,15 @@ const ids = (overrides: Record<string, unknown> = {}) =>
 const remainingIds = (provided: string[], overrides: Record<string, unknown> = {}) =>
   getIntakeScreens('retirement', fromDefaults(overrides), { mode: 'remaining', provided }).map((s) => s.id);
 
+const screen = (id: string) => RETIREMENT_FORM.screens.find((s) => s.id === id)!;
+
+/** Every screen of the form as the intake would show it, the optional one included. */
+const allScreens = (overrides: Record<string, unknown> = {}) =>
+  RETIREMENT_FORM.screens.map((s) => askedScreen(RETIREMENT_FORM, s, fromDefaults(overrides)));
+
 /** Each screen's visible questions, by path. */
 const fieldsByScreen = (overrides: Record<string, unknown> = {}) =>
-  Object.fromEntries(
-    askedScreens('retirement', fromDefaults(overrides)).map((screen) => [screen.id, screen.questions.map((q) => q.path)])
-  );
-
-const screen = (id: string) => RETIREMENT_FORM.screens.find((s) => s.id === id)!;
+  Object.fromEntries(allScreens(overrides).map((s) => [s.id, s.questions.map((q) => q.path)]));
 
 const validate = (id: string, overrides: Record<string, unknown>) =>
   validateIntakeScreen('retirement', screen(id), fromDefaults(overrides));
@@ -42,21 +54,33 @@ const profileWith = (provided: string[]): FinancialProfile => ({ ...getDefaultFi
 const CUSTOM = { 'assumptions.retirement.riskProfile': 'custom' };
 
 describe('retirement form: screens', () => {
-  it('asks the core, then savings, target, Social Security and healthcare, and the assumptions last', () => {
-    expect(ids()).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'ss-healthcare', 'assumptions']);
-    expect(RETIREMENT_FORM.screens.map((s) => [s.id, s.tier, s.surface])).toEqual([
-      ['about', 'core', undefined],
-      ['pay', 'core', undefined],
-      ['must-pay', 'core', undefined],
-      ['savings', 'details', undefined],
-      ['target', 'details', undefined],
-      ['ss-healthcare', 'details', undefined],
-      ['assumptions', 'assumption', undefined],
+  it('asks the core, then savings, target and the assumptions; the Social Security and healthcare screen is optional', () => {
+    expect(ids()).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'assumptions']);
+    expect(RETIREMENT_FORM.screens.map((s) => [s.id, s.tier, s.surface, s.optional])).toEqual([
+      ['about', 'core', undefined, undefined],
+      ['pay', 'core', undefined, undefined],
+      ['must-pay', 'core', undefined, undefined],
+      ['savings', 'details', undefined, undefined],
+      ['target', 'details', undefined, undefined],
+      ['ss-healthcare', 'details', undefined, true],
+      ['assumptions', 'assumption', undefined, undefined],
     ]);
   });
 
-  it('asks 4 screens after the core (plan section 2.12)', () => {
-    expect(remainingIds([...CORE_PATHS])).toEqual(['savings', 'target', 'ss-healthcare', 'assumptions']);
+  it('asks 3 screens after the core in the intent intake (plan section 2.12, less the optional one)', () => {
+    expect(remainingIds([...CORE_PATHS])).toEqual(['savings', 'target', 'assumptions']);
+  });
+
+  it('keeps the optional screen on the calculator page, where it was', () => {
+    const page = screensFor(RETIREMENT_FORM, fromDefaults(), { mode: 'all', surface: 'calculator' }).map((s) => s.id);
+    expect(page).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'ss-healthcare', 'assumptions']);
+  });
+
+  it('asks the optional screen at the end of the profile form, in the section "Optional"', () => {
+    const last = PROFILE_FORM.screens[PROFILE_FORM.screens.length - 1];
+    expect(last.id).toBe('ss-healthcare');
+    expect(last.fields).toEqual(screen('ss-healthcare').fields);
+    expect(profileFormSection(last.id)).toBe('optional');
   });
 
   it('titles each screen, with a question for the wizard where the card title is not one', () => {
@@ -74,7 +98,7 @@ describe('retirement form: screens', () => {
         id: 'ss-healthcare',
         title: 'Social Security and healthcare',
         question: 'What will Social Security and healthcare look like?',
-        description: "Estimates in today's dollars are fine.",
+        description: "Amounts are in today's dollars.",
       },
       {
         id: 'assumptions',
@@ -120,7 +144,7 @@ describe('retirement form: screens', () => {
   });
 
   it('labels and bounds each retirement field', () => {
-    const asked = askedScreens('retirement', fromDefaults(CUSTOM)).flatMap((s) => s.questions);
+    const asked = allScreens(CUSTOM).flatMap((s) => s.questions);
     const pick = (path: string) => {
       const { label, kind, min, max, step } = asked.find((q) => q.path === path)!;
       return { label, kind, min, max, step };
@@ -150,7 +174,7 @@ describe('retirement form: screens', () => {
         label: 'Target Date Fund',
         description: `Age-based: 90% stocks, ${Math.round(at30.accumulationReturn * 100)}% / ${Math.round(at30.retirementReturn * 100)}% returns`,
       },
-      { value: 'custom', label: 'Custom', description: 'Set your own values' },
+      { value: 'custom', label: 'Custom' },
     ]);
     // Age 65 is down to 40% stocks.
     expect(resolveOptions(spec, fromDefaults({ 'person.age': 65 }))[0].description).toMatch(/^Age-based: 40% stocks, /);
@@ -199,13 +223,13 @@ describe('retirement form: screens', () => {
     );
   });
 
-  it('offers the typical-value skip on the topic screens and keeps the defaults on the assumptions', () => {
-    expect(['savings', 'target', 'ss-healthcare'].map((id) => skipLabelFor(screen(id)))).toEqual([
-      'Skip, use a typical value',
-      'Skip, use a typical value',
-      'Skip, use a typical value',
+  it('takes the typical values on Next on the topic screens and the assumptions', () => {
+    expect(['savings', 'target', 'ss-healthcare', 'assumptions'].map((id) => nextNeedsOwnAnswer(screen(id)))).toEqual([
+      false,
+      false,
+      false,
+      false,
     ]);
-    expect(skipLabelFor(screen('assumptions'))).toBe('Keep the default assumptions');
   });
 });
 
@@ -278,16 +302,10 @@ describe('retirement form: validation', () => {
 
 describe("retirement form: 'remaining' mode", () => {
   it('drops the core and the fully answered screens, and keeps a partly answered one whole', () => {
-    expect(remainingIds([])).toEqual(['savings', 'target', 'ss-healthcare', 'assumptions']);
-    expect(remainingIds([...CORE_PATHS, 'investing.investedBalance'])).toEqual([
-      'savings',
-      'target',
-      'ss-healthcare',
-      'assumptions',
-    ]);
+    expect(remainingIds([])).toEqual(['savings', 'target', 'assumptions']);
+    expect(remainingIds([...CORE_PATHS, 'investing.investedBalance'])).toEqual(['savings', 'target', 'assumptions']);
     expect(remainingIds(['investing.investedBalance', 'investing.monthlyContribution', 'person.retirementAge'])).toEqual([
       'target',
-      'ss-healthcare',
       'assumptions',
     ]);
     expect(remainingIds(intakePaths('retirement'))).toEqual([]);
@@ -300,27 +318,31 @@ describe("retirement form: 'remaining' mode", () => {
       'assumptions.retirement.effectiveTaxRate',
       'assumptions.retirement.healthcareCostMultiplier',
     ];
-    expect(remainingIds(tdfAnswers)).toEqual(['savings', 'target', 'ss-healthcare']);
-    expect(remainingIds(tdfAnswers, CUSTOM)).toEqual(['savings', 'target', 'ss-healthcare', 'assumptions']);
+    expect(remainingIds(tdfAnswers)).toEqual(['savings', 'target']);
+    expect(remainingIds(tdfAnswers, CUSTOM)).toEqual(['savings', 'target', 'assumptions']);
   });
 
   it('matches what /start/retirement asks on arrival, from the saved profile', () => {
     const profile = profileWith([...CORE_PATHS, 'investing.investedBalance', 'investing.monthlyContribution']);
-    expect(remainingIntakeScreens('retirement', profile).map((s) => s.id)).toEqual([
-      'target',
-      'ss-healthcare',
-      'assumptions',
-    ]);
+    expect(remainingIntakeScreens('retirement', profile).map((s) => s.id)).toEqual(['target', 'assumptions']);
+  });
+
+  it('asks the same screens whether or not the optional facts were saved earlier', () => {
+    const optional = screen('ss-healthcare').fields;
+    const base = [...CORE_PATHS, 'investing.investedBalance', 'investing.monthlyContribution'];
+    const ids = (provided: string[]) => remainingIntakeScreens('retirement', profileWith(provided)).map((s) => s.id);
+    expect(ids([...base, ...optional])).toEqual(ids(base));
   });
 });
 
 describe('retirement form: the old intake question set is still asked', () => {
   // Captured from the intake before slice w1 (the provisional form carried
-  // these three after the core, one per screen).
+  // these three after the core, one per screen); the help is the copy
+  // slice b1 trimmed.
   const OLD_QUESTIONS: readonly OldQuestion[] = [
     { path: 'person.retirementAge', label: 'Target retirement age', kind: 'number', min: 30, max: 85, step: 1 },
-    { path: 'investing.investedBalance', label: 'Invested balance', kind: 'money', help: 'A rough total across 401(k), IRA, and brokerage accounts is fine. Leave out your emergency fund.', min: 0 },
-    { path: 'investing.monthlyContribution', label: 'Monthly investing contribution', kind: 'money', help: 'What you put toward investing each month across all accounts, including your own 401(k) contributions.', min: 0 },
+    { path: 'investing.investedBalance', label: 'Invested balance', kind: 'money', help: 'Total across 401(k), IRA and brokerage, not your emergency fund.', min: 0 },
+    { path: 'investing.monthlyContribution', label: 'Monthly investing contribution', kind: 'money', help: 'All accounts together, including your own 401(k) contributions.', min: 0 },
   ];
 
   it('asks the old core screens first and every old question with its wording and bounds', () => {

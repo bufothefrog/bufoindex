@@ -10,9 +10,22 @@ import { fieldMessageIds } from '@/components/ui/FieldMessages';
 import { BaseInputProps } from '@/lib/design-system/types';
 
 interface NumberInputProps extends BaseInputProps {
-  value: number;
+  /** null renders the field empty (an unanswered intake field). */
+  value: number | null;
   onChange: (value: number) => void;
   placeholder?: string;
+  /**
+   * A number shown as the placeholder, formatted as the field formats its
+   * value (the intake's typical value); wins over `placeholder`.
+   */
+  placeholderValue?: number;
+  /** Show a committed 0 as "0" instead of an empty field (the intake). */
+  showZero?: boolean;
+  /**
+   * Called instead of onChange(0) when the visitor empties the field, so the
+   * caller can treat it as unanswered again.
+   */
+  onClear?: () => void;
   min?: number;
   max?: number;
   step?: number;
@@ -30,10 +43,13 @@ interface NumberInputProps extends BaseInputProps {
 export function NumberInput({
   name,
   label,
-  value,
+  value: valueOrNull,
   onChange,
   className,
   placeholder = "0",
+  placeholderValue,
+  showZero = false,
+  onClear,
   required = false,
   help,
   error,
@@ -50,8 +66,11 @@ export function NumberInput({
   testId,
   ariaLabel,
 }: NumberInputProps) {
+  const value = valueOrNull ?? 0;
+  // Empty: no value (null), or a 0 the field does not show.
+  const isEmpty = valueOrNull === null || (value === 0 && !showZero);
   const format = (val: number): string => {
-    if (val === 0) return '';
+    if (val === 0) return showZero ? '0' : '';
     if (allowDecimals) {
       return val.toLocaleString('en-US', {
         minimumFractionDigits: 0,
@@ -67,7 +86,7 @@ export function NumberInput({
   };
   
   const [displayValue, setDisplayValue] = React.useState(
-    value !== 0 ? format(value) : ''
+    isEmpty ? '' : format(value)
   );
   const [isFocused, setIsFocused] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -87,7 +106,8 @@ export function NumberInput({
   // is authoritative. A committed value of 0 always shows an empty field.
   // While focused the user's draft text always wins (a committed 0 mid-edit
   // must not wipe the field, e.g. typing '0.5'); unfocused, 0 shows empty.
-  const shownValue = isFocused ? displayValue : value === 0 ? '' : format(value);
+  // showZero shows a committed 0 as "0".
+  const shownValue = isFocused ? displayValue : isEmpty ? '' : format(value);
 
   const validateAndUpdate = (newValue: number) => {
     // Apply min/max constraints
@@ -113,6 +133,11 @@ export function NumberInput({
     
     // Allow input while typing
     setDisplayValue(rawValue);
+
+    if (rawValue.trim() === '' && onClear) {
+      onClear();
+      return;
+    }
     
     // Parse and validate
     const numericValue = parse(rawValue);
@@ -166,7 +191,7 @@ export function NumberInput({
       if (!isNaN(numericValue)) {
         setDisplayValue(format(numericValue));
       } else {
-        setDisplayValue(value !== 0 ? format(value) : '');
+        setDisplayValue(isEmpty ? '' : format(value));
       }
     }
   };
@@ -176,7 +201,7 @@ export function NumberInput({
     reselectOnFocus.current = text !== '' && selectionStart === 0 && selectionEnd === text.length;
     setIsFocused(true);
     // Show raw value for easier editing
-    if (value !== 0) {
+    if (!isEmpty) {
       setDisplayValue(value.toString());
     } else {
       setDisplayValue('');
@@ -244,7 +269,7 @@ export function NumberInput({
           onPaste={handlePaste}
           onBlur={handleBlur}
           onFocus={handleFocus}
-          placeholder={placeholder}
+          placeholder={placeholderValue === undefined ? placeholder : format(placeholderValue) || '0'}
           min={min}
           max={max}
           step={step}

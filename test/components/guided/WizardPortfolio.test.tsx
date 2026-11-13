@@ -16,6 +16,7 @@ import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 import { answer } from '@/test/utils/wizard';
+import { skipToEnd } from './wizardSteps';
 
 vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory());
 
@@ -43,31 +44,33 @@ describe('Wizard, portfolio intent', () => {
 
     expect(screen.getByRole('heading', { name: 'Which stock and bond mix are you aiming for?' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
-    expect(screen.getAllByRole('radio').map((radio) => radio.getAttribute('aria-checked'))).toEqual([
-      'false',
-      'true',
-      'false',
-      'false',
-    ]);
+    // Nothing chosen yet; the typical mix carries the tag.
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((radio) => radio.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'false']);
+    expect(radios.map((radio) => radio.getAttribute('aria-describedby') !== null)).toEqual([false, true, false, false]);
+    expect(radios[1]).toHaveAccessibleDescription('Typical');
+    expect(screen.queryByText('This is an example. Change it to match yours, or skip.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: /60% stocks, 40% bonds/ }));
     await user.click(next());
 
     expect(screen.getByRole('heading', { name: 'How much new cash are you investing this month?' })).toBeInTheDocument();
     expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
+    expect(screen.getByText('This is an example. Change it to match yours, or skip.')).toBeInTheDocument();
     const brokerage = screen.getByRole('group', { name: 'Brokerage' });
     fireEvent.change(within(brokerage).getByRole('textbox', { name: 'New cash' }), { target: { value: '2400' } });
     await user.click(next());
 
     expect(screen.getByRole('heading', { name: 'What does each account hold today?' })).toBeInTheDocument();
     expect(screen.getByText('Step 3 of 4')).toBeInTheDocument();
+    expect(screen.getByText('This is an example. Change it to match yours, or skip.')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Roth IRA holdings' })).toBeInTheDocument();
     fireEvent.change(within(screen.getByTestId('holding-shares-0')).getByRole('textbox'), { target: { value: '12' } });
     await user.click(next());
 
     expect(screen.getByRole('heading', { name: 'How should the rebalance trade?' })).toBeInTheDocument();
     expect(screen.getByText('Step 4 of 4')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Keep the default assumptions' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByText('This is an example. Change it to match yours, or skip.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
 
     expect(push).not.toHaveBeenCalled();
@@ -120,7 +123,7 @@ describe('Wizard, portfolio intent', () => {
     await user.click(next());
 
     expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    expect(await skipToEnd(user)).toBe(3);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
     const saved = profile();
     expect(saved.investing.targetMix).toBe('custom');
@@ -155,12 +158,12 @@ describe('Wizard, portfolio intent', () => {
     expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
   });
 
-  it('replaces itself with the rebalancer on "Skip the rest", leaving every screen unanswered', async () => {
+  it('replaces itself with the rebalancer after skipping every screen, leaving them unanswered', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="portfolio" />);
 
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    expect(await skipToEnd(user)).toBe(4);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);

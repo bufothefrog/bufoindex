@@ -130,11 +130,11 @@ describe('collapsed cards across the calculators', () => {
 });
 
 describe('collapsed cards with nothing answered', () => {
-  it('show the description on core cards, not the placeholder defaults', () => {
+  it('say "Not answered yet" on core cards, not the placeholder defaults', () => {
     const cards = collapsedLines(FORMS.paycheck, profileGet(), []);
     const core = cards.filter((card) => card.tier === 'core');
     expect(core.length).toBeGreaterThan(0);
-    for (const card of core) expect(card.line, card.title).toBe(card.description ?? '');
+    for (const card of core) expect(card.line, card.title).toBe('Not answered yet');
     expect(core[0].line).not.toContain('30, TX');
   });
 

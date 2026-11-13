@@ -42,7 +42,6 @@ export const TARGET_RETIREMENT_INCOME: FieldSpec = {
     const future = num(get, 'spending.targetRetirementIncome') * Math.pow(1 + inflation, years);
     return `That's ${formatCurrency(Math.round(future))} in future dollars`;
   },
-  hint: 'Think about what you would spend per year; many people start near 70\u201380% of current income.',
   placeholder: '80,000',
   min: 0,
   tier: 'details',
@@ -53,7 +52,6 @@ export const LIFE_EXPECTANCY: FieldSpec = {
   path: 'person.lifeExpectancy',
   kind: 'number',
   label: 'Life expectancy',
-  help: 'Age you expect to live to',
   hint: 'ssa.gov has a life expectancy calculator by birth date and sex.',
   min: 50,
   max: RetirementConstants.MAX_LIFE_EXPECTANCY,
@@ -80,8 +78,7 @@ export const SOCIAL_SECURITY_BENEFIT: FieldSpec = {
   path: 'retirementIncome.socialSecurityBenefit',
   kind: 'money',
   label: 'Social Security benefit',
-  help: 'Annual benefit estimate',
-  hint: 'ssa.gov/myaccount shows your estimate.',
+  hint: 'A yearly amount; ssa.gov/myaccount shows your estimate.',
   placeholder: '30,000',
   min: 0,
   tier: 'details',
@@ -93,8 +90,7 @@ export const SOCIAL_SECURITY_AGE: FieldSpec = {
   path: 'retirementIncome.socialSecurityAge',
   kind: 'number',
   label: 'Social Security age',
-  help: 'When to claim benefits',
-  hint: 'Benefits can start between 62 and 70; the same ssa.gov statement lists the amount by claiming age.',
+  help: `Between ${RetirementConstants.SS_MIN_AGE} and ${RetirementConstants.SS_MAX_AGE}.`,
   min: RetirementConstants.SS_MIN_AGE,
   max: RetirementConstants.SS_MAX_AGE,
   step: 1,
@@ -105,8 +101,7 @@ export const ANNUAL_HEALTHCARE_COST: FieldSpec = {
   path: 'retirementIncome.annualHealthcareCost',
   kind: 'money',
   label: 'Annual healthcare cost',
-  help: 'Override estimated annual cost',
-  hint: 'Premiums plus typical out-of-pocket costs for a year.',
+  help: 'Premiums plus out-of-pocket costs for a year.',
   placeholder: '7,500',
   min: 0,
   // null runs the model's own base cost, which is also where an override starts.
@@ -152,7 +147,7 @@ function riskProfileOptions(get: Get): readonly FieldOption[] {
       label: 'Target Date Fund',
       description: `Age-based: ${wholePercent(tdf.stocks)} stocks, ${wholePercent(tdf.accumulationReturn)} / ${wholePercent(tdf.retirementReturn)} returns`,
     },
-    { value: 'custom', label: 'Custom', description: 'Set your own values' },
+    { value: 'custom', label: 'Custom' },
   ];
 }
 
@@ -160,7 +155,6 @@ export const RISK_PROFILE: FieldSpec = {
   path: RISK_PROFILE_PATH,
   kind: 'choice',
   label: 'Risk profile',
-  help: 'Target Date Fund adjusts allocation automatically based on your age. Custom lets you set return and volatility yourself.',
   options: riskProfileOptions,
   tier: 'assumption',
   // Choosing the glide path fills the custom inputs with its figures for the
@@ -184,7 +178,7 @@ export const ACCUMULATION_RETURN: FieldSpec = {
   path: ACCUMULATION_RETURN_PATH,
   kind: 'percent',
   label: 'Accumulation return',
-  help: "Nominal (before inflation) annual return while saving \u2014 the today's-dollars view handles inflation",
+  help: 'Nominal (before inflation) annual return while saving',
   min: 0,
   max: 0.25,
   step: 0.001,
@@ -212,7 +206,7 @@ export const VOLATILITY: FieldSpec = {
   path: VOLATILITY_PATH,
   kind: 'percent',
   label: 'Portfolio volatility',
-  help: 'Annual standard deviation of returns in the Monte Carlo draws',
+  help: 'Annual standard deviation of returns',
   min: 0.05,
   max: 0.25,
   step: 0.005,
@@ -226,7 +220,6 @@ export const INFLATION_RATE: FieldSpec = {
   path: 'assumptions.retirement.inflationRate',
   kind: 'percent',
   label: 'Inflation rate',
-  help: "Grows spending in the simulation and sets the today's-dollars conversion",
   min: 0.01,
   max: 0.05,
   step: 0.001,

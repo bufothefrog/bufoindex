@@ -28,6 +28,9 @@ const TIER_TOGGLE: Record<Tier, { expand: string; collapse: string; icon: 'edit'
 /** Kinds that take the full width of the two-column field grid. */
 const WIDE_KINDS: ReadonlySet<FieldKind> = new Set(['choice', 'list', 'custom']);
 
+/** The collapsed line of a card with neither a summary nor a description. */
+export const NOT_ANSWERED = 'Not answered yet';
+
 const CARD_HEADER_CLASS = 'p-4 pb-2 sm:p-6 sm:pb-4';
 const CARD_CONTENT_CLASS = 'p-4 pt-0 sm:p-6 sm:pt-0';
 
@@ -140,7 +143,7 @@ export function FieldSection({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {(summarize && summarizeScreen(form, screen, get)) || screen.description}
+              {(summarize && summarizeScreen(form, screen, get)) || screen.description || NOT_ANSWERED}
             </p>
           )}
         </div>

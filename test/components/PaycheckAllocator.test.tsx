@@ -23,7 +23,7 @@ import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 const meta = calculatorMeta('paycheck');
 
 const TAX_NOTE =
-  'Tax savings in this allocator use a fixed 22% federal bracket plus one 2026 rate for your state. Brackets are not calculated from your income.';
+  'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.';
 
 /** Waits for the first results (the bootstrap submits immediately once hydrated). */
 const findResults = () => screen.findByText('Long-Term Impact');

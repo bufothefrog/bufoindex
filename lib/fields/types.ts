@@ -65,7 +65,14 @@ export interface FieldSpec {
 export interface ScreenNote { text: Text; visibleWhen?: (get: Get) => boolean; tone?: 'info' | 'caution' }
 export interface ScreenSpec {
   id: string; title: string; question?: string; description?: string;
-  tier: Tier; surface?: Surface; fields: readonly string[]; notes?: readonly ScreenNote[]; skipLabel?: string;
+  tier: Tier; surface?: Surface; fields: readonly string[]; notes?: readonly ScreenNote[];
+  /**
+   * Optional information: the profile form asks it last, in its "Optional"
+   * section; a calculator's own intake (/start/<intent>) does not ask it (the
+   * calculator page still shows it); and it never counts toward profile
+   * completeness. The one place that says which screens are optional.
+   */
+  optional?: boolean;
 }
 export interface CrossFieldRule { lower: string; upper: string; strict: boolean; checkOn: string; message: string }
 export interface FormSpec {

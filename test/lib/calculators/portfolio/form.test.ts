@@ -12,7 +12,7 @@ import {
   getIntakeScreens,
   intentNeedsCore,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { applyWrites, makeGet } from '@/lib/fields/paths';
@@ -23,8 +23,8 @@ import { askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/tes
 
 /** The questions the intake asked for the portfolio intent before c5 (slice w1's fixture), after the core. */
 const OLD_QUESTIONS: Record<string, OldQuestion> = {
-  'investing.newCashThisMonth': { path: 'investing.newCashThisMonth', label: 'New cash to invest this month', kind: 'money', help: 'Money you are ready to put into your accounts now.', min: 0 },
-  'investing.targetMix': { path: 'investing.targetMix', label: 'Target mix', kind: 'choice', options: [{ value: '100-0', label: '100% stocks', description: 'The highest expected growth and the deepest drawdowns.' }, { value: '80-20', label: '80% stocks, 20% bonds', description: 'Mostly stocks, with a bond cushion.' }, { value: '60-40', label: '60% stocks, 40% bonds', description: 'Smaller swings and lower expected growth.' }] },
+  'investing.newCashThisMonth': { path: 'investing.newCashThisMonth', label: 'New cash to invest this month', kind: 'money', help: 'Money to invest now.', min: 0 },
+  'investing.targetMix': { path: 'investing.targetMix', label: 'Target mix', kind: 'choice', options: [{ value: '100-0', label: '100% stocks' }, { value: '80-20', label: '80% stocks, 20% bonds' }, { value: '60-40', label: '60% stocks, 40% bonds' }] },
 };
 
 const SETTINGS_PATHS = [
@@ -93,7 +93,7 @@ describe('portfolio form: screens', () => {
             help: undefined,
             options: [
               ...OLD_QUESTIONS['investing.targetMix'].options!,
-              { value: 'custom', label: 'Custom', description: 'Set your own target for each asset class.' },
+              { value: 'custom', label: 'Custom', description: 'Set a target for each asset class.' },
             ],
             min: undefined,
             max: undefined,
@@ -104,7 +104,7 @@ describe('portfolio form: screens', () => {
       {
         id: 'accounts',
         title: 'Accounts',
-        description: 'List each account you invest through and the new cash going into it.',
+        description: undefined,
         questions: [
           { path: 'portfolio.accounts', label: 'Accounts', kind: 'list', help: undefined, options: undefined, min: undefined, max: undefined, step: undefined },
         ],
@@ -112,7 +112,7 @@ describe('portfolio form: screens', () => {
       {
         id: 'holdings',
         title: 'Holdings',
-        description: 'A ticker, its current price and your shares. Prices are taken as current and executable.',
+        description: 'Prices are taken as current and executable.',
         questions: [
           { path: 'portfolio.holdings', label: 'Holdings', kind: 'custom', help: undefined, options: undefined, min: undefined, max: undefined, step: undefined },
         ],
@@ -128,8 +128,8 @@ describe('portfolio form: screens', () => {
             kind: 'choice',
             help: undefined,
             options: [
-              { value: 'whole', label: 'Whole shares', description: 'Floor to integers; leftover kept as cash.' },
-              { value: 'fractional', label: 'Fractional', description: 'Exact-to-penny splits. Requires broker support.' },
+              { value: 'whole', label: 'Whole shares', description: 'Rounds down; leftover stays as cash.' },
+              { value: 'fractional', label: 'Fractional', description: 'Exact amounts; your broker must allow fractions.' },
             ],
             min: undefined,
             max: undefined,
@@ -160,13 +160,8 @@ describe('portfolio form: screens', () => {
     expect(deposit.label).toBe('New cash');
   });
 
-  it('skips with a typical value on the facts and keeps the default settings', () => {
-    expect(getIntakeScreens('portfolio', fromDefaults()).map((s) => skipLabelFor(s))).toEqual([
-      'Skip, use a typical value',
-      'Skip, use a typical value',
-      'Skip, use a typical value',
-      'Keep the default assumptions',
-    ]);
+  it('takes the typical values on Next on every screen, the settings included', () => {
+    expect(getIntakeScreens('portfolio', fromDefaults()).map((s) => nextNeedsOwnAnswer(s))).toEqual([false, false, false, false]);
   });
 
   it('notes the capital gains risk only while taxable selling is on', () => {
@@ -219,7 +214,7 @@ describe('portfolio form: the fields', () => {
   it('offers every target mix, Custom included', () => {
     expect(spec('investing.targetMix').options).toEqual([
       ...OLD_QUESTIONS['investing.targetMix'].options!,
-      { value: 'custom', label: 'Custom', description: 'Set your own target for each asset class.' },
+      { value: 'custom', label: 'Custom', description: 'Set a target for each asset class.' },
     ]);
   });
 

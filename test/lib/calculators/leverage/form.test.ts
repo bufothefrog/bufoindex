@@ -11,7 +11,7 @@ import {
   CORE_PATHS,
   getIntakeScreens,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { resolveOptions, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
@@ -24,7 +24,7 @@ const OLD_QUESTIONS: Record<string, OldQuestion> = {
   'person.age': { path: 'person.age', label: 'Your age', kind: 'number', min: 16, max: 100, step: 1 },
   'leverage:person.retirementAge': { path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', min: 30, max: 85, step: 1 },
   'investing.taxableMonthlyContribution': { path: 'investing.taxableMonthlyContribution', label: 'Monthly taxable contribution', kind: 'money', help: 'Money you invest each month outside 401(k) and IRA accounts.', min: 0 },
-  'leverage:investing.investedBalance': { path: 'investing.investedBalance', label: 'Starting balance', kind: 'money', help: 'What you already have invested. A rough number is fine.', min: 0 },
+  'leverage:investing.investedBalance': { path: 'investing.investedBalance', label: 'Starting balance', kind: 'money', help: 'Money already invested; 0 compares contributions only.', min: 0 },
 };
 
 const spec = (path: string): FieldSpec => LEVERAGE_FORM.fields.find((field) => field.path === path)!;
@@ -65,8 +65,7 @@ describe('leverage form: screens', () => {
       {
         id: 'facts',
         title: 'What goes into the comparison?',
-        description:
-          'The comparison runs from now until you plan to stop contributing. The leverage comparison applies to taxable contributions, outside retirement accounts.',
+        description: undefined,
         questions: [
           { ...OLD_QUESTIONS['person.age'], help: undefined, options: undefined },
           { ...OLD_QUESTIONS['leverage:person.retirementAge'], help: undefined, options: undefined },
@@ -91,12 +90,11 @@ describe('leverage form: screens', () => {
       {
         id: 'market',
         title: 'Assumptions',
-        description:
-          'Defaults are long-run planning figures with sources listed under Model and caveats. Change them to test a flat decade or higher borrowing costs.',
+        description: undefined,
         questions: [
           { path: MARKET_PATHS[0], label: 'Index expected annual return', kind: 'percent', help: 'Expected simple return of the underlying index, before fund costs.', options: undefined, min: -0.5, max: 0.3, step: undefined },
-          { path: MARKET_PATHS[1], label: 'Index annual volatility', kind: 'percent', help: expect.any(Function), options: undefined, min: 0, max: 0.6, step: undefined },
-          { path: MARKET_PATHS[2], label: 'Financing rate on borrowed exposure', kind: 'percent', help: 'Short-term rate plus a swap spread, charged on the extra (L - 1) exposure.', options: undefined, min: 0, max: 0.2, step: undefined },
+          { path: MARKET_PATHS[1], label: 'Index annual volatility', kind: 'percent', help: undefined, options: undefined, min: 0, max: 0.6, step: undefined },
+          { path: MARKET_PATHS[2], label: 'Financing rate on borrowed exposure', kind: 'percent', help: 'Short-term rate plus swap spread, charged on the extra (L-1) exposure.', options: undefined, min: 0, max: 0.2, step: undefined },
           { path: MARKET_PATHS[3], label: 'Leveraged fund expense ratio', kind: 'percent', help: undefined, options: undefined, min: 0, max: 0.05, step: undefined },
           { path: MARKET_PATHS[4], label: 'Index fund expense ratio', kind: 'percent', help: undefined, options: undefined, min: 0, max: 0.05, step: undefined },
         ],
@@ -120,17 +118,14 @@ describe('leverage form: screens', () => {
     ]);
   });
 
-  it('skips with a typical value on the facts and keeps the default assumptions on the market screen', () => {
+  it('takes the typical values on Next on the facts and the market screen', () => {
     const [facts, market] = getIntakeScreens('leverage', fromDefaults());
-    expect(skipLabelFor(facts)).toBe('Skip, use a typical value');
-    expect(skipLabelFor(market)).toBe('Keep the default assumptions');
+    expect([nextNeedsOwnAnswer(facts), nextNeedsOwnAnswer(market)]).toEqual([false, false]);
   });
 
-  it('notes the fixed path count and seed on the market screen', () => {
+  it('leaves the path count and seed to the results (Model and caveats): no note on the market screen', () => {
     const market = LEVERAGE_FORM.screens[2];
-    expect(visibleScreenNotes(market, fromDefaults()).map((note) => resolveText(note.text, fromDefaults()))).toEqual([
-      '500 simulated paths with a fixed seed, so the same inputs always give the same results. A different seed would move the summary figures by a few percentage points.',
-    ]);
+    expect(visibleScreenNotes(market, fromDefaults())).toEqual([]);
   });
 });
 
@@ -153,16 +148,16 @@ describe('leverage form: the comparison fields', () => {
     expect(auto(contribution, fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toBe(1500);
   });
 
-  it('keeps the old help, units and bounds', () => {
+  it('keeps the old units and bounds, with one short help line each', () => {
     expect(spec('leverage.monthlyContribution')).toMatchObject({
       kind: 'money',
-      help: 'Invested at the start of every month, in both funds.',
+      help: "Added at each month's start, to both funds.",
       min: 0,
       max: 1_000_000,
     });
     expect(spec('leverage.years')).toMatchObject({
       kind: 'number',
-      help: '1 to 60 years of monthly contributions.',
+      help: '1 to 60 years.',
       unit: { suffix: ' yrs' },
       min: 1,
       max: 60,
@@ -170,7 +165,7 @@ describe('leverage form: the comparison fields', () => {
     });
     expect(spec('leverage.startingBalance')).toMatchObject({
       kind: 'money',
-      help: 'Already invested at month 0. Use 0 to compare contributions only.',
+      help: 'Invested at month 0; 0 compares contributions only.',
       min: 0,
       max: 100_000_000,
     });
@@ -185,14 +180,10 @@ describe('leverage form: the comparison fields', () => {
       { value: 3, label: '3x (UPRO-like daily-reset fund)' },
     ]);
     expect(resolveText(ratio.help, fromDefaults({ 'strategy.leverageRatio': 1 }))).toBe(
-      'At 1x the only difference from the index fund is the expense ratio in Assumptions.'
+      'At 1x, the funds differ only in expense ratio.'
     );
-    expect(resolveText(ratio.help, fromDefaults())).toBe(
-      'Compared against a plain index fund receiving the same dollars on the same dates.'
-    );
-    expect(resolveText(spec(MARKET_PATHS[1]).help, fromDefaults({ 'strategy.leverageRatio': 3 }))).toBe(
-      "The 3x fund's volatility is about 3x this figure."
-    );
+    expect(resolveText(ratio.help, fromDefaults())).toBeUndefined();
+    expect(resolveText(ratio.help, fromDefaults({ 'strategy.leverageRatio': 3 }))).toBeUndefined();
   });
 
   it('summarizes each screen in one line, auto values included', () => {

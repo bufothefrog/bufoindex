@@ -25,6 +25,36 @@ import { FieldListBase } from './FieldList';
 import { NullableField } from './NullableField';
 import type { FieldInputProps, FieldListProps, FieldSize } from './types';
 
+/**
+ * How the intake wizard shows a field it has not had an answer for (its
+ * display layer over the working copy; the calculator pages pass none).
+ */
+export interface FieldDisplay {
+  /**
+   * Render the field with no value: money, number, percent and text inputs
+   * empty with the typical value as the placeholder, a select or state with
+   * its empty "Select" option, a choice with nothing selected. List, custom
+   * and slider fields ignore it.
+   */
+  blank: boolean;
+  /** The value Next would accept for the field (the placeholder of a blank input). */
+  typical?: unknown;
+  /** Tag the typical option of a choice ("Typical"). */
+  typicalTag?: boolean;
+  /** The visitor emptied an input: the caller makes the field blank again. */
+  onClear?(): void;
+  /** Show a 0 as "0" (an answered 0) instead of an empty input. */
+  showZero?: boolean;
+}
+
+export type FieldInputDisplayProps = FieldInputProps & {
+  /** The intake wizard's display layer; omitted on the calculator pages. */
+  display?: FieldDisplay;
+};
+
+/** The empty option of a blank select or state field. */
+export const BLANK_SELECT_LABEL = 'Select';
+
 /** The wizard's lg is the primitives' xl; md renders them exactly as before. */
 const INPUT_SIZE: Record<FieldSize, InputSize> = { md: 'md', lg: 'xl' };
 /** BaseInput + Input has no size prop of its own; these match the xl primitives. */
@@ -41,6 +71,10 @@ function asNumber(value: unknown): number {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function isOptionValue(value: unknown): value is FieldOption['value'] {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
 /** SelectInput and StateSelector take no test id; the field wraps them. */
@@ -64,10 +98,18 @@ export function FieldInput({
   renderers,
   onChooseAndAdvance,
   idPrefix = 'field',
-}: FieldInputProps) {
+  display,
+}: FieldInputDisplayProps) {
   if (!isFieldVisible(spec, get)) return null;
 
   const value = get(spec.path);
+  const blank = display?.blank === true;
+  const typical = display?.typical;
+  // A blank numeric input shows nothing, with the typical value as its placeholder.
+  const numberValue = blank ? null : asNumber(value);
+  const placeholderValue = blank && isFiniteNumber(typical) ? typical : undefined;
+  const showZero = display?.showZero;
+  const onClear = display?.onClear;
   const name = `${idPrefix}-${spec.path}`;
   const label = spec.label;
   const help = resolveText(spec.help, get);
@@ -82,9 +124,10 @@ export function FieldInput({
     <ChoiceGroup
       label={label}
       options={options}
-      value={value}
+      value={blank ? undefined : value}
       onChange={write}
       onChooseAndAdvance={onChooseAndAdvance}
+      typicalValue={display?.typicalTag && isOptionValue(typical) ? typical : undefined}
       help={help}
       error={error}
       hideLabel={hideLabel}
@@ -106,9 +149,12 @@ export function FieldInput({
               label={label}
               help={help}
               error={error}
-              value={asNumber(value)}
+              value={numberValue}
               onChange={write}
               placeholder={spec.placeholder}
+              placeholderValue={placeholderValue}
+              showZero={showZero}
+              onClear={onClear}
               min={spec.min ?? 0}
               max={spec.max}
               step={spec.step}
@@ -127,9 +173,12 @@ export function FieldInput({
             label={label}
             help={help}
             error={error}
-            value={asNumber(value)}
+            value={numberValue}
             onChange={write}
             placeholder={spec.placeholder}
+            placeholderValue={placeholderValue}
+            showZero={showZero}
+            onClear={onClear}
             min={spec.min ?? 0}
             max={spec.max}
             size={inputSize}
@@ -143,9 +192,12 @@ export function FieldInput({
             label={label}
             help={help}
             error={error}
-            value={asNumber(value)}
+            value={numberValue}
             onChange={write}
             placeholder={spec.placeholder}
+            placeholderValue={placeholderValue}
+            showZero={showZero}
+            onClear={onClear}
             min={spec.min}
             max={spec.max}
             step={spec.step}
@@ -165,9 +217,12 @@ export function FieldInput({
             label={label}
             help={help}
             error={error}
-            value={asNumber(value)}
+            value={numberValue}
             onChange={write}
             placeholder={spec.placeholder}
+            placeholderValue={placeholderValue}
+            showZero={showZero}
+            onClear={onClear}
             min={spec.min ?? 0}
             max={spec.max ?? 1}
             step={spec.step}
@@ -205,12 +260,12 @@ export function FieldInput({
               label={label}
               help={help}
               error={error}
-              value={value === undefined || value === null ? '' : String(value)}
+              value={blank || value === undefined || value === null ? '' : String(value)}
               // The select hands back a string; write the option's own value
               // so numeric and boolean options keep their type.
               onChange={(text) => write(options.find((option) => String(option.value) === text)?.value ?? text)}
               options={options.map((option) => ({ value: String(option.value), label: option.label }))}
-              placeholder={spec.placeholder}
+              placeholder={blank ? (spec.placeholder ?? BLANK_SELECT_LABEL) : spec.placeholder}
               size={inputSize}
             />
           </TestIdBox>
@@ -243,9 +298,9 @@ export function FieldInput({
               label={label}
               help={help}
               error={error}
-              value={asString(value)}
+              value={blank ? '' : asString(value)}
               onChange={write}
-              placeholder={spec.placeholder}
+              placeholder={blank ? BLANK_SELECT_LABEL : spec.placeholder}
               size={inputSize}
             />
           </TestIdBox>
@@ -261,9 +316,9 @@ export function FieldInput({
               <Input
                 id={inputId}
                 name={name}
-                value={asString(value)}
+                value={blank ? '' : asString(value)}
                 onChange={(event) => write(event.target.value)}
-                placeholder={spec.placeholder}
+                placeholder={blank && asString(typical) !== '' ? asString(typical) : spec.placeholder}
                 maxLength={spec.maxLength}
                 aria-describedby={describedBy}
                 aria-invalid={error ? true : undefined}

@@ -4,9 +4,7 @@ import {
   CORE_PATHS,
   CORE_START_PATH,
   INTAKE_INTENTS,
-  INTAKE_SKIP_LABEL,
   INTENT_OPTIONS,
-  KEEP_ASSUMPTIONS_LABEL,
   LEARN_CHOOSER_PATH,
   LEARN_OPTIONS,
   buildIntakeSubmission,
@@ -20,7 +18,8 @@ import {
   isIntakeIntent,
   isProfileFinished,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
+  ownAnswerMessage,
   validateIntakeScreen,
   type IntakeFlow,
   type IntakeIntent,
@@ -41,6 +40,7 @@ import {
   OLD_CORE_FLOW,
   OLD_CORE_QUESTIONS,
   OLD_CORE_SCREENS,
+  askedScreen,
   askedScreens,
   fromDefaults,
   intakePaths,
@@ -102,13 +102,13 @@ describe('intake intents', () => {
 
 const OLD_PROFILE_EXTRA_SCREENS: Record<string, OldScreenCopy> = {
   'cash-buffer': { title: 'What does your emergency fund look like today?' },
-  strategy: { title: 'Which starting point should the calculators use?', description: 'This sets your starting emergency-fund target. Both presets run through the same math; your overview shows the other one next to it.' },
+  strategy: { title: 'Which starting point should the calculators use?' },
 };
 
 const OLD_PROFILE_EXTRA_QUESTIONS: Record<string, OldQuestion> = {
   'cash.emergencyFundBalance': { path: 'cash.emergencyFundBalance', label: 'Cash set aside for emergencies', kind: 'money', min: 0 },
-  'cash.emergencyFundApy': { path: 'cash.emergencyFundApy', label: 'Interest rate (APY) on that cash', kind: 'percent', help: 'The rate your savings account pays. A guess is fine.', min: 0, max: 0.2 },
-  'strategy.preset': { path: 'strategy.preset', label: 'Strategy preset', kind: 'choice', options: [{ value: 'standard', label: 'Standard', description: 'About 3 months of must-pay costs in cash, then unleveraged index funds.' }, { value: 'cashflow-investor', label: 'Cash-flow investor', description: 'About 1 month in cash backed by a plan, automated contributions, and a leverage comparison for long horizons.' }] },
+  'cash.emergencyFundApy': { path: 'cash.emergencyFundApy', label: 'Interest rate (APY) on that cash', kind: 'percent', min: 0, max: 0.2 },
+  'strategy.preset': { path: 'strategy.preset', label: 'Strategy preset', kind: 'choice', options: [{ value: 'standard', label: 'Standard', description: 'About 3 months of must-pay costs in cash.' }, { value: 'cashflow-investor', label: 'Cash-flow investor', description: 'About 1 month of must-pay costs in cash.' }] },
 };
 
 const OLD_PROFILE_EXTRA_FLOW: readonly OldScreen[] = [
@@ -131,8 +131,7 @@ const FORM_SECTIONS: Record<(typeof PROFILE_FORM_ORDER)[number], string> = {
 const TRIMMED_COPY: Readonly<Record<string, Pick<AskedScreen, 'title' | 'description'>>> = {
   'leverage:facts': {
     title: 'Leverage ratio',
-    description:
-      'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
+    description: undefined,
   },
 };
 
@@ -159,14 +158,21 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
   for (const screen of askedScreens('core', get)) take('core', screen, 'core');
   for (const id of PROFILE_FORM_ORDER) {
     const specs = new Map(FORMS[id].screens.map((spec) => [spec.id, spec]));
+    // The intent intake leaves its optional screens out; the profile form asks them last.
     for (const screen of askedScreens(id, get)) {
       const spec = specs.get(screen.id)!;
+      expect(spec.optional, `${id}:${spec.id}`).not.toBe(true);
       if (spec.tier === 'core' || spec.tier === 'assumption' || spec.surface === 'calculator') continue;
       take(id, screen, FORM_SECTIONS[id]);
     }
   }
   const extras = oldScreens(OLD_PROFILE_EXTRA_FLOW, OLD_PROFILE_EXTRA_SCREENS, OLD_PROFILE_EXTRA_QUESTIONS);
   for (const screen of extras) take('profile-extra', screen, 'cash');
+  for (const id of PROFILE_FORM_ORDER) {
+    for (const spec of FORMS[id].screens.filter((screen) => screen.optional)) {
+      take(id, askedScreen(FORMS[id], spec, get), 'optional');
+    }
+  }
   return out;
 }
 
@@ -223,7 +229,7 @@ describe('behaviour-preserving: the provisional forms carry the old question set
     expect(sections).toEqual(expectedProfile().map(({ section }) => section));
   });
 
-  it('counts the profile screens from the forms (14, 13 without a 401(k), 11 after the core, with the provisional forms)', () => {
+  it('counts the profile screens from the forms: all of them, fewer without a 401(k), and the non-core ones after the core', () => {
     const all = expectedProfile().length;
     expect(screenIds('profile')).toHaveLength(all);
     expect(screenIds('profile', { 'workplace.has401k': false })).toHaveLength(
@@ -244,9 +250,11 @@ describe('intake screens', () => {
     }
   });
 
-  it('counts each intent from its form', () => {
+  it('counts each intent from its form, without its optional screens', () => {
     for (const intent of CALCULATOR_INTENTS) {
-      expect(screenIds(intent)).toEqual(FORMS[intent].screens.filter((s) => s.surface !== 'calculator').map((s) => s.id));
+      expect(screenIds(intent)).toEqual(
+        FORMS[intent].screens.filter((s) => s.surface !== 'calculator' && !s.optional).map((s) => s.id)
+      );
     }
     expect(screenIds('profile')).toEqual(PROFILE_FORM.screens.map((s) => s.id));
     expect(screenIds('core')).toEqual(formForFlow('core').screens.map((s) => s.id));
@@ -263,16 +271,35 @@ describe('intake screens', () => {
     expect(intakePaths('profile').slice(0, CORE_PATHS.length)).toEqual([...CORE_PATHS]);
   });
 
-  it('offers the typical-value skip, and keeps the defaults on an assumption screen', () => {
+  it('needs the own entry on the basics screens only (nextNeedsOwnAnswer, both branches)', () => {
+    const basics = getIntakeScreens('core', fromDefaults());
+    expect(basics.map((s) => s.id)).toEqual(['about', 'pay', 'must-pay']);
+    expect(basics.map((s) => nextNeedsOwnAnswer(s))).toEqual([true, true, true]);
     for (const intent of INTAKE_INTENTS) {
       for (const screen of getIntakeScreens(intent, fromDefaults())) {
-        expect(skipLabelFor(screen)).toBe(screen.tier === 'assumption' ? KEEP_ASSUMPTIONS_LABEL : INTAKE_SKIP_LABEL);
+        expect(nextNeedsOwnAnswer(screen), `${intent}/${screen.id}`).toBe(screen.tier === 'core');
       }
     }
-    const assumptions: ScreenSpec = { id: 'a', title: 'Assumptions', tier: 'assumption', fields: [] };
-    expect(skipLabelFor(assumptions)).toBe(KEEP_ASSUMPTIONS_LABEL);
-    expect(KEEP_ASSUMPTIONS_LABEL).toBe('Keep the default assumptions');
-    expect(skipLabelFor({ ...assumptions, skipLabel: 'I have no debts' })).toBe('I have no debts');
+    const details: ScreenSpec = { id: 'd', title: 'Details', tier: 'details', fields: [] };
+    expect(nextNeedsOwnAnswer(details)).toBe(false);
+    expect(nextNeedsOwnAnswer({ ...details, tier: 'assumption' })).toBe(false);
+    expect(nextNeedsOwnAnswer({ ...details, tier: 'core' })).toBe(true);
+  });
+
+  it('words a blank basic as a short instruction, with a fallback per kind', () => {
+    const form = formForFlow('core');
+    const spec = (path: string) => form.fields.find((f) => f.path === path)!;
+    expect(CORE_PATHS.map((path) => ownAnswerMessage(spec(path)))).toEqual([
+      'Enter your age',
+      'Choose your state',
+      'Choose your filing status',
+      'Enter your gross pay',
+      'Choose how often you are paid',
+      'Enter your take-home pay',
+      'Enter your must-pay costs',
+    ]);
+    expect(ownAnswerMessage({ path: 'x', kind: 'money', label: 'X', tier: 'core' })).toBe('Enter a value');
+    expect(ownAnswerMessage({ path: 'x', kind: 'choice', label: 'X', tier: 'core' })).toBe('Choose an answer');
   });
 });
 
@@ -596,6 +623,23 @@ describe('remainingIntakeScreens', () => {
       expect(ids(intent, profileWith([...CORE_PATHS, ...intakePaths(intent)])), intent).toEqual([]);
     }
   });
+
+  it('never counts an optional screen, answered or not, though /start/profile still asks it', () => {
+    const optional = PROFILE_FORM.screens.filter((s) => s.optional);
+    expect(optional.map((s) => s.id)).toEqual(['ss-healthcare']);
+    const optionalPaths = optional.flatMap((s) => s.fields);
+    const required = intakePaths('profile').filter((path) => !optionalPaths.includes(path));
+    for (const intent of INTAKE_INTENTS) {
+      // A profile saved before the optional section, with the optional facts answered or not.
+      const without = ids(intent, profileWith([...CORE_PATHS]));
+      expect(without, intent).not.toContain('ss-healthcare');
+      expect(ids(intent, profileWith([...CORE_PATHS, ...optionalPaths])), intent).toEqual(without);
+    }
+    expect(ids('profile', profileWith(required))).toEqual([]);
+    // The profile wizard asks the unanswered optional screen at the end.
+    const asked = getIntakeScreens('profile', makeGet(profileWith(required)), { mode: 'remaining', provided: required });
+    expect(asked.map((s) => [s.id, profileFormSection(s.id)])).toEqual([['ss-healthcare', 'optional']]);
+  });
 });
 
 describe('isProfileFinished', () => {
@@ -616,6 +660,22 @@ describe('isProfileFinished', () => {
     // forms neither is the contribution rate.
     expect(neverAsked).toContain('cash.targetMonths');
     expect(isProfileFinished(profileWith(asked))).toBe(true);
-    expect(isProfileFinished(profileWith(asked.filter((path) => path !== asked[asked.length - 1])))).toBe(false);
+    const required = PROFILE_FORM.screens.filter((s) => !s.optional);
+    const lastFields = required[required.length - 1].fields;
+    const lastRequired = lastFields[lastFields.length - 1];
+    expect(isProfileFinished(profileWith(asked.filter((path) => path !== lastRequired)))).toBe(false);
+  });
+
+  it('does not wait for the optional screens', () => {
+    const optionalPaths = PROFILE_FORM.screens.filter((s) => s.optional).flatMap((s) => s.fields);
+    expect(optionalPaths).toEqual([
+      'retirementIncome.socialSecurityBenefit',
+      'retirementIncome.socialSecurityAge',
+      'retirementIncome.annualHealthcareCost',
+    ]);
+    const required = intakePaths('profile').filter((path) => !optionalPaths.includes(path));
+    expect(isProfileFinished(profileWith(required))).toBe(true);
+    expect(isProfileFinished(profileWith([...required, ...optionalPaths]))).toBe(true);
+    expect(isProfileFinished(profileWith(optionalPaths))).toBe(false);
   });
 });

@@ -7,8 +7,7 @@
  * the strategy preset is spelled "Cash-flow investor" everywhere.
  */
 
-import { formatCurrency, formatMultiple } from '@/lib/format';
-import { CONTRIBUTION_LIMITS_2026 } from './irs-2026';
+import { formatMultiple } from '@/lib/format';
 import { LEVERAGE_RATIO_OPTIONS } from './leverage';
 import type { AccountType } from '@/lib/calculations/portfolioRebalancing';
 import type {
@@ -104,12 +103,12 @@ export const STRATEGY_PRESET_OPTIONS: readonly LabelOption<StrategyPreset>[] = [
   {
     value: 'cashflow-investor',
     label: STRATEGY_PRESET_LABELS['cashflow-investor'],
-    description: 'About 1 month in cash backed by a plan, automated contributions, and a leverage comparison for long horizons.',
+    description: 'About 1 month of must-pay costs in cash.',
   },
   {
     value: 'standard',
     label: STRATEGY_PRESET_LABELS.standard,
-    description: 'About 3 months of must-pay costs in cash, then unleveraged index funds.',
+    description: 'About 3 months of must-pay costs in cash.',
   },
 ];
 
@@ -125,10 +124,10 @@ export const TARGET_MIX_LABELS: Readonly<Record<TargetMixPreset, string>> = {
 };
 
 export const TARGET_MIX_OPTIONS: readonly LabelOption<TargetMixPreset>[] = [
-  { value: '100-0', label: TARGET_MIX_LABELS['100-0'], description: 'The highest expected growth and the deepest drawdowns.' },
-  { value: '80-20', label: TARGET_MIX_LABELS['80-20'], description: 'Mostly stocks, with a bond cushion.' },
-  { value: '60-40', label: TARGET_MIX_LABELS['60-40'], description: 'Smaller swings and lower expected growth.' },
-  { value: 'custom', label: TARGET_MIX_LABELS.custom, description: 'Set your own target for each asset class.' },
+  { value: '100-0', label: TARGET_MIX_LABELS['100-0'] },
+  { value: '80-20', label: TARGET_MIX_LABELS['80-20'] },
+  { value: '60-40', label: TARGET_MIX_LABELS['60-40'] },
+  { value: 'custom', label: TARGET_MIX_LABELS.custom, description: 'Set a target for each asset class.' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -168,13 +167,11 @@ export const HSA_COVERAGE_LABELS: Readonly<Record<HsaCoverage, string>> = {
   family: 'Family',
 };
 
-/** The option text adds the 2026 annual limit, e.g. "Individual ($4,400 limit)". */
-export const HSA_COVERAGE_OPTIONS: readonly LabelOption<HsaCoverage>[] = (
-  ['individual', 'family'] as const
-).map((value) => ({
-  value,
-  label: `${HSA_COVERAGE_LABELS[value]} (${formatCurrency(CONTRIBUTION_LIMITS_2026.hsa[value])} limit)`,
-}));
+/**
+ * Plain labels: the annual limit is stated once, as the help line of the
+ * monthly HSA contribution (lib/calculators/paycheck/fields.ts).
+ */
+export const HSA_COVERAGE_OPTIONS = optionsFrom<HsaCoverage>(['individual', 'family'], HSA_COVERAGE_LABELS);
 
 export const CONTRIBUTION_TYPE_LABELS: Readonly<Record<ContributionType, string>> = {
   traditional: 'Traditional (Pre-tax)',

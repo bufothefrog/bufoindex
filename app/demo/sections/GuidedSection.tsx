@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react';
 import { Calculator, Compass, User } from 'lucide-react';
+import { BackControl } from '@/components/guided/BackControl';
 import { CoreSummary } from '@/components/guided/CoreSummary';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { OptionCard } from '@/components/guided/OptionCard';
 import { ProgressDots } from '@/components/guided/ProgressDots';
+import { ReviewTopicRow } from '@/components/guided/ReviewTopicRow';
 import { CalculatorLinks } from '@/components/shared/CalculatorLinks';
 import { CORE_PATHS } from '@/lib/constants/intake';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
@@ -25,7 +27,7 @@ export function GuidedSection() {
       <DemoBlock title="Guided-flow widgets" icon={Compass}>
         <DemoEntry
           name="OptionCard"
-          description="Link mode (default and emphasis tones) and radio mode, which ChoiceGroup builds on. Minimum height 64px."
+          description="Link mode (default and emphasis tones) and radio mode, which ChoiceGroup builds on; a radio card can carry a small tag (the intake's Typical). Minimum height 64px."
         >
           <div className="max-w-xl space-y-2">
             <OptionCard href="/tools" icon={Calculator} title="Link mode" description="Full-width link with an icon tile and a chevron." />
@@ -40,22 +42,29 @@ export function GuidedSection() {
           <div className="mt-4 max-w-xl space-y-2" role="radiogroup" aria-label="Strategy preset (demo)">
             <OptionCard
               title="Standard"
-              description="About 3 months of must-pay costs in cash, then unleveraged index funds."
+              description="About 3 months of must-pay costs in cash."
               selected={preset === 'standard'}
               onSelect={() => setPreset('standard')}
               tabIndex={preset === 'standard' ? 0 : -1}
             />
             <OptionCard
               title="Cash-flow investor"
-              description="About 1 month in cash backed by a plan, automated contributions, and a leverage comparison for long horizons."
+              description="About 1 month of must-pay costs in cash."
               selected={preset === 'cashflow-investor'}
               onSelect={() => setPreset('cashflow-investor')}
               tabIndex={preset === 'cashflow-investor' ? 0 : -1}
+              tag={{ id: 'demo-option-tag', text: 'Typical' }}
             />
           </div>
         </DemoEntry>
-        <DemoEntry name="ProgressDots" description="The wizard's step indicator, with an optional section label.">
-          <ProgressDots total={6} current={2} label="Retirement" />
+        <DemoEntry
+          name="ProgressDots and BackControl"
+          description="The wizard's step indicator, with an optional section label, and the Back control beside it (absent on the first screen)."
+        >
+          <div className="flex min-h-11 items-center gap-3">
+            <BackControl onBack={() => {}} />
+            <ProgressDots total={6} current={2} label="Retirement" className="ml-auto justify-end" />
+          </div>
         </DemoEntry>
         <DemoEntry
           name="NextSteps"
@@ -80,6 +89,31 @@ export function GuidedSection() {
           <div className="max-w-xl">
             <CoreSummary profile={DEMO_CORE_PROFILE} />
           </div>
+        </DemoEntry>
+        <DemoEntry
+          name="ReviewTopicRow"
+          description="One topic on the review page (/start/review): the title, a one-line summary of the answers given and a link to edit that topic alone, whose accessible name includes the topic. A topic with no answer reads 'Not answered' and its link 'Answer'."
+        >
+          <ul className="max-w-xl divide-y divide-border rounded-lg border border-border px-3">
+            <li>
+              <ReviewTopicRow
+                anchorId="demo-topic-pay"
+                title="What does a typical paycheck look like?"
+                summary="$3,500 gross every 2 weeks, $2,600 take-home"
+                status="answered"
+                href="/start/review/pay"
+              />
+            </li>
+            <li>
+              <ReviewTopicRow
+                anchorId="demo-topic-debts"
+                title="Debts"
+                summary="Not answered"
+                status="unanswered"
+                href="/start/review/debts"
+              />
+            </li>
+          </ul>
         </DemoEntry>
       </DemoBlock>
     </DemoSection>

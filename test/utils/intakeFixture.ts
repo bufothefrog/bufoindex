@@ -6,6 +6,10 @@
  * calculator's own questions live in its test/lib/calculators/<id>/form.test.ts,
  * so a calculator slice that grows its form edits only its own files.
  *
+ * Slice b1 (fewer explainers) trimmed the help and descriptions; the
+ * tables below carry the trimmed copy, so the pins now check that every
+ * old question is still asked, with today's wording.
+ *
  * askedScreens(flow) reads what the intake asks now, in the same shape as
  * oldScreens(...), so a test compares the two question by question;
  * intakePaths(flow) lists every path a flow's intake can ask.
@@ -13,7 +17,7 @@
 
 import { getIntakeScreens, intakeForm, type IntakeFlow } from '@/lib/constants/intake';
 import { resolveOptions, visibleScreenFields } from '@/lib/fields/runtime';
-import type { FieldOption, Get } from '@/lib/fields/types';
+import type { FieldOption, FormSpec, Get, ScreenSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
 
 /** Every profile path a flow's intake can ask, in order, deduplicated. */
@@ -43,8 +47,8 @@ export interface OldScreenCopy {
 export type OldScreen = readonly [id: string, section: string, questions: readonly string[]];
 
 export const OLD_CORE_SCREENS: Readonly<Record<string, OldScreenCopy>> = {
-  about: { title: 'A little about you', description: 'Age sets the time horizon. State and filing status set the tax estimate.' },
-  pay: { title: 'What does a typical paycheck look like?', description: 'A close guess is fine.' },
+  about: { title: 'A little about you' },
+  pay: { title: 'What does a typical paycheck look like?' },
   'must-pay': { title: 'What do you have to pay each month?' },
 };
 
@@ -99,10 +103,9 @@ export interface AskedScreen {
   questions: AskedQuestion[];
 }
 
-/** What the flow asks now ('all' mode), screen by screen, with each visible question's wording and bounds. */
-export function askedScreens(flow: IntakeFlow, get: Get = fromDefaults()): AskedScreen[] {
-  const form = intakeForm(flow);
-  return getIntakeScreens(flow, get).map((screen) => ({
+/** One screen of `form` in askedScreens' shape: its wording and each visible question's wording and bounds. */
+export function askedScreen(form: FormSpec, screen: ScreenSpec, get: Get = fromDefaults()): AskedScreen {
+  return {
     id: screen.id,
     title: screen.title,
     description: screen.description,
@@ -119,7 +122,13 @@ export function askedScreens(flow: IntakeFlow, get: Get = fromDefaults()): Asked
         step: spec.step,
       };
     }),
-  }));
+  };
+}
+
+/** What the flow asks now ('all' mode), screen by screen, with each visible question's wording and bounds. */
+export function askedScreens(flow: IntakeFlow, get: Get = fromDefaults()): AskedScreen[] {
+  const form = intakeForm(flow);
+  return getIntakeScreens(flow, get).map((screen) => askedScreen(form, screen, get));
 }
 
 /** What the old intake asked for `flow` rows, from the given screen and question tables. */

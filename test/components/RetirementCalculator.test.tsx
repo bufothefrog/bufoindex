@@ -22,7 +22,7 @@ import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 const meta = calculatorMeta('retirement');
 
 const FILING_NOTE =
-  'Retirement estimates model two filing statuses, single and married filing jointly. Your saved status, head of household, runs here as single.';
+  'Retirement estimates model only single and married filing jointly, so head of household runs here as single.';
 
 /** Waits for the first results (the run resolves after the bootstrap's submit). */
 const findResults = () => screen.findByText('Implied Withdrawal Rate');

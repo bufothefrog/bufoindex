@@ -146,8 +146,8 @@ describe('label wording', () => {
     expect(STRATEGY_PRESET_OPTIONS.map((o) => o.value)).toEqual(['cashflow-investor', 'standard']);
   });
 
-  it('puts the 2026 HSA limits in the coverage options', () => {
-    expect(HSA_COVERAGE_OPTIONS.map((o) => o.label)).toEqual(['Individual ($4,400 limit)', 'Family ($8,750 limit)']);
+  it('names the HSA coverage tiers without the limit (the contribution help states it)', () => {
+    expect(HSA_COVERAGE_OPTIONS.map((o) => o.label)).toEqual(['Individual', 'Family']);
   });
 
   it('adds the ordering to the risk tolerance options', () => {

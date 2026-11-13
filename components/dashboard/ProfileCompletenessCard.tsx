@@ -72,7 +72,7 @@ export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProp
         ) : (
           <CardLinkButton href="/start/profile">Fill in the rest</CardLinkButton>
         )}
-        <CardLinkButton href="/start/review">Review all answers</CardLinkButton>
+        <CardLinkButton href="/start/review">Review your answers</CardLinkButton>
       </div>
     </BaseCard>
   );

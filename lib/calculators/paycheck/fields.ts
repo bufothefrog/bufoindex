@@ -23,7 +23,7 @@ import {
   RISK_TOLERANCE_OPTIONS,
 } from '@/lib/constants/labels';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
-import { AGE, TAXABLE_MONTHLY } from '@/lib/fields/shared';
+import { AGE } from '@/lib/fields/shared';
 import type { CrossFieldRule, FieldSpec, Get, ScreenNote } from '@/lib/fields/types';
 import type { BonusFrequency, ContributionType, HsaCoverage, OptimizationGoal, RiskTolerance } from '@/lib/profile/types';
 import { CONTRIBUTION_PATH, CONTRIBUTION_TYPE_PATH, ROTH_PART_PATH } from './bindings';
@@ -120,7 +120,7 @@ export const HAS_401K: FieldSpec = {
   kind: 'boolean',
   label: 'Workplace retirement plan',
   options: [
-    { value: true, label: 'Yes', description: 'Not sure? Pick Yes and check your benefits portal later.' },
+    { value: true, label: 'Yes' },
     { value: false, label: 'No' },
   ],
   tier: 'details',
@@ -131,7 +131,7 @@ export const MATCH_PERCENT: FieldSpec = {
   path: 'workplace.matchPercent',
   kind: 'percent',
   label: 'Employer match rate',
-  help: 'What your employer adds per dollar you contribute. 50% means 50 cents per dollar.',
+  help: 'Per dollar you contribute; 50% means 50 cents.',
   min: 0,
   max: 2,
   tier: 'details',
@@ -143,7 +143,7 @@ export const MATCH_LIMIT: FieldSpec = {
   path: 'workplace.matchLimit',
   kind: 'percent',
   label: 'Matched up to this share of your pay',
-  help: 'In "50% of the first 6%", this is the 6%.',
+  help: 'The 6% in "50% of the first 6%".',
   min: 0,
   max: 0.25,
   tier: 'details',
@@ -154,7 +154,6 @@ export const CONTRIBUTION_TYPE: FieldSpec = {
   path: CONTRIBUTION_TYPE_PATH,
   kind: 'select',
   label: 'Contribution type',
-  help: 'Traditional reduces taxable income now, Roth is tax-free in retirement',
   options: CONTRIBUTION_TYPE_OPTIONS,
   tier: 'details',
   visibleWhen: hasPlan,
@@ -164,7 +163,7 @@ export const CONTRIBUTION_PERCENT: FieldSpec = {
   path: CONTRIBUTION_PATH,
   kind: 'percent',
   label: 'Your contribution',
-  help: 'The share of each paycheck you put into the plan, all types together.',
+  help: 'Share of pay, all types together.',
   min: 0,
   max: 1,
   step: 0.01,
@@ -178,7 +177,7 @@ export const ROTH_CONTRIBUTION_PERCENT: FieldSpec = {
   path: ROTH_PART_PATH,
   kind: 'percent',
   label: 'Roth part of your contribution',
-  help: 'The rest of your contribution is traditional (pre-tax). A Roth part above the total counts as the whole contribution.',
+  help: 'Percent of pay; the rest is traditional.',
   min: 0,
   max: 1,
   step: 0.01,
@@ -222,10 +221,20 @@ export const HSA_COVERAGE: FieldSpec = {
   summary: (value) => `${HSA_COVERAGE_LABELS[value as HsaCoverage].toLowerCase()} HSA`,
 };
 
+/**
+ * The 2026 annual HSA limit for the coverage and age in effect, the 55-and-over
+ * catch-up included: the same figure the HSA step card shows (bug 4).
+ */
+function hsaLimit(get: Get): number {
+  return limitHsa(get(HSA_COVERAGE.path) as HsaCoverage, get(AGE.path) as number);
+}
+
 export const HSA_MONTHLY_CONTRIBUTION: FieldSpec = {
   path: 'hsa.monthlyContribution',
   kind: 'money',
   label: 'Current monthly HSA contribution',
+  // The one place the yearly limit is stated (not on the coverage options).
+  help: (get) => `Up to ${formatCurrency(hsaLimit(get))} a year with employer money (${formatCurrency(hsaLimit(get) / 12)} a month).`,
   placeholder: '0',
   min: 0,
   tier: 'details',
@@ -251,39 +260,6 @@ export const HSA_INVESTING: FieldSpec = {
   visibleWhen: hsaEligible,
   summary: (value) => (value === true ? 'invested' : null),
 };
-
-/**
- * The 2026 annual HSA limit for the coverage and age in effect, the 55-and-over
- * catch-up included: the same figure the HSA step card shows (bug 4).
- */
-function hsaLimit(get: Get): number {
-  return limitHsa(get(HSA_COVERAGE.path) as HsaCoverage, get(AGE.path) as number);
-}
-
-/** The old HSA card's explanatory copy, word for word, as notes (plan section 2.13). */
-export const HSA_NOTES: readonly ScreenNote[] = [
-  {
-    text: 'Three tax advantages: Deductible contributions + untaxed growth + untaxed withdrawals for qualified medical costs',
-    visibleWhen: hsaEligible,
-  },
-  {
-    text: (get) => `${formatCurrency(hsaLimit(get))}/year limit: ${formatCurrency(hsaLimit(get) / 12)} per month`,
-    visibleWhen: hsaEligible,
-  },
-  {
-    text: 'Reimbursement timing: There is no deadline for reimbursing a qualified expense, so a receipt kept today can be reimbursed years later. Paying medical costs out of pocket leaves the balance invested and growing untaxed; reimbursing right away keeps that cash available now. The trade-off is between current liquidity and compounding.',
-    visibleWhen: hsaEligible,
-  },
-  {
-    text: 'Held as an investment: contributions, growth, and qualified withdrawals go untaxed, where a Roth IRA taxes the contribution. That extra advantage only applies while the balance stays invested. This approach generally involves: paying medical expenses out-of-pocket, keeping receipts for later reimbursement, investing the HSA balance rather than holding cash, and reimbursing against those receipts in retirement.',
-    visibleWhen: (get) => hsaEligible(get) && get(HSA_INVESTING_PATH) === true,
-  },
-  {
-    text: 'HSA and Roth IRA compared: spending the HSA on current medical costs uses up the balance that would otherwise compound untaxed. Roth IRA contributions can be withdrawn at any time without tax or penalty, so the two accounts differ mainly in how accessible the money is until retirement.',
-    visibleWhen: (get) => hsaEligible(get) && get(HSA_INVESTING_PATH) !== true,
-    tone: 'caution',
-  },
-];
 
 // ---------------------------------------------------------------------------
 // IRAs and taxable investing
@@ -347,11 +323,6 @@ export const IRA_ROTH_BALANCE: FieldSpec = {
   visibleWhen: hasRothIra,
 };
 
-export const TAXABLE_NOTE: ScreenNote = {
-  text: 'Taxable accounts: No contribution limits or withdrawal restrictions, but gains and dividends are taxed in the year they occur.',
-  visibleWhen: (get) => (get(TAXABLE_MONTHLY.path) as number) > 0,
-};
-
 // ---------------------------------------------------------------------------
 // Debts
 // ---------------------------------------------------------------------------
@@ -411,7 +382,7 @@ export const TARGET_MONTHS: FieldSpec = {
   path: 'cash.targetMonths',
   kind: 'number',
   label: 'Emergency fund target',
-  help: 'Months of expenses to save (typically 3-6)',
+  help: 'Months of expenses to hold in cash.',
   min: 0,
   max: 24,
   step: 0.5,
@@ -443,7 +414,7 @@ export const EXPECTED_RETIREMENT_BRACKET: FieldSpec = {
   path: 'assumptions.paycheck.expectedRetirementBracket',
   kind: 'percent',
   label: 'Expected tax bracket in retirement',
-  help: 'The federal bracket you expect when you withdraw, weighed against the 22% bracket the allocator uses today.',
+  help: "Federal bracket you expect when withdrawing, compared with today's 22%.",
   min: 0,
   max: 0.37,
   step: 0.01,
@@ -453,5 +424,5 @@ export const EXPECTED_RETIREMENT_BRACKET: FieldSpec = {
 
 /** O9: the allocator keeps a fixed 22% federal bracket; the copy says so instead of claiming automatic brackets. */
 export const TAX_NOTE: ScreenNote = {
-  text: 'Tax savings in this allocator use a fixed 22% federal bracket plus one 2026 rate for your state. Brackets are not calculated from your income.',
+  text: 'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.',
 };

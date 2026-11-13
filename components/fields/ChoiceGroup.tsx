@@ -28,7 +28,12 @@ export interface ChoiceGroupProps {
   layout?: ChoiceGroupLayout;
   size?: FieldSize;
   testId?: string;
+  /** The option with this value carries a "Typical" tag (the intake's accepted typical value). */
+  typicalValue?: FieldOption['value'];
 }
+
+/** The tag on the option the intake's Next would accept. */
+export const TYPICAL_TAG = 'Typical';
 
 /**
  * Radio group of OptionCards with the standard keyboard model: Tab enters
@@ -47,6 +52,7 @@ export function ChoiceGroup({
   layout = 'stack',
   size = 'md',
   testId,
+  typicalValue,
 }: ChoiceGroupProps) {
   const id = useId();
   const labelId = `${id}-label`;
@@ -113,6 +119,11 @@ export function ChoiceGroup({
             selected={index === selectedIndex}
             onSelect={() => onChange(option.value)}
             tabIndex={index === tabStop ? 0 : -1}
+            tag={
+              typicalValue !== undefined && option.value === typicalValue
+                ? { id: `${id}-typical`, text: TYPICAL_TAG }
+                : undefined
+            }
           />
         ))}
       </div>

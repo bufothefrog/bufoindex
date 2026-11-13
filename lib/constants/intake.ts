@@ -6,8 +6,8 @@
  * Each intent asks everything its calculator uses, a few related questions
  * per screen (docs/rebuild-plan.md section 2.12), with the facts every
  * calculator shares asked once, in the core. Questions come in the user's
- * own units (per paycheck, not per month). Anything skipped keeps its
- * typical value and is not marked as provided, so the calculators can
+ * own units (per paycheck, not per month). A skipped screen keeps its
+ * values on arrival and is not marked as provided, so the calculators can
  * surface it later as a detail worth looking up.
  *
  * Guided flow: everyone answers the shared core first (/start, flow 'core'),
@@ -18,7 +18,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { Layers, Scale, Sunset, UserRound, Wallet } from 'lucide-react';
-import { formForFlow } from '@/lib/calculators/forms';
+import { formForFlow, requiredScreens } from '@/lib/calculators/forms';
 import { CLASS_TARGETS_PATH, classTargetsError } from '@/lib/calculators/portfolio/bindings';
 import {
   CORE_SCREENS,
@@ -32,7 +32,7 @@ import {
 } from '@/lib/fields/shared';
 import { getAt, makeGet } from '@/lib/fields/paths';
 import { screenPaths, screensFor, validateFields } from '@/lib/fields/runtime';
-import type { FieldErrors, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
+import type { FieldErrors, FieldSpec, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import { isProfilePath } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 
@@ -194,25 +194,84 @@ export interface IntakeScreenOptions {
    * 'remaining' asks, for an intent, its non-core screens without the core
    * facts (the shared core is asked once, on its own), and drops every
    * screen whose visible facts are all in `provided`. A partly answered
-   * screen shows all of its facts, prefilled.
+   * screen shows all of its facts (the answered ones with their values).
    */
   mode?: IntakeMode;
   /** Paths already answered (profile.provided); used by 'remaining' mode. */
   provided?: readonly string[];
 }
 
-/** The per-screen skip: the screen keeps its typical values, unanswered. */
-export const INTAKE_SKIP_LABEL = 'Skip, use a typical value';
+// ---------------------------------------------------------------------------
+// Skip or Next
+// ---------------------------------------------------------------------------
+//
+// Every wizard screen offers two actions: Skip (the screen goes back to its
+// values on arrival, unanswered) and Next. A field the visitor has not
+// answered shows no value, with the typical value as its grey placeholder.
 
-/** The skip on an assumption screen. */
-export const KEEP_ASSUMPTIONS_LABEL = 'Keep the default assumptions';
-
-/** The skip button's text for a screen: its own, or the one for its tier. */
-export function skipLabelFor(screen: ScreenSpec): string {
-  return screen.skipLabel ?? (screen.tier === 'assumption' ? KEEP_ASSUMPTIONS_LABEL : INTAKE_SKIP_LABEL);
+/**
+ * Whether Next on `screen` needs the visitor's own entry in every visible
+ * field (true), or takes the typical value for each field left blank and
+ * marks it answered (false).
+ *
+ * The rule is: the three basics screens (tier 'core': about, pay, must-pay)
+ * need the visitor's own entry; every other screen accepts the typical
+ * values. This is the default the guided-flow design picked for a question
+ * that is still open, so it lives here, in one place, to be changed alone.
+ * Skip stays available on every screen either way.
+ */
+export function nextNeedsOwnAnswer(screen: ScreenSpec): boolean {
+  return screen.tier === 'core';
 }
 
+/** The short error of a blank field on a screen whose Next needs the visitor's own entry. */
+const OWN_ANSWER_MESSAGES: Readonly<Record<string, string>> = {
+  'person.age': 'Enter your age',
+  'person.state': 'Choose your state',
+  'person.filingStatus': 'Choose your filing status',
+  'income.grossPerPaycheck': 'Enter your gross pay',
+  'income.frequency': 'Choose how often you are paid',
+  'income.netPerPaycheck': 'Enter your take-home pay',
+  'spending.necessaryMonthly': 'Enter your must-pay costs',
+};
+
+const CHOSEN_KINDS: ReadonlySet<FieldSpec['kind']> = new Set<FieldSpec['kind']>(['select', 'state', 'choice', 'boolean']);
+
+/** The message for `spec` left blank where Next needs the visitor's own entry. */
+export function ownAnswerMessage(spec: FieldSpec): string {
+  return OWN_ANSWER_MESSAGES[spec.path] ?? (CHOSEN_KINDS.has(spec.kind) ? 'Choose an answer' : 'Enter a value');
+}
+
+/** The muted line under a screen heading while the screen has blank fields, by its Next rule. */
+export const BLANK_FIELDS_NOTE = {
+  /** Next takes the typical values. */
+  typical: 'Grey values are typical. Next uses them for anything left blank.',
+  /** The same rule in single-screen mode (/start/review/<id>), whose only button is Save. */
+  typicalOnSave: 'Grey values are typical. Save uses them for anything left blank.',
+  /** Next needs the visitor's own entry (nextNeedsOwnAnswer). */
+  examples: 'Grey values are examples.',
+} as const;
+
+/** The line on an unanswered screen that shows example rows (accounts, holdings, class targets). */
+export const EXAMPLE_ROWS_NOTE = 'This is an example. Change it to match yours, or skip.';
+
+/** EXAMPLE_ROWS_NOTE in single-screen mode, which has no Skip. */
+export const EXAMPLE_ROWS_NOTE_ON_SAVE = 'This is an example. Change it to match yours.';
+
 const REMAINING_FORMS = new WeakMap<FormSpec, FormSpec>();
+const INTENT_FORMS = new WeakMap<FormSpec, FormSpec>();
+
+/**
+ * A calculator intent's form without its optional screens: /start/<intent>
+ * does not ask them (the calculator page and the profile form do).
+ */
+function withoutOptional(form: FormSpec): FormSpec {
+  const cached = INTENT_FORMS.get(form);
+  if (cached) return cached;
+  const intent = { ...form, screens: requiredScreens(form.screens) };
+  INTENT_FORMS.set(form, intent);
+  return intent;
+}
 
 /** An intent's form for 'remaining' mode: its non-core screens, with the core facts left out. */
 function withoutCore(form: FormSpec): FormSpec {
@@ -227,10 +286,15 @@ function withoutCore(form: FormSpec): FormSpec {
   return remaining;
 }
 
-/** The form whose screens a flow asks in `mode` (shares its field specs with formForFlow). */
+/**
+ * The form whose screens a flow asks in `mode` (shares its field specs with
+ * formForFlow). A calculator intent leaves out its optional screens; the
+ * profile flow asks them, last.
+ */
 export function intakeForm(flow: IntakeFlow, mode: IntakeMode = 'all'): FormSpec {
-  const form = formForFlow(flow);
-  return flow === 'core' || mode === 'all' ? form : withoutCore(form);
+  if (flow === 'core') return formForFlow(flow);
+  const form = flow === 'profile' ? formForFlow(flow) : withoutOptional(formForFlow(flow));
+  return mode === 'all' ? form : withoutCore(form);
 }
 
 /**
@@ -244,18 +308,20 @@ export function getIntakeScreens(flow: IntakeFlow, get: Get, options: IntakeScre
 }
 
 /**
- * The screens `intent` still asks in 'remaining' mode given the saved
- * profile: what /start/<intent> shows on arrival. Empty means that page goes
- * straight to its destination (the calculator, or the overview for
- * 'profile').
+ * The required screens `intent` still asks in 'remaining' mode given the
+ * saved profile: the questions the chooser counts as left. For a calculator
+ * intent this is what /start/<intent> shows on arrival (empty means it goes
+ * straight to the calculator). For 'profile' the optional screens are left
+ * out, although /start/profile still asks the unanswered ones at the end.
  */
 export function remainingIntakeScreens(intent: IntakeIntent, profile: FinancialProfile): ScreenSpec[] {
-  return getIntakeScreens(intent, makeGet(profile), { mode: 'remaining', provided: profile.provided });
+  return requiredScreens(getIntakeScreens(intent, makeGet(profile), { mode: 'remaining', provided: profile.provided }));
 }
 
 /**
  * Whether "Finish your profile" has nothing left to do, so the guided flow
- * offers the overview in its place: the profile intake has no screen left.
+ * offers the overview in its place: the profile intake has no required
+ * screen left (optional screens never hold it back).
  * Fields on a calculator-only screen are never asked by an intake, and
  * fields behind an unmet condition (the match terms without a 401(k)) are
  * not asked, so /start/profile can have nothing left to ask while some
