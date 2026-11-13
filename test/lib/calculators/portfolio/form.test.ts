@@ -12,7 +12,7 @@ import {
   getIntakeScreens,
   intentNeedsCore,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { applyWrites, makeGet } from '@/lib/fields/paths';
@@ -160,13 +160,8 @@ describe('portfolio form: screens', () => {
     expect(deposit.label).toBe('New cash');
   });
 
-  it('skips with a typical value on the facts and keeps the default settings', () => {
-    expect(getIntakeScreens('portfolio', fromDefaults()).map((s) => skipLabelFor(s))).toEqual([
-      'Skip, use a typical value',
-      'Skip, use a typical value',
-      'Skip, use a typical value',
-      'Keep the default assumptions',
-    ]);
+  it('takes the typical values on Next on every screen, the settings included', () => {
+    expect(getIntakeScreens('portfolio', fromDefaults()).map((s) => nextNeedsOwnAnswer(s))).toEqual([false, false, false, false]);
   });
 
   it('notes the capital gains risk only while taxable selling is on', () => {

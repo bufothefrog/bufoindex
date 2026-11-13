@@ -55,7 +55,7 @@ export const PROFILE_FORM_ORDER: readonly CalculatorId[] = ['retirement', 'paych
 
 /**
  * The section each profile screen belongs to, for the profile intake's
- * progress label and "Skip the rest of this section". The leverage form's
+ * progress label. The leverage form's
  * profile screen (the taxable contribution) sits with the portfolio
  * questions, so the two calculators share one section.
  */

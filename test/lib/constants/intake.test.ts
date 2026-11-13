@@ -4,9 +4,7 @@ import {
   CORE_PATHS,
   CORE_START_PATH,
   INTAKE_INTENTS,
-  INTAKE_SKIP_LABEL,
   INTENT_OPTIONS,
-  KEEP_ASSUMPTIONS_LABEL,
   LEARN_CHOOSER_PATH,
   LEARN_OPTIONS,
   buildIntakeSubmission,
@@ -20,7 +18,8 @@ import {
   isIntakeIntent,
   isProfileFinished,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
+  ownAnswerMessage,
   validateIntakeScreen,
   type IntakeFlow,
   type IntakeIntent,
@@ -262,16 +261,35 @@ describe('intake screens', () => {
     expect(intakePaths('profile').slice(0, CORE_PATHS.length)).toEqual([...CORE_PATHS]);
   });
 
-  it('offers the typical-value skip, and keeps the defaults on an assumption screen', () => {
+  it('needs the own entry on the basics screens only (nextNeedsOwnAnswer, both branches)', () => {
+    const basics = getIntakeScreens('core', fromDefaults());
+    expect(basics.map((s) => s.id)).toEqual(['about', 'pay', 'must-pay']);
+    expect(basics.map((s) => nextNeedsOwnAnswer(s))).toEqual([true, true, true]);
     for (const intent of INTAKE_INTENTS) {
       for (const screen of getIntakeScreens(intent, fromDefaults())) {
-        expect(skipLabelFor(screen)).toBe(screen.tier === 'assumption' ? KEEP_ASSUMPTIONS_LABEL : INTAKE_SKIP_LABEL);
+        expect(nextNeedsOwnAnswer(screen), `${intent}/${screen.id}`).toBe(screen.tier === 'core');
       }
     }
-    const assumptions: ScreenSpec = { id: 'a', title: 'Assumptions', tier: 'assumption', fields: [] };
-    expect(skipLabelFor(assumptions)).toBe(KEEP_ASSUMPTIONS_LABEL);
-    expect(KEEP_ASSUMPTIONS_LABEL).toBe('Keep the default assumptions');
-    expect(skipLabelFor({ ...assumptions, skipLabel: 'I have no debts' })).toBe('I have no debts');
+    const details: ScreenSpec = { id: 'd', title: 'Details', tier: 'details', fields: [] };
+    expect(nextNeedsOwnAnswer(details)).toBe(false);
+    expect(nextNeedsOwnAnswer({ ...details, tier: 'assumption' })).toBe(false);
+    expect(nextNeedsOwnAnswer({ ...details, tier: 'core' })).toBe(true);
+  });
+
+  it('words a blank basic as a short instruction, with a fallback per kind', () => {
+    const form = formForFlow('core');
+    const spec = (path: string) => form.fields.find((f) => f.path === path)!;
+    expect(CORE_PATHS.map((path) => ownAnswerMessage(spec(path)))).toEqual([
+      'Enter your age',
+      'Choose your state',
+      'Choose your filing status',
+      'Enter your gross pay',
+      'Choose how often you are paid',
+      'Enter your take-home pay',
+      'Enter your must-pay costs',
+    ]);
+    expect(ownAnswerMessage({ path: 'x', kind: 'money', label: 'X', tier: 'core' })).toBe('Enter a value');
+    expect(ownAnswerMessage({ path: 'x', kind: 'choice', label: 'X', tier: 'core' })).toBe('Choose an answer');
   });
 });
 

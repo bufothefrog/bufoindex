@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Calculator, Compass, User } from 'lucide-react';
+import { BackControl } from '@/components/guided/BackControl';
 import { CoreSummary } from '@/components/guided/CoreSummary';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { OptionCard } from '@/components/guided/OptionCard';
@@ -25,7 +26,7 @@ export function GuidedSection() {
       <DemoBlock title="Guided-flow widgets" icon={Compass}>
         <DemoEntry
           name="OptionCard"
-          description="Link mode (default and emphasis tones) and radio mode, which ChoiceGroup builds on. Minimum height 64px."
+          description="Link mode (default and emphasis tones) and radio mode, which ChoiceGroup builds on; a radio card can carry a small tag (the intake's Typical). Minimum height 64px."
         >
           <div className="max-w-xl space-y-2">
             <OptionCard href="/tools" icon={Calculator} title="Link mode" description="Full-width link with an icon tile and a chevron." />
@@ -51,11 +52,18 @@ export function GuidedSection() {
               selected={preset === 'cashflow-investor'}
               onSelect={() => setPreset('cashflow-investor')}
               tabIndex={preset === 'cashflow-investor' ? 0 : -1}
+              tag={{ id: 'demo-option-tag', text: 'Typical' }}
             />
           </div>
         </DemoEntry>
-        <DemoEntry name="ProgressDots" description="The wizard's step indicator, with an optional section label.">
-          <ProgressDots total={6} current={2} label="Retirement" />
+        <DemoEntry
+          name="ProgressDots and BackControl"
+          description="The wizard's step indicator, with an optional section label, and the Back control beside it (absent on the first screen)."
+        >
+          <div className="flex min-h-11 items-center gap-3">
+            <BackControl onBack={() => {}} />
+            <ProgressDots total={6} current={2} label="Retirement" className="ml-auto justify-end" />
+          </div>
         </DemoEntry>
         <DemoEntry
           name="NextSteps"

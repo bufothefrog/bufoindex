@@ -6,8 +6,8 @@
  * Each intent asks everything its calculator uses, a few related questions
  * per screen (docs/rebuild-plan.md section 2.12), with the facts every
  * calculator shares asked once, in the core. Questions come in the user's
- * own units (per paycheck, not per month). Anything skipped keeps its
- * typical value and is not marked as provided, so the calculators can
+ * own units (per paycheck, not per month). A skipped screen keeps its
+ * values on arrival and is not marked as provided, so the calculators can
  * surface it later as a detail worth looking up.
  *
  * Guided flow: everyone answers the shared core first (/start, flow 'core'),
@@ -32,7 +32,7 @@ import {
 } from '@/lib/fields/shared';
 import { getAt, makeGet } from '@/lib/fields/paths';
 import { screenPaths, screensFor, validateFields } from '@/lib/fields/runtime';
-import type { FieldErrors, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
+import type { FieldErrors, FieldSpec, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import { isProfilePath } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 
@@ -194,23 +194,64 @@ export interface IntakeScreenOptions {
    * 'remaining' asks, for an intent, its non-core screens without the core
    * facts (the shared core is asked once, on its own), and drops every
    * screen whose visible facts are all in `provided`. A partly answered
-   * screen shows all of its facts, prefilled.
+   * screen shows all of its facts (the answered ones with their values).
    */
   mode?: IntakeMode;
   /** Paths already answered (profile.provided); used by 'remaining' mode. */
   provided?: readonly string[];
 }
 
-/** The per-screen skip: the screen keeps its typical values, unanswered. */
-export const INTAKE_SKIP_LABEL = 'Skip, use a typical value';
+// ---------------------------------------------------------------------------
+// Skip or Next
+// ---------------------------------------------------------------------------
+//
+// Every wizard screen offers two actions: Skip (the screen goes back to its
+// values on arrival, unanswered) and Next. A field the visitor has not
+// answered shows no value, with the typical value as its grey placeholder.
 
-/** The skip on an assumption screen. */
-export const KEEP_ASSUMPTIONS_LABEL = 'Keep the default assumptions';
-
-/** The skip button's text for a screen: its own, or the one for its tier. */
-export function skipLabelFor(screen: ScreenSpec): string {
-  return screen.skipLabel ?? (screen.tier === 'assumption' ? KEEP_ASSUMPTIONS_LABEL : INTAKE_SKIP_LABEL);
+/**
+ * Whether Next on `screen` needs the visitor's own entry in every visible
+ * field (true), or takes the typical value for each field left blank and
+ * marks it answered (false).
+ *
+ * The rule is: the three basics screens (tier 'core': about, pay, must-pay)
+ * need the visitor's own entry; every other screen accepts the typical
+ * values. This is the default the guided-flow design picked for a question
+ * that is still open, so it lives here, in one place, to be changed alone.
+ * Skip stays available on every screen either way.
+ */
+export function nextNeedsOwnAnswer(screen: ScreenSpec): boolean {
+  return screen.tier === 'core';
 }
+
+/** The short error of a blank field on a screen whose Next needs the visitor's own entry. */
+const OWN_ANSWER_MESSAGES: Readonly<Record<string, string>> = {
+  'person.age': 'Enter your age',
+  'person.state': 'Choose your state',
+  'person.filingStatus': 'Choose your filing status',
+  'income.grossPerPaycheck': 'Enter your gross pay',
+  'income.frequency': 'Choose how often you are paid',
+  'income.netPerPaycheck': 'Enter your take-home pay',
+  'spending.necessaryMonthly': 'Enter your must-pay costs',
+};
+
+const CHOSEN_KINDS: ReadonlySet<FieldSpec['kind']> = new Set<FieldSpec['kind']>(['select', 'state', 'choice', 'boolean']);
+
+/** The message for `spec` left blank where Next needs the visitor's own entry. */
+export function ownAnswerMessage(spec: FieldSpec): string {
+  return OWN_ANSWER_MESSAGES[spec.path] ?? (CHOSEN_KINDS.has(spec.kind) ? 'Choose an answer' : 'Enter a value');
+}
+
+/** The muted line under a screen heading while the screen has blank fields, by its Next rule. */
+export const BLANK_FIELDS_NOTE = {
+  /** Next takes the typical values. */
+  typical: 'Grey values are typical. Next uses them for anything left blank.',
+  /** Next needs the visitor's own entry (nextNeedsOwnAnswer). */
+  examples: 'Grey values are examples.',
+} as const;
+
+/** The line on an unanswered screen that shows example rows (accounts, holdings, class targets). */
+export const EXAMPLE_ROWS_NOTE = 'This is an example. Change it to match yours, or skip.';
 
 const REMAINING_FORMS = new WeakMap<FormSpec, FormSpec>();
 

@@ -2,7 +2,7 @@
  * The paycheck intent in the wizard, with the grown PAYCHECK_FORM: seven
  * screens after the core (fun money and bonuses, emergency fund, 401(k),
  * HSA, IRAs and taxable investing, debts, assumptions), the debts list with
- * its "I have no debts" answer (O4), the skip affordances, and the finish on
+ * its "I have no debts" answer (O4), the two footer actions, and the finish on
  * the allocator path with from=profile and no hash. The wizard mechanics
  * are tested apart in Wizard.test.tsx.
  */
@@ -18,6 +18,7 @@ import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 import { answer, typeInto } from '@/test/utils/wizard';
+import { skip, skipToEnd } from './wizardSteps';
 
 vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory());
 
@@ -50,8 +51,11 @@ describe('Wizard, paycheck intent', () => {
     // 1. Fun money and bonuses: the bonus details follow the bonus answer.
     expect(screen.getByRole('heading', { name: 'How much fun money do you want each month?' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 7')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip, use a typical value' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip the rest' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Skip the rest/ })).not.toBeInTheDocument();
+    // Nothing pre-filled: the typical amounts are grey placeholders.
+    expect(screen.getByLabelText('At least, per month')).toHaveValue('');
+    expect(screen.getByLabelText('At least, per month')).toHaveAttribute('placeholder', '300');
     expect(screen.queryByLabelText('Average bonus amount')).not.toBeInTheDocument();
     await typeInto('At least, per month', '200');
     await user.click(within(screen.getByRole('radiogroup', { name: 'I receive regular bonuses' })).getByRole('radio', { name: /^Yes/ }));
@@ -79,23 +83,22 @@ describe('Wizard, paycheck intent', () => {
     // 4. HSA: skipped, so its typical values stay unanswered.
     expect(screen.getByRole('heading', { name: 'Do you have a health savings account (HSA)?' })).toBeInTheDocument();
     expect(screen.getByText('Step 4 of 7')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
 
     // 5. IRAs and taxable investing: skipped.
     expect(screen.getByRole('heading', { name: 'Do you invest in an IRA or a taxable account?' })).toBeInTheDocument();
     expect(screen.getByText('Step 5 of 7')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
 
     // 6. Debts: "I have no debts" answers the screen with the empty list.
     expect(screen.getByRole('heading', { name: 'Do you have any debts?' })).toBeInTheDocument();
     expect(screen.getByText('Step 6 of 7')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'I have no debts' }));
 
-    // 7. Assumptions, last: no "Skip the rest".
+    // 7. Assumptions, last: Skip and Finish; Finish takes the typical values.
     expect(screen.getByRole('heading', { name: 'Which assumptions should the allocation use?' })).toBeInTheDocument();
     expect(screen.getByText('Step 7 of 7')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Keep the default assumptions' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     expect(screen.getByLabelText('Emergency fund target')).toBeInTheDocument();
     expect(screen.getByLabelText('Expected tax bracket in retirement')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
@@ -150,7 +153,7 @@ describe('Wizard, paycheck intent', () => {
     await next();
 
     expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Keep the default assumptions' }));
+    await skip(user);
 
     const [debt] = useProfileStore.getState().profile.debts;
     expect(debt).toMatchObject({ name: 'Card', balance: 3000, interestRate: 0.18, minimumPayment: 90, extraPayment: 0 });
@@ -198,12 +201,12 @@ describe('Wizard, paycheck intent', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('replaces itself with the allocator on "Skip the rest", leaving the skipped screens unanswered', async () => {
+  it('replaces itself with the allocator after skipping every screen, leaving them unanswered', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="paycheck" />);
 
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    expect(await skipToEnd(user)).toBe(7);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);

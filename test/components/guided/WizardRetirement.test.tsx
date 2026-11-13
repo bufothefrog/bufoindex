@@ -20,6 +20,7 @@ import { retirementRunner } from '@/lib/store/retirementStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 import { answer, typeInto } from '@/test/utils/wizard';
+import { skip, skipToEnd } from './wizardSteps';
 
 vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory());
 
@@ -47,15 +48,16 @@ describe('Wizard, retirement intent', () => {
     render(<Wizard flow="retirement" />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'See if I am on track to retire' })).toBeInTheDocument();
-    expect(screen.getByText('Everything this calculator uses, a few related questions per screen.')).toBeInTheDocument();
+    expect(screen.getByText('Opens the Retirement Calculator and runs the simulation with your answers.')).toBeInTheDocument();
 
     // 1. Savings.
     expect(screen.getByRole('heading', { name: 'What are you investing today?' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
     expect(screen.getByLabelText('Monthly investing contribution')).toBeInTheDocument();
     expect(screen.getByLabelText('Invested balance')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip, use a typical value' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip the rest' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Invested balance')).toHaveValue('');
+    expect(screen.getByText('Grey values are typical. Next uses them for anything left blank.')).toBeInTheDocument();
     await typeInto('Monthly investing contribution', '900');
     await next();
 
@@ -72,17 +74,17 @@ describe('Wizard, retirement intent', () => {
     expect(screen.getByRole('heading', { name: 'What will Social Security and healthcare look like?' })).toBeInTheDocument();
     expect(screen.getByLabelText('Social Security benefit')).toBeInTheDocument();
     expect(screen.getByLabelText('Social Security age')).toBeInTheDocument();
+    // A nullable field on Auto stays on Auto.
     expect(screen.getByRole('group', { name: 'Annual healthcare cost' })).toHaveTextContent(
       'Typical cost the model uses: $7,500'
     );
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
 
-    // 4. Assumptions, last: no "Skip the rest"; the custom inputs follow the risk profile.
+    // 4. Assumptions, last: Skip and Finish; the custom inputs follow the risk profile.
     expect(screen.getByRole('heading', { name: 'Which assumptions should the projection use?' })).toBeInTheDocument();
     expect(screen.getByText('Step 4 of 4')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Keep the default assumptions' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
-    expect(screen.getByText('Good enough to start. You can change any answer on the calculator.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByText(/Good enough to start/)).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Accumulation return' })).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Inflation rate' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Effective tax rate' })).toBeInTheDocument();
@@ -157,12 +159,12 @@ describe('Wizard, retirement intent', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('replaces itself with the calculator on "Skip the rest", leaving the skipped screens unanswered', async () => {
+  it('replaces itself with the calculator after skipping every screen, leaving them unanswered', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="retirement" />);
 
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    expect(await skipToEnd(user)).toBe(4);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);

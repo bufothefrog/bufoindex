@@ -65,7 +65,7 @@ export interface FieldSpec {
 export interface ScreenNote { text: Text; visibleWhen?: (get: Get) => boolean; tone?: 'info' | 'caution' }
 export interface ScreenSpec {
   id: string; title: string; question?: string; description?: string;
-  tier: Tier; surface?: Surface; fields: readonly string[]; notes?: readonly ScreenNote[]; skipLabel?: string;
+  tier: Tier; surface?: Surface; fields: readonly string[]; notes?: readonly ScreenNote[];
 }
 export interface CrossFieldRule { lower: string; upper: string; strict: boolean; checkOn: string; message: string }
 export interface FormSpec {

@@ -127,7 +127,7 @@ describe('LearnChooser', () => {
     const user = userEvent.setup();
     const { unmount } = render(<Wizard flow="core" />);
     for (let i = 0; i < 3; i += 1) {
-      await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+      await user.click(screen.getByRole('button', { name: 'Skip' }));
     }
     expect(push).toHaveBeenCalledWith('/start/choose');
     unmount();

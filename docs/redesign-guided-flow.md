@@ -149,9 +149,13 @@ Rules that fall out of this:
 One topic screen at a time (O2): a few related fields under one question,
 with Next pinned to the bottom of the viewport and the Skip affordance
 inside the same bar so it is visible on first paint, progress dots, Back
-always available. Skip ("Skip, use a typical value") keeps the screen's
-typical values without marking them answered. Each intent ends on its
-assumption screen, prefilled, with "Keep the default assumptions" (O3).
+always available. Every screen has two actions, "Skip" (keeps the typical values
+without marking them answered) and "Next" (takes the typical value for each
+blank field and marks it answered; on the three basics screens it asks for
+the visitor's own entry instead, see `nextNeedsOwnAnswer` in
+`lib/constants/intake.ts`). Nothing is pre-filled: typical values show as
+grey placeholders. Each Next and Skip saves, and Back sits beside the
+progress display.
 
 One component (`components/guided/Wizard.tsx`) runs every flow, and every
 screen is a `ScreenSpec` from the calculator's FormSpec

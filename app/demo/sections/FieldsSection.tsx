@@ -242,6 +242,16 @@ export function FieldsSection({ idPrefix }: FieldsSectionProps) {
       <DemoBlock title="Field building blocks" icon={ListChecks}>
         <DemoEntry name="ChoiceGroup" description="A radio group of OptionCards; stack is the intake layout, grid the calculator layout.">
           <ChoiceGroup label="Target mix" options={MIX_OPTIONS} value={choice} onChange={setChoice} layout="stack" />
+          <div className="mt-4">
+            <ChoiceGroup
+              label="Target mix, unanswered in the intake"
+              options={MIX_OPTIONS}
+              value={undefined}
+              onChange={() => {}}
+              typicalValue={MIX_OPTIONS[0].value}
+              layout="stack"
+            />
+          </div>
         </DemoEntry>
         <DemoEntry name="Checkbox" description="Native checkbox with a 44px row, help text and an announced error.">
           <div className="space-y-2">

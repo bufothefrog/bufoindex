@@ -11,9 +11,22 @@ import { BaseInput, type InputSize } from './BaseInput';
 import { BaseInputProps } from '@/lib/design-system/types';
 
 interface PercentInputProps extends BaseInputProps {
-  value: number; // 0-1 decimal format (e.g., 0.05 for 5%)
+  /** 0-1 decimal format (e.g., 0.05 for 5%); null renders the field empty (an unanswered intake field). */
+  value: number | null;
   onChange: (value: number) => void;
   placeholder?: string;
+  /**
+   * A fraction shown as the placeholder, formatted as the field formats its
+   * value (the intake's typical value); wins over `placeholder`.
+   */
+  placeholderValue?: number;
+  /** Show a committed 0 as "0.0" instead of an empty field (the intake). */
+  showZero?: boolean;
+  /**
+   * Called instead of onChange(0) when the visitor empties the field, so the
+   * caller can treat it as unanswered again.
+   */
+  onClear?: () => void;
   min?: number; // In decimal format (e.g., 0 for 0%)
   max?: number; // In decimal format (e.g., 1 for 100%)
   precision?: number; // Decimal places to show (default: 1)
@@ -32,10 +45,13 @@ interface PercentInputProps extends BaseInputProps {
 export function PercentInput({
   name,
   label,
-  value,
+  value: valueOrNull,
   onChange,
   className,
   placeholder = "0.0",
+  placeholderValue,
+  showZero = false,
+  onClear,
   required = false,
   help,
   error,
@@ -49,10 +65,12 @@ export function PercentInput({
   showSlider = false,
   ariaLabel,
 }: PercentInputProps) {
-  // Convert decimal to percentage for display
-  const percentValue = value * 100;
+  const value = valueOrNull ?? 0;
+  // Empty: no value (null), or a 0 the field does not show.
+  const isEmpty = valueOrNull === null || (value === 0 && !showZero);
+  const format = (fraction: number) => (fraction * 100).toFixed(precision);
   const [displayValue, setDisplayValue] = React.useState(
-    percentValue > 0 ? percentValue.toFixed(precision) : ''
+    !isEmpty && value >= 0 ? format(value) : ''
   );
   const [isFocused, setIsFocused] = React.useState(false);
 
@@ -61,23 +79,24 @@ export function PercentInput({
   // is being edited the user's raw text wins; otherwise a positive committed
   // value is authoritative (negative values keep the raw text, matching the
   // long-standing sync behavior). While focused the user's draft text always
-  // wins — a committed 0 mid-edit must not wipe the field (typing '0.5'
-  // would otherwise lose its leading keystrokes). Unfocused, 0 shows empty.
+  // wins: a committed 0 mid-edit must not wipe the field (typing '0.5'
+  // would otherwise lose its leading keystrokes). Unfocused, 0 shows empty
+  // (or "0.0" with showZero).
   const shownValue = isFocused
     ? displayValue
-    : value === 0
+    : isEmpty
       ? ''
-      : value > 0
-        ? (value * 100).toFixed(precision)
+      : value >= 0
+        ? format(value)
         : displayValue;
 
   const handleFocus = () => {
     setIsFocused(true);
     // Adopt the derived text so edits start from exactly what is shown.
-    if (value > 0) {
-      setDisplayValue((value * 100).toFixed(precision));
-    } else if (value === 0) {
+    if (isEmpty) {
       setDisplayValue('');
+    } else if (value >= 0) {
+      setDisplayValue(format(value));
     }
   };
 
@@ -107,6 +126,11 @@ export function PercentInput({
     }
     
     setDisplayValue(formattedValue);
+
+    if (cleanValue === '' && onClear) {
+      onClear();
+      return;
+    }
     
     // Convert percentage back to decimal for onChange
     const numericPercent = parseFloat(cleanValue.replace(/,/g, '')) || 0;
@@ -181,7 +205,7 @@ export function PercentInput({
       const cleanValue = displayValue.replace(/[^\d.-]/g, '');
       const numericPercent = parseFloat(cleanValue) || 0;
       
-      if (numericPercent !== 0) {
+      if (numericPercent !== 0 || (showZero && cleanValue !== '')) {
         setDisplayValue(numericPercent.toFixed(precision));
       } else {
         setDisplayValue('');
@@ -226,7 +250,7 @@ export function PercentInput({
           onPaste={handlePaste}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          placeholder={placeholder}
+          placeholder={placeholderValue === undefined ? placeholder : format(placeholderValue)}
           min={min * 100}
           max={max * 100}
           step={step * 100}

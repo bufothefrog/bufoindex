@@ -10,12 +10,10 @@ import { describe, expect, it } from 'vitest';
 import { FORMS } from '@/lib/calculators/forms';
 import {
   CORE_PATHS,
-  INTAKE_SKIP_LABEL,
-  KEEP_ASSUMPTIONS_LABEL,
   getIntakeScreens,
   isProfileFinished,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { resolveOptions, resolveText, summarizeScreen, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
@@ -156,18 +154,8 @@ describe('paycheck form: screens and fields', () => {
     ]);
   });
 
-  it('labels the skip on each screen by its tier', () => {
-    expect(FORM.screens.slice(3).map((s) => skipLabelFor(s))).toEqual([
-      INTAKE_SKIP_LABEL,
-      INTAKE_SKIP_LABEL,
-      INTAKE_SKIP_LABEL,
-      INTAKE_SKIP_LABEL,
-      INTAKE_SKIP_LABEL,
-      INTAKE_SKIP_LABEL,
-      KEEP_ASSUMPTIONS_LABEL,
-    ]);
-    expect(INTAKE_SKIP_LABEL).toBe('Skip, use a typical value');
-    expect(KEEP_ASSUMPTIONS_LABEL).toBe('Keep the default assumptions');
+  it('needs the own entry on the three basics only; Next takes the typical values after them', () => {
+    expect(FORM.screens.map((s) => nextNeedsOwnAnswer(s))).toEqual([true, true, true, false, false, false, false, false, false, false]);
   });
 });
 

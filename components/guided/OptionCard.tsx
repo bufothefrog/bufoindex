@@ -37,6 +37,11 @@ export interface OptionCardRadioProps extends OptionCardBaseProps {
   onSelect: () => void;
   /** Roving tabindex, managed by the parent radiogroup. */
   tabIndex?: number;
+  /**
+   * A small tag after the title ("Typical"). It is the card's accessible
+   * description, not part of its name; `id` must be unique on the page.
+   */
+  tag?: { id: string; text: string };
 }
 
 export type OptionCardProps = OptionCardLinkProps | OptionCardRadioProps;
@@ -52,7 +57,13 @@ const TONE = {
   selected: 'border-sage-400 bg-sage-50 text-foreground dark:border-sage-500 dark:bg-sage-800/50',
 } as const;
 
-function CardBody({ title, description, icon: Icon, selected }: OptionCardBaseProps & { selected?: boolean }) {
+function CardBody({
+  title,
+  description,
+  icon: Icon,
+  selected,
+  tag,
+}: OptionCardBaseProps & { selected?: boolean; tag?: OptionCardRadioProps['tag'] }) {
   return (
     <>
       {Icon && (
@@ -71,6 +82,15 @@ function CardBody({ title, description, icon: Icon, selected }: OptionCardBasePr
           )}
         >
           {title}
+          {tag && (
+            <span
+              id={tag.id}
+              aria-hidden="true"
+              className="ml-2 inline-block rounded-full border border-border px-2 py-0.5 align-middle text-xs font-medium text-muted-foreground"
+            >
+              {tag.text}
+            </span>
+          )}
         </span>
         {description && (
           <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
@@ -95,17 +115,18 @@ export function OptionCard(props: OptionCardProps) {
     );
   }
 
-  const { selected, onSelect, tabIndex } = props;
+  const { selected, onSelect, tabIndex, tag } = props;
   return (
     <button
       type="button"
       role="radio"
       aria-checked={selected}
+      aria-describedby={tag?.id}
       tabIndex={tabIndex}
       onClick={onSelect}
       className={cn(SURFACE, selected ? TONE.selected : TONE[tone], className)}
     >
-      <CardBody title={title} description={description} icon={icon} selected={selected} />
+      <CardBody title={title} description={description} icon={icon} selected={selected} tag={tag} />
       <span
         className={cn(
           'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',

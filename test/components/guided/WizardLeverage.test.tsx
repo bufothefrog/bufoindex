@@ -17,6 +17,7 @@ import { useProfileStore } from '@/lib/store/profileStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 import { answer, typeInto } from '@/test/utils/wizard';
+import { fillPay, skip, skipToEnd } from './wizardSteps';
 
 vi.mock('next/navigation', async () => (await import('@/test/utils/navigation')).nextNavigationFactory());
 
@@ -39,7 +40,8 @@ describe('Wizard, leverage intent', () => {
 
     expect(screen.getByRole('heading', { name: FACTS })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
-    expect(screen.getByLabelText('Your age')).toBeInTheDocument();
+    expect(screen.getByLabelText('Your age')).toHaveValue('');
+    expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '30');
     expect(screen.getByLabelText('Age you plan to stop contributing')).toBeInTheDocument();
     expect(screen.getByLabelText('Monthly taxable contribution')).toBeInTheDocument();
     // The comparison's own overrides are calculator-only.
@@ -55,10 +57,8 @@ describe('Wizard, leverage intent', () => {
     expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
     // The path count and seed are stated with the results, not on the form.
     expect(screen.queryByText(/simulated paths/)).not.toBeInTheDocument();
-    expect(screen.getByText('Good enough to start. You can change any answer on the calculator.')).toBeInTheDocument();
-    // The last screen has no "Skip the rest".
-    expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Keep the default assumptions' }));
+    expect(screen.queryByText(/Good enough to start/)).not.toBeInTheDocument();
+    await skip(user);
 
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
@@ -89,7 +89,7 @@ describe('Wizard, leverage intent', () => {
     answer(CORE_PATHS);
     render(<Wizard flow="leverage" />);
 
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
     expect(screen.getByRole('heading', { name: MARKET })).toBeInTheDocument();
     await typeInto('Index expected annual return', '6');
     await user.click(screen.getByRole('button', { name: /Finish/ }));
@@ -121,8 +121,10 @@ describe('Wizard, leverage intent', () => {
   it('lets a visitor who skipped core questions continue, until the profile is reset', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<Wizard flow="core" next="leverage" />);
-    await user.click(screen.getByRole('button', { name: 'Skip, use a typical value' }));
+    await skip(user);
+    await fillPay(user);
     await user.click(screen.getByRole('button', { name: /Next/ }));
+    await typeInto('Must-pay costs per month', '3000');
     await user.click(screen.getByRole('button', { name: /Finish/ }));
     expect(push).toHaveBeenCalledWith('/start/leverage');
     unmount();
@@ -146,12 +148,12 @@ describe('Wizard, leverage intent', () => {
     expect(replace).toHaveBeenCalledWith('/start?next=leverage');
   });
 
-  it('replaces itself with the comparison, no hash and no query, on "Skip the rest"', async () => {
+  it('replaces itself with the comparison, no hash and no query, after skipping every screen', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="leverage" />);
 
-    await user.click(screen.getByRole('button', { name: 'Skip the rest' }));
+    expect(await skipToEnd(user)).toBe(2);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);

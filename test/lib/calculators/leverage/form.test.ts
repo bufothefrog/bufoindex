@@ -11,7 +11,7 @@ import {
   CORE_PATHS,
   getIntakeScreens,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { resolveOptions, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
@@ -118,10 +118,9 @@ describe('leverage form: screens', () => {
     ]);
   });
 
-  it('skips with a typical value on the facts and keeps the default assumptions on the market screen', () => {
+  it('takes the typical values on Next on the facts and the market screen', () => {
     const [facts, market] = getIntakeScreens('leverage', fromDefaults());
-    expect(skipLabelFor(facts)).toBe('Skip, use a typical value');
-    expect(skipLabelFor(market)).toBe('Keep the default assumptions');
+    expect([nextNeedsOwnAnswer(facts), nextNeedsOwnAnswer(market)]).toEqual([false, false]);
   });
 
   it('leaves the path count and seed to the results (Model and caveats): no note on the market screen', () => {

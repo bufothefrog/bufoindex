@@ -12,7 +12,7 @@ import {
   CORE_PATHS,
   getIntakeScreens,
   remainingIntakeScreens,
-  skipLabelFor,
+  nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
 import { fieldMap, resolveOptions, resolveOverrideDefault, summarizeScreen } from '@/lib/fields/runtime';
@@ -199,13 +199,13 @@ describe('retirement form: screens', () => {
     );
   });
 
-  it('offers the typical-value skip on the topic screens and keeps the defaults on the assumptions', () => {
-    expect(['savings', 'target', 'ss-healthcare'].map((id) => skipLabelFor(screen(id)))).toEqual([
-      'Skip, use a typical value',
-      'Skip, use a typical value',
-      'Skip, use a typical value',
+  it('takes the typical values on Next on the topic screens and the assumptions', () => {
+    expect(['savings', 'target', 'ss-healthcare', 'assumptions'].map((id) => nextNeedsOwnAnswer(screen(id)))).toEqual([
+      false,
+      false,
+      false,
+      false,
     ]);
-    expect(skipLabelFor(screen('assumptions'))).toBe('Keep the default assumptions');
   });
 });
 

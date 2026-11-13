@@ -43,6 +43,7 @@ export interface ControlsSectionProps {
 export function ControlsSection({ idPrefix }: ControlsSectionProps) {
   const [number, setNumber] = useState(42);
   const [money, setMoney] = useState(75000);
+  const [blankMoney, setBlankMoney] = useState<number | null>(null);
   const [percent, setPercent] = useState(0.25);
   const [state, setState] = useState('CA');
   const [filing, setFiling] = useState('single');
@@ -141,6 +142,16 @@ export function ControlsSection({ idPrefix }: ControlsSectionProps) {
               onCommitNewTicker={setTicker}
             />
           </div>
+          <MoneyInput
+            name={`${idPrefix}-blank`}
+            label="Unanswered (intake)"
+            value={blankMoney}
+            onChange={setBlankMoney}
+            onClear={() => setBlankMoney(null)}
+            placeholderValue={3500}
+            showZero
+            help="null shows empty with the typical value as the placeholder; a typed 0 shows as 0."
+          />
           <MoneyInput
             name={`${idPrefix}-error`}
             label="Input with an error"
