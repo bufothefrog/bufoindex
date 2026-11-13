@@ -7,8 +7,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   calculateOptimalAllocation,
   getDefaultProfile,
-  validateProfile,
-  estimateMonthlyExpenses,
   formatCurrency,
   formatPercent,
   calculateCompoundGrowth,
@@ -198,139 +196,6 @@ describe('Core Paycheck Optimization', () => {
       expect(profile.preferences.emergencyFundMonths).toBe(3) // default profile caps the emergency fund at 3 months
       expect(profile.preferences.funMoney.min).toBe(300)
       expect(profile.preferences.funMoney.max).toBe(600)
-    })
-
-    it('should validate against its own validation rules', () => {
-      const profile = getDefaultProfile()
-      const errors = validateProfile(profile)
-      expect(Object.keys(errors)).toHaveLength(0)
-    })
-  })
-
-  describe('validateProfile', () => {
-    let validProfile: PaycheckProfile
-
-    beforeEach(() => {
-      validProfile = getDefaultProfile()
-    })
-
-    it('should pass validation for default profile', () => {
-      const errors = validateProfile(validProfile)
-      expect(errors).toEqual({})
-    })
-
-    it('should validate income fields', () => {
-      // Test gross income validation
-      const invalidGross = { ...validProfile, income: { ...validProfile.income, gross: 0 } }
-      expect(validateProfile(invalidGross).grossIncome).toBeDefined()
-
-      const invalidNet = { ...validProfile, income: { ...validProfile.income, net: 0 } }
-      expect(validateProfile(invalidNet).netIncome).toBeDefined()
-
-      // Test net > gross scenario
-      const netTooHigh = {
-        ...validProfile,
-        income: { ...validProfile.income, gross: 3000, net: 4000 }
-      }
-      expect(validateProfile(netTooHigh).netIncome).toBeDefined()
-    })
-
-    it('should validate tax bracket', () => {
-      const invalidBracket = {
-        ...validProfile,
-        taxes: { ...validProfile.taxes, federalBracket: 0.15 }
-      }
-      expect(validateProfile(invalidBracket).federalBracket).toBeDefined()
-
-      // Test valid brackets
-      const validBrackets = [0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
-      validBrackets.forEach(bracket => {
-        const profile = {
-          ...validProfile,
-          taxes: { ...validProfile.taxes, federalBracket: bracket }
-        }
-        expect(validateProfile(profile).federalBracket).toBeUndefined()
-      })
-    })
-
-    it('should validate employer 401k settings', () => {
-      // Invalid match percentage
-      const invalidMatch = {
-        ...validProfile,
-        benefits: {
-          ...validProfile.benefits,
-          employer401k: { ...validProfile.benefits.employer401k, matchPercent: 1.5 }
-        }
-      }
-      expect(validateProfile(invalidMatch).employerMatch).toBeDefined()
-
-      // Invalid contribution percentage
-      const invalidContrib = {
-        ...validProfile,
-        benefits: {
-          ...validProfile.benefits,
-          employer401k: { ...validProfile.benefits.employer401k, currentContribution: -0.1 }
-        }
-      }
-      expect(validateProfile(invalidContrib).currentContribution).toBeDefined()
-    })
-
-    it('should validate debt fields', () => {
-      const profileWithDebts = createPaycheckProfile({
-        debts: [
-          createDebtData({
-            name: 'Credit Card',
-            balance: 0,           // Invalid: zero balance
-            interestRate: 0.15,
-            minimumPayment: 100
-          }),
-          createDebtData({
-            name: 'Student Loan',
-            balance: 10000,
-            interestRate: 0.60,   // Invalid: 60% interest rate
-            minimumPayment: 150
-          }),
-          createDebtData({
-            name: 'Car Loan',
-            balance: 15000,
-            interestRate: 0.05,
-            minimumPayment: 0     // Invalid: zero payment
-          })
-        ]
-      })
-
-      const errors = validateProfile(profileWithDebts)
-      expect(errors.debt_0_balance).toBeDefined()
-      expect(errors.debt_1_rate).toBeDefined()
-      expect(errors.debt_2_payment).toBeDefined()
-    })
-
-    it('should validate preference ranges', () => {
-      // Emergency fund months
-      const invalidEmergency = {
-        ...validProfile,
-        preferences: { ...validProfile.preferences, emergencyFundMonths: 15 }
-      }
-      expect(validateProfile(invalidEmergency).emergencyFundMonths).toBeDefined()
-
-      // Fun money validation
-      const invalidFunMoney = {
-        ...validProfile,
-        preferences: {
-          ...validProfile.preferences,
-          funMoney: { min: -100, max: 200, current: 150 }
-        }
-      }
-      expect(validateProfile(invalidFunMoney).funMoneyMin).toBeDefined()
-
-      const funMoneyMaxTooLow = {
-        ...validProfile,
-        preferences: {
-          ...validProfile.preferences,
-          funMoney: { min: 500, max: 300, current: 400 }
-        }
-      }
-      expect(validateProfile(funMoneyMaxTooLow).funMoneyMax).toBeDefined()
     })
   })
 
@@ -531,8 +396,8 @@ describe('Core Paycheck Optimization', () => {
     })
 
     it('should never report a negative fun-money range', () => {
-      // The max input is not constrained to the min, and validateProfile only
-      // reports the error — it never blocks the calculation. A max below the
+      // The engine does not constrain the max to the min, and nothing in it
+      // blocks the calculation on that input. A max below the
       // min must not surface as a negative flexible-spending band.
       const inverted = createPaycheckProfile({
         ...mockProfile,
@@ -782,33 +647,6 @@ describe('Core Paycheck Optimization', () => {
   })
 
   describe('utility functions', () => {
-    describe('estimateMonthlyExpenses', () => {
-      it('should estimate expenses based on income and debts', () => {
-        const profile = createPaycheckProfile({
-          ...getDefaultProfile(),
-          income: { ...getDefaultProfile().income, net: 5000 },
-          debts: [
-            createDebtData({ name: 'Credit Card', balance: 3000, interestRate: 0.15, minimumPayment: 100 }),
-            createDebtData({ name: 'Car Loan', balance: 15000, interestRate: 0.05, minimumPayment: 300 })
-          ]
-        })
-
-        const estimate = estimateMonthlyExpenses(profile)
-
-        // Should be 70% of net income + debt payments
-        const expectedBase = 5000 * 0.7
-        const expectedDebts = 100 + 300
-        expect(estimate).toBe(expectedBase + expectedDebts)
-      })
-
-      it('should handle profiles with no debt', () => {
-        const profile = { ...getDefaultProfile(), debts: [] }
-        const estimate = estimateMonthlyExpenses(profile)
-
-        expect(estimate).toBe(profile.income.net * 0.7)
-      })
-    })
-
     describe('formatCurrency', () => {
       it('should format currency with proper locale', () => {
         expect(formatCurrency(1234.56)).toBe('$1,235')

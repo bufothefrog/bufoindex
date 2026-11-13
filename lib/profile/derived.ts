@@ -88,14 +88,6 @@ const DERIVED_RULES: Readonly<Record<string, (profile: FinancialProfile) => unkn
 /** The leaf paths whose typical value is derived. */
 export const DERIVED_PATHS: readonly string[] = Object.keys(DERIVED_RULES);
 
-/** The leaves each derived leaf reads, for tests and the wizard. */
-export const DERIVED_DEPENDENCIES: Readonly<Record<string, readonly string[]>> = {
-  'cash.emergencyFundBalance': ['spending.necessaryMonthly'],
-  'spending.targetRetirementIncome': ['spending.necessaryMonthly', 'spending.funMoneyMin', 'spending.funMoneyMax'],
-  'hsa.coverage': ['person.filingStatus'],
-  'assumptions.paycheck.expectedRetirementBracket': ['spending.targetRetirementIncome', 'person.filingStatus'],
-};
-
 /**
  * The profile with every unanswered derived leaf filled from the answers.
  * `answered` defaults to profile.provided; the wizard passes its own list

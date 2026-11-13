@@ -2014,8 +2014,7 @@ describe('inputs collected by the UI', () => {
    *
    * Trigger profile: `prefs-funmoney-min-above-max` (min 800, max 200) —
    * reachable because the max input is not constrained to the min, and
-   * `validateProfile` only reports the error, it never blocks
-   * `calculateOptimalAllocation`. It reported
+   * nothing in `calculateOptimalAllocation` rejects that input. It reported
    * `{ min: 800, max: 200, difference: -600 }`.
    *
    * A second, quieter case: `Number(max) || minFunMoneyMonthly || 0` treated a

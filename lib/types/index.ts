@@ -200,23 +200,5 @@ export interface AllocationResult {
   };
 }
 
-// Constants - imported from single source of truth
-import {
-  FEDERAL_TAX_BRACKETS_2026,
-  CONTRIBUTION_LIMITS_2026,
-} from '../constants/irs-2026';
-
-// Re-export with legacy keyed structure for backward compatibility
-export const TAX_BRACKETS = {
-  2026: {
-    single: FEDERAL_TAX_BRACKETS_2026.single,
-    marriedJoint: FEDERAL_TAX_BRACKETS_2026.marriedFilingJointly,
-  }
-} as const;
-
-export const CONTRIBUTION_LIMITS = {
-  2026: CONTRIBUTION_LIMITS_2026,
-} as const;
-
 // State income tax rates moved to lib/constants/states-2026.ts
 // (single source of truth). Import STATE_TAX_RATES_2026 from there.

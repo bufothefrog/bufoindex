@@ -29,8 +29,6 @@ import {
   calculateEmergencyFundCompletion,
   calculateEmployerMatch,
   calculateHighInterestDebt,
-  hasHighInterestDebt,
-  hasLowInterestDebt,
   calculateHSAOptimal,
   determineRothVsTraditional,
   calculateRothIRA,
@@ -388,40 +386,6 @@ describe('optimization.ts — paycheck allocation decisions', () => {
 
       const traditional = calculateEmployerMatch(buildProfile({ contributionType: 'traditional' }), 1000)!
       expect(traditional.taxImpact).toBeCloseTo(-traditional.amount * 0.22, 4)
-    })
-  })
-
-  // ────────────────────────────────────────────────────────────────────────
-  // High-interest debt (7% threshold)
-  // ────────────────────────────────────────────────────────────────────────
-  describe('hasHighInterestDebt / hasLowInterestDebt', () => {
-    it('classifies debt above 7% as high-interest', () => {
-      const profile = createPaycheckProfile({
-        debts: [createDebtData({ interestRate: 0.071, balance: 1000 })],
-      })
-      expect(hasHighInterestDebt(profile)).toBe(true)
-    })
-
-    it('classifies debt at exactly 7% as low-interest (strict > check)', () => {
-      const profile = createPaycheckProfile({
-        debts: [createDebtData({ interestRate: 0.07, balance: 1000 })],
-      })
-      expect(hasHighInterestDebt(profile)).toBe(false)
-      expect(hasLowInterestDebt(profile)).toBe(true)
-    })
-
-    it('classifies sub-7% debt with balance>0 as low-interest', () => {
-      const profile = createPaycheckProfile({
-        debts: [createDebtData({ interestRate: 0.04, balance: 15000 })],
-      })
-      expect(hasHighInterestDebt(profile)).toBe(false)
-      expect(hasLowInterestDebt(profile)).toBe(true)
-    })
-
-    it('returns false on empty debt list', () => {
-      const profile = createPaycheckProfile({ debts: [] })
-      expect(hasHighInterestDebt(profile)).toBe(false)
-      expect(hasLowInterestDebt(profile)).toBe(false)
     })
   })
 

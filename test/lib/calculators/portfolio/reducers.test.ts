@@ -23,7 +23,6 @@ import {
   portfolioWrites,
   pruneUnusedSecurities,
   readPortfolio,
-  removeAccount,
   removeClassTarget,
   removeCustomAssetClass,
   removeHolding,
@@ -79,7 +78,6 @@ describe('the reducers never mutate their input', () => {
     expect(() => {
       addSecurity(p);
       updateSecurity(p, 'sec-vti', { price: 1 });
-      removeAccount(p, 'acc-roth');
       addHolding(p);
       updateHolding(p, 'hld-roth-vti', { shares: 1 });
       removeHolding(p, 'hld-roth-bnd');
@@ -132,15 +130,6 @@ describe('account actions', () => {
     expect(goldId).toBe('cac-1');
     expect(againId).not.toBe(goldId);
     expect(again.securities.find((sec) => sec.id === 'sec-vti')?.assetClass).toBe(goldId);
-  });
-
-  it('removeAccount drops its holdings and garbage-collects orphaned securities', () => {
-    const { accounts, holdings, securities } = removeAccount(seed(), 'acc-roth');
-    expect(accounts.map((a) => a.id)).toEqual(['acc-brok']);
-    expect(holdings.map((h) => h.id)).toEqual(['hld-brok-vti', 'hld-brok-vxus']);
-    // BND was held only in the Roth, so its security is GC'd; VTI survives
-    // because the brokerage still holds it.
-    expect(securities.map((s) => s.id)).toEqual(['sec-vti', 'sec-vxus']);
   });
 });
 
@@ -324,7 +313,13 @@ describe('reading and writing the profile lists', () => {
     expect(portfolioWrites(before, before)).toEqual([]);
     const withCash = { ...before, newCash: [{ id: 'acc-brok', amount: 500 }] };
     expect(portfolioWrites(before, withCash)).toEqual([{ path: 'portfolio.newCash', value: withCash.newCash }]);
-    const after = removeAccount(before, 'acc-roth');
+    // Drop the Roth account and its holdings; BND was held only there, so its
+    // security goes too, while VTI stays because the brokerage still holds it.
+    const after = pruneUnusedSecurities({
+      ...before,
+      accounts: before.accounts.filter((a) => a.id !== 'acc-roth'),
+      holdings: before.holdings.filter((h) => h.accountId !== 'acc-roth'),
+    });
     expect(portfolioWrites(before, after)).toEqual([
       { path: 'portfolio.accounts', value: [before.accounts[1]] },
       { path: 'portfolio.securities', value: [before.securities[0], before.securities[1]] },

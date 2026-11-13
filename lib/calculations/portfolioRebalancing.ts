@@ -54,7 +54,6 @@ export const BUILTIN_ASSET_CLASSES = [
 
 export type BuiltinAssetClass = (typeof BUILTIN_ASSET_CLASSES)[number];
 
-export const DEFAULT_ACCOUNT_TYPE: AccountType = 'taxable';
 export const DEFAULT_ASSET_CLASS: AssetClass = 'other';
 
 /** A user-defined asset class, identified by a stable id and a display label. */

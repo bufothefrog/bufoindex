@@ -6,8 +6,9 @@
  *
  * Bounds follow plan section 2.3: the match rate 0-200% and its limit 0-25%
  * of pay, the 401(k) contribution 0-100%, and debt rates 0-50%. The
- * emergency fund target months are a shared fact (lib/fields/shared.ts). The old engine-side checks (validateProfile,
- * O18) live on as these bounds and the fun-money relation.
+ * emergency fund target months are a shared fact (lib/fields/shared.ts). The
+ * engine has no input checks of its own: these bounds and the fun-money
+ * relation are the paycheck allocator's input rules.
  */
 
 import { limitHsa } from '@/lib/calculations/contributionLimits';

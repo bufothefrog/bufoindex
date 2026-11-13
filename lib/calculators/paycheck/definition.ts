@@ -28,8 +28,8 @@ function paycheckEngineBase(): PaycheckProfile {
 }
 
 /**
- * No engine-level checks: validateProfile stays unwired (O18); its rules
- * live on as the form's field bounds and relations.
+ * No engine-level checks: the paycheck allocator's input rules are the
+ * form's field bounds and relations.
  */
 function noEngineChecks(): FieldErrors {
   return {};

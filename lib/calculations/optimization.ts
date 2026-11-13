@@ -183,18 +183,6 @@ function getHighInterestThreshold(): number {
 }
 
 /**
- * Check if profile has high-interest debt based on age-adjusted thresholds
- */
-export function hasHighInterestDebt(profile: PaycheckProfile): boolean {
-  const threshold = getHighInterestThreshold();
-  
-  return profile.debts.some(debt => {
-    // All debt uses the 7% threshold consistently
-    return debt.interestRate > threshold;
-  });
-}
-
-/**
  * Calculate high-interest debt payments with Money Guy thresholds
  */
 export function calculateHighInterestDebt(
@@ -620,13 +608,6 @@ export function calculateTaxableInvestment(
     annualEquivalent: monthlyEquivalent * 12,
     implementation: `Invest ${formatCurrency(availableAmount)} per paycheck in a taxable account`,
   };
-}
-
-/**
- * Check if profile has low-interest debt (under 7%)
- */
-export function hasLowInterestDebt(profile: PaycheckProfile): boolean {
-  return profile.debts.some(debt => debt.interestRate <= 0.07 && debt.balance > 0);
 }
 
 // Low-interest debt (FOO Step 8) is surfaced as a skipped item by

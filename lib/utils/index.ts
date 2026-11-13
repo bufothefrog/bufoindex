@@ -107,15 +107,3 @@ export function calculateHSATaxRate(
   return calculateIncomeTaxRate(federalRate, stateCode) + getFICARate(grossAnnualIncome, filingStatus);
 }
 
-/**
- * Calculate total marginal tax rate including federal, state, and FICA.
- * Use for display/informational purposes only. For tax savings on specific
- * contribution types, use calculateIncomeTaxRate or calculateHSATaxRate.
- */
-export function calculateMarginalTaxRate(federalRate: number, stateCode: string): number {
-  const stateRate = stateCode && STATE_TAX_RATES_2026[stateCode as keyof typeof STATE_TAX_RATES_2026]
-    ? STATE_TAX_RATES_2026[stateCode as keyof typeof STATE_TAX_RATES_2026].rate
-    : 0;
-
-  return federalRate + stateRate + FICA_RATE;
-}

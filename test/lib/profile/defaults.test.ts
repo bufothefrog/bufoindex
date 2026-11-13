@@ -23,7 +23,6 @@ import {
   PROFILE_LIST_PATHS,
   PROFILE_LIST_ROW_DEFAULTS,
   PROFILE_SECTIONS,
-  providedPathFor,
   TARGET_MIX_PRESETS,
   TARGET_MIX_WEIGHTS,
 } from '@/lib/profile/defaults';
@@ -346,11 +345,6 @@ describe('path registry', () => {
   });
 
   it('records rows and row fields by their list path', () => {
-    expect(providedPathFor('person.age')).toBe('person.age');
-    expect(providedPathFor('debts')).toBe('debts');
-    expect(providedPathFor('debts.3')).toBe('debts');
-    expect(providedPathFor('portfolio.accounts.1.balance')).toBe('portfolio.accounts');
-    expect(providedPathFor('not.a.path')).toBeNull();
     expect(normalizeProvided(['debts.0.balance', 'person.age', 'debts', 7, 'nope', 'person.age'])).toEqual([
       'debts',
       'person.age',

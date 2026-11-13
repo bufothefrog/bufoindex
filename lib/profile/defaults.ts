@@ -499,17 +499,6 @@ export function patchWrites(patch: ProfilePatch): Write[] {
   return out;
 }
 
-/**
- * The path `provided` records for a profile path: the path itself for a
- * leaf or a list, the list path for a row or a row field, and null for
- * anything that is not a profile path.
- */
-export function providedPathFor(path: string): string | null {
-  const info = classifyPath(path);
-  if (!info) return null;
-  return info.kind === 'leaf' ? path : info.kind === 'list' ? path : info.list;
-}
-
 function matchesRule(rule: ValueRule, value: unknown): boolean {
   if (value === null) return rule.nullable;
   if (rule.type === 'number') return isFiniteNumber(value) && (rule.min === undefined || value >= rule.min);
