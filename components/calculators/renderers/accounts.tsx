@@ -23,7 +23,7 @@
  */
 
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
@@ -49,6 +49,7 @@ import { formatCount, formatCurrency } from '@/lib/format';
 import {
   ACCOUNT_PATHS,
   accountDisplayName,
+  accountLabels,
   accountsInEffect,
   answeredPaths,
   holdingsOf,
@@ -97,23 +98,28 @@ export function removeAccountMessage(get: Get, account: AccountRow, writes: read
   return `${base} An empty ${ACCOUNT_KIND_LABELS[suggested.kind]} row stays while you answer Yes to '${seed}'.`;
 }
 
+const KIND_CHOICES = ACCOUNT_KIND_OPTIONS.map((option) => ({ value: option.value, label: option.label }));
+
 function holdingsText(count: number): string {
   return `${formatCount(count)} ${count === 1 ? 'holding' : 'holdings'}`;
 }
 
 interface AccountLineProps {
   account: AccountRow;
+  /** The row's name for its controls' accessible names, distinct across the list (accountLabels). */
+  label: string;
   suggested: boolean;
   get: Get;
   onWrite(writes: Write[]): void;
   open: boolean;
   onToggle(): void;
+  onRemoved(): void;
   idPrefix: string;
   large: boolean;
 }
 
 /** One account: the compact line, and its editor while open. */
-function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefix, large }: AccountLineProps) {
+function AccountLine({ account, label, suggested, get, onWrite, open, onToggle, onRemoved, idPrefix, large }: AccountLineProps) {
   const name = accountDisplayName(account);
   const kindLabel = ACCOUNT_KIND_LABELS[account.kind];
   const ownName = account.name.trim();
@@ -126,7 +132,10 @@ function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefi
 
   const remove = () => {
     const writes = removeAccountRow(get, account.id);
-    if (writes.length > 0 && window.confirm(removeAccountMessage(get, account, writes))) onWrite(writes);
+    if (writes.length > 0 && window.confirm(removeAccountMessage(get, account, writes))) {
+      onWrite(writes);
+      onRemoved();
+    }
   };
   const oneBalance = () => {
     if (window.confirm(`Remove the holdings of ${name}? Its balance is used again.`)) {
@@ -153,7 +162,7 @@ function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefi
             <MoneyInput
               name={`${idPrefix}-${account.id}-balance`}
               label=""
-              ariaLabel={`${name} balance`}
+              ariaLabel={`${label} balance`}
               value={suggested ? null : account.balance}
               showZero={!suggested}
               onChange={(value) => write(setAccountBalance(get, account.id, value))}
@@ -169,10 +178,10 @@ function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefi
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={editorId}
-          aria-label={`${open ? 'Close' : 'Edit'} ${name}`}
+          aria-label={`${open ? 'Done editing' : 'Edit'} ${label}`}
           className="min-h-11 gap-1.5 text-muted-foreground hover:text-foreground"
         >
-          <Pencil className="h-4 w-4" aria-hidden="true" />
+          {open ? <Check className="h-4 w-4" aria-hidden="true" /> : <Pencil className="h-4 w-4" aria-hidden="true" />}
           {open ? 'Done' : 'Edit'}
         </Button>
       </div>
@@ -183,7 +192,8 @@ function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefi
             name={`${idPrefix}-${account.id}-kind`}
             label="Kind"
             value={account.kind}
-            options={ACCOUNT_KIND_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+            // An account with holdings cannot become cash (setAccountField refuses it), so cash is not offered.
+            options={KIND_CHOICES.filter((option) => count === 0 || option.value !== 'cash')}
             onChange={(kind) => write(setAccountField(get, account.id, { kind: kind as AccountKind }))}
           />
           <div className="space-y-2">
@@ -231,7 +241,7 @@ function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefi
                 variant="ghost"
                 size="sm"
                 onClick={remove}
-                aria-label={`Remove ${name}`}
+                aria-label={`Remove ${label}`}
                 className="min-h-11 gap-1.5 text-muted-foreground hover:text-foreground"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -244,8 +254,6 @@ function AccountLine({ account, suggested, get, onWrite, open, onToggle, idPrefi
     </li>
   );
 }
-
-const KIND_CHOICES = ACCOUNT_KIND_OPTIONS.map((option) => ({ value: option.value, label: option.label }));
 
 /** The account list: one compact line per account in effect, then the suggested ones, and Add account. */
 function AccountsEditor({ spec, get, onWrite, error, size }: CustomRendererProps) {
@@ -263,6 +271,7 @@ function AccountsEditor({ spec, get, onWrite, error, size }: CustomRendererProps
   });
 
   const { rows, suggested } = accountsInEffect(get);
+  const labels = accountLabels(get);
   const lines = [...rows.map((account) => ({ account, suggested: false })), ...suggested.map((account) => ({ account, suggested: true }))];
 
   const add = () => {
@@ -284,11 +293,13 @@ function AccountsEditor({ spec, get, onWrite, error, size }: CustomRendererProps
             <AccountLine
               key={account.id}
               account={account}
+              label={labels.get(account.id) ?? accountDisplayName(account)}
               suggested={isSuggested}
               get={get}
               onWrite={onWrite}
               open={openId === account.id}
               onToggle={() => setOpenId(openId === account.id ? null : account.id)}
+              onRemoved={() => setOpenId(null)}
               idPrefix={id}
               large={large}
             />

@@ -12,6 +12,7 @@ import {
   ACCOUNT_KINDS,
   ACCOUNT_PATHS,
   accountDisplayName,
+  distinctAccountNames,
   accountLines,
   accountValue,
   accountsInEffect,
@@ -85,6 +86,30 @@ describe('kinds', () => {
     const base: AccountRow = { id: 'a', kind: 'hsa', name: '  ', balance: 0, holdsEmergencyFund: false };
     expect(accountDisplayName(base)).toBe('HSA');
     expect(accountDisplayName({ ...base, name: ' Fidelity HSA ' })).toBe('Fidelity HSA');
+  });
+
+  it('numbers the rows that share a display name, in list order, and keeps the others', () => {
+    const row = (id: string, kind: AccountRow['kind'], name = ''): AccountRow => ({
+      id,
+      kind,
+      name,
+      balance: 0,
+      holdsEmergencyFund: false,
+    });
+    const names = distinctAccountNames([
+      row('a', 'brokerage'),
+      row('b', 'hsa'),
+      row('c', 'brokerage'),
+      row('d', 'roth-ira', 'Brokerage (taxable)'),
+      row('e', 'roth-ira', 'Fidelity'),
+    ]);
+    expect([...names.entries()]).toEqual([
+      ['a', 'Brokerage (taxable) 1'],
+      ['b', 'HSA'],
+      ['c', 'Brokerage (taxable) 2'],
+      ['d', 'Brokerage (taxable) 3'],
+      ['e', 'Fidelity'],
+    ]);
   });
 
   it('counts cash, and a ticked brokerage only, as an emergency-fund account', () => {

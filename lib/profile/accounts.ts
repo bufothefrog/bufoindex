@@ -280,6 +280,35 @@ export function accountDisplayName(a: AccountRow): string {
   return a.name.trim() || ACCOUNT_KINDS[a.kind].label;
 }
 
+/**
+ * Each row's display name, made distinct for the controls' accessible names:
+ * rows that share a display name get ' 1', ' 2', ... in list order; every
+ * other row keeps its display name. Keyed by account id.
+ */
+export function distinctAccountNames(rows: readonly AccountRow[]): Map<string, string> {
+  const totals = new Map<string, number>();
+  for (const row of rows) totals.set(accountDisplayName(row), (totals.get(accountDisplayName(row)) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  const out = new Map<string, string>();
+  for (const row of rows) {
+    const name = accountDisplayName(row);
+    if ((totals.get(name) ?? 0) < 2) {
+      out.set(row.id, name);
+      continue;
+    }
+    const n = (seen.get(name) ?? 0) + 1;
+    seen.set(name, n);
+    out.set(row.id, `${name} ${n}`);
+  }
+  return out;
+}
+
+/** distinctAccountNames over the rows in effect and the suggested rows, in the order the account list shows them. */
+export function accountLabels(get: Get): Map<string, string> {
+  const { rows, suggested } = accountsInEffect(get);
+  return distinctAccountNames([...rows, ...suggested]);
+}
+
 // ---------------------------------------------------------------------------
 // Values
 // ---------------------------------------------------------------------------

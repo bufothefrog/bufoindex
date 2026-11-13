@@ -33,6 +33,7 @@ import { formatCurrency } from '@/lib/format';
 import {
   ACCOUNT_PATHS,
   accountDisplayName,
+  accountLabels,
   accountsInEffect,
   newCashFor,
   normalNewCash,
@@ -121,6 +122,8 @@ function NewCashEditor({ spec, get, onWrite, error, size }: CustomRendererProps)
   const labelId = `${id}-label`;
   const { describedBy } = fieldMessageIds(id, undefined, error);
   const candidates = rebalanceCandidates(get);
+  // Distinct across the account list, so two unnamed brokerages get distinct labels here too.
+  const labels = accountLabels(get);
   const overridden = new Set(listRows(get(ACCOUNT_PATHS.newCash)).map((row) => row.id));
   const write = (writes: ReturnType<typeof setNewCash>) => {
     if (writes.length > 0) onWrite(writes);
@@ -135,7 +138,7 @@ function NewCashEditor({ spec, get, onWrite, error, size }: CustomRendererProps)
         <p className="text-sm text-muted-foreground">No account can take new cash.</p>
       ) : (
         candidates.map((account) => {
-          const name = accountDisplayName(account);
+          const name = labels.get(account.id) ?? accountDisplayName(account);
           const normal = normalNewCash(get, account.id);
           return (
             <NullableField
