@@ -36,7 +36,10 @@ import {
 } from './savingsRateMarkers';
 
 export interface SavingsRateChartProps {
-  /** The curve's inputs plus monthlySavings and retirementAge for the visitor's markers. */
+  /**
+   * The curve's inputs plus monthlySavings, yearStartSavings and retirementAge
+   * for the visitor's markers.
+   */
   inputs: SavingsRateMarkerInputs;
 }
 
@@ -135,6 +138,7 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
     accumulationReturn,
     currentIncome,
     monthlySavings,
+    yearStartSavings,
     retirementAge,
   } = inputs;
   const { curve: data, currentSavingsRate, plannedPoint } = useMemo(
@@ -146,9 +150,19 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
         accumulationReturn,
         currentIncome,
         monthlySavings,
+        yearStartSavings,
         retirementAge,
       }),
-    [startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome, monthlySavings, retirementAge]
+    [
+      startingAge,
+      targetIncome,
+      startingBalance,
+      accumulationReturn,
+      currentIncome,
+      monthlySavings,
+      yearStartSavings,
+      retirementAge,
+    ]
   );
 
   const axis = chartAxisProps(theme);

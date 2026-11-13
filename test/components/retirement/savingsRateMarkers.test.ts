@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
+import { engineInputsFor } from '@/lib/calculators/runtime';
+import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
+import { ownerYearStartRaw } from '@/test/factories/accountsFixtures';
 import {
   savingsRateLabelPositions,
   savingsRateMarkers,
@@ -45,8 +49,9 @@ describe('savingsRateMarkers', () => {
     });
     expect(m.currentSavingsRate).toBeCloseTo(24, 10);
     // $10,000 grows to $147,853 over 35 years at 8%; the remaining
-    // $1,852,147 needs $807.43 a month at 8%/12 over 420 months, 9.689%.
-    expect(m.plannedPoint?.requiredSavingsRate).toBeCloseTo(9.689144, 5);
+    // $1,852,147 needs $864.45 a month at i = 1.08^(1/12) - 1 over 420
+    // months, 10.373%. (Before PR 5, at 8%/12: $807.43, 9.689%.)
+    expect(m.plannedPoint?.requiredSavingsRate).toBeCloseTo(10.373422, 5);
     expect(m.sentence).toBe('Your current savings rate is 24%. Retiring at 60 needs about 10%.');
   });
 
@@ -100,6 +105,25 @@ describe('savingsRateMarkers', () => {
     expect(capped.sentence).toBe(
       'Your current savings rate is 12%. Retiring at 45 needs 100% of current income or more.'
     );
+  });
+});
+
+describe('savingsRateMarkers: contribution timing (PR 5)', () => {
+  it('keeps the default sentence', () => {
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile());
+    const m = savingsRateMarkers(inputs);
+    // 65: 149.60 a month, 1.726% (138.04, 1.593% before PR 5).
+    expect(m.plannedPoint?.requiredSavingsRate).toBeCloseTo(1.726, 3);
+    expect(m.sentence).toBe('Your current savings rate is 18%. Retiring at 65 needs about 2%.');
+  });
+
+  it('reads the start-of-year share from monthlySavings and yearStartSavings', () => {
+    const inputs = { ...engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerYearStartRaw())), retirementAge: 45 };
+    expect(inputs.yearStartSavings).toBe(7500);
+    // Share 7,500 / (12 x 3,195) = 0.19562: 927.07 a month, 7.13%.
+    expect(savingsRateMarkers(inputs).plannedPoint?.requiredSavingsRate).toBeCloseTo(7.13, 2);
+    // The same inputs all monthly: 934.75 a month, 7.19%.
+    expect(savingsRateMarkers({ ...inputs, yearStartSavings: 0 }).plannedPoint?.requiredSavingsRate).toBeCloseTo(7.19, 2);
   });
 });
 

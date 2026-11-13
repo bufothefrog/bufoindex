@@ -5,18 +5,26 @@
  * implies for the target income, and that contribution as a share of the
  * current income.
  *
- * Moved verbatim from the retirement calculator's SavingsRateChart (rebuild
- * slice c2). The target income and the required contribution are in today's
- * dollars: the target is not inflated to the retirement year.
+ * Moved from the retirement calculator's SavingsRateChart (rebuild slice c2).
+ * The target income and the required contribution are in today's dollars:
+ * the target is not inflated to the retirement year.
+ *
+ * Contributions compound at the effective monthly rate (1 + r)^(1/12) - 1, the
+ * rate that grows the starting balance, and a share of each year's total may
+ * land at the start of the year (lib/calculations/contributionSchedule.ts).
  */
 
+import { scheduleFactor } from './contributionSchedule';
 import { calculateRequiredBalance, futureValue, type RetirementInputs } from './retirement';
 
 /** The inputs the curve reads. */
 export type SavingsRateInputs = Pick<
   RetirementInputs,
   'startingAge' | 'targetIncome' | 'startingBalance' | 'accumulationReturn' | 'currentIncome'
->;
+> & {
+  /** 0..1, default 0: share of the yearly total landing at the start of the year. */
+  yearStartShare?: number;
+};
 
 export interface SavingsRatePoint {
   retirementAge: number;
@@ -42,7 +50,7 @@ export function requiredSavingsCurve(inputs: SavingsRateInputs): SavingsRatePoin
   const requiredBalance = calculateRequiredBalance(inputs.targetIncome);
 
   const minAge = Math.max(inputs.startingAge + MIN_YEARS_TO_RETIREMENT, EARLIEST_RETIREMENT_AGE);
-  const monthlyRate = inputs.accumulationReturn / 12;
+  const yearStartShare = inputs.yearStartShare ?? 0;
 
   for (let retirementAge = minAge; retirementAge <= LATEST_RETIREMENT_AGE; retirementAge++) {
     const yearsToRetirement = retirementAge - inputs.startingAge;
@@ -62,12 +70,12 @@ export function requiredSavingsCurve(inputs: SavingsRateInputs): SavingsRatePoin
       continue;
     }
 
-    // Future value of an annuity: FVA = PMT * ((1 + r)^n - 1) / r, so
-    // PMT = FVA / (((1 + r)^n - 1) / r); with r = 0, PMT = FVA / n.
+    // The monthly-equivalent contribution whose schedule grows to the
+    // amount needed: PMT = FV / (future value per monthly-equivalent dollar).
+    // All monthly at i = (1 + r)^(1/12) - 1 that factor is ((1 + i)^n - 1) / i,
+    // and n at a zero return.
     const requiredMonthlySavings =
-      monthlyRate === 0
-        ? additionalNeeded / monthsToRetirement
-        : additionalNeeded / ((Math.pow(1 + monthlyRate, monthsToRetirement) - 1) / monthlyRate);
+      additionalNeeded / scheduleFactor(inputs.accumulationReturn, monthsToRetirement, yearStartShare);
 
     const requiredSavingsRate = Math.min(1, (requiredMonthlySavings * 12) / inputs.currentIncome);
 

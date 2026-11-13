@@ -10,6 +10,7 @@
  * loading the chart.
  */
 
+import { yearStartShareOf } from '@/lib/calculations/contributionSchedule';
 import type { RetirementInputs } from '@/lib/calculations/retirement';
 import {
   requiredSavingsCurve,
@@ -18,9 +19,13 @@ import {
 } from '@/lib/calculations/savingsRate';
 import { formatPercent } from '@/lib/format';
 
-/** The inputs the markers read: the curve's own plus savings and retirement age. */
-export type SavingsRateMarkerInputs = SavingsRateInputs &
-  Pick<RetirementInputs, 'monthlySavings' | 'retirementAge'>;
+/**
+ * The inputs the markers read: the curve's own plus savings, the yearly part
+ * of the savings and retirement age. The curve's start-of-year share comes
+ * from monthlySavings and yearStartSavings (yearStartShareOf).
+ */
+export type SavingsRateMarkerInputs = Omit<SavingsRateInputs, 'yearStartShare'> &
+  Pick<RetirementInputs, 'monthlySavings' | 'retirementAge' | 'yearStartSavings'>;
 
 export interface SavingsRateMarkers {
   /** The required-savings curve, one point per retirement age. */
@@ -256,6 +261,7 @@ export function savingsRateMarkers(inputs: SavingsRateMarkerInputs): SavingsRate
     startingBalance,
     accumulationReturn,
     currentIncome,
+    yearStartShare: yearStartShareOf(inputs.monthlySavings, inputs.yearStartSavings),
   });
 
   const hasIncome = Number.isFinite(currentIncome) && currentIncome > 0;

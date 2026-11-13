@@ -17,7 +17,9 @@ import {
   calculateCoastFire,
   calculateCoastFireAnalysis,
   calculateCoastFireNumber,
+  calculateMonthlyContributionsForCoastFire,
   calculateTimeToCoastFire,
+  findCoastFireAge,
   isCoastFireAchieved,
 } from '@/lib/calculations/coastFire'
 import type { RetirementInputs } from '@/lib/calculations/retirement'
@@ -235,5 +237,76 @@ describe('calculateCoastFire', () => {
       expect(analysis.insights).toHaveLength(1)
       expect(analysis.insights[0]).toContain('Add $822/month')
     })
+  })
+})
+
+describe('contribution timing and the effective monthly rate (PR 5)', () => {
+  it('share 0: the PMT equals the ec300fd expression shortfall x i / ((1 + i)^n - 1)', () => {
+    for (const [shortfall, r, years] of [
+      [345331.94, 0.07, 10],
+      [100000, 0.1, 25],
+      [5000, 0.03, 1],
+    ] as const) {
+      const i = Math.pow(1 + r, 1 / 12) - 1
+      const before = (shortfall * i) / (Math.pow(1 + i, years * 12) - 1)
+      const after = calculateMonthlyContributionsForCoastFire(shortfall, r, years)
+      expect(Math.abs(after - before) / before).toBeLessThan(1e-9)
+      expect(calculateMonthlyContributionsForCoastFire(shortfall, r, years, 0)).toBe(after)
+    }
+  })
+
+  it('share 1: the yearly amount at the start of each year (hand-computed)', () => {
+    // E1: 1,000 at the start of each of 3 years at 10% grows to 3,641, so a
+    // 3,641 shortfall needs 1,000 a year, 83.33 a month equivalent.
+    expect(calculateMonthlyContributionsForCoastFire(3641, 0.1, 3, 1)).toBeCloseTo(1000 / 12, 9)
+    // 345,331.94 over 10 years at 7%, all yearly:
+    // 12 x 1.07 x (1.07^10 - 1) / 0.07 = 177.40319 per monthly-equivalent dollar,
+    // 345,331.94 / 177.40319 = 1,946.59 (against 2,018.87 all monthly).
+    expect(calculateMonthlyContributionsForCoastFire(345331.94, 0.07, 10, 1)).toBeCloseTo(1946.59, 2)
+  })
+
+  it('a zero return divides the shortfall over the months at any share', () => {
+    expect(calculateMonthlyContributionsForCoastFire(12000, 0, 10)).toBeCloseTo(100, 10)
+    expect(calculateMonthlyContributionsForCoastFire(12000, 0, 10, 0.5)).toBeCloseTo(100, 10)
+  })
+
+  // Ages 30 to 40, no inflation, 4,000 a year of income: 100,000 required.
+  // At a 0% return the balance at k years is 12,000k; 9 years give 108,000.
+  const zeroReturn = makeInputs({
+    startingAge: 30,
+    retirementAge: 40,
+    targetIncome: 4000,
+    startingBalance: 0,
+    inflationRate: 0,
+    accumulationReturn: 0,
+    monthlySavings: 1000,
+  })
+
+  it('findCoastFireAge at a zero return now finds an age (it divided 0 by 0 before)', () => {
+    expect(findCoastFireAge(zeroReturn)).toBe(39)
+    // All of it once a year: 12,000 at the start of each year, the same 12,000k.
+    expect(findCoastFireAge({ ...zeroReturn, yearStartSavings: 12000 })).toBe(39)
+    expect(calculateCoastFire(zeroReturn).ageAchievable).toBe(39)
+  })
+
+  it('findCoastFireAge follows the yearly part (hand-computed)', () => {
+    // laterInputs (4,000 a month) coasts at 40 when paid monthly. Paid as
+    // 48,000 at the start of each year, the balance at 9 years coasts to
+    // (50,000 x 1.07^9 + 48,000 x 1.07 x (1.07^9 - 1) / 0.07) x 1.07^26
+    // = 4,106,452, short of the 4,220,794 required; at 10 years 4,385,205
+    // (4,247,316 paid monthly), so the age stays 40.
+    const monthly = makeInputs({ monthlySavings: 4000 })
+    expect(findCoastFireAge(monthly)).toBe(40)
+    expect(findCoastFireAge({ ...monthly, yearStartSavings: 0 })).toBe(40)
+    expect(findCoastFireAge({ ...monthly, yearStartSavings: 48000 })).toBe(40)
+    expect(findCoastFireAge({ ...monthly, startingBalance: 0, retirementAge: 31 })).toBeUndefined()
+  })
+
+  it('calculateCoastFire passes the start-of-year share to the PMT', () => {
+    // Share 48,000 / (12 x 4,000) = 1: 1,946.59 a month equivalent over the
+    // 10 years (2,018.87 when paid monthly).
+    const result = calculateCoastFire(makeInputs({ monthlySavings: 4000, yearStartSavings: 48000 }))
+    expect(result.yearsToCoast).toBe(10)
+    expect(result.monthlyContributionsUntilCoast).toBeCloseTo(1946.59, 2)
   })
 })
