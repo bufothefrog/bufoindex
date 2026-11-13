@@ -18,14 +18,21 @@ import { RETIREMENT_FORM } from '@/lib/calculators/retirement/form';
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
+import { resolveSocialSecurityBenefit } from '@/lib/calculators/retirement/socialSecurity';
 import type { Write } from '@/lib/fields/types';
 import type { FilingStatus, FinancialProfile, PayFrequency, ProfilePatch } from '@/lib/profile/types';
+import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
-/** A v1-shaped profile: the given sections over the defaults, normalized the way any stored profile is. */
-const v1 = (patch: ProfilePatch = {}): FinancialProfile => normalizeProfile(patch);
+/**
+ * A v1-shaped profile: the given sections over the 3bb0132 defaults the
+ * fixture was captured on, normalized the way any stored profile is, every
+ * field answered (test/factories/profile-3bb0132.ts).
+ */
+const v1 = (patch: ProfilePatch = {}): FinancialProfile => answeredAt3bb0132(patch);
 
-/** The default profile with `writes` applied (each must be a valid profile write). */
-const withWrites = (writes: Write[]): FinancialProfile => applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
+/** The 3bb0132 default profile, all answered, with `writes` applied (each must be a valid profile write). */
+const withWrites = (writes: Write[]): FinancialProfile =>
+  applyProfileWrites(answeredEverywhere(defaultProfileAt3bb0132()), writes).profile;
 
 /** Every RetirementInputs leaf; the Record type makes the compiler reject a missing or extra one. */
 const LEAVES: Readonly<Record<keyof RetirementInputs, true>> = {
@@ -121,16 +128,17 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
     expect(engineInputsFor(RETIREMENT_CALCULATOR, v1(patch))).toEqual({ ...DEFAULT_INPUTS, ...changed });
   });
 
-  it('pins the default profile value by value', () => {
+  it('pins the default profile value by value (the PR 3 worked example)', () => {
     expect(engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile())).toEqual({
-      startingAge: 30,
-      retirementAge: 60,
-      lifeExpectancy: 85,
-      targetIncome: 80000,
+      startingAge: 25,
+      retirementAge: 65,
+      lifeExpectancy: 90,
+      // Derived while unanswered: 12 x (3,000 + 450) = 41,400, to the nearest 1,000.
+      targetIncome: 41000,
       startingBalance: 25000,
-      // 3,500 every two weeks x 26.
-      currentIncome: 91000,
-      incomeAmount: 3500,
+      // 4,000 every two weeks x 26.
+      currentIncome: 104000,
+      incomeAmount: 4000,
       incomePeriod: 'biweekly',
       monthlySavings: 1500,
       necessaryMonthlyExpenses: 3000,
@@ -138,11 +146,13 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       retirementReturn: 0.06,
       inflationRate: 0.03,
       socialSecurityAge: 67,
-      socialSecurityBenefit: 30000,
+      // Auto: the estimate from 104,000 a year, 40,358.52 to the whole dollar
+      // (test/lib/calculations/socialSecurityEstimate.test.ts).
+      socialSecurityBenefit: 40359,
       healthcareCostMultiplier: 1,
       volatility: 0.15,
       filingStatus: 'single',
-      state: 'TX',
+      state: 'CA',
       riskProfile: 'tdf',
       effectiveTaxRate: null,
       estimatedAnnualHealthcareCost: null,
@@ -178,6 +188,64 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       riskProfile: 'custom',
       effectiveTaxRate: 0.18,
       healthcareCostMultiplier: 1.5,
+    });
+  });
+
+  describe('the Social Security benefit: answered, unanswered and Auto', () => {
+    const benefitIn = (profile: FinancialProfile) => engineInputsFor(RETIREMENT_CALCULATOR, profile).socialSecurityBenefit;
+
+    it('runs an answered number as entered', () => {
+      expect(benefitIn(withWrites([{ path: 'retirementIncome.socialSecurityBenefit', value: 24000 }]))).toBe(24000);
+      // 0 is an answer, not Auto.
+      expect(benefitIn(withWrites([{ path: 'retirementIncome.socialSecurityBenefit', value: 0 }]))).toBe(0);
+    });
+
+    it('runs the estimate from yearly gross pay on Auto (null)', () => {
+      // 3,500 every two weeks = 91,000 a year; AIME 7,583.33:
+      // 1,157.40 + 0.32 x (7,583.33 - 1,286) = 2,015.15 -> 3,172.55 a month, 38,070.56 a year.
+      expect(benefitIn(withWrites([{ path: 'retirementIncome.socialSecurityBenefit', value: null }]))).toBe(38071);
+      // Weekly pay of 2,100 = 109,200 a year; AIME 9,100:
+      // 1,157.40 + 2,068.16 + 0.15 x 1,351 = 202.65 -> 3,428.21 a month, 41,138.52 a year.
+      expect(
+        benefitIn(
+          withWrites([
+            { path: 'retirementIncome.socialSecurityBenefit', value: null },
+            { path: 'income.grossPerPaycheck', value: 2100 },
+            { path: 'income.frequency', value: 'weekly' },
+          ])
+        )
+      ).toBe(41139);
+    });
+
+    it('married filing jointly: still one worker\'s benefit from the household pay figure', () => {
+      const single = withWrites([{ path: 'retirementIncome.socialSecurityBenefit', value: null }]);
+      const joint = withWrites([
+        { path: 'retirementIncome.socialSecurityBenefit', value: null },
+        { path: 'person.filingStatus', value: 'marriedJoint' },
+      ]);
+      expect(benefitIn(joint)).toBe(benefitIn(single));
+    });
+
+    it('treats an unanswered stored benefit (the 3bb0132 default 30,000, unconfirmed) as Auto', () => {
+      // A profile saved at 3bb0132 with nothing answered: normalizeProfile loads the benefit as null.
+      const saved = JSON.parse(JSON.stringify({ ...defaultProfileAt3bb0132(), provided: ['person.age'] }));
+      expect(saved.retirementIncome.socialSecurityBenefit).toBe(30000);
+      const loaded = normalizeProfile(saved);
+      expect(loaded.retirementIncome.socialSecurityBenefit).toBeNull();
+      expect(benefitIn(loaded)).toBe(38071);
+    });
+
+    it('keeps an answered stored benefit from a profile saved at 3bb0132', () => {
+      const saved = JSON.parse(JSON.stringify(answeredEverywhere(defaultProfileAt3bb0132())));
+      const loaded = normalizeProfile(saved);
+      expect(loaded.retirementIncome.socialSecurityBenefit).toBe(30000);
+      expect(engineInputsFor(RETIREMENT_CALCULATOR, loaded)).toEqual(DEFAULT_INPUTS);
+    });
+
+    it('resolves the leaf through one helper', () => {
+      const read = RETIREMENT_BINDINGS.filter((binding) => binding.engine === 'socialSecurityBenefit');
+      expect(read).toHaveLength(1);
+      expect(isDerivedBinding(read[0]) && read[0].read).toBe(resolveSocialSecurityBenefit);
     });
   });
 

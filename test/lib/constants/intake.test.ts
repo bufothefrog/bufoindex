@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_FORM, FORMS, PROFILE_FORM, PROFILE_FORM_ORDER, formForFlow, profileFormSection } from '@/lib/calculators/forms';
+import {
+  CORE_FORM,
+  FORMS,
+  PROFILE_FORM,
+  PROFILE_FORM_ORDER,
+  formForFlow,
+  profileCompleteness,
+  profileFormSection,
+} from '@/lib/calculators/forms';
 import {
   CORE_PATHS,
   CORE_START_PATH,
@@ -15,6 +23,7 @@ import {
   getIntentOption,
   getLearnOption,
   isCoreComplete,
+  intentAsksScreen,
   isIntakeIntent,
   isProfileFinished,
   remainingIntakeScreens,
@@ -35,6 +44,7 @@ import {
   getDefaultFinancialProfile,
   isProfilePath,
 } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
 import type { FinancialProfile } from '@/lib/profile/types';
 import {
   OLD_CORE_FLOW,
@@ -100,20 +110,18 @@ describe('intake intents', () => {
 // against what those forms ask, so a calculator slice edits only its files.
 // ---------------------------------------------------------------------------
 
+// The old strategy preset screen is gone (slice c1): the preset was removed.
 const OLD_PROFILE_EXTRA_SCREENS: Record<string, OldScreenCopy> = {
   'cash-buffer': { title: 'What does your emergency fund look like today?' },
-  strategy: { title: 'Which starting point should the calculators use?' },
 };
 
 const OLD_PROFILE_EXTRA_QUESTIONS: Record<string, OldQuestion> = {
   'cash.emergencyFundBalance': { path: 'cash.emergencyFundBalance', label: 'Cash set aside for emergencies', kind: 'money', min: 0 },
   'cash.emergencyFundApy': { path: 'cash.emergencyFundApy', label: 'Interest rate (APY) on that cash', kind: 'percent', min: 0, max: 0.2 },
-  'strategy.preset': { path: 'strategy.preset', label: 'Strategy preset', kind: 'choice', options: [{ value: 'standard', label: 'Standard', description: 'About 3 months of must-pay costs in cash.' }, { value: 'cashflow-investor', label: 'Cash-flow investor', description: 'About 1 month of must-pay costs in cash.' }] },
 };
 
 const OLD_PROFILE_EXTRA_FLOW: readonly OldScreen[] = [
   ['cash-buffer', 'cash', ['cash.emergencyFundBalance', 'cash.emergencyFundApy']],
-  ['strategy', 'cash', ['strategy.preset']],
 ];
 
 /** The section each calculator form's screens take in the profile intake. */
@@ -125,22 +133,10 @@ const FORM_SECTIONS: Record<(typeof PROFILE_FORM_ORDER)[number], string> = {
 };
 
 /**
- * The profile form's own wording for a screen it trims (TRIMMED_SCREEN_COPY
- * in lib/calculators/forms.ts), keyed '<form>:<screen>'.
- */
-const TRIMMED_COPY: Readonly<Record<string, Pick<AskedScreen, 'title' | 'description'>>> = {
-  'leverage:facts': {
-    title: 'Leverage ratio',
-    description: undefined,
-  },
-};
-
-/**
  * What the profile intake should ask, built from what each flow asks: the
  * core, then each calculator's own intake screens in profile order, then the
  * old profile-only screens. A question is asked once, on the first screen
- * that asks it; a screen left with no question is dropped. A trimmed
- * screen takes its TRIMMED_COPY wording.
+ * that asks it; a screen left with no question is dropped.
  */
 function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: string }[] {
   const seen = new Set<string>();
@@ -152,8 +148,7 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
     for (const question of questions) seen.add(question.path);
     const id = ids.has(screen.id) ? `${source}-${screen.id}` : screen.id;
     ids.add(id);
-    const copy = questions.length < screen.questions.length ? TRIMMED_COPY[`${source}:${screen.id}`] : undefined;
-    out.push({ screen: { ...screen, ...copy, id, questions }, section });
+    out.push({ screen: { ...screen, id, questions }, section });
   };
   for (const screen of askedScreens('core', get)) take('core', screen, 'core');
   for (const id of PROFILE_FORM_ORDER) {
@@ -250,10 +245,12 @@ describe('intake screens', () => {
     }
   });
 
-  it('counts each intent from its form, without its optional screens', () => {
+  it('counts each intent from its form, without its optional, assumption and calculator-only screens', () => {
     for (const intent of CALCULATOR_INTENTS) {
       expect(screenIds(intent)).toEqual(
-        FORMS[intent].screens.filter((s) => s.surface !== 'calculator' && !s.optional).map((s) => s.id)
+        FORMS[intent].screens
+          .filter((s) => s.surface !== 'calculator' && !s.optional && s.tier !== 'assumption')
+          .map((s) => s.id)
       );
     }
     expect(screenIds('profile')).toEqual(PROFILE_FORM.screens.map((s) => s.id));
@@ -300,6 +297,65 @@ describe('intake screens', () => {
     ]);
     expect(ownAnswerMessage({ path: 'x', kind: 'money', label: 'X', tier: 'core' })).toBe('Enter a value');
     expect(ownAnswerMessage({ path: 'x', kind: 'choice', label: 'X', tier: 'core' })).toBe('Choose an answer');
+  });
+});
+
+describe('each intent intake asks only its calculator\'s profile questions', () => {
+  it('lists the screens of each intake in "all" mode', () => {
+    expect(screenIds('paycheck')).toEqual([
+      'about',
+      'pay',
+      'must-pay',
+      'spending-bonus',
+      'emergency-fund',
+      '401k',
+      'hsa',
+      'ira-taxable',
+      'debts',
+    ]);
+    expect(screenIds('retirement')).toEqual(['about', 'pay', 'must-pay', 'savings', 'target']);
+    expect(screenIds('portfolio')).toEqual(['targets', 'accounts', 'holdings']);
+    expect(screenIds('leverage')).toEqual(['facts']);
+  });
+
+  it('lists the screens each intake asks after the core', () => {
+    expect(remainingIds('paycheck', [...CORE_PATHS])).toEqual([
+      'spending-bonus',
+      'emergency-fund',
+      '401k',
+      'hsa',
+      'ira-taxable',
+      'debts',
+    ]);
+    expect(remainingIds('retirement', [...CORE_PATHS])).toEqual(['savings', 'target']);
+    expect(remainingIds('portfolio', [...CORE_PATHS])).toEqual(['targets', 'accounts', 'holdings']);
+    expect(remainingIds('leverage', [...CORE_PATHS])).toEqual(['facts']);
+  });
+
+  it('never asks an assumption, optional or calculator-only screen in any intent (intentAsksScreen)', () => {
+    for (const intent of CALCULATOR_INTENTS) {
+      for (const screen of getIntakeScreens(intent, fromDefaults())) {
+        expect(screen.tier, `${intent}/${screen.id}`).not.toBe('assumption');
+        expect(screen.optional, `${intent}/${screen.id}`).not.toBe(true);
+        expect(screen.surface, `${intent}/${screen.id}`).not.toBe('calculator');
+      }
+    }
+    const details: ScreenSpec = { id: 'd', title: 'D', tier: 'details', fields: [] };
+    expect(intentAsksScreen(details)).toBe(true);
+    expect(intentAsksScreen({ ...details, tier: 'assumption' })).toBe(false);
+    expect(intentAsksScreen({ ...details, optional: true })).toBe(false);
+  });
+
+  it('has nothing left to ask once the profile questions are answered, whatever the assumptions say', () => {
+    // The "nothing to ask" redirect (an empty remainingIntakeScreens) applies with every assumption,
+    // the leverage ratio and the claiming age still unanswered.
+    for (const intent of CALCULATOR_INTENTS) {
+      const asked = getIntakeScreens(intent, fromDefaults()).flatMap((screen) => screen.fields);
+      expect(asked.some((path) => path.startsWith('assumptions.')), intent).toBe(false);
+      expect(asked, intent).not.toContain('strategy.leverageRatio');
+      expect(asked, intent).not.toContain('retirementIncome.socialSecurityAge');
+      expect(remainingIntakeScreens(intent, profileWith([...CORE_PATHS, ...asked])), intent).toEqual([]);
+    }
   });
 });
 
@@ -360,17 +416,16 @@ describe('buildIntakeSubmission', () => {
     return out as unknown as FinancialProfile;
   };
 
-  it('writes the answered paths, then the preset-derived cash target', () => {
+  it('writes the answered paths and derives no emergency-fund months', () => {
     const result = buildIntakeSubmission(
       'paycheck',
       values({ person: { age: 27, state: 'CA' }, income: { grossPerPaycheck: 4200 } }),
       ['person.age', 'income.grossPerPaycheck', 'income.grossPerPaycheck']
     );
-    // The default preset is cashflow-investor (1 month); person.state was not answered.
+    // person.state was not answered.
     expect(result.writes).toEqual([
       { path: 'person.age', value: 27 },
       { path: 'income.grossPerPaycheck', value: 4200 },
-      { path: 'cash.targetMonths', value: 1 },
     ]);
     expect(result.providedPaths).toEqual(['person.age', 'income.grossPerPaycheck']);
   });
@@ -378,63 +433,28 @@ describe('buildIntakeSubmission', () => {
   it('drops unknown paths', () => {
     const result = buildIntakeSubmission('core', values(), ['person.age', 'person.nickname'], ['cash.targetMonths']);
     expect(result.providedPaths).toEqual(['person.age']);
-    expect(result.writes).toEqual([{ path: 'person.age', value: 30 }]);
+    expect(result.writes).toEqual([{ path: 'person.age', value: 25 }]);
   });
 
-  it('derives emergency months from the chosen preset without marking them provided', () => {
-    const cashflow = buildIntakeSubmission('profile', values({ strategy: { preset: 'cashflow-investor' } }), [
-      'strategy.preset',
-    ]);
-    expect(cashflow.writes).toEqual([
-      { path: 'strategy.preset', value: 'cashflow-investor' },
-      { path: 'cash.targetMonths', value: 1 },
-    ]);
-    expect(cashflow.providedPaths).toEqual(['strategy.preset']);
-
-    const standard = buildIntakeSubmission('profile', values({ strategy: { preset: 'standard' } }), [
-      'strategy.preset',
-    ]);
-    expect(standard.writes).toContainEqual({ path: 'cash.targetMonths', value: 3 });
-  });
-
-  it('leaves user-entered emergency months alone', () => {
-    const result = buildIntakeSubmission('profile', values(), ['strategy.preset'], ['cash.targetMonths']);
-    expect(result.writes.map((write) => write.path)).toEqual(['strategy.preset']);
-  });
-
-  it('derives emergency months from the profile preset when the preset question was not asked', () => {
-    // Paycheck, retirement, portfolio and leverage intakes never ask the
-    // preset; the working copy holds the profile's current one.
-    for (const intent of CALCULATOR_INTENTS) {
-      const cashflow = buildIntakeSubmission(intent, values({ cash: { targetMonths: 3 } }), ['person.age']);
-      expect(cashflow.writes, intent).toEqual([
-        { path: 'person.age', value: 30 },
-        { path: 'cash.targetMonths', value: 1 },
-      ]);
+  it('keeps stored emergency months that came from the old preset write, in every flow', () => {
+    // A profile saved before slice c1 may hold 1 month, written by the removed
+    // cash-flow investor preset without marking it provided. No intake rewrites it.
+    for (const flow of [...CALCULATOR_INTENTS, 'core', 'profile'] as const) {
+      const result = buildIntakeSubmission(flow, values({ cash: { targetMonths: 1 } }), ['person.age']);
+      expect(result.writes, flow).toEqual([{ path: 'person.age', value: 25 }]);
     }
-    const standard = buildIntakeSubmission(
-      'core',
-      values({ strategy: { preset: 'standard' }, cash: { targetMonths: 1 } }),
-      ['person.age']
-    );
-    expect(standard.writes).toContainEqual({ path: 'cash.targetMonths', value: 3 });
+  });
+
+  it('marks a "strategy.preset" answer from an old wizard session as unknown and drops it', () => {
+    const result = buildIntakeSubmission('profile', values(), ['strategy.preset', 'person.age']);
+    expect(result.providedPaths).toEqual(['person.age']);
+    expect(result.writes).toEqual([{ path: 'person.age', value: 25 }]);
   });
 
   it('keeps emergency months entered in the same intake', () => {
-    const result = buildIntakeSubmission('profile', values({ cash: { targetMonths: 6 } }), [
-      'strategy.preset',
-      'cash.targetMonths',
-    ]);
-    expect(result.writes).toEqual([
-      { path: 'strategy.preset', value: 'cashflow-investor' },
-      { path: 'cash.targetMonths', value: 6 },
-    ]);
-    expect(result.providedPaths).toEqual(['strategy.preset', 'cash.targetMonths']);
-  });
-
-  it('skips the derivation when the preset value is not a known preset', () => {
-    const result = buildIntakeSubmission('core', values({ strategy: { preset: 'yolo' } }), ['person.age']);
-    expect(result.writes).toEqual([{ path: 'person.age', value: 30 }]);
+    const result = buildIntakeSubmission('profile', values({ cash: { targetMonths: 6 } }), ['cash.targetMonths']);
+    expect(result.writes).toEqual([{ path: 'cash.targetMonths', value: 6 }]);
+    expect(result.providedPaths).toEqual(['cash.targetMonths']);
   });
 
   it('raises a retirement age at or below the current age to age + 1, after the answers', () => {
@@ -443,7 +463,6 @@ describe('buildIntakeSubmission', () => {
     ]);
     expect(result.writes).toEqual([
       { path: 'person.age', value: 62 },
-      { path: 'cash.targetMonths', value: 1 },
       { path: 'person.retirementAge', value: 63 },
     ]);
     expect(result.providedPaths).toEqual(['person.age']);
@@ -559,7 +578,7 @@ describe('LEARN_OPTIONS', () => {
 describe('coreSummary', () => {
   it('summarizes a complete core in one line', () => {
     expect(coreSummary(profileWith([...CORE_PATHS]))).toBe(
-      '30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs'
+      '25, CA, single, $4,000 gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs'
     );
   });
 
@@ -599,9 +618,9 @@ describe('coreSummary', () => {
   });
 
   it('words take-home pay, with the cadence on the gross amount when both are saved', () => {
-    expect(coreSummary(profileWith(['income.netPerPaycheck']))).toBe('$2,600 take-home');
+    expect(coreSummary(profileWith(['income.netPerPaycheck']))).toBe('$2,550 take-home');
     expect(coreSummary(profileWith(['income.netPerPaycheck', 'income.frequency']))).toBe(
-      'paid every 2 weeks, $2,600 take-home'
+      'paid every 2 weeks, $2,550 take-home'
     );
   });
 
@@ -609,7 +628,7 @@ describe('coreSummary', () => {
     const profile = profileWith([...CORE_PATHS]);
     const get = makeGet(profile);
     const cards = CORE_SCREENS.map((screen) => summarizeScreen(CORE_FORM, screen, get));
-    expect(cards).toEqual(['30, TX, single', '$3,500 gross every 2 weeks, $2,600 take-home', '$3,000 a month']);
+    expect(cards).toEqual(['25, CA, single', '$4,000 gross every 2 weeks, $2,550 take-home', '$3,000 a month']);
     expect(coreSummary(profile)).toBe(`${cards[0]}, ${cards[1]}, ${cards[2]} in must-pay costs`);
   });
 });
@@ -656,9 +675,12 @@ describe('isProfileFinished', () => {
   it('is true once the profile intake has nothing left, though a few fields are never asked', () => {
     const asked = intakePaths('profile');
     const neverAsked = PROFILE_LEAF_PATHS.filter((path) => !asked.includes(path));
-    // The derived emergency-month target is never asked; with the provisional
-    // forms neither is the contribution rate.
-    expect(neverAsked).toContain('cash.targetMonths');
+    // The calculator-only leaves (the leverage ratio, the claiming age) and the assumptions are never
+    // asked by the profile intake; the emergency-fund months are (slice c1).
+    expect(neverAsked).toContain('strategy.leverageRatio');
+    expect(neverAsked).toContain('retirementIncome.socialSecurityAge');
+    expect(neverAsked).toContain('assumptions.paycheck.riskTolerance');
+    expect(asked).toContain('cash.targetMonths');
     expect(isProfileFinished(profileWith(asked))).toBe(true);
     const required = PROFILE_FORM.screens.filter((s) => !s.optional);
     const lastFields = required[required.length - 1].fields;
@@ -668,14 +690,34 @@ describe('isProfileFinished', () => {
 
   it('does not wait for the optional screens', () => {
     const optionalPaths = PROFILE_FORM.screens.filter((s) => s.optional).flatMap((s) => s.fields);
-    expect(optionalPaths).toEqual([
-      'retirementIncome.socialSecurityBenefit',
-      'retirementIncome.socialSecurityAge',
-      'retirementIncome.annualHealthcareCost',
-    ]);
+    expect(optionalPaths).toEqual(['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost']);
     const required = intakePaths('profile').filter((path) => !optionalPaths.includes(path));
     expect(isProfileFinished(profileWith(required))).toBe(true);
     expect(isProfileFinished(profileWith([...required, ...optionalPaths]))).toBe(true);
     expect(isProfileFinished(profileWith(optionalPaths))).toBe(false);
+  });
+});
+
+describe('a profile finished at 3bb0132', () => {
+  // Every fact answered except the emergency fund target, which the profile
+  // form of 3bb0132 never asked; the cash-flow investor preset had written
+  // 1 month there without marking it provided.
+  const saved = {
+    ...getDefaultFinancialProfile(),
+    cash: { emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 1 },
+    provided: [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => path !== 'cash.targetMonths'),
+  };
+
+  it('loads the unanswered months as the typical 3, never 1', () => {
+    expect(migrateProfile(saved, 2).cash.targetMonths).toBe(3);
+  });
+
+  it('has one topic left, the emergency fund screen that now asks the months', () => {
+    const profile = migrateProfile(saved, 2);
+    expect(remainingIntakeScreens('profile', profile).map((screen) => screen.id)).toEqual(['emergency-fund']);
+    expect(isProfileFinished(profile)).toBe(false);
+    const completeness = profileCompleteness(profile);
+    expect(completeness.missing.map((screen) => screen.id)).toEqual(['emergency-fund']);
+    expect(completeness.provided).toBe(completeness.total - 1);
   });
 });

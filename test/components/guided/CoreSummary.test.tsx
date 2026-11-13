@@ -14,7 +14,7 @@ describe('CoreSummary', () => {
   it('recaps every saved core answer, take-home pay included', () => {
     render(<CoreSummary profile={{ ...getDefaultFinancialProfile(), provided: [...CORE_PATHS] }} />);
     expect(
-      screen.getByText('30, TX, single, $3,500 gross every 2 weeks, $2,600 take-home, $3,000 a month in must-pay costs')
+      screen.getByText('25, CA, single, $4,000 gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs')
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit the basics' })).toHaveAttribute('href', '/start');
   });

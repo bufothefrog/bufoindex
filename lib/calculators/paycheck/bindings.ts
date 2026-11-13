@@ -15,6 +15,13 @@
  *   and Roth shares.
  * - hasIRA (either IRA), hasTaxableAccount (a taxable contribution above
  *   zero) and the current fun money (the midpoint of the range).
+ * - The current federal bracket (currentBracketFrom): the 2026 bracket of
+ *   yearly gross pay (bonus included) minus the traditional 401(k) share
+ *   and HSA payroll contributions (each capped at its 2026 limit) minus the
+ *   standard deduction
+ *   (lib/calculations/taxBracket.ts).
+ * - The retirement bracket, read as the nearest of the seven bracket rates
+ *   (a stored value from the old free percent field is not rewritten).
  *
  * Everything else the engine reads with no profile home keeps its value
  * from the engine base (getDefaultProfile); PAYCHECK_ENGINE_ONLY lists each
@@ -22,6 +29,8 @@
  */
 
 import { updateLegacyIncomeFields } from '@/lib/calculations/core';
+import { limit401k, limitHsa } from '@/lib/calculations/contributionLimits';
+import { currentFederalBracket, nearestBracketRate } from '@/lib/calculations/taxBracket';
 import type { Binding } from '@/lib/fields/binding';
 import {
   AGE,
@@ -36,8 +45,8 @@ import {
   TAXABLE_MONTHLY,
 } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
-import type { ContributionType } from '@/lib/profile/types';
-import type { IncomeData, PaycheckProfile } from '@/lib/types';
+import type { ContributionType, FilingStatus } from '@/lib/profile/types';
+import type { HSABenefits, IncomeData, PaycheckProfile } from '@/lib/types';
 
 export const CONTRIBUTION_TYPE_PATH = 'workplace.contributionType';
 export const CONTRIBUTION_PATH = 'workplace.contributionPercent';
@@ -45,6 +54,7 @@ export const ROTH_PART_PATH = 'workplace.rothContributionPercent';
 const GROSS_PATH = GROSS_PAY.path;
 const NET_PATH = NET_PAY.path;
 const FREQUENCY_PATH = PAY_FREQUENCY.path;
+export const RETIREMENT_BRACKET_PATH = 'assumptions.paycheck.expectedRetirementBracket';
 
 /** The traditional and Roth shares of a 401(k) election. */
 export interface Election401k {
@@ -91,6 +101,50 @@ function incomeFrom(get: Get): IncomeData {
   });
 }
 
+/** Dollars to the cent, so a bracket edge is not missed by float drift. */
+const toCents = (value: number) => Math.round(value * 100) / 100;
+
+/**
+ * The visitor's current federal bracket: the 2026 bracket their taxable
+ * income falls in for their filing status. Taxable income is yearly gross
+ * pay (paychecks plus a regular bonus) minus the pre-tax payroll
+ * contributions the profile describes (the traditional share of the 401(k)
+ * election on regular pay, after the whole election is capped at the 2026
+ * deferral limit, and HSA payroll contributions capped at their 2026 limit) minus the standard deduction. The arithmetic is lib/calculations/taxBracket.ts.
+ */
+export function currentBracketFrom(get: Get): number {
+  const income = incomeFrom(get);
+  const yearlyPay = income.monthlyGross * 12;
+  const yearlyGross = yearlyPay + income.bonusExpected * 12;
+  const age = get(AGE.path) as number;
+  // Each deduction is capped at its 2026 limit for the age, as the engine
+  // applies them. The 402(g) deferral limit covers traditional and Roth
+  // deferrals together: the whole election is capped first and the
+  // traditional share of the capped total is pre-tax (the engine's
+  // preTaxDeferralShare pro-rates a split election the same way). The HSA is
+  // capped at the limit for the coverage less the employer's money.
+  const election = electionFrom(get);
+  const electedShare = election.traditional + election.roth;
+  const deferral = Math.min(yearlyPay * electedShare, limit401k(age));
+  const traditional401k =
+    get('workplace.has401k') === true && electedShare > 0 ? (deferral * election.traditional) / electedShare : 0;
+  const hsaRoom = Math.max(
+    0,
+    limitHsa(get('hsa.coverage') as HSABenefits['coverageType'], age) - (get('hsa.employerAnnualContribution') as number)
+  );
+  const hsa = get('hsa.eligible') === true ? Math.min((get('hsa.monthlyContribution') as number) * 12, hsaRoom) : 0;
+  return currentFederalBracket({
+    yearlyGross: toCents(yearlyGross),
+    preTaxDeductions: toCents(traditional401k + hsa),
+    filingStatus: get(FILING_STATUS.path) as FilingStatus,
+  });
+}
+
+/** The retirement bracket the engine compares with: the stored value read as the nearest bracket rate. */
+export function retirementBracketFrom(get: Get): number {
+  return nearestBracketRate(get(RETIREMENT_BRACKET_PATH) as number);
+}
+
 export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   // Income: the derived figures first, then the leaves the profile owns.
   {
@@ -108,6 +162,7 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   // Taxes.
   { profile: STATE.path, engine: 'taxes.state' },
   { profile: FILING_STATUS.path, engine: 'taxes.filingStatus' },
+  { engine: 'taxes.federalBracket', read: currentBracketFrom, errorPath: GROSS_PATH },
 
   // 401(k).
   { profile: 'workplace.has401k', engine: 'benefits.employer401k.available' },
@@ -164,7 +219,7 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
     read: (get) => (get(TAXABLE_MONTHLY.path) as number) > 0,
   },
   { profile: TAXABLE_MONTHLY.path, engine: 'preferences.taxableAccountContribution' },
-  { profile: 'assumptions.paycheck.expectedRetirementBracket', engine: 'preferences.expectedRetirementBracket' },
+  { engine: 'preferences.expectedRetirementBracket', read: retirementBracketFrom, errorPath: RETIREMENT_BRACKET_PATH },
   { profile: 'assumptions.paycheck.riskTolerance', engine: 'preferences.riskTolerance' },
   { profile: 'assumptions.paycheck.optimizationGoal', engine: 'preferences.optimizationGoal' },
 ];
@@ -180,7 +235,7 @@ export const PAYCHECK_ENGINE_ONLY: Readonly<Record<string, string>> = {
   'income.gross': 'Derived by updateLegacyIncomeFields in the income binding (legacy alias of monthlyGross).',
   'income.net': 'Derived by updateLegacyIncomeFields in the income binding (legacy alias of monthlyNet).',
   'income.bonusExpected': 'Derived by updateLegacyIncomeFields in the income binding (monthly bonus equivalent).',
-  'taxes.federalBracket': 'A fixed 22% bracket (O9); the allocator does not derive it from income.',
+  'taxes.federalBracket': 'Derived: the 2026 bracket of taxable pay (currentBracketFrom).',
   'taxes.currentWithholding.federal': 'Read only by the core.ts estimates; withholding stays internal (O12).',
   'taxes.currentWithholding.state': 'Read only by the core.ts estimates; withholding stays internal (O12).',
   'taxes.currentWithholding.fica': 'Read only by the core.ts estimates; withholding stays internal (O12).',

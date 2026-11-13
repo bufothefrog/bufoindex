@@ -1,6 +1,6 @@
 /**
- * The dashboard's pure derivations: the cash buffer under each strategy
- * preset, the automation checklist rows and the retirement summary with its
+ * The dashboard's pure derivations: the cash buffer against the emergency
+ * fund target, the automation checklist rows and the retirement summary with its
  * "save more" lever. Every expected figure is worked out by hand from the
  * profile below (or, for the seeded Monte Carlo figures, pinned once from the
  * engine and compared with a tolerance, since Node 22 and 24 can differ in
@@ -12,7 +12,6 @@ import {
   ASSUMED_PORTFOLIO_RETURN,
   buildChecklistRows,
   sortAllocations,
-  strategyDescription,
   summarizeCashBuffer,
   summarizeRetirement,
 } from '@/lib/dashboard/derive';
@@ -22,6 +21,7 @@ import { engineInputsFor } from '@/lib/calculators/runtime';
 import { formatCurrency } from '@/lib/format';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
+import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 import type { AllocationItem } from '@/lib/types';
 import { toTodaysDollars } from '@/lib/utils/displayDollars';
 
@@ -29,9 +29,14 @@ type Overrides = {
   [K in keyof FinancialProfile]?: FinancialProfile[K] extends unknown[] ? FinancialProfile[K] : Partial<FinancialProfile[K]>;
 };
 
-/** The default profile with some sections partly replaced. */
+/**
+ * The 3bb0132 default profile (30, TX, $3,500 every two weeks, 6% to the
+ * 401(k)), every field answered, with some sections partly replaced. The
+ * figures below were worked out on it; the PR 3 defaults have their own
+ * tests.
+ */
 function profileWith(overrides: Overrides = {}): FinancialProfile {
-  const base = getDefaultFinancialProfile();
+  const base = answeredEverywhere(defaultProfileAt3bb0132());
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(overrides)) {
     const current = (base as unknown as Record<string, unknown>)[key];
@@ -60,33 +65,27 @@ describe('ASSUMED_PORTFOLIO_RETURN', () => {
   });
 });
 
-describe('strategyDescription', () => {
-  it('describes each preset with its cash months, and the leverage ratio for the cash-flow investor', () => {
-    expect(strategyDescription('standard', 2)).toBe(
-      '3 months of necessary expenses in cash and unleveraged index funds for every contribution.'
-    );
-    expect(strategyDescription('cashflow-investor', 2)).toBe(
-      '1 month of necessary expenses in cash, with steady income as the backstop, and a 2x daily-reset fund compared for taxable contributions.'
-    );
-    expect(strategyDescription('cashflow-investor', 1.5)).toContain('a 1.5x daily-reset fund');
-  });
-});
-
 describe('summarizeCashBuffer', () => {
-  it('measures the default profile against its 3-month target: a $4,000 shortfall', () => {
+  it('measures the PR 3 default profile (nothing answered): the derived balance is the 3-month target', () => {
+    // Unanswered, the balance is 3 x $3,000 of must-pay costs = $9,000, whatever is stored.
+    const stored = { ...getDefaultFinancialProfile(), cash: { ...getDefaultFinancialProfile().cash, emergencyFundBalance: 5000 } };
+    const cash = summarizeCashBuffer(stored);
+    expect([cash.balance, cash.target, cash.shortfall, cash.excess]).toEqual([9000, 9000, 0, 0]);
+    expect(cash.monthsOnHand).toBeCloseTo(3, 12);
+    // Must-pay costs answered as $2,000: the derived balance follows, $6,000.
+    const answered = { ...stored, spending: { ...stored.spending, necessaryMonthly: 2000 }, provided: ['spending.necessaryMonthly'] };
+    expect(summarizeCashBuffer(answered).balance).toBe(6000);
+  });
+
+  it('measures the answered 3bb0132 example against its 3-month target: a $4,000 shortfall', () => {
     // $5,000 on hand, $3,000 a month of necessary expenses, 3 target months, 4% APY.
     const cash = summarizeCashBuffer(profileWith());
     expect(cash.balance).toBe(5000);
     expect(cash.necessaryMonthly).toBe(3000);
     expect(cash.monthsOnHand).toBeCloseTo(5 / 3, 12);
-    expect(cash.presets).toEqual([
-      { preset: 'cashflow-investor', months: 1, target: 3000 },
-      { preset: 'standard', months: 3, target: 9000 },
-    ]);
-    expect(cash.activePreset).toBe('cashflow-investor');
-    expect(cash.activeMonths).toBe(3);
-    expect(cash.activeTarget).toBe(9000);
-    expect(cash.usesCustomTarget).toBe(false);
+    expect(cash.targetMonths).toBe(3);
+    expect(cash.target).toBe(9000);
+    expect(cash).not.toHaveProperty('presets');
     expect(cash.excess).toBe(0);
     expect(cash.shortfall).toBe(4000);
     expect(cash.costSpread).toBeCloseTo(0.03, 12);
@@ -100,11 +99,10 @@ describe('summarizeCashBuffer', () => {
       profileWith({
         spending: { necessaryMonthly: 4200 },
         cash: { emergencyFundBalance: 30000, emergencyFundApy: 0.04, targetMonths: 3 },
-        strategy: { preset: 'standard' },
       })
     );
     expect(cash.monthsOnHand).toBeCloseTo(30000 / 4200, 12);
-    expect(cash.activeTarget).toBe(12600);
+    expect(cash.target).toBe(12600);
     expect(cash.excess).toBe(17400);
     expect(cash.shortfall).toBe(0);
     expect(cash.costSpread).toBeCloseTo(0.03, 12);
@@ -128,24 +126,21 @@ describe('summarizeCashBuffer', () => {
     expect(cash.necessaryMonthly).toBe(0);
     expect(cash.balance).toBe(0);
     expect(cash.monthsOnHand).toBeNull();
-    expect(cash.activeMonths).toBe(0);
-    expect(cash.activeTarget).toBe(0);
-    expect(cash.presets.map((p) => p.target)).toEqual([0, 0]);
+    expect(cash.targetMonths).toBe(0);
+    expect(cash.target).toBe(0);
     expect(cash.excess).toBe(0);
     expect(cash.shortfall).toBe(0);
   });
 
-  it('uses a custom target only when the visitor entered months that differ from the preset', () => {
-    const entered = (targetMonths: number, preset: FinancialProfile['strategy']['preset']) =>
-      summarizeCashBuffer({
-        ...profileWith({ cash: { targetMonths }, strategy: { preset } }),
-        provided: ['cash.targetMonths'],
-      }).usesCustomTarget;
-    expect(entered(2, 'cashflow-investor')).toBe(true);
-    expect(entered(1, 'cashflow-investor')).toBe(false);
-    expect(entered(3, 'standard')).toBe(false);
-    // Not entered: a target that differs from the preset still follows it.
-    expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 2 } })).usesCustomTarget).toBe(false);
+  it('measures against the stored months whether or not the visitor entered them, up to 60', () => {
+    // The summary reads the months it is given, answered or not: 1 month is $3,000. (Loading a stored
+    // profile turns an unanswered 1 into 3 first: lib/profile/defaults.ts UNANSWERED_LOADS_AS.)
+    const unmarked = { ...profileWith({ cash: { targetMonths: 1 } }), provided: ['cash.emergencyFundBalance'] };
+    expect(summarizeCashBuffer(unmarked).target).toBe(3000);
+    const entered = summarizeCashBuffer(profileWith({ cash: { targetMonths: 6 } }));
+    expect([entered.targetMonths, entered.target, entered.shortfall]).toEqual([6, 18000, 13000]);
+    // 60 months of $3,000 is $180,000.
+    expect(summarizeCashBuffer(profileWith({ cash: { targetMonths: 60 } })).target).toBe(180000);
   });
 });
 
@@ -209,7 +204,7 @@ describe('buildChecklistRows', () => {
 });
 
 describe('summarizeRetirement', () => {
-  it('runs the calculator on the default profile and the same markets with $500 more a month', () => {
+  it('runs the calculator on the answered 3bb0132 example and the same markets with $500 more a month', () => {
     const inputs = engineInputsFor(RETIREMENT_CALCULATOR, profileWith());
     const outcome = summarizeRetirement(inputs);
     if (outcome.status !== 'ok') throw new Error('expected a result');

@@ -21,6 +21,8 @@ import { AGE, FILING_STATUS, RETIREMENT_AGE } from '@/lib/fields/shared';
 import type { CrossFieldRule, FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
 import { retirementFilingStatus } from './bindings';
+import { SOCIAL_SECURITY_AGE_PATH, claimingAgeLabel } from './claiming';
+import { SOCIAL_SECURITY_BENEFIT_PATH, estimatedSocialSecurityBenefit } from './socialSecurity';
 
 const RISK_PROFILE_PATH = 'assumptions.retirement.riskProfile';
 
@@ -42,7 +44,6 @@ export const TARGET_RETIREMENT_INCOME: FieldSpec = {
     const future = num(get, 'spending.targetRetirementIncome') * Math.pow(1 + inflation, years);
     return `That's ${formatCurrency(Math.round(future))} in future dollars`;
   },
-  placeholder: '80,000',
   min: 0,
   tier: 'details',
   summary: (value) => `${formatCurrency(value as number)}/yr target`,
@@ -74,27 +75,44 @@ export const LIFE_EXPECTANCY_AFTER_RETIREMENT: CrossFieldRule = {
 // Social Security and healthcare
 // ---------------------------------------------------------------------------
 
+/**
+ * The benefit at full retirement age. Auto (null, the default) is an estimate
+ * from pay (./socialSecurity.ts), which is also where an override starts; the
+ * Auto label and the summary say "estimate", so it never reads as the
+ * visitor's own number.
+ */
 export const SOCIAL_SECURITY_BENEFIT: FieldSpec = {
-  path: 'retirementIncome.socialSecurityBenefit',
+  path: SOCIAL_SECURITY_BENEFIT_PATH,
   kind: 'money',
   label: 'Social Security benefit',
   hint: 'A yearly amount; ssa.gov/myaccount shows your estimate.',
-  placeholder: '30,000',
   min: 0,
+  nullable: { autoLabel: 'Estimate from your pay', overrideDefault: estimatedSocialSecurityBenefit },
   tier: 'details',
   summary: (value, get) =>
-    `Social Security ${formatCurrency(value as number)}/yr at ${num(get, 'retirementIncome.socialSecurityAge')}`,
+    value === null
+      ? `Social Security estimate ${formatCurrency(estimatedSocialSecurityBenefit(get))}/yr`
+      : `Social Security ${formatCurrency(value as number)}/yr`,
 };
 
+/** Renderer id of the claiming-age control (components/calculators/renderers/retirement.tsx). */
+export const CLAIMING_AGE_RENDERER = 'socialSecurityClaiming';
+
+/**
+ * The claiming age, a calculator-only control: three choices (62, 67, 70)
+ * next to a table of the yearly benefit at each (./claiming.ts). The stored
+ * age may be any whole age in the bounds; the control shows the nearest
+ * choice.
+ */
 export const SOCIAL_SECURITY_AGE: FieldSpec = {
-  path: 'retirementIncome.socialSecurityAge',
-  kind: 'number',
-  label: 'Social Security age',
-  help: `Between ${RetirementConstants.SS_MIN_AGE} and ${RetirementConstants.SS_MAX_AGE}.`,
+  path: SOCIAL_SECURITY_AGE_PATH,
+  kind: 'custom',
+  renderer: CLAIMING_AGE_RENDERER,
+  label: 'Social Security claiming age',
   min: RetirementConstants.SS_MIN_AGE,
   max: RetirementConstants.SS_MAX_AGE,
-  step: 1,
   tier: 'details',
+  summary: (value) => `claim at ${claimingAgeLabel(value)}`,
 };
 
 export const ANNUAL_HEALTHCARE_COST: FieldSpec = {

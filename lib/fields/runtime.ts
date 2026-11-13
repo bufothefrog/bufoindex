@@ -224,6 +224,9 @@ export function fieldError(spec: FieldSpec, value: unknown, get: Get): string | 
         ? `${spec.label} must be at least ${formatFieldValue(spec, min as number)}.`
         : `${spec.label} must be at most ${formatFieldValue(spec, max as number)}.`;
     }
+    // precision 0 means whole numbers only; the input blocks typing a
+    // decimal, so this catches a stored one (months were in steps of 0.5).
+    if (spec.precision === 0 && !Number.isInteger(value)) return `${spec.label} must be a whole number.`;
   } else if (NUMERIC_KINDS.has(spec.kind)) {
     return `${spec.label} must be a number.`;
   }

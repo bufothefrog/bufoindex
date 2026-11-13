@@ -332,7 +332,7 @@ export function calculateStepStatus(
           if (isComplete) return `Emergency fund complete (${formatCurrency(profile.preferences.currentEmergencyFund)})`;
           if (profile.preferences.necessaryExpenses <= 0) return NO_EXPENSE_TARGET;
           if (isUrgent) return `Need ${formatCurrency(profile.preferences.necessaryExpenses)} emergency fund`;
-          return allocation ? `Building emergency fund` : `Build 1-month emergency fund`;
+          return allocation ? `Building emergency fund` : `Build starter emergency fund`;
 
         case 'employer-match':
           if (isComplete) return `Employer match maximized`;

@@ -34,6 +34,7 @@ import {
 import { applyWrites, getAt, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, listRows, relationErrors, visibleScreenFields } from '@/lib/fields/runtime';
 import type { FieldErrors, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
+import { DERIVED_PATHS, withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { cn } from '@/lib/utils';
@@ -292,7 +293,24 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
   const screensAt = (values: FinancialProfile) =>
     flowScreens(flow, makeGet(values), mode, initiallyProvided, onlyScreen);
 
-  const answers = progress.answers;
+  // Answered on arrival or in this visit: shown with the saved value.
+  const answeredPaths = useMemo(
+    () => [...initiallyProvided, ...progress.provided],
+    [initiallyProvided, progress.provided]
+  );
+  // A derived leaf (lib/profile/derived.ts) the visitor has neither answered
+  // nor edited follows the working answers: the emergency fund balance shown
+  // on its screen is three months of the must-pay costs answered earlier.
+  const derivedOver = (values: FinancialProfile, edited: readonly string[]) =>
+    withDerivedValues(values, [...answeredPaths, ...edited]);
+  const editedPaths = useMemo(() => Object.values(progress.touched).flat(), [progress.touched]);
+  const answers = useMemo(
+    () => withDerivedValues(progress.answers, [...answeredPaths, ...editedPaths]),
+    [progress.answers, answeredPaths, editedPaths]
+  );
+  // The typical value of each derived leaf, ignoring the visitor's edit of it
+  // (the choice's "Typical" tag once another option is picked).
+  const typicals = useMemo(() => withDerivedValues(progress.answers, answeredPaths), [progress.answers, answeredPaths]);
   const get = useMemo(() => makeGet(answers), [answers]);
   const arrival = useMemo(() => makeGet(seed), [seed]);
   const screens = useMemo(
@@ -303,8 +321,6 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
   const screen = screens[step];
   const isLast = step === screens.length - 1;
   const isProfileIntent = flow === 'profile';
-  // Answered on arrival or in this visit: shown with the saved value.
-  const answeredPaths = [...initiallyProvided, ...progress.provided];
   const acceptsTypical = !nextNeedsOwnAnswer(screen);
 
   // Move focus to the new question (and back to the top on phones) whenever
@@ -372,10 +388,17 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
 
   const advance = (writes?: Write[]) => {
     if (submitting) return;
-    const nextAnswers = writes ? applyWrites(answers, writes) : answers;
+    const raw = writes ? applyWrites(progress.answers, writes) : progress.answers;
+    const nextAnswers = writes ? derivedOver(raw, [...editedPaths, ...writes.map((w) => w.path)]) : answers;
     const nextScreens = writes ? screensAt(nextAnswers) : screens;
     const current = nextScreens[Math.min(step, nextScreens.length - 1)];
     const nextGet = makeGet(nextAnswers);
+    // Next takes a blank derived leaf's grey value as the answer, like any
+    // typical value: it is written before the screen is marked answered.
+    const own = visibleScreenFields(form, current, nextGet).map((spec) => spec.path);
+    const derivedWrites: Write[] = DERIVED_PATHS.filter(
+      (path) => own.includes(path) && getAt(nextAnswers, path) !== getAt(raw, path)
+    ).map((path) => ({ path, value: getAt(nextAnswers, path) }));
     const keepWrites = () => {
       if (writes) setProgress((prev) => editScreen(form, prev, current, writes));
     };
@@ -404,7 +427,7 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
       return;
     }
 
-    const confirmed = answerScreen(form, progress, current, writes);
+    const confirmed = answerScreen(form, progress, current, [...derivedWrites, ...(writes ?? [])]);
     setProgress(confirmed);
     save(confirmed);
     clearErrors();
@@ -475,7 +498,7 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
         blank,
         // What Next would accept: the working value while blank, the value on
         // arrival (for the choice's tag) once the visitor has chosen.
-        typical: blank ? value : getAt(seed, spec.path),
+        typical: blank ? value : getAt(DERIVED_PATHS.includes(spec.path) ? typicals : seed, spec.path),
         typicalTag: acceptsTypical && unanswered,
         onClear: unanswered ? () => clear(spec) : undefined,
         showZero: true,

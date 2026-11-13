@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { setAt } from '@/lib/fields/paths';
 import type { FieldErrors, FormSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { createCalculatorStore } from '@/lib/store/createCalculatorStore';
 
@@ -60,8 +60,9 @@ function definition(debounceMs: number): CalculatorDefinition<Engine, Results> {
   };
 }
 
+/** Built on the 3bb0132 defaults (age 30, retirement age 60), which the pins below assume. */
 function profileWith(values: Record<string, unknown> = {}): FinancialProfile {
-  let profile = getDefaultFinancialProfile();
+  let profile = defaultProfileAt3bb0132();
   for (const [path, value] of Object.entries(values)) profile = setAt(profile, path, value);
   return profile;
 }
@@ -78,7 +79,7 @@ function manualRunner() {
   return { runner, calls };
 }
 
-// Defaults: age 30, retirementAge 60, so years 30 and total 60.
+// 3bb0132 defaults: age 30, retirementAge 60, so years 30 and total 60.
 const DEFAULT_RESULTS: Results = { total: 60 };
 
 beforeEach(() => {

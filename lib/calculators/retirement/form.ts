@@ -1,8 +1,11 @@
 /**
  * Retirement calculator form (docs/rebuild-plan.md sections 2.12 and 2.14):
  * every field the retirement engine uses, in topic screens. The calculator
- * page shows them all; the retirement intake asks the four screens after
- * the core, the assumptions last (O3). The basics are the core facts the
+ * page shows them all; the retirement intake asks the profile screens after
+ * the core (savings and target). The optional Social Security and healthcare
+ * screen is asked by the profile form only, the claiming age is a
+ * calculator-only control, and the assumptions are a collapsed card on the
+ * page. The basics are the core facts the
  * engine reads, with the shared help; take-home pay is not one.
  */
 
@@ -137,7 +140,17 @@ export const RETIREMENT_FORM: FormSpec = {
       description: "Amounts are in today's dollars.",
       tier: 'details',
       optional: true,
-      fields: [SOCIAL_SECURITY_BENEFIT.path, SOCIAL_SECURITY_AGE.path, ANNUAL_HEALTHCARE_COST.path],
+      fields: [SOCIAL_SECURITY_BENEFIT.path, ANNUAL_HEALTHCARE_COST.path],
+    },
+    {
+      // Calculator-only: when to claim compares one run with another, so
+      // only this page asks it (Surface in lib/fields/types.ts).
+      id: 'claiming',
+      title: 'When to claim Social Security',
+      description: "Amounts are in today's dollars.",
+      tier: 'details',
+      surface: 'calculator',
+      fields: [SOCIAL_SECURITY_AGE.path],
     },
     {
       id: 'assumptions',

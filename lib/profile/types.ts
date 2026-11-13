@@ -40,14 +40,6 @@ export type PayFrequency = 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly';
 export type FilingStatus = 'single' | 'marriedJoint' | 'marriedSeparate' | 'headOfHousehold';
 
 /**
- * Strategy presets. Both are presented side by side; neither is a default
- * "right answer". 'standard' follows the conventional sequence (3-month cash
- * cushion, unleveraged index funds); 'cashflow-investor' holds a smaller cash
- * buffer and compares a leveraged fund for taxable contributions.
- */
-export type StrategyPreset = 'standard' | 'cashflow-investor';
-
-/**
  * Stock/bond split, e.g. '80-20' = 80% stocks, 20% bonds. 'custom' uses the
  * per-class targets in portfolio.classTargets.
  */
@@ -154,8 +146,11 @@ export interface FinancialProfile {
     targetMix: TargetMixPreset;
   };
   retirementIncome: {
-    /** Annual benefit in today's dollars. */
-    socialSecurityBenefit: number;
+    /**
+     * Annual benefit at full retirement age in today's dollars; null estimates
+     * it from pay (lib/calculators/retirement/socialSecurity.ts).
+     */
+    socialSecurityBenefit: number | null;
     socialSecurityAge: number;
     /** Annual healthcare cost; null derives it from the retirement model. */
     annualHealthcareCost: number | null;
@@ -170,7 +165,6 @@ export interface FinancialProfile {
     customAssetClasses: CustomAssetClassRow[];
   };
   strategy: {
-    preset: StrategyPreset;
     /** Daily-reset leverage multiple used by the leverage comparison, e.g. 2. */
     leverageRatio: number;
   };

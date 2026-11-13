@@ -15,7 +15,7 @@ interface Computed<R> {
  * the current inputs is pending.
  *
  * Inputs are keyed by stableKey, so a profile edit that leaves them equal
- * (the strategy preset, the cash target) does not run the simulation again.
+ * (the cash target, for example) does not run the simulation again.
  * `compute` must be a stable, pure function (a module-level one).
  */
 export function useDeferredResult<I, R>(inputs: I, compute: (inputs: I) => R): R | null {

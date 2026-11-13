@@ -14,11 +14,11 @@ import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/s
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import type { DollarDisplayMode } from '@/lib/utils/displayDollars';
 
-type Strategy = 'standard' | 'cashflow' | 'growth';
+type Strategy = 'standard' | 'balanced' | 'growth';
 
 const OPTIONS: readonly SegmentedControlOption<Strategy>[] = [
   { value: 'standard', label: 'Standard' },
-  { value: 'cashflow', label: 'Cash-flow investor' },
+  { value: 'balanced', label: 'Balanced' },
   { value: 'growth', label: 'Growth' },
 ];
 
@@ -47,15 +47,15 @@ describe('SegmentedControl', () => {
     expect(screen.getByText('Strategy')).toBeVisible();
     expect(screen.getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
       'Standard',
-      'Cash-flow investor',
+      'Balanced',
       'Growth',
     ]);
   });
 
   it('marks only the selected option as checked', () => {
-    render(<Harness initial="cashflow" />);
+    render(<Harness initial="balanced" />);
 
-    expect(screen.getByRole('radio', { name: 'Cash-flow investor' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Balanced' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Standard' })).not.toBeChecked();
     expect(screen.getByRole('radio', { name: 'Growth' })).not.toBeChecked();
   });
@@ -76,14 +76,14 @@ describe('SegmentedControl', () => {
     render(
       <>
         <button type="button">Before</button>
-        <Harness initial="cashflow" />
+        <Harness initial="balanced" />
         <button type="button">After</button>
       </>
     );
 
     await user.click(screen.getByRole('button', { name: 'Before' }));
     await user.tab();
-    expect(screen.getByRole('radio', { name: 'Cash-flow investor' })).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'Balanced' })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole('button', { name: 'After' })).toHaveFocus();
   });
@@ -97,8 +97,8 @@ describe('SegmentedControl', () => {
     expect(screen.getByRole('radio', { name: 'Standard' })).toHaveFocus();
 
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('radio', { name: 'Cash-flow investor' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Cash-flow investor' })).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'Balanced' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Balanced' })).toHaveFocus();
 
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('radio', { name: 'Growth' })).toHaveFocus();
@@ -111,20 +111,20 @@ describe('SegmentedControl', () => {
     expect(screen.getByRole('radio', { name: 'Growth' })).toBeChecked();
 
     await user.keyboard('{ArrowUp}');
-    expect(screen.getByRole('radio', { name: 'Cash-flow investor' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Balanced' })).toBeChecked();
 
     expect(onChange.mock.calls.map(([value]) => value)).toEqual([
-      'cashflow',
+      'balanced',
       'growth',
       'standard',
       'growth',
-      'cashflow',
+      'balanced',
     ]);
   });
 
   it('jumps to the first and last option with Home and End', async () => {
     const user = userEvent.setup();
-    render(<Harness initial="cashflow" />);
+    render(<Harness initial="balanced" />);
 
     await user.tab();
     await user.keyboard('{End}');

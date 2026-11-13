@@ -32,14 +32,16 @@ import type { FieldInputProps, FieldListProps, FieldSize } from './types';
 export interface FieldDisplay {
   /**
    * Render the field with no value: money, number, percent and text inputs
-   * empty with the typical value as the placeholder, a select or state with
-   * its empty "Select" option, a choice with nothing selected. List, custom
+   * empty with the typical value as the placeholder, a select with nothing
+   * chosen and its typical option's label (or "Select" without one) muted in
+   * the closed control, a state with its empty "Select" option, a choice
+   * with nothing selected. List, custom
    * and slider fields ignore it.
    */
   blank: boolean;
   /** The value Next would accept for the field (the placeholder of a blank input). */
   typical?: unknown;
-  /** Tag the typical option of a choice ("Typical"). */
+  /** Tag the typical option of a choice ("Typical") or a select ("(typical)" after its label). */
   typicalTag?: boolean;
   /** The visitor emptied an input: the caller makes the field blank again. */
   onClear?(): void;
@@ -54,6 +56,9 @@ export type FieldInputDisplayProps = FieldInputProps & {
 
 /** The empty option of a blank select or state field. */
 export const BLANK_SELECT_LABEL = 'Select';
+
+/** Added to the label of a select's typical option in the wizard: "Individual (typical)". */
+export const TYPICAL_OPTION_SUFFIX = '(typical)';
 
 /** The wizard's lg is the primitives' xl; md renders them exactly as before. */
 const INPUT_SIZE: Record<FieldSize, InputSize> = { md: 'md', lg: 'xl' };
@@ -253,6 +258,12 @@ export function FieldInput({
         );
       case 'select': {
         const options = resolveOptions(spec, get);
+        const typicalOption = display?.typicalTag && isOptionValue(typical) ? typical : undefined;
+        // A blank select shows the label of the option Next would take as its
+        // placeholder (muted, like a blank number input's typical value).
+        // It is the placeholder option, so the value stays '' (unanswered).
+        const typicalLabel =
+          blank && isOptionValue(typical) ? options.find((option) => option.value === typical)?.label : undefined;
         return (
           <TestIdBox testId={testId}>
             <SelectInput
@@ -264,8 +275,13 @@ export function FieldInput({
               // The select hands back a string; write the option's own value
               // so numeric and boolean options keep their type.
               onChange={(text) => write(options.find((option) => String(option.value) === text)?.value ?? text)}
-              options={options.map((option) => ({ value: String(option.value), label: option.label }))}
-              placeholder={blank ? (spec.placeholder ?? BLANK_SELECT_LABEL) : spec.placeholder}
+              // The option Next would accept is marked in its label, as a
+              // choice tags it "Typical" (a select has no room for a tag).
+              options={options.map((option) => ({
+                value: String(option.value),
+                label: typicalOption === option.value ? `${option.label} ${TYPICAL_OPTION_SUFFIX}` : option.label,
+              }))}
+              placeholder={blank ? (typicalLabel ?? spec.placeholder ?? BLANK_SELECT_LABEL) : spec.placeholder}
               size={inputSize}
             />
           </TestIdBox>

@@ -10,7 +10,24 @@
 
 /** design 2.4: Quick answers / Details worth looking up / Assumptions */
 export type Tier = 'core' | 'details' | 'assumption';
-/** Where a screen appears (default 'both'). */
+/**
+ * Where a screen appears (default 'both').
+ *
+ * 'calculator' is the calculator-only flag: a question one calculator needs
+ * for one run, not a lasting fact about the person. Such a screen is never in
+ * the profile form, the profile wizard, the review page, the completeness
+ * figure or any /start/<intent> intake; it shows only as an input card on its
+ * calculator page. It is honored in one place each: composeProfileForm
+ * (lib/calculators/forms.ts) leaves it out of PROFILE_FORM, which the profile
+ * wizard, the review page and completeness read, and the intakes ask only
+ * 'intake'-surface screens (getIntakeScreens in lib/constants/intake.ts).
+ *
+ * Its values still live in the one stored profile, so the browser remembers
+ * them between visits. That is the orchestrating session's default on an open
+ * question (remember or ask again each run), not a decision by the site owner.
+ *
+ * 'intake' is the reverse: asked by the intakes only, never on the page.
+ */
 export type Surface = 'both' | 'intake' | 'calculator';
 export type FieldKind = 'money' | 'number' | 'percent' | 'slider' | 'select' | 'choice' | 'boolean'
   | 'state' | 'text' | 'list' | 'custom';
@@ -80,6 +97,6 @@ export interface FormSpec {
   fields: readonly FieldSpec[];
   screens: readonly ScreenSpec[];
   relations?: readonly CrossFieldRule[];
-  /** Derived writes (preset -> months, retirementAge >= age + 1). */
+  /** Derived writes (retirementAge >= age + 1). */
   onSubmit?: (get: Get, provided: ReadonlySet<string>) => Write[];
 }

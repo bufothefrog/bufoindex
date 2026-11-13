@@ -17,7 +17,7 @@ export class RetirementConstants {
   static readonly MIN_STARTING_AGE = 18;
   static readonly MAX_RETIREMENT_AGE = 100;
   static readonly MIN_RETIREMENT_AGE = 30;
-  static readonly DEFAULT_LIFE_EXPECTANCY = 85;
+  static readonly DEFAULT_LIFE_EXPECTANCY = 90;         // The profile's worked example (age to plan to)
   static readonly MAX_LIFE_EXPECTANCY = 110;
   
   // Savings Rates

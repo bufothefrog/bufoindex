@@ -58,7 +58,7 @@ describe('setFields', () => {
       ['person.age', 'person.state', 'investing.monthlyContribution']
     );
     const { profile, hasProfile } = getState();
-    expect(profile.person).toEqual({ age: 41, state: 'CA', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 });
+    expect(profile.person).toEqual({ age: 41, state: 'CA', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 });
     expect(profile.investing.monthlyContribution).toBe(2000);
     expect(profile.investing.investedBalance).toBe(25000);
     expect(profile.income).toEqual(getDefaultFinancialProfile().income);
@@ -76,8 +76,8 @@ describe('setFields', () => {
   });
 
   it('changes values without marking them provided when no paths are given', () => {
-    getState().setFields({ strategy: { preset: 'standard' } }, []);
-    expect(getState().profile.strategy.preset).toBe('standard');
+    getState().setFields({ strategy: { leverageRatio: 3 } }, []);
+    expect(getState().profile.strategy.leverageRatio).toBe(3);
     expect(getState().profile.provided).toEqual([]);
     expect(getState().hasProfile).toBe(false);
   });
@@ -174,7 +174,7 @@ describe('setValues', () => {
       { path: 'person.nickname', value: 'Bufo' },
       { path: 'income.frequency', value: 'monthly' },
     ]);
-    expect(getState().profile.person.age).toBe(30);
+    expect(getState().profile.person.age).toBe(25);
     expect(getState().profile.income.frequency).toBe('monthly');
     expect(getState().profile.provided).toEqual(['income.frequency']);
   });
@@ -207,8 +207,8 @@ describe('setValues', () => {
     expect(getState().profile.cash.targetMonths).toBe(1);
     expect(getState().profile.provided).toEqual(['person.age']);
 
-    getState().setValues([{ path: 'strategy.preset', value: 'standard' }], { provide: [] });
-    expect(getState().profile.strategy.preset).toBe('standard');
+    getState().setValues([{ path: 'strategy.leverageRatio', value: 3 }], { provide: [] });
+    expect(getState().profile.strategy.leverageRatio).toBe(3);
     expect(getState().profile.provided).toEqual(['person.age']);
   });
 
@@ -295,7 +295,8 @@ describe('setProvidedValue', () => {
     const before = getState().profile;
     getState().setProvidedValue('person.nickname', 'Bufo');
     getState().setProvidedValue('person.age', '31');
-    getState().setProvidedValue('strategy.preset', 'yolo');
+    getState().setProvidedValue('strategy.preset', 'standard');
+    getState().setProvidedValue('strategy.leverageRatio', 'yolo');
     getState().setProvidedValue('provided', ['person.age']);
     getState().setProvidedValue('debts.0.balance', 100);
     getState().setProvidedValue('person', { age: 50 });
@@ -346,7 +347,7 @@ describe('rehydration from localStorage', () => {
       })
     );
     const { profile, hasProfile } = getState();
-    expect(profile.person).toEqual({ age: 52, state: 'TX', filingStatus: 'single', retirementAge: 60, lifeExpectancy: 85 });
+    expect(profile.person).toEqual({ age: 52, state: 'CA', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 });
     expect(profile.cash).toEqual(getDefaultFinancialProfile().cash);
     expect(profile.provided).toEqual(['person.age']);
     expect(hasProfile).toBe(true);
@@ -394,12 +395,14 @@ describe('rehydration from localStorage', () => {
     expect(hasProfile).toBe(true);
     expect(profile.version).toBe(2);
     expect(profile.updatedAt).toBe(1761000000000);
-    expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 85 });
+    expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 90 });
     expect(profile.income).toEqual({ ...getDefaultFinancialProfile().income, ...v1.income });
     expect(profile.spending).toEqual(v1.spending);
-    expect(profile.cash).toEqual(v1.cash);
+    // The months were never asked in v1 (not in provided): an unanswered 1 loads as the typical 3.
+    expect(profile.cash).toEqual({ ...v1.cash, targetMonths: 3 });
     expect(profile.workplace).toEqual({ ...getDefaultFinancialProfile().workplace, ...v1.workplace });
-    expect(profile.strategy).toEqual(v1.strategy);
+    // The removed strategy preset is dropped with it.
+    expect(profile.strategy).toEqual({ leverageRatio: 1.5 });
     // The v1 new cash is no v2 leaf: it is dropped and not moved anywhere,
     // so the Brokerage deposit keeps its default.
     expect(profile.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });

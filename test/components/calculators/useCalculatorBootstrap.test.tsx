@@ -99,8 +99,8 @@ describe('useCalculatorBootstrap', () => {
     const { result } = bootstrap();
     expect(result.current).toEqual({ ready: true, arrivedFromProfile: false });
     expect(replaceState).not.toHaveBeenCalled();
-    // Default retirement age 60, seeded age 50.
-    expect(store.getState().results).toBe(10);
+    // Default retirement age 65, seeded age 50.
+    expect(store.getState().results).toBe(15);
     replaceState.mockRestore();
   });
 
@@ -115,7 +115,7 @@ describe('useCalculatorBootstrap', () => {
     act(() => useProfileStore.setState({ hasHydrated: true }));
     expect(result.current).toEqual({ ready: true, arrivedFromProfile: true });
     expect(location()).toBe('/tools/fake');
-    expect(store.getState().results).toBe(30);
+    expect(store.getState().results).toBe(40);
   });
 
   it('runs once under StrictMode', () => {

@@ -3,7 +3,6 @@ import { Shield } from 'lucide-react';
 import { ResultCard } from '@/components/ui/cards';
 import { DENSE_CARD_CLASSES } from '@/components/ui/cards/density';
 import { StatGrid } from '@/components/ui/results';
-import { STRATEGY_PRESET_LABELS } from '@/lib/constants/labels';
 import { ASSUMED_PORTFOLIO_RETURN, summarizeCashBuffer } from '@/lib/dashboard/derive';
 import type { StatSpec } from '@/lib/design-system/stat';
 import { formatCurrency, formatMonths, formatPercent } from '@/lib/format';
@@ -34,41 +33,24 @@ export function CashBufferCard({ profile }: CashBufferCardProps) {
           ? 'Necessary expenses not set'
           : `At ${formatCurrency(cash.necessaryMonthly)}/mo necessary expenses`,
     },
-  ];
-
-  const presetTargets: StatSpec[] = cash.presets.map((p) => {
-    const active = p.preset === cash.activePreset;
-    return {
-      id: p.preset,
-      label: STRATEGY_PRESET_LABELS[p.preset],
-      value: p.target,
+    {
+      id: 'target',
+      label: 'Target',
+      value: cash.target,
       format: 'currency',
-      hint: formatMonths(p.months),
-      tone: active ? 'brand' : 'neutral',
-      badge: active ? 'Active' : undefined,
-    };
-  });
+      hint: `${formatMonths(cash.targetMonths)} of necessary expenses`,
+    },
+  ];
 
   return (
     <ResultCard title="Cash buffer" icon={Shield} className="h-full" {...DENSE_CARD_CLASSES} testId="overview-cash">
       <div className="space-y-4">
         <StatGrid stats={onHand} />
 
-        <div>
-          <h4 className="mb-2 text-sm font-medium text-foreground">Target under each preset</h4>
-          <StatGrid stats={presetTargets} />
-          {cash.usesCustomTarget && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Your own target of {formatMonths(cash.activeMonths)} ({formatCurrency(cash.activeTarget)}) is used
-              below instead of the preset.
-            </p>
-          )}
-        </div>
-
         {cash.excess > 0 ? (
           <p className="text-sm text-muted-foreground">
             <span className="font-medium tabular-nums text-foreground">{formatCurrency(cash.excess)}</span> sits above
-            the {formatMonths(cash.activeMonths)} target. At an assumed {formatPercent(ASSUMED_PORTFOLIO_RETURN)}{' '}
+            the {formatMonths(cash.targetMonths)} target. At an assumed {formatPercent(ASSUMED_PORTFOLIO_RETURN)}{' '}
             long-run portfolio return versus {formatPercent(profile.cash.emergencyFundApy)} APY, its expected cost is
             about <span className="font-medium tabular-nums text-foreground">{formatCurrency(cash.annualCostOfExcess)}</span>{' '}
             a year, in exchange for more cushion.
@@ -76,15 +58,15 @@ export function CashBufferCard({ profile }: CashBufferCardProps) {
         ) : cash.shortfall > 0 ? (
           <p className="text-sm text-muted-foreground">
             The fund is <span className="font-medium tabular-nums text-foreground">{formatCurrency(cash.shortfall)}</span>{' '}
-            below the {formatMonths(cash.activeMonths)} target.
+            below the {formatMonths(cash.targetMonths)} target.
           </p>
         ) : (
-          <p className="text-sm text-muted-foreground">The fund matches the {formatMonths(cash.activeMonths)} target.</p>
+          <p className="text-sm text-muted-foreground">The fund matches the {formatMonths(cash.targetMonths)} target.</p>
         )}
 
         <p className="text-xs text-muted-foreground">
           Job stability, a second household income, available credit, and insurance all change how much cash is
-          enough. Both presets are starting points to compare, not answers.
+          enough.
         </p>
       </div>
     </ResultCard>

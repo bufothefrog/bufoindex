@@ -58,7 +58,7 @@ describe('/start/review/<screen>', () => {
   });
 
   it('names Save, not Next or Skip, in the line about grey values and example rows', async () => {
-    await renderTopic('ss-healthcare');
+    await renderTopic('target');
     expect(screen.getByText('Grey values are typical. Save uses them for anything left blank.')).toBeInTheDocument();
     expect(screen.queryByText(/Next uses them/)).not.toBeInTheDocument();
     cleanup();

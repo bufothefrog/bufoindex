@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { Route } from 'next';
 import { Disclaimer } from '@/components/ui/results';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import { DollarModeToggle } from '@/components/shared/DollarModeToggle';
 import { LEVERAGE_CALCULATOR } from '@/lib/calculators/leverage/definition';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
@@ -11,10 +10,9 @@ import { calculatorHref } from '@/lib/calculators/registry';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { composeDisclaimer, DISCLAIMER } from '@/lib/constants/disclaimers';
-import { STRATEGY_PRESET_LABELS, STRATEGY_PRESET_OPTIONS, TARGET_MIX_LABELS } from '@/lib/constants/labels';
-import { strategyDescription } from '@/lib/dashboard/derive';
-import { PRESET_EMERGENCY_MONTHS } from '@/lib/profile/defaults';
-import type { FinancialProfile, ProfilePatch, StrategyPreset } from '@/lib/profile/types';
+import { TARGET_MIX_LABELS } from '@/lib/constants/labels';
+import { withDerivedValues } from '@/lib/profile/derived';
+import type { FinancialProfile } from '@/lib/profile/types';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import type { AllocationResult } from '@/lib/types';
@@ -35,9 +33,6 @@ export interface OverviewDashboardProps {
 
 const OVERVIEW_DISCLAIMER = composeDisclaimer(DISCLAIMER.overview, DISCLAIMER.overviewModel, DISCLAIMER.consultAdvisor);
 
-/** The strategy control shows each preset's label only; the description is in the summary below it. */
-const STRATEGY_OPTIONS = STRATEGY_PRESET_OPTIONS.map(({ value, label }) => ({ value, label }));
-
 /**
  * /overview: one screen computed from the shared profile. Rendering waits for
  * the persisted profile to hydrate so server and client markup match.
@@ -45,21 +40,11 @@ const STRATEGY_OPTIONS = STRATEGY_PRESET_OPTIONS.map(({ value, label }) => ({ va
 export function OverviewDashboard({ className }: OverviewDashboardProps) {
   const hasHydrated = useProfileStore((s) => s.hasHydrated);
   const hasProfile = useProfileStore((s) => s.hasProfile);
-  const profile = useProfileStore((s) => s.profile);
-  const setFields = useProfileStore((s) => s.setFields);
+  const stored = useProfileStore((s) => s.profile);
+  // Every card reads the profile with its unanswered derived leaves filled
+  // (lib/profile/derived.ts), as the calculators do.
+  const profile = useMemo(() => withDerivedValues(stored), [stored]);
   const reset = useProfileStore((s) => s.reset);
-
-  const handleStrategyChange = useCallback(
-    (preset: StrategyPreset) => {
-      const patch: ProfilePatch = { strategy: { preset } };
-      // A preset only sets the cash target while the user has not chosen one.
-      if (!profile.provided.includes('cash.targetMonths')) {
-        patch.cash = { targetMonths: PRESET_EMERGENCY_MONTHS[preset] };
-      }
-      setFields(patch, ['strategy.preset']);
-    },
-    [profile.provided, setFields]
-  );
 
   const ready = hasHydrated && hasProfile;
 
@@ -74,15 +59,6 @@ export function OverviewDashboard({ className }: OverviewDashboardProps) {
         </div>
         {ready && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <SegmentedControl
-              label="Strategy"
-              options={STRATEGY_OPTIONS}
-              value={profile.strategy.preset}
-              onChange={handleStrategyChange}
-              size="md"
-              fullWidth
-              className="w-full sm:w-auto"
-            />
             <ResetProfileButton onReset={reset} />
           </div>
         )}
@@ -128,12 +104,6 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
   return (
     <div className="space-y-4 md:space-y-6">
       {showsFutureDollars && <OverviewDollarMode />}
-
-      <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{STRATEGY_PRESET_LABELS[profile.strategy.preset]}:</span>{' '}
-        {strategyDescription(profile.strategy.preset, profile.strategy.leverageRatio)} Switch the preset above to see
-        the alternative; the cash buffer card shows both targets either way.
-      </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
         <PaycheckCard inputs={paycheckInputs} allocation={allocation} />

@@ -78,3 +78,13 @@ export const STATE_TAX_RATES_2026 = {
   WY: { rate: 0, hasStateTax: false, name: 'Wyoming' }           // no state income tax
 } as const satisfies Record<string, StateTaxInfo>;
 
+
+/**
+ * The entry for a two-letter state code, or undefined for a code the table
+ * does not hold.
+ */
+export function getStateTaxInfo(code: string): StateTaxInfo | undefined {
+  return Object.prototype.hasOwnProperty.call(STATE_TAX_RATES_2026, code)
+    ? (STATE_TAX_RATES_2026 as Record<string, StateTaxInfo>)[code]
+    : undefined;
+}

@@ -5,12 +5,14 @@
  * lib/fields/shared.ts. Pure.
  *
  * Bounds follow plan section 2.3: the match rate 0-200% and its limit 0-25%
- * of pay, the 401(k) contribution 0-100%, target months 0-24 in half
- * months, and debt rates 0-50%. The old engine-side checks (validateProfile,
+ * of pay, the 401(k) contribution 0-100%, and debt rates 0-50%. The
+ * emergency fund target months are a shared fact (lib/fields/shared.ts). The old engine-side checks (validateProfile,
  * O18) live on as these bounds and the fun-money relation.
  */
 
 import { limitHsa } from '@/lib/calculations/contributionLimits';
+import { nearestBracketRate } from '@/lib/calculations/taxBracket';
+import { type TaxBracket, getBracketsForStatus } from '@/lib/constants/irs-2026';
 import {
   BONUS_FREQUENCY_LABELS,
   BONUS_FREQUENCY_OPTIONS,
@@ -22,11 +24,25 @@ import {
   RISK_TOLERANCE_LABELS,
   RISK_TOLERANCE_OPTIONS,
 } from '@/lib/constants/labels';
+import { getStateTaxInfo } from '@/lib/constants/states-2026';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
-import { AGE } from '@/lib/fields/shared';
-import type { CrossFieldRule, FieldSpec, Get, ScreenNote } from '@/lib/fields/types';
-import type { BonusFrequency, ContributionType, HsaCoverage, OptimizationGoal, RiskTolerance } from '@/lib/profile/types';
-import { CONTRIBUTION_PATH, CONTRIBUTION_TYPE_PATH, ROTH_PART_PATH } from './bindings';
+import { AGE, FILING_STATUS, STATE } from '@/lib/fields/shared';
+import type { CrossFieldRule, FieldOption, FieldSpec, Get, ScreenNote } from '@/lib/fields/types';
+import type {
+  BonusFrequency,
+  ContributionType,
+  FilingStatus,
+  HsaCoverage,
+  OptimizationGoal,
+  RiskTolerance,
+} from '@/lib/profile/types';
+import {
+  CONTRIBUTION_PATH,
+  CONTRIBUTION_TYPE_PATH,
+  RETIREMENT_BRACKET_PATH,
+  ROTH_PART_PATH,
+  currentBracketFrom,
+} from './bindings';
 
 const isTrue = (path: string) => (get: Get) => get(path) === true;
 const money = (value: unknown) => formatCurrency(value as number);
@@ -143,7 +159,7 @@ export const MATCH_LIMIT: FieldSpec = {
   path: 'workplace.matchLimit',
   kind: 'percent',
   label: 'Matched up to this share of your pay',
-  help: 'The 6% in "50% of the first 6%".',
+  help: 'The 4% in "100% of the first 4%".',
   min: 0,
   max: 0.25,
   tier: 'details',
@@ -378,20 +394,6 @@ export const DEBTS: FieldSpec = {
 // Assumptions
 // ---------------------------------------------------------------------------
 
-export const TARGET_MONTHS: FieldSpec = {
-  path: 'cash.targetMonths',
-  kind: 'number',
-  label: 'Emergency fund target',
-  help: 'Months of expenses to hold in cash.',
-  min: 0,
-  max: 24,
-  step: 0.5,
-  precision: 1,
-  unit: { suffix: ' months' },
-  tier: 'assumption',
-  summary: (value) => `${value as number}-month emergency fund`,
-};
-
 export const RISK_TOLERANCE: FieldSpec = {
   path: 'assumptions.paycheck.riskTolerance',
   kind: 'select',
@@ -410,19 +412,78 @@ export const OPTIMIZATION_GOAL: FieldSpec = {
   summary: (value) => `${OPTIMIZATION_GOAL_LABELS[value as OptimizationGoal].toLowerCase()} goal`,
 };
 
+/** The 2026 bracket table's range, as taxable income for the filing status. */
+function bracketRange(bracket: TaxBracket, first: boolean): string {
+  if (first) return `Taxable up to ${formatCurrency(bracket.max)}`;
+  if (!Number.isFinite(bracket.max)) return `Taxable over ${formatCurrency(bracket.min)}`;
+  return `Taxable ${formatCurrency(bracket.min)} to ${formatCurrency(bracket.max)}`;
+}
+
+/**
+ * The taxable-income range of the bracket a stored retirement bracket reads
+ * as (its nearest rate), for the filing status: "Taxable $12,400 to
+ * $50,400". The select's help line shows it, so the option labels stay short
+ * enough for a phone.
+ */
+export function retirementBracketRange(filingStatus: FilingStatus, stored: number): string {
+  const brackets = getBracketsForStatus(filingStatus);
+  const rate = nearestBracketRate(stored);
+  const index = Math.max(0, brackets.findIndex((bracket) => bracket.rate === rate));
+  return bracketRange(brackets[index], index === 0);
+}
+
+/**
+ * The retirement bracket options: the seven 2026 federal brackets for the
+ * filing status, each labeled with its rate, plus the state's one rate when
+ * the state has an income tax ("12% federal + 9.3% CA"). The labels stay
+ * short so a phone does not cut them off; the taxable-income range of the
+ * selected bracket is the field's help line. The value is the federal rate
+ * only, so the engine compares federal with federal and the state rate is
+ * the same on both sides.
+ *
+ * A stored value that is not one of the seven rates (the field was a free
+ * percent before) is carried by the option of its nearest rate, so the
+ * select shows that bracket and validation passes without rewriting
+ * storage; the binding reads the same nearest rate (retirementBracketFrom).
+ */
+export function retirementBracketOptions(filingStatus: FilingStatus, state: string, stored?: number): FieldOption[] {
+  const info = getStateTaxInfo(state);
+  // Two decimals at most, so 5.09% (GA) is not shown as 5.1%.
+  const statePart = info?.hasStateTax ? ` + ${Number((info.rate * 100).toFixed(2))}% ${state}` : '';
+  const carried = stored !== undefined && Number.isFinite(stored) ? nearestBracketRate(stored) : undefined;
+  return getBracketsForStatus(filingStatus).map((bracket) => ({
+    value: carried === bracket.rate ? (stored as number) : bracket.rate,
+    label: `${formatPercent(bracket.rate)} federal${statePart}`,
+  }));
+}
+
 export const EXPECTED_RETIREMENT_BRACKET: FieldSpec = {
-  path: 'assumptions.paycheck.expectedRetirementBracket',
-  kind: 'percent',
+  path: RETIREMENT_BRACKET_PATH,
+  kind: 'select',
   label: 'Expected tax bracket in retirement',
-  help: "Federal bracket you expect when withdrawing, compared with today's 22%.",
-  min: 0,
-  max: 0.37,
-  step: 0.01,
+  options: (get) => {
+    const stored = get(RETIREMENT_BRACKET_PATH);
+    return retirementBracketOptions(
+      get(FILING_STATUS.path) as FilingStatus,
+      String(get(STATE.path) ?? ''),
+      typeof stored === 'number' ? stored : undefined
+    );
+  },
+  // "Taxable $12,400 to $50,400. Today: 22% federal; same state rate in both."
+  help: (get) => {
+    const stored = get(RETIREMENT_BRACKET_PATH);
+    const range =
+      typeof stored === 'number' && Number.isFinite(stored)
+        ? `${retirementBracketRange(get(FILING_STATUS.path) as FilingStatus, stored)}. `
+        : '';
+    return `${range}Today: ${formatPercent(currentBracketFrom(get))} federal; same state rate in both.`;
+  },
   tier: 'assumption',
-  summary: (value) => `${percent(value)} retirement bracket`,
+  summary: (value) =>
+    typeof value === 'number' ? `${formatPercent(nearestBracketRate(value))} retirement bracket` : null,
 };
 
-/** O9: the allocator keeps a fixed 22% federal bracket; the copy says so instead of claiming automatic brackets. */
+/** The tax note: the federal bracket in use, computed from the visitor's pay (currentBracketFrom). */
 export const TAX_NOTE: ScreenNote = {
-  text: 'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.',
+  text: (get) => `Tax savings use your ${formatPercent(currentBracketFrom(get))} federal bracket and one 2026 state rate.`,
 };

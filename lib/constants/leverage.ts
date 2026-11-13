@@ -16,8 +16,13 @@
  *     priced off a floating short-term benchmark plus a dealer spread (see the
  *     swap and counterparty disclosures in the ProShares prospectus). The
  *     financing cost is approximated here as the 3-month Treasury bill yield
- *     (FRED series DTB3, roughly 4% through 2025) plus a 0.5 percentage point
- *     spread. Check the current DTB3 value before relying on the default.
+ *     plus a 0.5 percentage point spread. Short rate checked on 2026-11-13:
+ *     FRED series DTB3 (fred.stlouisfed.org, fredgraph.csv?id=DTB3) 4.12%
+ *     for 2026-11-10, and the US Treasury daily bill rates page
+ *     (home.treasury.gov, daily_treasury_bill_rates) 4.14% bank discount
+ *     for the 13-week bill on 2026-11-12. Both are within 0.25 point of the
+ *     4% assumption, so it stays 4%. Check the current DTB3 value before
+ *     relying on the default.
  *   - Long-run S&P 500 nominal total return of about 10% a year and annualized
  *     volatility of about 16%: Damodaran, "Historical Returns on Stocks, Bonds
  *     and Bills" (NYU Stern, updated annually) and Shiller's monthly S&P
@@ -41,7 +46,7 @@ export const INDEX_FUND_EXPENSE_RATIO = 0.0003;
 
 // ── Financing ───────────────────────────────────────────────────────────────
 
-/** 3-month Treasury bill yield assumption (FRED DTB3, approximate). */
+/** 3-month Treasury bill yield assumption (FRED DTB3, about 4.1% on 2026-11-10, read 2026-11-13). */
 export const SHORT_RATE_ASSUMPTION = 0.04;
 
 /** Spread a swap counterparty charges above the short rate (assumption). */

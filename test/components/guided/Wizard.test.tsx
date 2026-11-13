@@ -146,7 +146,7 @@ describe('Wizard, shared core flow', () => {
     expect(screen.queryByRole('link', { name: 'Keep them and continue' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Grey values/)).not.toBeInTheDocument();
     await next(user);
-    expect(screen.getByLabelText('Gross pay per paycheck')).toHaveValue('3,500');
+    expect(screen.getByLabelText('Gross pay per paycheck')).toHaveValue('4,000');
     expect(screen.getByLabelText('How often you are paid')).toHaveValue('bi-weekly');
     await next(user);
 
@@ -334,7 +334,8 @@ const FIXTURE: FormSpec = {
       fields: ['cash.emergencyFundBalance'],
       notes: [{ text: 'A fixture note.', tone: 'caution' }],
     },
-    { id: 'assume', title: 'Fixture assumptions?', tier: 'assumption', fields: ['assumptions.retirement.inflationRate'] },
+    // A details screen: an intent intake never asks an assumption screen (intentAsksScreen).
+    { id: 'rates', title: 'Fixture rates?', tier: 'details', fields: ['assumptions.retirement.inflationRate'] },
   ],
   relations: [
     { lower: 'person.age', upper: 'person.retirementAge', strict: true, checkOn: 'person.retirementAge', message: 'Stop after now.' },
@@ -436,7 +437,7 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(heading('Fixture cash?')).toHaveFocus();
 
     await user.keyboard('{Enter}');
-    expect(heading('Fixture assumptions?')).toBeInTheDocument();
+    expect(heading('Fixture rates?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
     expect(useProfileStore.getState().profile.investing.targetMix).toBe('60-40');
   });
@@ -587,12 +588,12 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(screen.getByText('A fixture note.')).toBeInTheDocument();
   });
 
-  it('skips the assumption screen like any other: its values stay as they were, unanswered', async () => {
+  it('skips the last screen like any other: its values stay as they were, unanswered', async () => {
     const user = userEvent.setup();
     render(<Wizard flow="leverage" mode="all" />);
     for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
 
-    expect(heading('Fixture assumptions?')).toBeInTheDocument();
+    expect(heading('Fixture rates?')).toBeInTheDocument();
     await typeInto('Inflation', '5');
     await skip(user);
 
@@ -644,6 +645,23 @@ describe('Wizard mechanics (fixture form)', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it('never asks an assumption screen of an intent form: it stays on the calculator page', async () => {
+    injected.form = {
+      ...FIXTURE,
+      screens: FIXTURE.screens.map((s) => (s.id === 'rates' ? { ...s, tier: 'assumption' as const } : s)),
+    };
+    const user = userEvent.setup();
+    render(<Wizard flow="leverage" mode="all" />);
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+    await skip(user);
+    await skip(user);
+    expect(heading('Fixture cash?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Finish/ })).toBeInTheDocument();
+    await skip(user);
+    expect(screen.queryByRole('heading', { name: 'Fixture rates?' })).not.toBeInTheDocument();
+    expect(replace).toHaveBeenCalledWith('/tools/leverage-comparison?from=profile');
+  });
+
   it('takes the typical value for each blank field on Next and marks it answered', async () => {
     const defaults = getDefaultFinancialProfile();
     const user = userEvent.setup();
@@ -676,7 +694,8 @@ describe('Wizard mechanics (fixture form)', () => {
     await skip(user);
     const cash = screen.getByLabelText('Cash on hand');
     expect(cash).toHaveValue('');
-    expect(cash).toHaveAttribute('placeholder', '5,000');
+    // The derived typical balance: 3 x the $3,000 of must-pay costs.
+    expect(cash).toHaveAttribute('placeholder', '9,000');
     await user.type(cash, '0');
     await user.tab();
     expect(cash).toHaveValue('0');
@@ -698,9 +717,9 @@ describe('Wizard mechanics (fixture form)', () => {
     await user.clear(cash);
     await user.tab();
     expect(cash).toHaveValue('');
-    expect(cash).toHaveAttribute('placeholder', '5,000');
+    expect(cash).toHaveAttribute('placeholder', '9,000');
     await next(user);
-    expect(useProfileStore.getState().profile.cash.emergencyFundBalance).toBe(5000);
+    expect(useProfileStore.getState().profile.cash.emergencyFundBalance).toBe(9000);
   });
 });
 
@@ -768,13 +787,15 @@ describe('Wizard, blank fields (nothing pre-filled)', () => {
     render(<Wizard flow="leverage" mode="all" />);
 
     expect(screen.getByLabelText('Fixture money')).toHaveValue('');
-    expect(screen.getByLabelText('Fixture money')).toHaveAttribute('placeholder', '3,500');
+    expect(screen.getByLabelText('Fixture money')).toHaveAttribute('placeholder', '4,000');
     expect(screen.getByLabelText('Fixture number')).toHaveValue('');
-    expect(screen.getByLabelText('Fixture number')).toHaveAttribute('placeholder', '30');
+    expect(screen.getByLabelText('Fixture number')).toHaveAttribute('placeholder', '25');
     expect(screen.getByLabelText('Fixture percent')).toHaveValue('');
     expect(screen.getByLabelText('Fixture percent')).toHaveAttribute('placeholder', '4.0');
     expect(screen.getByLabelText('Fixture select')).toHaveValue('');
-    expect(screen.getByLabelText('Fixture select')).toHaveDisplayValue('Select');
+    // A blank select shows its typical option's label, muted, with nothing chosen.
+    expect(screen.getByLabelText('Fixture select')).toHaveDisplayValue('Every two weeks');
+    expect(screen.getByLabelText('Fixture select')).toHaveClass('text-muted-foreground');
     expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveValue('');
     expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveAttribute('placeholder', 'Select');
 
@@ -804,9 +825,9 @@ describe('Wizard, blank fields (nothing pre-filled)', () => {
   it('shows answered fields with their saved values, and no grey line once nothing is blank', () => {
     answer(injected.form!.screens[0].fields);
     render(<Wizard flow="leverage" mode="all" />);
-    expect(screen.getByLabelText('Fixture money')).toHaveValue('3,500');
+    expect(screen.getByLabelText('Fixture money')).toHaveValue('4,000');
     expect(screen.getByLabelText('Fixture select')).toHaveValue('bi-weekly');
-    expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveValue('Texas');
+    expect(screen.getByRole('combobox', { name: 'Fixture state' })).toHaveValue('California');
     expect(screen.getByRole('radio', { name: 'Single' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByText(/Grey values/)).not.toBeInTheDocument();
   });
@@ -817,7 +838,7 @@ describe('Wizard, the basics need the visitor\'s own entry', () => {
     const user = userEvent.setup();
     render(<Wizard flow="core" />);
     expect(screen.getByText('Grey values are examples.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '30');
+    expect(screen.getByLabelText('Your age')).toHaveAttribute('placeholder', '25');
     // No "Typical" tag where Next does not take the typical value.
     expect(screen.getByRole('radio', { name: 'Single' })).not.toHaveAccessibleDescription('Typical');
 

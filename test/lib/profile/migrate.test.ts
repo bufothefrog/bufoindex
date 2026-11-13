@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
 import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
+import { defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
 /** v1 getDefaultFinancialProfile(), as JSON.parse returns it. */
 const V1_DEFAULT = {
@@ -76,11 +77,22 @@ const V1_GARBAGE = {
 };
 
 describe('migrateProfile from an older version (normalize only)', () => {
-  it('turns the v1 default into exactly the v2 default', () => {
-    expect(migrateProfile(V1_DEFAULT, 1)).toEqual(getDefaultFinancialProfile());
+  it('keeps the old example values the v1 default stored; the leaves it lacks take today\'s defaults', () => {
+    // The stored leaves are 3bb0132's example (30, TX, $3,500 ...); life
+    // expectancy and the portfolio were not in v1, so they come from the
+    // PR 3 defaults. Nothing is marked answered, so the stored Social
+    // Security benefit (the old 30,000 default) loads as Auto (null).
+    const today = getDefaultFinancialProfile();
+    const old = defaultProfileAt3bb0132();
+    expect(migrateProfile(V1_DEFAULT, 1)).toEqual({
+      ...old,
+      person: { ...old.person, lifeExpectancy: today.person.lifeExpectancy },
+      retirementIncome: { ...old.retirementIncome, socialSecurityBenefit: null },
+      portfolio: today.portfolio,
+    });
   });
 
-  it('loads a v1 payload: every v2 leaf it holds is kept, the unknown v1 new-cash leaf is dropped', () => {
+  it('loads a v1 payload: every v2 leaf it holds is kept, the unknown new-cash and preset leaves are dropped', () => {
     let p: ReturnType<typeof migrateProfile> | undefined;
     expect(() => {
       p = migrateProfile(V1_ALL_PROVIDED, 1);
@@ -89,15 +101,18 @@ describe('migrateProfile from an older version (normalize only)', () => {
     const defaults = getDefaultFinancialProfile();
     expect(p.version).toBe(2);
     expect(p.updatedAt).toBe(1761000000000);
-    expect(p.person).toEqual({ age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58, lifeExpectancy: 85 });
+    expect(p.person).toEqual({ age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58, lifeExpectancy: 90 });
     expect(p.income).toEqual({ ...defaults.income, grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' });
     expect(p.spending).toEqual(V1_ALL_PROVIDED.spending);
-    expect(p.cash).toEqual(V1_ALL_PROVIDED.cash);
+    // The 1 month was never asked in v1 (not in provided): it loads as the typical 3.
+    expect(p.cash).toEqual({ ...V1_ALL_PROVIDED.cash, targetMonths: 3 });
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
     expect(p.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(p.investing).not.toHaveProperty('newCashThisMonth');
-    expect(p.strategy).toEqual(V1_ALL_PROVIDED.strategy);
-    expect(p.provided).toEqual(V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth'));
+    expect(p.strategy).toEqual({ leverageRatio: 1.5 });
+    expect(p.provided).toEqual(
+      V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth' && path !== 'strategy.preset')
+    );
     // The v1 new cash is not moved anywhere: the portfolio keeps its defaults,
     // the Brokerage deposit included.
     for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'portfolio', 'assumptions'] as const) {
@@ -115,14 +130,48 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.income).toEqual(defaults.income);
     expect(p.spending).toEqual({ ...defaults.spending, necessaryMonthly: -200 });
     expect(p.cash).toEqual(defaults.cash);
-    expect(p.workplace).toEqual(defaults.workplace);
+    // The one valid workplace leaf (a 50% match) is kept.
+    expect(p.workplace).toEqual({ ...defaults.workplace, matchPercent: 0.5 });
     expect(p.investing).toEqual(defaults.investing);
-    expect(p.strategy).toEqual({ preset: 'cashflow-investor', leverageRatio: 3 });
+    expect(p.strategy).toEqual({ leverageRatio: 3 });
     expect(p).not.toHaveProperty('extras');
     expect(p.portfolio).toEqual(defaults.portfolio);
     // Junk paths are dropped, and so is a row path whose row does not exist
     // (v1 had no debts list, so 'debts.0.balance' was never a real answer).
     expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
+  });
+
+  it('loads a v2 profile saved with the removed strategy preset: the leaf and its answer go, unanswered months load as 3', () => {
+    // As saved at 3bb0132: the preset answered, and 1 month written by the cash-flow investor preset
+    // without being marked provided. The 1 was never the visitor's answer, so it loads as the typical 3.
+    const saved = {
+      ...getDefaultFinancialProfile(),
+      updatedAt: 1762000000000,
+      cash: { emergencyFundBalance: 4000, emergencyFundApy: 0.04, targetMonths: 1 },
+      strategy: { preset: 'cashflow-investor', leverageRatio: 3 },
+      provided: ['person.age', 'strategy.preset', 'strategy.leverageRatio'],
+    };
+    let p: ReturnType<typeof migrateProfile> | undefined;
+    expect(() => {
+      p = migrateProfile(saved, 2);
+    }).not.toThrow();
+    if (!p) throw new Error('no profile');
+    expect(p.version).toBe(PROFILE_VERSION);
+    expect(p.strategy).toEqual({ leverageRatio: 3 });
+    expect(p.strategy).not.toHaveProperty('preset');
+    expect(p.cash).toEqual({ emergencyFundBalance: 4000, emergencyFundApy: 0.04, targetMonths: 3 });
+    expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
+  });
+
+  it('keeps emergency months the visitor entered, 1 included', () => {
+    const saved = {
+      ...getDefaultFinancialProfile(),
+      cash: { emergencyFundBalance: 4000, emergencyFundApy: 0.04, targetMonths: 1 },
+      provided: ['cash.targetMonths'],
+    };
+    expect(migrateProfile(saved, 2).cash.targetMonths).toBe(1);
+    // A partial patch normalized over a base is not a stored payload: left alone.
+    expect(normalizeProfile({ cash: { targetMonths: 1 } }).cash.targetMonths).toBe(1);
   });
 
   it('treats every version the same: the result is normalizeProfile of the payload', () => {

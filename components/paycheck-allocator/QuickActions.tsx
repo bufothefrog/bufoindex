@@ -24,7 +24,7 @@ import { limitHsa, limitIra } from '@/lib/calculations/contributionLimits';
 import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { TONE_BORDER, TONE_SURFACE, TONE_TEXT, type Tone } from '@/lib/design-system/tone';
-import { formatCurrency, formatPercent } from '@/lib/format';
+import { formatCurrency, formatMonths, formatPercent } from '@/lib/format';
 import { PaycheckProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { highestRateHighInterestDebt } from '@/lib/utils/stepStatusUtils';
@@ -155,19 +155,24 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
     });
   }
 
-  // Emergency fund under one month of expenses (important)
-  if (profile.preferences.currentEmergencyFund < profile.preferences.necessaryExpenses) {
+  // Emergency fund under one month of expenses (important). The figure is
+  // the months on hand, rounded down so it never reads as a full month; the
+  // one-month line is the engine's first step, not a target.
+  const { currentEmergencyFund, necessaryExpenses } = profile.preferences;
+  if (currentEmergencyFund < necessaryExpenses) {
+    const monthsOnHand = Math.max(0, Math.floor((currentEmergencyFund / necessaryExpenses) * 10) / 10);
     actions.push({
       id: 'emergency-fund',
       title: 'Emergency Fund Below One Month of Expenses',
       urgency: 'important',
       impact: {
-        value: '1 month',
-        detail: 'of necessary expenses covered',
+        value: formatMonths(monthsOnHand),
+        detail: 'of necessary expenses on hand',
       },
       timeToImplement: '3-6 months',
       actionLabel: 'Setup Emergency Fund',
-      description: 'A month of necessary expenses on hand covers a minor emergency without borrowing at credit-card rates.',
+      description:
+        'Cash on hand covers less than one month of necessary expenses, so a minor emergency may mean borrowing at credit-card rates.',
       icon: Shield,
       monthlySavings: 0,
       screen: 'emergency-fund',

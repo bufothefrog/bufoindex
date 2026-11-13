@@ -43,10 +43,11 @@ const firstAsker = (path: string): FormSpec | undefined =>
   );
 
 /**
- * The profile-only screens PROFILE_FORM keeps: the paycheck form asks the
- * emergency fund (cash-buffer's two fields) first, so only strategy is left.
+ * The profile-only screens PROFILE_FORM keeps: none. The paycheck form asks
+ * the emergency fund (cash-buffer's three fields) first, and the strategy
+ * preset screen is gone.
  */
-const KEPT_EXTRAS = ['strategy'];
+const KEPT_EXTRAS: string[] = [];
 
 /** The optional screens of the calculator forms, which PROFILE_FORM asks after everything else. */
 const OPTIONAL_IDS = ['ss-healthcare'];
@@ -131,40 +132,50 @@ describe('PROFILE_FORM', () => {
     }
     const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - TAIL);
     expect(middle.map((screen) => [screen.id, screen.fields])).toEqual(expected);
-    // Leverage's facts screen keeps only what no earlier screen asks (the age, the retirement age and the
-    // invested balance were asked before it, and the taxable contribution on paycheck's ira-taxable screen).
-    expect(PROFILE_FORM.screens.find((screen) => screen.id === 'facts')?.fields).toEqual(['strategy.leverageRatio']);
+    // Leverage's facts screen adds nothing: the age, the retirement age and the invested balance were asked
+    // before it, and the taxable contribution on paycheck's ira-taxable screen. The leverage ratio left it.
+    expect(PROFILE_FORM.screens.map((screen) => screen.id)).not.toContain('facts');
   });
 
-  it('gives a trimmed screen its own wording: the leverage facts screen speaks of the ratio alone', () => {
-    const facts = PROFILE_FORM.screens.find((screen) => screen.id === 'facts')!;
-    expect(facts).toMatchObject({
-      title: 'Leverage ratio',
-      question: 'Which leverage ratio should the comparison use?',
-    });
-    expect(facts.description).toBeUndefined();
-    // The leverage intake asks the whole screen, with its own wording.
-    expect(FORMS.leverage.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
-    // A screen that keeps every field keeps its wording even with copy for it.
-    const whole = composeProfileForm(
+  it('never asks a calculator-only screen (surface "calculator"): the leverage ratio and the claiming age', () => {
+    const calculatorOnly = PROFILE_FORM_ORDER.flatMap((id) =>
+      FORMS[id].screens.filter((screen) => screen.surface === 'calculator')
+    );
+    expect(calculatorOnly.map((screen) => screen.id)).toEqual(['claiming', 'comparison']);
+    const profilePaths = PROFILE_FORM.screens.flatMap((screen) => screen.fields);
+    for (const path of ['strategy.leverageRatio', 'retirementIncome.socialSecurityAge']) {
+      expect(profilePaths, path).not.toContain(path);
+      expect(fieldMap(PROFILE_FORM).has(path), path).toBe(false);
+    }
+    // Even a calculator-only screen whose fields no other screen asks stays out.
+    const built = composeProfileForm(
       { id: 'core', fields: [], screens: [] },
-      [{ form: FORMS.leverage, section: 'portfolio', trimmedCopy: { facts: { title: 'Trimmed' } } }],
+      [
+        {
+          form: {
+            id: 'calc',
+            fields: [{ path: 'only', kind: 'number', label: 'Only', tier: 'details' }],
+            screens: [{ id: 'page', title: 'Page', tier: 'details', surface: 'calculator', fields: ['only'] }],
+          },
+          section: 'retirement',
+        },
+      ],
       { id: 'extra', fields: [], screens: [] }
     );
-    expect(whole.form.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
+    expect(built.form.screens).toEqual([]);
   });
 
   it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {
     expect(PROFILE_FORM_ORDER).toEqual(['retirement', 'paycheck', 'portfolio', 'leverage']);
   });
 
-  it('walks the profile sections in order: the basics, each calculator, then cash and strategy', () => {
+  it('walks the profile sections in order: the basics, each calculator, then the optional screens', () => {
     const walked = screensFor(PROFILE_FORM, makeGet(getDefaultFinancialProfile()), { mode: 'all', surface: 'intake' }).map(
       (screen) => profileFormSection(screen.id)
     );
     // Consecutive screens of one section collapse to one entry, so the forms can grow without changing this list.
     const sections = walked.filter((section, i) => i === 0 || section !== walked[i - 1]);
-    expect(sections).toEqual(['core', 'retirement', 'paycheck', 'portfolio', 'cash', 'optional']);
+    expect(sections).toEqual(['core', 'retirement', 'paycheck', 'portfolio', 'optional']);
   });
 
   it('labels every screen with its section', () => {
@@ -174,7 +185,7 @@ describe('PROFILE_FORM', () => {
     expect(PROFILE_FORM.screens.map((screen) => PROFILE_FORM_SECTION_LABELS[profileFormSection(screen.id)!])).toEqual([
       ...CORE_SCREENS.map(() => 'The basics'),
       ...middle.map((screen) => labelOf(screen.id)),
-      ...KEPT_EXTRAS.map(() => 'Cash and strategy'),
+      ...KEPT_EXTRAS.map(() => 'Cash'),
       ...OPTIONAL_IDS.map(() => 'Optional'),
     ]);
     expect(profileFormSection('nope')).toBeUndefined();
@@ -189,12 +200,9 @@ describe('PROFILE_FORM', () => {
     );
     expect(tail.map((screen) => profileFormSection(screen.id))).toEqual(OPTIONAL_IDS.map(() => 'optional'));
     expect(PROFILE_FORM_SECTION_LABELS.optional).toBe('Optional');
-    // The retirement screen with the Social Security benefit, the claiming age and the healthcare cost.
-    expect(tail[0].fields).toEqual([
-      'retirementIncome.socialSecurityBenefit',
-      'retirementIncome.socialSecurityAge',
-      'retirementIncome.annualHealthcareCost',
-    ]);
+    // The retirement screen with the Social Security benefit and the healthcare cost; the claiming age is a
+    // calculator-only control on the retirement page.
+    expect(tail[0].fields).toEqual(['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost']);
   });
 
   it('puts an optional screen of the profile-only form in the section "Optional" too, after the calculator ones', () => {
@@ -231,10 +239,8 @@ describe('PROFILE_FORM', () => {
 
   it('runs the shared derived writes once', () => {
     const get = makeGet(profileWith([], { person: { ...getDefaultFinancialProfile().person, age: 62, retirementAge: 60 } }));
-    expect(PROFILE_FORM.onSubmit?.(get, new Set())).toEqual([
-      { path: 'cash.targetMonths', value: 1 },
-      { path: 'person.retirementAge', value: 63 },
-    ]);
+    // No emergency-fund months are derived any more: only the retirement age is raised.
+    expect(PROFILE_FORM.onSubmit?.(get, new Set())).toEqual([{ path: 'person.retirementAge', value: 63 }]);
   });
 });
 
@@ -338,7 +344,7 @@ describe('profileCompleteness (by topic screen)', () => {
     const empty = profileCompleteness(getDefaultFinancialProfile());
     expect(empty.total).toBe(topics(getDefaultFinancialProfile()).length - OPTIONAL_IDS.length);
     expect(empty.total).toBe(REQUIRED.length);
-    expect(empty.total).toBe(16);
+    expect(empty.total).toBe(14);
     expect(empty.provided).toBe(0);
     expect(empty.missing.map((s) => s.id)).toEqual(REQUIRED.map((s) => s.id));
   });
@@ -350,11 +356,47 @@ describe('profileCompleteness (by topic screen)', () => {
     const withOptional = profileCompleteness(profileWith([...CORE_SCREENS[0].fields, ...optionalPaths]));
     const withoutOptional = profileCompleteness(profileWith([...CORE_SCREENS[0].fields]));
     expect(withOptional).toEqual(withoutOptional);
-    expect(withOptional).toMatchObject({ provided: 1, total: 16 });
+    expect(withOptional).toMatchObject({ provided: 1, total: 14 });
     expect(withOptional.missing.map((s) => s.id)).not.toContain('ss-healthcare');
     // Everything else answered is complete whether the optional facts are or not.
-    expect(profileCompleteness(profileWith(rest))).toEqual({ provided: 16, total: 16, missing: [] });
-    expect(profileCompleteness(profileWith([...rest, ...optionalPaths]))).toEqual({ provided: 16, total: 16, missing: [] });
+    expect(profileCompleteness(profileWith(rest))).toEqual({ provided: 14, total: 14, missing: [] });
+    expect(profileCompleteness(profileWith([...rest, ...optionalPaths]))).toEqual({ provided: 14, total: 14, missing: [] });
+  });
+
+  it('counts the same answers against 14 topics where 3bb0132 counted 16', () => {
+    // At 3bb0132 the required topics were the 3 basics, retirement savings and target, the 6 paycheck
+    // screens, the 3 portfolio screens, the leverage ratio (leverage "facts", trimmed) and the strategy
+    // preset: 16. The leverage ratio became calculator-only and the preset was removed, so the denominator
+    // lost those two topics: 14. The emergency fund months joined the emergency fund screen, which adds
+    // no topic. A visitor who had answered the basics, the ratio and the preset read "5 of 16"; the same
+    // stored answers now read "3 of 14".
+    const answers = [...CORE_SCREENS.flatMap((s) => s.fields), 'strategy.leverageRatio', 'strategy.preset'];
+    const result = profileCompleteness(profileWith(answers));
+    expect(result).toMatchObject({ provided: 3, total: 14 });
+    expect(topicsAnsweredText(result)).toBe('3 of 14 topics answered');
+    expect(PROFILE_FORM.screens.map((s) => s.id)).toEqual([
+      'about',
+      'pay',
+      'must-pay',
+      'savings',
+      'target',
+      'spending-bonus',
+      'emergency-fund',
+      '401k',
+      'hsa',
+      'ira-taxable',
+      'debts',
+      'targets',
+      'accounts',
+      'holdings',
+      'ss-healthcare',
+    ]);
+    // The emergency fund screen now asks the target months too, so a profile that answered its balance and
+    // rate but not the months counts it as missing.
+    const emergency = PROFILE_FORM.screens.find((s) => s.id === 'emergency-fund')!;
+    expect(emergency.fields).toEqual(['cash.emergencyFundBalance', 'cash.emergencyFundApy', 'cash.targetMonths']);
+    const partly = profileCompleteness(profileWith(['cash.emergencyFundBalance', 'cash.emergencyFundApy']));
+    expect(partly.missing.map((s) => s.id)).toContain('emergency-fund');
   });
 
   it('keeps only the screens without the optional flag (requiredScreens)', () => {

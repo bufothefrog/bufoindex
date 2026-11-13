@@ -26,8 +26,6 @@ import {
   OPTIMIZATION_GOAL_OPTIONS,
   RISK_TOLERANCE_LABELS,
   RISK_TOLERANCE_OPTIONS,
-  STRATEGY_PRESET_LABELS,
-  STRATEGY_PRESET_OPTIONS,
   TARGET_MIX_LABELS,
   TARGET_MIX_OPTIONS,
   leverageRatioLabel,
@@ -36,7 +34,7 @@ import {
 } from '@/lib/constants/labels';
 import { DISCLAIMER, composeDisclaimer } from '@/lib/constants/disclaimers';
 import { LEVERAGE_RATIO_OPTIONS } from '@/lib/constants/leverage';
-import { PAY_FREQUENCIES, STRATEGY_PRESETS, TARGET_MIX_PRESETS } from '@/lib/profile/defaults';
+import { PAY_FREQUENCIES, TARGET_MIX_PRESETS } from '@/lib/profile/defaults';
 
 /** The value lists every vocabulary must cover, spelled as the types spell them. */
 const VOCABULARIES: Array<{
@@ -59,7 +57,6 @@ const VOCABULARIES: Array<{
   },
   { name: 'bonus frequency', values: ['quarterly', 'annual', 'irregular'], labels: BONUS_FREQUENCY_LABELS, options: BONUS_FREQUENCY_OPTIONS },
   { name: 'account type', values: ['taxable', 'tax-deferred', 'tax-free'], labels: ACCOUNT_TYPE_LABELS, options: ACCOUNT_TYPE_OPTIONS },
-  { name: 'strategy preset', values: STRATEGY_PRESETS, labels: STRATEGY_PRESET_LABELS, options: STRATEGY_PRESET_OPTIONS },
   { name: 'target mix', values: [...new Set([...TARGET_MIX_PRESETS, 'custom'])], labels: TARGET_MIX_LABELS, options: TARGET_MIX_OPTIONS },
   { name: 'risk tolerance', values: ['conservative', 'moderate', 'optimizer'], labels: RISK_TOLERANCE_LABELS, options: RISK_TOLERANCE_OPTIONS },
   {
@@ -139,11 +136,6 @@ describe('label wording', () => {
     ]);
     expect(FILING_STATUS_META.marriedJoint.phrase).toBe('married filing jointly');
     expect(FILING_STATUS_META.headOfHousehold.phrase).toBe('head of household');
-  });
-
-  it('spells the strategy preset "Cash-flow investor" and lists it first', () => {
-    expect(STRATEGY_PRESET_LABELS['cashflow-investor']).toBe('Cash-flow investor');
-    expect(STRATEGY_PRESET_OPTIONS.map((o) => o.value)).toEqual(['cashflow-investor', 'standard']);
   });
 
   it('names the HSA coverage tiers without the limit (the contribution help states it)', () => {

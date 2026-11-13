@@ -135,12 +135,12 @@ describe('collapsed cards with nothing answered', () => {
     const core = cards.filter((card) => card.tier === 'core');
     expect(core.length).toBeGreaterThan(0);
     for (const card of core) expect(card.line, card.title).toBe('Not answered yet');
-    expect(core[0].line).not.toContain('30, TX');
+    expect(core[0].line).not.toContain('25, CA');
   });
 
   it('show the summary once one field on a core card is answered', () => {
     const lines = collapsedLines(FORMS.paycheck, profileGet(), ['person.age']).map((card) => card.line);
-    expect(lines[0]).toBe('30, TX, single');
+    expect(lines[0]).toBe('25, CA, single');
   });
 
   it('still show values on assumption cards', () => {

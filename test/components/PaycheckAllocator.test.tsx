@@ -2,8 +2,8 @@
  * The paycheck allocator on the platform: generated sections over the
  * shared profile, live allocation results from the real engine with no
  * Calculate button, no results before hydration, write-through edits, the
- * fun-money relation keeping stale results, the fixed-bracket tax note
- * (O9), the debt rate badge and totals, the ?from=profile strip, the reload regression (bug 1) and the shared
+ * fun-money relation keeping stale results, the tax note stating the
+ * computed federal bracket, the retirement bracket select, the debt rate badge and totals, the ?from=profile strip, the reload regression (bug 1) and the shared
  * dollar-display preference.
  */
 
@@ -22,8 +22,7 @@ import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 
 const meta = calculatorMeta('paycheck');
 
-const TAX_NOTE =
-  'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.';
+const TAX_NOTE = 'Tax savings use your 22% federal bracket and one 2026 state rate.';
 
 /** Waits for the first results (the bootstrap submits immediately once hydrated). */
 const findResults = () => screen.findByText('Long-Term Impact');
@@ -115,12 +114,54 @@ describe('PaycheckAllocator', () => {
     );
   });
 
-  it('says the federal bracket is fixed, and nowhere that brackets are calculated automatically (O9)', async () => {
+  it('states the federal bracket computed from pay, and nowhere that brackets are calculated automatically', async () => {
     renderWithProfile(<PaycheckAllocator />);
     await findResults();
 
     expect(screen.getByText(TAX_NOTE)).toBeInTheDocument();
+    expect(usePaycheckStore.getState().inputs?.taxes.federalBracket).toBe(0.22);
     expect(document.body.textContent).not.toMatch(/automatically/i);
+  });
+
+  it('follows a pay edit into the note and the engine bracket', async () => {
+    renderWithProfile(<PaycheckAllocator />);
+    await findResults();
+
+    // 2,000 every two weeks: 52,000 - 4,160 (8% traditional) - 16,100 = 31,740: 12%.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Take-home pay per paycheck' }), { target: { value: '1500' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Gross pay per paycheck' }), { target: { value: '2000' } });
+
+    expect(screen.getByText('Tax savings use your 12% federal bracket and one 2026 state rate.')).toBeInTheDocument();
+    await usePaycheckStore.getState().flush();
+    expect(usePaycheckStore.getState().inputs?.taxes.federalBracket).toBe(0.12);
+  });
+
+  it('offers the retirement bracket as a select of the real brackets, following state and filing status', async () => {
+    const user = userEvent.setup();
+    renderWithProfile(<PaycheckAllocator />);
+    await findResults();
+    await user.click(screen.getByRole('button', { name: 'Show assumptions' }));
+
+    const select = () => screen.getByRole('combobox', { name: 'Expected tax bracket in retirement' });
+    const optionNames = () => within(select()).getAllByRole('option').map((option) => option.textContent);
+    expect(optionNames()).toContain('12% federal + 9.3% CA');
+    // The help line carries the selected bracket's range, so the labels stay short on a phone.
+    expect(select()).toHaveAccessibleDescription('Taxable $12,400 to $50,400. Today: 22% federal; same state rate in both.');
+
+    await user.selectOptions(select(), '24% federal + 9.3% CA');
+    expect(useProfileStore.getState().profile.assumptions.paycheck.expectedRetirementBracket).toBe(0.24);
+    expect(select()).toHaveAccessibleDescription('Taxable $105,700 to $201,775. Today: 22% federal; same state rate in both.');
+    await usePaycheckStore.getState().flush();
+    expect(usePaycheckStore.getState().inputs?.preferences.expectedRetirementBracket).toBe(0.24);
+
+    useProfileStore.getState().setValues([
+      { path: 'person.state', value: 'TX' },
+      { path: 'person.filingStatus', value: 'marriedJoint' },
+    ]);
+    expect(await screen.findByRole('option', { name: '24% federal' })).toBeInTheDocument();
+    // Filing jointly, the worked example's pay is in the 12% bracket today: 104,000 - 8,320 - 32,200 = 63,480.
+    expect(await screen.findByText('Taxable $211,400 to $403,550. Today: 12% federal; same state rate in both.')).toBeInTheDocument();
+    expect(optionNames().some((name) => name?.includes('CA'))).toBe(false);
   });
 
   it('badges each debt by its rate and totals the debts', async () => {

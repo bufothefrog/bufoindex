@@ -14,6 +14,7 @@ import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { toEngineInputs } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { withDerivedValues } from '@/lib/profile/derived';
 import { RETIREMENT_BINDINGS } from './bindings';
 import { RETIREMENT_FORM } from './form';
 
@@ -23,11 +24,12 @@ let base: RetirementInputs | null = null;
  * The engine inputs of the default profile. Every RetirementInputs leaf is
  * bound (test/lib/calculators/retirement/bindings.test.ts), so applying the
  * bindings to an empty object builds the whole shape, and the defaults stay
- * in one place: the profile. toEngineInputs copies on write, so the cached
- * object is never changed.
+ * in one place: the profile (through withDerivedValues, like every other
+ * reader). toEngineInputs copies on write, so the cached object is never
+ * changed.
  */
 function retirementEngineBase(): RetirementInputs {
-  base ??= toEngineInputs(RETIREMENT_BINDINGS, {} as RetirementInputs, makeGet(getDefaultFinancialProfile()));
+  base ??= toEngineInputs(RETIREMENT_BINDINGS, {} as RetirementInputs, makeGet(withDerivedValues(getDefaultFinancialProfile())));
   return base;
 }
 

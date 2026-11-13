@@ -17,10 +17,10 @@ import { Code, DemoBlock, DemoEntry, DemoSection } from './DemoBlock';
 // shows the full one-line recap.
 const DEMO_CORE_PROFILE = { ...getDefaultFinancialProfile(), provided: [...CORE_PATHS] };
 
-type Preset = 'standard' | 'cashflow-investor';
+type Coverage = 'individual' | 'family';
 
 export function GuidedSection() {
-  const [preset, setPreset] = useState<Preset>('cashflow-investor');
+  const [coverage, setCoverage] = useState<Coverage>('individual');
 
   return (
     <DemoSection title="Guided flow" intro="The intake wizard, the chooser and the post-results card are built from these.">
@@ -39,21 +39,19 @@ export function GuidedSection() {
               description="The returning visitor's 'Continue with my profile' card."
             />
           </div>
-          <div className="mt-4 max-w-xl space-y-2" role="radiogroup" aria-label="Strategy preset (demo)">
+          <div className="mt-4 max-w-xl space-y-2" role="radiogroup" aria-label="HSA coverage (demo)">
             <OptionCard
-              title="Standard"
-              description="About 3 months of must-pay costs in cash."
-              selected={preset === 'standard'}
-              onSelect={() => setPreset('standard')}
-              tabIndex={preset === 'standard' ? 0 : -1}
+              title="Individual"
+              selected={coverage === 'individual'}
+              onSelect={() => setCoverage('individual')}
+              tabIndex={coverage === 'individual' ? 0 : -1}
+              tag={{ id: 'demo-option-tag', text: 'Typical' }}
             />
             <OptionCard
-              title="Cash-flow investor"
-              description="About 1 month of must-pay costs in cash."
-              selected={preset === 'cashflow-investor'}
-              onSelect={() => setPreset('cashflow-investor')}
-              tabIndex={preset === 'cashflow-investor' ? 0 : -1}
-              tag={{ id: 'demo-option-tag', text: 'Typical' }}
+              title="Family"
+              selected={coverage === 'family'}
+              onSelect={() => setCoverage('family')}
+              tabIndex={coverage === 'family' ? 0 : -1}
             />
           </div>
         </DemoEntry>
@@ -99,7 +97,7 @@ export function GuidedSection() {
               <ReviewTopicRow
                 anchorId="demo-topic-pay"
                 title="What does a typical paycheck look like?"
-                summary="$3,500 gross every 2 weeks, $2,600 take-home"
+                summary="$4,000 gross every 2 weeks, $2,550 take-home"
                 status="answered"
                 href="/start/review/pay"
               />

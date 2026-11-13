@@ -75,9 +75,9 @@ describe('LeverageComparison page', () => {
 
     act(() => useProfileStore.setState({ hasHydrated: true }));
     expect(screen.queryByRole('status', { name: 'Loading results' })).not.toBeInTheDocument();
-    // The default profile: $500 taxable a month for 30 years plus $25,000.
+    // The default profile: $500 taxable a month for 40 years (age 25 to 65) plus $25,000.
     expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent(
-      '$205,000 contributed to each over 30 years, 500 paths'
+      '$265,000 contributed to each over 40 years, 500 paths'
     );
     expect(results()).toHaveTextContent('Index fund, median ending balance');
     expect(results()).toHaveTextContent('Cash flow vs lump sum');
@@ -100,7 +100,7 @@ describe('LeverageComparison page', () => {
     render(page());
     expect(window.location.search).toBe('');
     expect(tile('2x fund, median ending balance')).toBeInTheDocument();
-    expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent('over 30 years');
+    expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent('over 40 years');
   });
 
   it('shows where each auto value comes from, and the ratio and assumptions it uses', () => {
@@ -108,7 +108,7 @@ describe('LeverageComparison page', () => {
     const contribution = screen.getByRole('group', { name: 'Monthly contribution' });
     expect(contribution).toHaveTextContent('Your monthly taxable contribution: $500');
     expect(screen.getByRole('group', { name: 'Years' })).toHaveTextContent(
-      'From your age to the age you plan to stop contributing: 30 yrs'
+      'From your age to the age you plan to stop contributing: 40 yrs'
     );
     expect(screen.getByRole('group', { name: 'Starting balance' })).toHaveTextContent(
       'What you already have invested: $25,000'
@@ -124,7 +124,7 @@ describe('LeverageComparison page', () => {
     render(page());
     await user.click(within(sourceSwitch('Years')).getByRole('radio', { name: 'Custom' }));
     const years = screen.getByRole('textbox', { name: 'Years' });
-    expect(years).toHaveValue('30');
+    expect(years).toHaveValue('40');
     fireEvent.change(years, { target: { value: '12' } });
 
     const { profile } = useProfileStore.getState();

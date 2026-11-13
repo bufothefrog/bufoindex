@@ -10,10 +10,16 @@
 
 import { formulaRegistry } from './registry';
 import { FormulaRegistryEntry } from './types';
+import {
+  CONTRIBUTION_AND_BENEFIT_BASE_2026,
+  PIA_FIRST_BEND_POINT_2026,
+  PIA_SECOND_BEND_POINT_2026,
+} from '@/lib/constants/social-security-2026';
+import { formatCurrency as usd } from '@/lib/format';
 
 // Define the retirement formulas metadata. `functionName` is the exported
-// function in lib/calculations/retirement.ts (or lib/utils/random.ts) that
-// implements the entry.
+// function in lib/calculations/retirement.ts (or lib/utils/random.ts, or
+// lib/calculations/socialSecurityEstimate.ts) that implements the entry.
 const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'validated' | 'lastUpdated'>[] = [
   {
     name: "Future Value of Investment",
@@ -233,6 +239,66 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     ]
   },
   {
+    name: "Social Security Benefit Estimate",
+    functionName: "estimateSocialSecurityBenefit",
+    category: "intermediate",
+    latex: "B_{\\text{FRA}} = 12 \\left(0.90\\min(A, b_1) + 0.32\\,\\text{clamp}(A - b_1,\\ 0,\\ b_2 - b_1) + 0.15\\max(A - b_2, 0)\\right) \\qquad A = \\tfrac{\\min(P,\\ W)}{12}",
+    variables: {
+      P: {
+        symbol: "P",
+        description: "Yearly gross pay from your profile (pay per paycheck times paychecks per year)",
+        unit: "$/year",
+        constraints: "Negative pay counts as 0"
+      },
+      W: {
+        symbol: "W",
+        description: `Contribution and benefit base: ${usd(CONTRIBUTION_AND_BENEFIT_BASE_2026)} in 2026; pay above it is not counted`,
+        unit: "$/year"
+      },
+      A: {
+        symbol: "A",
+        description: "Average indexed monthly earnings (AIME), here current pay divided by 12",
+        unit: "$/month"
+      },
+      b1: {
+        symbol: "b_1, b_2",
+        description: `2026 bend points of the primary insurance amount formula: ${usd(PIA_FIRST_BEND_POINT_2026)} and ${usd(PIA_SECOND_BEND_POINT_2026)} a month`,
+        unit: "$/month"
+      }
+    },
+    description: "When the Social Security benefit is on Auto, the calculator estimates the yearly benefit at full retirement age from your pay with the SSA primary insurance amount formula. It is a simplification: your current pay stands in for the average of your 35 highest years of indexed earnings, and it is one worker's own benefit. For married filing jointly the household pay figure is treated as one worker's pay; spousal and survivor benefits are not modeled.",
+    purpose: "Give the simulation a Social Security figure based on your pay until you enter your own (ssa.gov/myaccount shows your SSA estimate)",
+    example: {
+      inputs: { P: 104000 },
+      output: 40358.52,
+      explanation: "Pay of $104,000 a year gives an estimated $40,358.52 a year at full retirement age, in today's dollars",
+      stepByStep: [
+        "AIME: $104,000 / 12 = $8,666.67 (below the $184,500 base)",
+        "90% of the first $1,286 = $1,157.40",
+        "32% of the $6,463 between $1,286 and $7,749 = $2,068.16",
+        "15% of the $917.67 above $7,749 = $137.65",
+        "Monthly benefit: $1,157.40 + $2,068.16 + $137.65 = $3,363.21",
+        "Yearly: $3,363.21 x 12 = $40,358.52 (the calculator rounds to $40,359)"
+      ]
+    },
+    sources: [
+      "Social Security Administration, Office of the Chief Actuary: Primary Insurance Amount (formula factors 90%, 32%, 15%)",
+      "Social Security Administration, Office of the Chief Actuary: Benefit Formula Bend Points (2026: $1,286 and $7,749)",
+      "Social Security Administration, Office of the Chief Actuary: Contribution and Benefit Base (2026: $184,500)",
+      "BufoIndex constants: lib/constants/social-security-2026.ts"
+    ],
+    assumptions: [
+      "Your current gross pay, in today's dollars, is your average indexed earnings over a 35-year career",
+      "Bonus pay is not included",
+      "The estimate is the benefit at full retirement age; the claiming-age formula below adjusts it"
+    ],
+    limitations: [
+      "Fewer than 35 years of earnings, or lower earlier pay, gives a lower real benefit than this estimate",
+      "One worker's own benefit only: no spousal, survivor or earnings test adjustments",
+      "Uses the 2026 bend points and base for every age"
+    ]
+  },
+  {
     name: "Social Security Benefit at Claiming Age",
     functionName: "calculateSocialSecurityBenefit",
     category: "intermediate",
@@ -240,7 +306,7 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     variables: {
       baseBenefit: {
         symbol: "B_{\\text{FRA}}",
-        description: "Annual benefit at full retirement age, as entered",
+        description: "Annual benefit at full retirement age: the one you enter, or the estimate from your pay on Auto",
         unit: "$/year",
         constraints: "Must be ≥ 0"
       },
@@ -278,13 +344,13 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     ],
     assumptions: [
       "Full retirement age is fixed at 67 for every user",
-      "The benefit you enter is an annual amount stated in today's dollars",
+      "The benefit (entered or estimated) is an annual amount stated in today's dollars",
       "Claiming before 62 produces no benefit; claiming after 70 is treated as claiming at 70",
       "Payments begin in the first simulated year in which your age reaches the claiming age, and grow with the general inflation rate you enter"
     ],
     limitations: [
       "Real full retirement age varies by birth year (66–67); this model uses 67 for everyone",
-      "No earnings test, spousal, survivor, or WEP/GPO adjustments",
+      "No earnings test, spousal or survivor adjustments",
       "Benefits are grown at the general inflation rate you enter rather than an SSA cost-of-living adjustment",
       "Benefits are treated as untaxed income in the simulation",
       "Assumes the program pays scheduled benefits in full for the whole retirement"

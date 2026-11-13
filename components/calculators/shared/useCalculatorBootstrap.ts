@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { PROFILE_HANDOFF_PARAM, PROFILE_HANDOFF_VALUE } from '@/lib/calculators/registry';
 import type { CalculatorStore } from '@/lib/store/createCalculatorStore';
+import { withDerivedValues } from '@/lib/profile/derived';
 import { useProfileStore } from '@/lib/store/profileStore';
 
 export interface CalculatorBootstrap {
@@ -49,7 +50,7 @@ export function useCalculatorBootstrap<E, R>(
       new URLSearchParams(search).get(PROFILE_HANDOFF_PARAM) === PROFILE_HANDOFF_VALUE;
     if (search !== '' || hash !== '') window.history.replaceState(null, '', pathname);
 
-    store.getState().submit(useProfileStore.getState().profile, { immediate: true });
+    store.getState().submit(withDerivedValues(useProfileStore.getState().profile), { immediate: true });
     setBootstrap({ ready: true, arrivedFromProfile });
   }, [hasHydrated, def, store]);
 

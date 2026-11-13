@@ -107,14 +107,14 @@ describe('CalculatorPage', () => {
   it('shows defaults and no results before hydration, a skeleton until the first run', () => {
     resetProfileStore({ hydrated: false });
     render(page());
-    expect(ageBox()).toHaveValue('30');
+    expect(ageBox()).toHaveValue('25');
     expect(screen.getByRole('status', { name: 'Loading results' })).toBeInTheDocument();
     expect(screen.queryByText(/years left/)).not.toBeInTheDocument();
     expect(store.getState().hasCalculatedOnce).toBe(false);
 
     act(() => useProfileStore.setState({ hasHydrated: true }));
     expect(screen.queryByRole('status', { name: 'Loading results' })).not.toBeInTheDocument();
-    expect(screen.getByText('30 years left from age 30')).toBeInTheDocument();
+    expect(screen.getByText('40 years left from age 25')).toBeInTheDocument();
   });
 
   it('keeps the skeleton while a worker run is in flight', async () => {
@@ -126,7 +126,7 @@ describe('CalculatorPage', () => {
     renderWithProfile(page());
     expect(screen.getByRole('status', { name: 'Loading results' })).toBeInTheDocument();
     await act(async () => resolve({ yearsLeft: 7 }));
-    expect(screen.getByText('7 years left from age 30')).toBeInTheDocument();
+    expect(screen.getByText('7 years left from age 25')).toBeInTheDocument();
   });
 
   it('writes an edit through to the profile, marks it provided and recalculates', () => {
@@ -135,7 +135,7 @@ describe('CalculatorPage', () => {
     fireEvent.change(ageBox(), { target: { value: '35' } });
     expect(useProfileStore.getState().profile.person.age).toBe(35);
     expect(useProfileStore.getState().profile.provided).toContain('person.age');
-    expect(screen.getByText('25 years left from age 35')).toBeInTheDocument();
+    expect(screen.getByText('30 years left from age 35')).toBeInTheDocument();
   });
 
   it('keeps the last results, marked stale, while a field is invalid', () => {
@@ -219,7 +219,7 @@ describe('CalculatorPage', () => {
 
   it('reads the profile when the URL is clean, and resubmits when it changes elsewhere', () => {
     renderWithProfile(page(), { profile: { person: { age: 50 } } });
-    expect(screen.getByText('10 years left from age 50')).toBeInTheDocument();
+    expect(screen.getByText('15 years left from age 50')).toBeInTheDocument();
     act(() => useProfileStore.getState().setValues([{ path: 'person.retirementAge', value: 70 }]));
     expect(screen.getByText('20 years left from age 50')).toBeInTheDocument();
   });
@@ -248,7 +248,7 @@ describe('CalculatorPage', () => {
     renderWithProfile(
       <CalculatorPage definition={definition} store={store} renderResults={({ results }) => <Counted years={results.yearsLeft} />} />
     );
-    expect(screen.getByText('30 years left')).toBeInTheDocument();
+    expect(screen.getByText('40 years left')).toBeInTheDocument();
     const before = renders;
     const inflation = screen.getByRole('textbox', { name: 'Inflation' });
     for (const value of ['3', '3.', '3.5']) fireEvent.change(inflation, { target: { value } });
@@ -256,7 +256,7 @@ describe('CalculatorPage', () => {
     expect(renders).toBe(before);
 
     fireEvent.change(ageBox(), { target: { value: '35' } });
-    expect(screen.getByText('25 years left')).toBeInTheDocument();
+    expect(screen.getByText('30 years left')).toBeInTheDocument();
     expect(renders).toBe(before + 1);
   });
 
@@ -305,7 +305,7 @@ describe('CalculatorPage', () => {
       expect(recoverable).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
       expect(useProfileStore.getState().hasHydrated).toBe(true);
-      expect(container.textContent).toContain('16 years left from age 44');
+      expect(container.textContent).toContain('21 years left from age 44');
     } finally {
       consoleError.mockRestore();
       act(() => root?.unmount());

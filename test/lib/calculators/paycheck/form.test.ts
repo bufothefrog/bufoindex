@@ -2,12 +2,14 @@
  * The paycheck intent's intake over the grown PAYCHECK_FORM (slice c3,
  * docs/rebuild-plan.md sections 2.12 to 2.14): the screens in order, the
  * fields on each, the visibility rules, the validation messages, 'remaining'
- * mode with its seven screens after the core, the skip labels, the tax
+ * mode with its six screens after the core (the assumptions stay on the
+ * page), the skip labels, the tax
  * note, and every question the old intake asked still asked.
  */
 
 import { describe, expect, it } from 'vitest';
 import { FORMS } from '@/lib/calculators/forms';
+import { retirementBracketRange } from '@/lib/calculators/paycheck/fields';
 import {
   CORE_PATHS,
   getIntakeScreens,
@@ -16,7 +18,14 @@ import {
   nextNeedsOwnAnswer,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
-import { resolveOptions, resolveText, summarizeScreen, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
+import {
+  resolveOptions,
+  resolveText,
+  summarizeScreen,
+  validateFields,
+  visibleScreenFields,
+  visibleScreenNotes,
+} from '@/lib/fields/runtime';
 import type { Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -35,8 +44,8 @@ import {
 
 const FORM = FORMS.paycheck;
 
-/** The paycheck screens after the core, in order (section 2.12). */
-const AFTER_CORE = ['spending-bonus', 'emergency-fund', '401k', 'hsa', 'ira-taxable', 'debts', 'assumptions'];
+/** The paycheck screens after the core that the intake asks, in order (section 2.12). */
+const AFTER_CORE = ['spending-bonus', 'emergency-fund', '401k', 'hsa', 'ira-taxable', 'debts'];
 
 /** The questions the old paycheck intake asked, captured before w1 (see intakeFixture). */
 const OLD_SCREENS: Record<string, OldScreenCopy> = {
@@ -50,7 +59,7 @@ const OLD_QUESTIONS: Record<string, OldQuestion> = {
   'spending.funMoneyMax': { path: 'spending.funMoneyMax', label: 'At most, per month', kind: 'money', min: 0 },
   'workplace.has401k': { path: 'workplace.has401k', label: 'Workplace retirement plan', kind: 'choice', options: [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] },
   'workplace.matchPercent': { path: 'workplace.matchPercent', label: 'Employer match rate', kind: 'percent', help: 'Per dollar you contribute; 50% means 50 cents.', min: 0, max: 2 },
-  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'The 6% in "50% of the first 6%".', min: 0, max: 1 },
+  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'The 4% in "100% of the first 4%".', min: 0, max: 1 },
 };
 
 const OLD_FLOW: readonly OldScreen[] = [
@@ -82,8 +91,8 @@ const profileWith = (provided: string[], edits: Partial<FinancialProfile> = {}):
 });
 
 describe('paycheck form: screens and fields', () => {
-  it('lists the screens in order: the core, then the seven paycheck screens', () => {
-    expect(FORM.screens.map((s) => s.id)).toEqual(['about', 'pay', 'must-pay', ...AFTER_CORE]);
+  it('lists the screens in order: the core, the six paycheck screens, then the assumptions (page only)', () => {
+    expect(FORM.screens.map((s) => s.id)).toEqual(['about', 'pay', 'must-pay', ...AFTER_CORE, 'assumptions']);
     expect(getIntakeScreens('paycheck', fromDefaults()).map((s) => s.id)).toEqual([
       'about',
       'pay',
@@ -104,7 +113,7 @@ describe('paycheck form: screens and fields', () => {
         'income.bonusAmount',
         'income.bonusFrequency',
       ],
-      'emergency-fund': ['cash.emergencyFundBalance', 'cash.emergencyFundApy'],
+      'emergency-fund': ['cash.emergencyFundBalance', 'cash.emergencyFundApy', 'cash.targetMonths'],
       '401k': [
         'workplace.has401k',
         'workplace.matchPercent',
@@ -126,7 +135,6 @@ describe('paycheck form: screens and fields', () => {
       ],
       debts: ['debts'],
       assumptions: [
-        'cash.targetMonths',
         'assumptions.paycheck.riskTolerance',
         'assumptions.paycheck.optimizationGoal',
         'assumptions.paycheck.expectedRetirementBracket',
@@ -163,23 +171,23 @@ describe('paycheck form: collapsed summaries', () => {
   const summary = (id: string, get: Get = fromDefaults()) => summarizeScreen(FORM, screen(id), get);
 
   it('summarizes the core cards with their values, not their descriptions', () => {
-    expect(summary('about')).toBe('30, TX, single');
-    expect(summary('pay')).toBe('$3,500 gross every 2 weeks, $2,600 take-home');
+    expect(summary('about')).toBe('25, CA, single');
+    expect(summary('pay')).toBe('$4,000 gross every 2 weeks, $2,550 take-home');
     expect(summary('must-pay')).toBe('$3,000 a month');
     expect(
-      [summary('about', fromDefaults({ 'person.age': 25, 'person.state': 'CA', 'person.filingStatus': 'marriedJoint' })),
-        summary('pay', fromDefaults({ 'income.grossPerPaycheck': 4000, 'income.netPerPaycheck': 3000, 'income.frequency': 'monthly' }))]
-    ).toEqual(['25, CA, married filing jointly', '$4,000 gross once a month, $3,000 take-home']);
+      [summary('about', fromDefaults({ 'person.age': 41, 'person.state': 'NY', 'person.filingStatus': 'marriedJoint' })),
+        summary('pay', fromDefaults({ 'income.grossPerPaycheck': 6000, 'income.netPerPaycheck': 4200, 'income.frequency': 'monthly' }))]
+    ).toEqual(['41, NY, married filing jointly', '$6,000 gross once a month, $4,200 take-home']);
   });
 
   it('summarizes each paycheck screen of the default profile in one line', () => {
     expect(summary('spending-bonus')).toBe('fun money $300\u2013$600/mo, no regular bonus');
-    expect(summary('emergency-fund')).toBe('$5,000 saved, 4% APY');
-    expect(summary('401k')).toBe('50% match on the first 6%, contributing 6% traditional (pre-tax)');
+    expect(summary('emergency-fund')).toBe('$9,000 saved, 4% APY, 3-month emergency fund');
+    expect(summary('401k')).toBe('100% match on the first 4%, contributing 8% traditional (pre-tax)');
     expect(summary('hsa')).toBe('no HSA');
     expect(summary('ira-taxable')).toBe('no IRA, taxable $500/mo');
     expect(summary('debts')).toBe('no debts');
-    expect(summary('assumptions')).toBe('3-month emergency fund, moderate risk, balanced goal, 12% retirement bracket');
+    expect(summary('assumptions')).toBe('moderate risk, balanced goal, 12% retirement bracket');
   });
 
   it('summarizes what the visitor turned on', () => {
@@ -203,11 +211,12 @@ describe('paycheck form: collapsed summaries', () => {
     });
     expect(summary('spending-bonus', get)).toBe('fun money $300\u2013$600/mo, $6,000 quarterly bonus');
     expect(summary('401k', get)).toBe(
-      '50% match on the first 6%, contributing 6% split between traditional and Roth, after-tax contributions allowed'
+      '100% match on the first 4%, contributing 8% split between traditional and Roth, after-tax contributions allowed'
     );
     expect(summary('hsa', get)).toBe('family HSA, $300/mo, invested');
     expect(summary('ira-taxable', get)).toBe('traditional IRA $200/mo, Roth IRA $500/mo, no taxable investing');
-    expect(summary('assumptions', get)).toBe('4.5-month emergency fund, optimizer risk, balanced goal, 12% retirement bracket');
+    expect(summary('assumptions', get)).toBe('optimizer risk, balanced goal, 12% retirement bracket');
+    expect(summary('emergency-fund', get)).toBe('$9,000 saved, 4% APY, 4.5-month emergency fund');
     expect(summary('401k', fromDefaults({ 'workplace.has401k': false }))).toBe('no workplace plan');
     expect(summary('debts', withDebts([{ id: 'd1', name: 'Card', balance: 3000, interestRate: 0.24, minimumPayment: 90, extraPayment: 0, taxDeductible: false }]))).toBe('1 debt');
   });
@@ -316,18 +325,97 @@ describe('paycheck form: visibility', () => {
   });
 });
 
-describe('paycheck form: the tax note (O9)', () => {
-  it('says the bracket is fixed, and no longer claims brackets are calculated automatically', () => {
-    const tax = notes('about');
-    expect(tax).toEqual([
-      {
-        text: 'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.',
-        tone: 'info',
-      },
+describe('paycheck form: the tax note', () => {
+  it('states the federal bracket in use, and does not claim brackets are calculated automatically', () => {
+    // The worked example: 104,000 - 8,320 (8% traditional) - 16,100 = 79,580, single: 22%.
+    expect(notes('about')).toEqual([
+      { text: 'Tax savings use your 22% federal bracket and one 2026 state rate.', tone: 'info' },
     ]);
+    // 2,000 every two weeks: 52,000 - 4,160 - 16,100 = 31,740: 12%.
+    expect(notes('about', fromDefaults({ 'income.grossPerPaycheck': 2000, 'income.netPerPaycheck': 1500 }))[0].text).toBe(
+      'Tax savings use your 12% federal bracket and one 2026 state rate.'
+    );
     const words = JSON.stringify(FORM).toLowerCase();
     expect(words).not.toContain('calculated automatically');
     expect(words).not.toContain('automatically calculated');
+    expect(words).not.toContain('fixed 22%');
+  });
+});
+
+describe('paycheck form: the retirement bracket select', () => {
+  const field = FORM.fields.find((spec) => spec.path === 'assumptions.paycheck.expectedRetirementBracket')!;
+  const labels = (get: Get) => resolveOptions(field, get).map((option) => option.label);
+  const values = (get: Get) => resolveOptions(field, get).map((option) => option.value);
+
+  it('is a select of the seven federal brackets with the CA rate (the worked example), in labels short enough for a phone', () => {
+    expect(field.kind).toBe('select');
+    expect(values(fromDefaults())).toEqual([0.1, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]);
+    expect(labels(fromDefaults())).toEqual([
+      '10% federal + 9.3% CA',
+      '12% federal + 9.3% CA',
+      '22% federal + 9.3% CA',
+      '24% federal + 9.3% CA',
+      '32% federal + 9.3% CA',
+      '35% federal + 9.3% CA',
+      '37% federal + 9.3% CA',
+    ]);
+    // Short enough for a 360 px select ("37% federal + 5.09% GA" is 21 characters).
+    for (const label of labels(fromDefaults({ 'person.state': 'GA' }))) expect(label.length).toBeLessThanOrEqual(22);
+  });
+
+  it('shows federal only for a state without an income tax', () => {
+    expect(labels(fromDefaults({ 'person.state': 'TX', 'person.filingStatus': 'marriedJoint' }))).toEqual([
+      '10% federal',
+      '12% federal',
+      '22% federal',
+      '24% federal',
+      '32% federal',
+      '35% federal',
+      '37% federal',
+    ]);
+    expect(labels(fromDefaults({ 'person.state': 'GA' }))[1]).toBe('12% federal + 5.09% GA');
+  });
+
+  it('gives the taxable range of the selected bracket for the filing status (Rev. Proc. 2025-32 tables)', () => {
+    const range = (status: string, rate: number) =>
+      retirementBracketRange(status as Parameters<typeof retirementBracketRange>[0], rate);
+    expect(range('single', 0.1)).toBe('Taxable up to $12,400');
+    expect(range('single', 0.24)).toBe('Taxable $105,700 to $201,775');
+    expect(range('single', 0.32)).toBe('Taxable $201,775 to $256,225');
+    expect(range('single', 0.37)).toBe('Taxable over $640,600');
+    expect(range('marriedJoint', 0.12)).toBe('Taxable $24,800 to $100,800');
+    expect(range('marriedJoint', 0.37)).toBe('Taxable over $768,700');
+    expect(range('marriedSeparate', 0.35)).toBe('Taxable $256,225 to $384,350');
+    // Head of household: Table 2 puts the 24%/32% edge at $201,750, not the single $201,775.
+    expect(range('headOfHousehold', 0.24)).toBe('Taxable $105,700 to $201,750');
+    expect(range('headOfHousehold', 0.32)).toBe('Taxable $201,750 to $256,200');
+    // An old free percent reads as its nearest rate: 0.15 is the 12% bracket.
+    expect(range('single', 0.15)).toBe('Taxable $12,400 to $50,400');
+  });
+
+  it('lets the option of the nearest rate carry a stored value from the old free percent, so it validates', () => {
+    const get = fromDefaults({ 'assumptions.paycheck.expectedRetirementBracket': 0.15 });
+    expect(values(get)).toEqual([0.1, 0.15, 0.22, 0.24, 0.32, 0.35, 0.37]);
+    expect(labels(get)[1]).toBe('12% federal + 9.3% CA');
+    expect(validateFields(FORM, get, { screen: screen('assumptions') })).toEqual({});
+    expect(summarizeScreen(FORM, screen('assumptions'), get)).toBe('moderate risk, balanced goal, 12% retirement bracket');
+  });
+
+  it('says in its help the selected range and which bracket it is compared with', () => {
+    expect(resolveText(field.help, fromDefaults())).toBe(
+      'Taxable $12,400 to $50,400. Today: 22% federal; same state rate in both.'
+    );
+    expect(
+      resolveText(
+        field.help,
+        fromDefaults({
+          'income.grossPerPaycheck': 10000,
+          'income.netPerPaycheck': 6000,
+          'assumptions.paycheck.expectedRetirementBracket': 0.24,
+          'person.filingStatus': 'marriedJoint',
+        })
+      )
+    ).toBe('Taxable $211,400 to $403,550. Today: 22% federal; same state rate in both.');
   });
 });
 
@@ -365,10 +453,34 @@ describe('paycheck intake: validation', () => {
     expect(validateIntakeScreen('paycheck', screen('401k'), get)).toEqual({});
   });
 
-  it('checks the emergency-fund target against its bounds', () => {
-    const get = fromDefaults({ 'cash.targetMonths': 30 });
-    expect(Object.keys(validateIntakeScreen('paycheck', screen('assumptions'), get))).toEqual(['cash.targetMonths']);
-    expect(validateIntakeScreen('paycheck', screen('assumptions'), fromDefaults({ 'cash.targetMonths': 6 }))).toEqual({});
+  it('checks the emergency-fund target against its bounds: whole months from 0 to 60', () => {
+    const errors = (months: number) =>
+      validateIntakeScreen('paycheck', screen('emergency-fund'), fromDefaults({ 'cash.targetMonths': months }));
+    expect(errors(0)).toEqual({});
+    expect(errors(6)).toEqual({});
+    expect(errors(30)).toEqual({});
+    expect(errors(60)).toEqual({});
+    expect(errors(61)).toEqual({ 'cash.targetMonths': 'Emergency fund target must be between 0 months and 60 months.' });
+    expect(errors(-1)).toEqual({ 'cash.targetMonths': 'Emergency fund target must be between 0 months and 60 months.' });
+    // A stored half month (the field took steps of 0.5 before) is not a whole number.
+    expect(errors(2.5)).toEqual({ 'cash.targetMonths': 'Emergency fund target must be a whole number.' });
+  });
+
+  it('asks the emergency-fund target as a whole number of months, typically 3, with one help line', () => {
+    const months = FORM.fields.find((f) => f.path === 'cash.targetMonths')!;
+    expect(months).toMatchObject({
+      kind: 'number',
+      label: 'Emergency fund target',
+      help: '3 to 6 months is common.',
+      min: 0,
+      max: 60,
+      step: 1,
+      precision: 0,
+      tier: 'details',
+    });
+    expect(months.hint).toBeUndefined();
+    // The typical value the wizard shows is the profile default.
+    expect(getDefaultFinancialProfile().cash.targetMonths).toBe(3);
   });
 
   it('checks a debt row rate against its bounds', () => {
@@ -404,9 +516,9 @@ describe('paycheck intake: every old question is still asked', () => {
 });
 
 describe("paycheck intake: 'remaining' mode", () => {
-  it('drops the core and asks the seven paycheck screens, debts included (O4)', () => {
+  it('drops the core and asks the six paycheck screens, debts included (O4), not the assumptions', () => {
     expect(remainingIds([...CORE_PATHS])).toEqual(AFTER_CORE);
-    expect(remainingIds([...CORE_PATHS])).toHaveLength(7);
+    expect(remainingIds([...CORE_PATHS])).toHaveLength(6);
   });
 
   it('keeps a screen with only part of its questions answered, showing all of its visible questions', () => {
@@ -434,18 +546,23 @@ describe("paycheck intake: 'remaining' mode", () => {
       'ira.roth',
       'investing.taxableMonthlyContribution',
     ];
-    expect(remainingIds(provided, { 'workplace.has401k': false })).toEqual(['emergency-fund', 'debts', 'assumptions']);
+    expect(remainingIds(provided, { 'workplace.has401k': false })).toEqual(['emergency-fund', 'debts']);
     // A plan, an HSA or a bonus brings its questions back.
     expect(remainingIds(provided, { 'hsa.eligible': true, 'workplace.has401k': false, 'income.hasBonus': true })).toEqual([
       'spending-bonus',
       'emergency-fund',
       'hsa',
       'debts',
-      'assumptions',
     ]);
+    // The months are on the emergency fund screen now: balance and rate alone leave it partly answered.
     expect(remainingIds([...provided, 'cash.emergencyFundBalance', 'cash.emergencyFundApy', 'debts'], { 'workplace.has401k': false })).toEqual([
-      'assumptions',
+      'emergency-fund',
     ]);
+    expect(
+      remainingIds([...provided, 'cash.emergencyFundBalance', 'cash.emergencyFundApy', 'cash.targetMonths', 'debts'], {
+        'workplace.has401k': false,
+      })
+    ).toEqual([]);
   });
 
   it('reads saved answers for visibility rules on arrival: no 401(k) means no plan terms', () => {

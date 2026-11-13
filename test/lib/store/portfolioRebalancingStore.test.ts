@@ -56,12 +56,13 @@ describe('usePortfolioRebalancingStore', () => {
     expect(errors).toEqual({});
     expect(hasCalculatedOnce).toBe(true);
     expect(results).toEqual(rebalancePortfolioV2(inputs!));
-    expect(results!.totalValueBefore).toBe(8775);
+    // Roth 10 x 375 + 5 x 70 = 4,100; Brokerage 20 x 375 + 15 x 85 = 8,775.
+    expect(results!.totalValueBefore).toBe(12875);
     expect(results!.totalDeposit).toBe(1000);
     expect(results!.accounts).toHaveLength(2);
     expect(results!.mode).toBe('whole');
     // Money conservation: after = before + deposit - uninvested cash.
-    expect(results!.totalValueAfter).toBeCloseTo(8775 + 1000 - results!.cashLeftover, 6);
+    expect(results!.totalValueAfter).toBeCloseTo(12875 + 1000 - results!.cashLeftover, 6);
   });
 
   it('keeps the last results, marked stale, when custom targets do not sum to 100%', () => {
@@ -78,10 +79,10 @@ describe('usePortfolioRebalancingStore', () => {
 
   it('recalculates an edit on the next submit', () => {
     store.getState().submit(profile());
-    // Doubling the Roth VTI position adds 10 x $250 = $2,500 -> $11,275.
+    // Doubling the Roth VTI position adds 10 x $375 = $3,750 -> $16,625.
     edit((p) => updateHolding(p, 'hld-roth-vti', { shares: 20 }));
     store.getState().submit(profile());
-    expect(store.getState().results?.totalValueBefore).toBe(8775 + 2500);
+    expect(store.getState().results?.totalValueBefore).toBe(12875 + 3750);
     expect(store.getState().stale).toBe(false);
   });
 

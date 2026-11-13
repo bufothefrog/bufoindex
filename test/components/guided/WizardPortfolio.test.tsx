@@ -1,6 +1,7 @@
 /**
- * The portfolio intent in the wizard (slice c5): the four screens of the
- * grown PORTFOLIO_FORM (targets, accounts, holdings, settings), with no core
+ * The portfolio intent in the wizard (slice c5): three of the four screens
+ * of the grown PORTFOLIO_FORM (targets, accounts, holdings; the settings are
+ * an assumption screen on the rebalancer page only), with no core
  * gate (O5), the custom editors working on the wizard's copy of the
  * profile, and the finish landing on the rebalancer with only the handoff
  * marker. The wizard mechanics are tested apart in Wizard.test.tsx.
@@ -37,13 +38,13 @@ afterEach(() => {
 });
 
 describe('Wizard, portfolio intent', () => {
-  it('asks the four portfolio screens in order and lands on the rebalancer with no hash', async () => {
+  it('asks the three portfolio screens in order and lands on the rebalancer with no hash', async () => {
     const user = userEvent.setup();
     answer(CORE_PATHS);
     render(<Wizard flow="portfolio" />);
 
     expect(screen.getByRole('heading', { name: 'Which stock and bond mix are you aiming for?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
     // Nothing chosen yet; the typical mix carries the tag.
     const radios = screen.getAllByRole('radio');
     expect(radios.map((radio) => radio.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'false']);
@@ -54,24 +55,21 @@ describe('Wizard, portfolio intent', () => {
     await user.click(next());
 
     expect(screen.getByRole('heading', { name: 'How much new cash are you investing this month?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
     expect(screen.getByText('This is an example. Change it to match yours, or skip.')).toBeInTheDocument();
     const brokerage = screen.getByRole('group', { name: 'Brokerage' });
     fireEvent.change(within(brokerage).getByRole('textbox', { name: 'New cash' }), { target: { value: '2400' } });
     await user.click(next());
 
     expect(screen.getByRole('heading', { name: 'What does each account hold today?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 3 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
     expect(screen.getByText('This is an example. Change it to match yours, or skip.')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Roth IRA holdings' })).toBeInTheDocument();
     fireEvent.change(within(screen.getByTestId('holding-shares-0')).getByRole('textbox'), { target: { value: '12' } });
-    await user.click(next());
-
-    expect(screen.getByRole('heading', { name: 'How should the rebalance trade?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 4 of 4')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-    expect(screen.queryByText('This is an example. Change it to match yours, or skip.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Finish/ }));
+
+    // The trade settings are not asked: they stay on the rebalancer page.
+    expect(screen.queryByRole('heading', { name: 'How should the rebalance trade?' })).not.toBeInTheDocument();
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);
@@ -86,16 +84,16 @@ describe('Wizard, portfolio intent', () => {
         'portfolio.accounts',
         'portfolio.holdings',
         'portfolio.securities',
-        'assumptions.portfolio.mode',
       ])
     );
+    expect(saved.provided).not.toContain('assumptions.portfolio.mode');
   });
 
   it('does not send a visitor without the basics to the core first', () => {
     render(<Wizard flow="portfolio" />);
     expect(replace).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Which stock and bond mix are you aiming for?' })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
   });
 
   it('starts the custom targets from the preset chosen before', async () => {
@@ -122,8 +120,8 @@ describe('Wizard, portfolio intent', () => {
     fireEvent.change(within(editor).getByRole('textbox', { name: 'Bonds target' }), { target: { value: '30' } });
     await user.click(next());
 
-    expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
-    expect(await skipToEnd(user)).toBe(3);
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
+    expect(await skipToEnd(user)).toBe(2);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
     const saved = profile();
     expect(saved.investing.targetMix).toBe('custom');
@@ -149,13 +147,13 @@ describe('Wizard, portfolio intent', () => {
     expect(within(editor).getByTestId('target-sum-portfolio')).toHaveTextContent('Targets total: 130.0%');
     await user.click(next());
 
-    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
     expect(screen.getByText('Target allocations must sum to 100% (currently 130.00%).')).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
 
     fireEvent.change(within(editor).getByRole('textbox', { name: 'US Stock target' }), { target: { value: '60' } });
     await user.click(next());
-    expect(screen.getByText('Step 2 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
   });
 
   it('replaces itself with the rebalancer after skipping every screen, leaving them unanswered', async () => {
@@ -163,7 +161,7 @@ describe('Wizard, portfolio intent', () => {
     answer(CORE_PATHS);
     render(<Wizard flow="portfolio" />);
 
-    expect(await skipToEnd(user)).toBe(4);
+    expect(await skipToEnd(user)).toBe(3);
 
     expect(push).not.toHaveBeenCalled();
     expect(replace).toHaveBeenCalledTimes(1);
@@ -171,15 +169,8 @@ describe('Wizard, portfolio intent', () => {
     expect(profile().provided).toEqual([...CORE_PATHS]);
   });
 
-  it('goes straight to the rebalancer once every screen is answered', () => {
-    answer([
-      'investing.targetMix',
-      'portfolio.accounts',
-      'portfolio.holdings',
-      'assumptions.portfolio.mode',
-      'assumptions.portfolio.allowTaxableSelling',
-      'assumptions.portfolio.showPlacementAdvice',
-    ]);
+  it('goes straight to the rebalancer once every profile screen is answered, the settings unanswered', () => {
+    answer(['investing.targetMix', 'portfolio.accounts', 'portfolio.holdings']);
     render(<Wizard flow="portfolio" />);
     expect(replace).toHaveBeenCalledWith(DESTINATION);
   });

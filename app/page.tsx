@@ -189,14 +189,11 @@ export default function HomePage() {
           Point of view
         </h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          For people with steady income, no high-interest debt, and a long
-          horizon, this site starts from a cash-flow investor preset: automate
-          contributions every payday, keep a smaller cash buffer backed by a
-          plan, and consider leverage only with a long horizon and the drawdown
-          math in front of you. It is one preset, not the answer. Your overview
-          shows it next to the standard alternative, with about three months of
-          expenses in cash and no leverage, run through the same math. The
-          calculators themselves use the numbers you enter.
+          Built for people with steady income, no high-interest debt, and a
+          long horizon who want the math behind a decision: what to automate
+          each payday, how much cash to hold, and what leverage does over a
+          long horizon, drawdowns included. The calculators use the numbers
+          you enter and show their work; none of them picks the answer.
         </p>
       </section>
 

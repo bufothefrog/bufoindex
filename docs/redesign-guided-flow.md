@@ -4,6 +4,8 @@ Status: proposal, written 2026-10-03 against the `Initial release` commit.
 Sections 2.1, 2.3, 2.4, 3.4 and 9.1 were updated after the rebuild
 (docs/rebuild-plan.md) to match the code. The other sections are the
 original proposal and can describe the tree as it was before the rebuild.
+The strategy presets of sections 3.2 and 5 (`strategy.preset`) were later
+removed (next-3 follow-up stack); those sections are kept as the proposal.
 
 This document sketches a reimagined BufoIndex: a mobile-first landing page
 that asks what the visitor wants to do, a short intake that seeds the right

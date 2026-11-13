@@ -20,6 +20,7 @@ import {
   type ClassTarget,
 } from '@/lib/calculations/portfolioRebalancing';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
+import { EXAMPLE_FUND_PRICES } from '@/lib/constants/example-prices';
 import { PAY_FREQUENCY_OPTIONS } from '@/lib/constants/frequency';
 import {
   ACCOUNT_TYPE_OPTIONS,
@@ -29,10 +30,10 @@ import {
   HSA_COVERAGE_OPTIONS,
   OPTIMIZATION_GOAL_OPTIONS,
   RISK_TOLERANCE_OPTIONS,
-  STRATEGY_PRESET_OPTIONS,
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
+import { derivedEmergencyFundBalance, derivedHsaCoverage, derivedTargetRetirementIncome } from './derived';
 import { getAt, isRecord, setAt } from '@/lib/fields/paths';
 import { isFiniteNumber } from '@/lib/fields/runtime';
 import type { Write } from '@/lib/fields/types';
@@ -50,7 +51,6 @@ import type {
   ProfileSection,
   RiskProfile,
   SecurityRow,
-  StrategyPreset,
   TargetMixPreset,
 } from './types';
 
@@ -90,49 +90,81 @@ export const BROKERAGE_ACCOUNT_ID = 'acc-brok';
 
 const DEFAULT_NEW_CASH = 1000;
 
+/**
+ * Take-home pay of the worked example (single, CA, $4,000 gross every two
+ * weeks, 8% traditional 401(k)), computed with the tax model the paycheck
+ * allocator itself uses and rounded to the nearest 50. Working (2026 tax
+ * year, test/lib/profile/defaults.test.ts recomputes it):
+ * - Gross per year: 4,000 x 26 = 104,000. 401(k): 8% = 8,320.
+ * - Federal: calculateAnnualFederalTax(104,000 - 8,320 = 95,680, single)
+ *   (lib/calculations/projections.ts): 95,680 - 16,100 standard deduction =
+ *   79,580 taxable; 1,240 + 4,560 + 6,419.60 = 12,219.60.
+ * - State: STATE_TAX_RATES_2026.CA.rate 9.3% of 95,680 = 8,898.24.
+ * - FICA: getFICARate(104,000, single) 7.65% of 104,000 = 7,956.
+ * - Take-home per year: 104,000 - 8,320 - 12,219.60 - 8,898.24 - 7,956 =
+ *   66,606.16; per paycheck 66,606.16 / 26 = 2,561.78, rounded to 2,550.
+ */
+const DEFAULT_NET_PER_PAYCHECK = 2550;
+
+/** Must-pay costs per month and the fun money range of the worked example. */
+const DEFAULT_NECESSARY_MONTHLY = 3000;
+const DEFAULT_FUN_MONEY_MIN = 300;
+const DEFAULT_FUN_MONEY_MAX = 600;
+
+/** Emergency fund target in months of must-pay costs (the field's typical value). */
+const DEFAULT_EMERGENCY_FUND_MONTHS = 3;
+
 export function getDefaultFinancialProfile(): FinancialProfile {
   const leverage = DEFAULT_DCA_COMPARISON_INPUTS;
   return {
     version: 2,
     updatedAt: 0,
     person: {
-      age: 30,
-      state: 'TX',
+      age: 25,
+      state: 'CA',
       filingStatus: 'single',
-      retirementAge: 60,
+      retirementAge: 65,
       lifeExpectancy: RetirementConstants.DEFAULT_LIFE_EXPECTANCY,
     },
     income: {
-      grossPerPaycheck: 3500,
-      netPerPaycheck: 2600,
+      grossPerPaycheck: 4000,
+      netPerPaycheck: DEFAULT_NET_PER_PAYCHECK,
       frequency: 'bi-weekly',
       hasBonus: false,
       bonusAmount: 0,
       bonusFrequency: 'annual',
     },
     spending: {
-      necessaryMonthly: 3000,
-      funMoneyMin: 300,
-      funMoneyMax: 600,
-      targetRetirementIncome: 80000,
+      necessaryMonthly: DEFAULT_NECESSARY_MONTHLY,
+      funMoneyMin: DEFAULT_FUN_MONEY_MIN,
+      funMoneyMax: DEFAULT_FUN_MONEY_MAX,
+      // Derived while unanswered (lib/profile/derived.ts); stored as the
+      // value the rule gives for the defaults, 41,000.
+      targetRetirementIncome: derivedTargetRetirementIncome(
+        DEFAULT_NECESSARY_MONTHLY,
+        DEFAULT_FUN_MONEY_MIN,
+        DEFAULT_FUN_MONEY_MAX
+      ),
     },
     cash: {
-      emergencyFundBalance: 5000,
+      // Derived while unanswered: three months of must-pay costs, 9,000.
+      emergencyFundBalance: derivedEmergencyFundBalance(DEFAULT_NECESSARY_MONTHLY),
       emergencyFundApy: 0.04,
-      targetMonths: 3,
+      targetMonths: DEFAULT_EMERGENCY_FUND_MONTHS,
     },
     workplace: {
       has401k: true,
-      matchPercent: 0.5,
-      matchLimit: 0.06,
+      matchPercent: 1,
+      matchLimit: 0.04,
       contributionType: 'traditional',
-      contributionPercent: 0.06,
+      contributionPercent: 0.08,
       rothContributionPercent: 0,
       afterTaxAvailable: false,
     },
     hsa: {
       eligible: false,
-      coverage: 'individual',
+      // Derived while unanswered (family when filing jointly).
+      coverage: derivedHsaCoverage('single'),
       monthlyContribution: 0,
       employerAnnualContribution: 0,
       investing: false,
@@ -152,22 +184,23 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       targetMix: '80-20',
     },
     retirementIncome: {
-      socialSecurityBenefit: 30000,
+      socialSecurityBenefit: null,
       socialSecurityAge: RetirementConstants.SS_FULL_RETIREMENT_AGE,
       annualHealthcareCost: null,
     },
     debts: [],
     // The rebalancer's three-fund worked example (Roth IRA plus a taxable
     // brokerage). The ids are stable so server and client render the same.
+    // Prices and their source: lib/constants/example-prices.ts.
     portfolio: {
       accounts: [
         { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
         { id: BROKERAGE_ACCOUNT_ID, name: 'Brokerage', accountType: 'taxable', deposit: DEFAULT_NEW_CASH },
       ],
       securities: [
-        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
-        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
-        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
+        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: EXAMPLE_FUND_PRICES.VTI, assetClass: 'us-stock' },
+        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: EXAMPLE_FUND_PRICES.VXUS, assetClass: 'intl-stock' },
+        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: EXAMPLE_FUND_PRICES.BND, assetClass: 'bonds' },
       ],
       holdings: [
         { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
@@ -179,7 +212,6 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       customAssetClasses: [],
     },
     strategy: {
-      preset: 'cashflow-investor',
       leverageRatio: 2,
     },
     leverage: {
@@ -260,22 +292,12 @@ export const PROFILE_SECTIONS: readonly ProfileSection[] = [
   'assumptions',
 ];
 
-/**
- * Emergency-fund months each strategy preset starts from. The intake shows
- * both; a user-entered cash.targetMonths always wins over the preset.
- */
-export const PRESET_EMERGENCY_MONTHS: Record<StrategyPreset, number> = {
-  standard: 3,
-  'cashflow-investor': 1,
-};
-
 const optionValues = <V extends string | number>(options: readonly { value: V }[]): readonly V[] =>
   options.map((option) => option.value);
 
 // Vocabularies with a label table take their values from it (one table per vocabulary).
 export const PAY_FREQUENCIES: readonly PayFrequency[] = optionValues(PAY_FREQUENCY_OPTIONS);
 export const PROFILE_FILING_STATUSES: readonly FilingStatus[] = optionValues(FILING_STATUS_OPTIONS);
-export const STRATEGY_PRESETS: readonly StrategyPreset[] = optionValues(STRATEGY_PRESET_OPTIONS);
 export const TARGET_MIX_PRESETS: readonly TargetMixPreset[] = optionValues(TARGET_MIX_OPTIONS);
 const RISK_PROFILES: readonly RiskProfile[] = ['tdf', 'custom'];
 
@@ -290,7 +312,6 @@ export const PROFILE_ENUM_VALUES: Readonly<Record<string, readonly string[]>> = 
   'workplace.contributionType': optionValues(CONTRIBUTION_TYPE_OPTIONS),
   'hsa.coverage': optionValues(HSA_COVERAGE_OPTIONS),
   'investing.targetMix': TARGET_MIX_PRESETS,
-  'strategy.preset': STRATEGY_PRESETS,
   'assumptions.retirement.riskProfile': RISK_PROFILES,
   'assumptions.paycheck.riskTolerance': optionValues(RISK_TOLERANCE_OPTIONS),
   'assumptions.paycheck.optimizationGoal': optionValues(OPTIMIZATION_GOAL_OPTIONS),
@@ -317,6 +338,7 @@ interface ValueRule {
 
 /** The type of each leaf or row field whose default is null. */
 const NULLABLE_TYPES: Readonly<Record<string, ValueType>> = {
+  'retirementIncome.socialSecurityBenefit': 'number',
   'retirementIncome.annualHealthcareCost': 'number',
   'leverage.monthlyContribution': 'number',
   'leverage.years': 'number',
@@ -616,7 +638,58 @@ export function normalizeProfile(
   }
   const profile = out as unknown as FinancialProfile;
   out.provided = Array.isArray(source.provided) ? normalizeProvided(source.provided, profile) : [...base.provided];
-  return profile;
+  return Array.isArray(source.provided) ? loadAnsweredAsWhole(loadUnansweredAsDefault(profile)) : profile;
+}
+
+/**
+ * Leaves whose stored value, while unanswered, is an old default that PR 3
+ * replaced: a stored profile that holds a value there without the path in
+ * `provided` held that old default, never confirmed, so it loads as the new
+ * default. An answered value is kept. The rule applies to stored payloads,
+ * which always carry their own `provided` list, not to a partial patch
+ * normalized over a base.
+ *
+ * - retirementIncome.socialSecurityBenefit: the old fixed 30,000 loads as
+ *   Auto (null), the estimate from pay.
+ * - cash.targetMonths: before PR 3 the removed strategy preset wrote 1 month
+ *   (cash-flow investor) or 3 (standard) without marking it provided; it
+ *   loads as the field's typical 3, so no 1-month target is kept or shown
+ *   as typical unless the visitor entered it.
+ */
+const UNANSWERED_LOADS_AS: Readonly<Record<string, unknown>> = {
+  'retirementIncome.socialSecurityBenefit': null,
+  'cash.targetMonths': DEFAULT_EMERGENCY_FUND_MONTHS,
+};
+
+function loadUnansweredAsDefault(profile: FinancialProfile): FinancialProfile {
+  const answered = new Set(profile.provided);
+  return Object.entries(UNANSWERED_LOADS_AS).reduce(
+    (next, [path, value]) => (answered.has(path) || getAt(next, path) === value ? next : setAt(next, path, value)),
+    profile
+  );
+}
+
+/**
+ * Leaves the form asks in whole units within a range, whose answered stored
+ * value may predate that rule: before PR 3, cash.targetMonths took any
+ * number, so a stored answer of 2.5 months would block the allocator (whole
+ * months only) while the overview computed with 2.5. An answered value loads
+ * as the nearest whole number, half up (2.5 is 3), within the range, and
+ * stays answered; every page then reads the same value. Like
+ * UNANSWERED_LOADS_AS, the rule applies to stored payloads only.
+ */
+const ANSWERED_LOADS_AS_WHOLE: Readonly<Record<string, { min: number; max: number }>> = {
+  'cash.targetMonths': { min: 0, max: 60 },
+};
+
+function loadAnsweredAsWhole(profile: FinancialProfile): FinancialProfile {
+  const answered = new Set(profile.provided);
+  return Object.entries(ANSWERED_LOADS_AS_WHOLE).reduce((next, [path, { min, max }]) => {
+    const value = getAt(next, path);
+    if (!answered.has(path) || typeof value !== 'number') return next;
+    const whole = Math.min(max, Math.max(min, Math.floor(value + 0.5)));
+    return whole === value ? next : setAt(next, path, whole);
+  }, profile);
 }
 
 // ---------------------------------------------------------------------------

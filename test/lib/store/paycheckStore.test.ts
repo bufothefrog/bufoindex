@@ -63,13 +63,13 @@ describe('usePaycheckStore', () => {
     vi.advanceTimersByTime(149);
     expect(getState().results).toBeNull();
     vi.advanceTimersByTime(1);
-    expect(getState().inputs?.preferences.age).toBe(30);
+    expect(getState().inputs?.preferences.age).toBe(25);
 
     getState().submit(profileWith([{ path: 'person.age', value: 40 }]));
     vi.advanceTimersByTime(100);
     getState().submit(profileWith([{ path: 'person.age', value: 45 }]));
     vi.advanceTimersByTime(149);
-    expect(getState().inputs?.preferences.age).toBe(30);
+    expect(getState().inputs?.preferences.age).toBe(25);
     vi.advanceTimersByTime(1);
     // The newer submit restarted the delay; only its inputs ran.
     expect(getState().inputs?.preferences.age).toBe(45);

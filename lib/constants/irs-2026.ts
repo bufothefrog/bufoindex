@@ -50,13 +50,17 @@ export const FEDERAL_TAX_BRACKETS_2026 = {
     { min: 256225, max: 384350, rate: 0.35 },
     { min: 384350, max: Infinity, rate: 0.37 },
   ],
-  // Rev. Proc. 2025-32 (as amended by OBBBA), head-of-household table.
+  // Rev. Proc. 2025-32 (as amended by OBBBA), section 4.01 Table 2, Heads of
+  // Households (irs.gov/pub/irs-drop/rp-25-32.pdf, read 2026-11-13): the 24%
+  // bracket ends and the 32% bracket starts at $201,750 ("$39,207 plus 32% of
+  // the excess over $201,750"), not the single table's $201,775; the 32%
+  // bracket ends at $256,200.
   headOfHousehold: [
     { min: 0, max: 17700, rate: 0.10 },
     { min: 17700, max: 67450, rate: 0.12 },
     { min: 67450, max: 105700, rate: 0.22 },
-    { min: 105700, max: 201775, rate: 0.24 },
-    { min: 201775, max: 256200, rate: 0.32 }, // verify: HoH 32% ceiling ($256,200; single is $256,225)
+    { min: 105700, max: 201750, rate: 0.24 },
+    { min: 201750, max: 256200, rate: 0.32 },
     { min: 256200, max: 640600, rate: 0.35 },
     { min: 640600, max: Infinity, rate: 0.37 },
   ],
