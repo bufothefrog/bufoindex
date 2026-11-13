@@ -401,11 +401,3 @@ describe('reset', () => {
     });
   });
 });
-
-describe('devtools', () => {
-  it('creates a working store with a devtools name', () => {
-    const store = createCalculatorStore({ definition: definition(0), devtoolsName: 'FakeRunStore' });
-    store.getState().submit(profileWith());
-    expect(store.getState().results).toEqual(DEFAULT_RESULTS);
-  });
-});

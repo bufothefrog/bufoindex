@@ -10,5 +10,4 @@ import { createCalculatorStore, type CalculatorStore } from './createCalculatorS
 
 export const useLeverageStore: CalculatorStore<DcaComparisonInputs, DcaComparisonResult> = createCalculatorStore({
   definition: LEVERAGE_CALCULATOR,
-  devtoolsName: 'calculator:leverage',
 });

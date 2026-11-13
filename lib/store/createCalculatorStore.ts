@@ -27,7 +27,6 @@
  */
 
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import { devtools } from 'zustand/middleware';
 import { prepareRun } from '@/lib/calculators/runtime';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { stableKey } from '@/lib/fields/binding';
@@ -65,8 +64,6 @@ export interface CreateCalculatorStoreOptions<E, R> {
   definition: CalculatorDefinition<E, R>;
   /** Runs the calculation asynchronously (e.g. off-thread); defaults to definition.calculate in-thread. */
   runner?: (inputs: E) => Promise<R>;
-  /** Connects the store to Redux DevTools under this name. */
-  devtoolsName?: string;
 }
 
 type RunData<E, R> = Omit<CalculatorRunState<E, R>, 'submit' | 'flush' | 'reset'>;
@@ -92,130 +89,126 @@ interface Job<E> {
 export function createCalculatorStore<E, R>({
   definition,
   runner,
-  devtoolsName,
 }: CreateCalculatorStoreOptions<E, R>): CalculatorStore<E, R> {
   return create<CalculatorRunState<E, R>>()(
-    devtools(
-      (set, get) => {
-        let seq = 0;
-        let timer: ReturnType<typeof setTimeout> | null = null;
-        let queued: Job<E> | null = null;
-        let inFlight: (Job<E> & { done: Promise<void> }) | null = null;
+    (set, get) => {
+      let seq = 0;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      let queued: Job<E> | null = null;
+      let inFlight: (Job<E> & { done: Promise<void> }) | null = null;
 
-        const cancelQueued = (): void => {
-          if (timer !== null) clearTimeout(timer);
-          timer = null;
-          queued = null;
-        };
+      const cancelQueued = (): void => {
+        if (timer !== null) clearTimeout(timer);
+        timer = null;
+        queued = null;
+      };
 
-        /** Drops whatever is queued or in flight; their results will never land. */
-        const abandon = (): void => {
-          cancelQueued();
-          seq += 1;
+      /** Drops whatever is queued or in flight; their results will never land. */
+      const abandon = (): void => {
+        cancelQueued();
+        seq += 1;
+        inFlight = null;
+      };
+
+      const succeed = (job: Job<E>, results: R): void =>
+        set({
+          inputs: job.inputs,
+          results,
+          resultsKey: job.key,
+          errors: NO_ERRORS,
+          stale: false,
+          hasCalculatedOnce: true,
+        });
+
+      const fail = (error: unknown): void =>
+        set({ errors: { calculation: calculationErrorMessage(error) }, stale: true });
+
+      const dispatch = (job: Job<E>): void => {
+        const id = ++seq;
+        if (!runner) {
           inFlight = null;
-        };
-
-        const succeed = (job: Job<E>, results: R): void =>
-          set({
-            inputs: job.inputs,
-            results,
-            resultsKey: job.key,
-            errors: NO_ERRORS,
-            stale: false,
-            hasCalculatedOnce: true,
-          });
-
-        const fail = (error: unknown): void =>
-          set({ errors: { calculation: calculationErrorMessage(error) }, stale: true });
-
-        const dispatch = (job: Job<E>): void => {
-          const id = ++seq;
-          if (!runner) {
-            inFlight = null;
-            let results: R;
-            try {
-              results = definition.calculate(job.inputs);
-            } catch (error) {
-              fail(error);
-              return;
-            }
-            succeed(job, results);
+          let results: R;
+          try {
+            results = definition.calculate(job.inputs);
+          } catch (error) {
+            fail(error);
             return;
           }
-          let run: Promise<R>;
-          try {
-            run = runner(job.inputs);
-          } catch (error) {
-            // A runner that throws instead of rejecting still reports under 'calculation'.
-            run = Promise.reject(error);
+          succeed(job, results);
+          return;
+        }
+        let run: Promise<R>;
+        try {
+          run = runner(job.inputs);
+        } catch (error) {
+          // A runner that throws instead of rejecting still reports under 'calculation'.
+          run = Promise.reject(error);
+        }
+        const done = run.then(
+          (results) => {
+            if (id !== seq) return;
+            inFlight = null;
+            succeed(job, results);
+          },
+          (error: unknown) => {
+            if (id !== seq) return;
+            inFlight = null;
+            fail(error);
           }
-          const done = run.then(
-            (results) => {
-              if (id !== seq) return;
-              inFlight = null;
-              succeed(job, results);
-            },
-            (error: unknown) => {
-              if (id !== seq) return;
-              inFlight = null;
-              fail(error);
-            }
-          );
-          inFlight = { ...job, done };
-        };
+        );
+        inFlight = { ...job, done };
+      };
 
-        const dispatchQueued = (): void => {
-          const job = queued;
-          cancelQueued();
-          if (job) dispatch(job);
-        };
+      const dispatchQueued = (): void => {
+        const job = queued;
+        cancelQueued();
+        if (job) dispatch(job);
+      };
 
-        return {
-          ...initialRunData<E, R>(),
+      return {
+        ...initialRunData<E, R>(),
 
-          submit: (values, opts = {}) => {
-            const { inputs, errors } = prepareRun(definition, values);
-            if (Object.keys(errors).length > 0) {
-              abandon();
-              set({ errors, stale: true });
-              return;
-            }
-
-            const key = stableKey(inputs);
-            const state = get();
-            if (state.results !== null && key === state.resultsKey) {
-              abandon();
-              set({ errors: NO_ERRORS, stale: false });
-              return;
-            }
-            if (Object.keys(state.errors).length > 0) set({ errors: NO_ERRORS });
-            if (inFlight?.key === key) {
-              // The run already under way is for these very inputs.
-              cancelQueued();
-              return;
-            }
-
-            queued = { inputs, key };
-            if (opts.immediate || definition.debounceMs <= 0) {
-              dispatchQueued();
-              return;
-            }
-            if (timer !== null) clearTimeout(timer);
-            timer = setTimeout(dispatchQueued, definition.debounceMs);
-          },
-
-          flush: () => {
-            dispatchQueued();
-            return inFlight ? inFlight.done : Promise.resolve();
-          },
-
-          reset: () => {
+        submit: (values, opts = {}) => {
+          const { inputs, errors } = prepareRun(definition, values);
+          if (Object.keys(errors).length > 0) {
             abandon();
-            set(initialRunData<E, R>());
-          },
-        };
-      },
-      { name: devtoolsName ?? `calculator:${definition.id}`, enabled: devtoolsName !== undefined }
-    )
+            set({ errors, stale: true });
+            return;
+          }
+
+          const key = stableKey(inputs);
+          const state = get();
+          if (state.results !== null && key === state.resultsKey) {
+            abandon();
+            set({ errors: NO_ERRORS, stale: false });
+            return;
+          }
+          if (Object.keys(state.errors).length > 0) set({ errors: NO_ERRORS });
+          if (inFlight?.key === key) {
+            // The run already under way is for these very inputs.
+            cancelQueued();
+            return;
+          }
+
+          queued = { inputs, key };
+          if (opts.immediate || definition.debounceMs <= 0) {
+            dispatchQueued();
+            return;
+          }
+          if (timer !== null) clearTimeout(timer);
+          timer = setTimeout(dispatchQueued, definition.debounceMs);
+        },
+
+        flush: () => {
+          dispatchQueued();
+          return inFlight ? inFlight.done : Promise.resolve();
+        },
+
+        reset: () => {
+          abandon();
+          set(initialRunData<E, R>());
+        },
+      };
+    }
   );
 }
