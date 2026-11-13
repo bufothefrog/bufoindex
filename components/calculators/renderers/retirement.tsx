@@ -1,8 +1,8 @@
 /**
  * The retirement form's custom renderers, by renderer id (FieldSpec.renderer,
- * rowAdornment and footer), and its intake hooks. The one custom renderer is
- * the Social Security claiming-age control of the calculator page: three
- * choices and the yearly benefit at each. The wizard and the calculator page
+ * rowAdornment and footer), and its intake hooks: the shared account list
+ * (./accounts.tsx) and the Social Security claiming-age control of the
+ * calculator page (three choices and the yearly benefit at each). The wizard and the calculator page
  * pick these up through RENDERERS in ./index.ts.
  */
 
@@ -23,6 +23,7 @@ import { CLAIMING_AGE_RENDERER } from '@/lib/calculators/retirement/fields';
 import { isSocialSecurityAuto, resolveSocialSecurityBenefit } from '@/lib/calculators/retirement/socialSecurity';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { retirementRunner } from '@/lib/store/retirementStore';
+import { ACCOUNTS_RENDERERS } from './accounts';
 
 const CLAIMING_OPTIONS = CLAIMING_AGE_CHOICES.map(({ age, label }) => ({ value: String(age), label }));
 
@@ -73,6 +74,7 @@ function ClaimingAgeControl({ spec, get, onWrite, error }: CustomRendererProps) 
 }
 
 export const RETIREMENT_RENDERERS: CustomRenderers = {
+  ...ACCOUNTS_RENDERERS,
   [CLAIMING_AGE_RENDERER]: ClaimingAgeControl,
 };
 

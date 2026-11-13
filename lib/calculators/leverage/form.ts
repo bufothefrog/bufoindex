@@ -10,12 +10,15 @@
  * - facts (intake only): the profile facts those overrides derive from. It
  *   also asks the age, which the intake drops in 'remaining' mode because
  *   the core asked it.
+ * - accounts: the shared account list, whose invested total is the auto
+ *   starting balance.
  * - market (assumptions): the five rates, with Restore defaults.
  */
 
 import {
+  ACCOUNTS,
+  ACCOUNTS_SCREEN,
   AGE,
-  INVESTED_BALANCE,
   RETIREMENT_AFTER_AGE,
   RETIREMENT_AGE,
   TAXABLE_MONTHLY,
@@ -33,13 +36,6 @@ import {
 
 const STOP_AGE: FieldSpec = withOverrides(RETIREMENT_AGE, { label: 'Age you plan to stop contributing' });
 
-// The shared help names 401(k) and IRA money; this comparison is about
-// taxable money, so the leverage intake keeps the calculator's own wording.
-const INVESTED: FieldSpec = withOverrides(INVESTED_BALANCE, {
-  label: 'Starting balance',
-  help: 'Money already invested; 0 compares contributions only.',
-});
-
 export const LEVERAGE_FORM: FormSpec = {
   id: 'leverage',
   fields: [
@@ -50,7 +46,7 @@ export const LEVERAGE_FORM: FormSpec = {
     AGE,
     STOP_AGE,
     TAXABLE_MONTHLY,
-    INVESTED,
+    ACCOUNTS,
     ...MARKET_FIELDS,
   ],
   screens: [
@@ -66,8 +62,9 @@ export const LEVERAGE_FORM: FormSpec = {
       title: 'What goes into the comparison?',
       tier: 'details',
       surface: 'intake',
-      fields: [AGE.path, STOP_AGE.path, TAXABLE_MONTHLY.path, INVESTED.path],
+      fields: [AGE.path, STOP_AGE.path, TAXABLE_MONTHLY.path],
     },
+    ACCOUNTS_SCREEN,
     {
       id: 'market',
       title: 'Assumptions',

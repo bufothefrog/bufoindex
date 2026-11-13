@@ -3,7 +3,8 @@
  * screens of docs/rebuild-plan.md sections 2.12 and 2.14. The comparison
  * screen is the calculator's own and the only one that asks the leverage
  * ratio (calculator-only); the market assumptions are a collapsed card on
- * the page. The intake asks the facts, 1 screen after the core.
+ * the page. The intake asks the facts and the shared accounts screen (whose
+ * invested total is the auto starting balance), 2 screens after the core.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -25,8 +26,11 @@ const OLD_QUESTIONS: Record<string, OldQuestion> = {
   'person.age': { path: 'person.age', label: 'Your age', kind: 'number', min: 16, max: 100, step: 1 },
   'leverage:person.retirementAge': { path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', min: 30, max: 85, step: 1 },
   'investing.taxableMonthlyContribution': { path: 'investing.taxableMonthlyContribution', label: 'Monthly taxable contribution', kind: 'money', help: 'Money you invest each month outside 401(k) and IRA accounts.', min: 0 },
-  'leverage:investing.investedBalance': { path: 'investing.investedBalance', label: 'Starting balance', kind: 'money', help: 'Money already invested; 0 compares contributions only.', min: 0 },
 };
+
+// The old intake also asked investing.investedBalance ("Starting balance"); in
+// v3 the invested balance is the sum of the account list, asked on the
+// shared accounts screen.
 
 const spec = (path: string): FieldSpec => LEVERAGE_FORM.fields.find((field) => field.path === path)!;
 const calculatorScreens = (get = fromDefaults()) =>
@@ -43,25 +47,27 @@ const MARKET_PATHS = [
 ];
 
 describe('leverage form: screens', () => {
-  it('has the comparison, facts and market screens, in that order', () => {
+  it('has the comparison, facts, accounts and market screens, in that order', () => {
     expect(LEVERAGE_FORM.screens.map((s) => [s.id, s.tier, s.surface ?? 'both'])).toEqual([
       ['comparison', 'details', 'calculator'],
       ['facts', 'details', 'intake'],
+      ['accounts', 'details', 'both'],
       ['market', 'assumption', 'both'],
     ]);
   });
 
-  it('shows the comparison and the market assumptions on the calculator', () => {
+  it('shows the comparison, the accounts and the market assumptions on the calculator', () => {
     expect(calculatorScreens()).toEqual([
       ['comparison', ['leverage.monthlyContribution', 'leverage.years', 'leverage.startingBalance', 'strategy.leverageRatio']],
+      ['accounts', ['portfolio.accounts']],
       ['market', MARKET_PATHS],
     ]);
-    const [comparison, market] = screensFor(LEVERAGE_FORM, fromDefaults(), { mode: 'all', surface: 'calculator' });
+    const [comparison, , market] = screensFor(LEVERAGE_FORM, fromDefaults(), { mode: 'all', surface: 'calculator' });
     expect(comparison.title).toBe('Contributions');
     expect(market.title).toBe('Assumptions');
   });
 
-  it('asks only the facts in the intake, worded as before where they were asked before', () => {
+  it('asks the facts and the accounts in the intake, worded as before where they were asked before', () => {
     expect(askedScreens('leverage')).toEqual([
       {
         id: 'facts',
@@ -71,11 +77,18 @@ describe('leverage form: screens', () => {
           { ...OLD_QUESTIONS['person.age'], help: undefined, options: undefined },
           { ...OLD_QUESTIONS['leverage:person.retirementAge'], help: undefined, options: undefined },
           { ...OLD_QUESTIONS['investing.taxableMonthlyContribution'], options: undefined, max: undefined, step: undefined },
-          { ...OLD_QUESTIONS['leverage:investing.investedBalance'], options: undefined, max: undefined, step: undefined },
+        ],
+      },
+      {
+        id: 'accounts',
+        title: 'What do you have saved and invested?',
+        description: undefined,
+        questions: [
+          { path: 'portfolio.accounts', label: 'Accounts', kind: 'list', help: undefined, options: undefined, min: undefined, max: undefined, step: undefined },
         ],
       },
     ]);
-    const market = LEVERAGE_FORM.screens[2];
+    const market = LEVERAGE_FORM.screens[3];
     expect(market.question).toBe('Which market assumptions should the comparison use?');
   });
 
@@ -88,7 +101,7 @@ describe('leverage form: screens', () => {
       'person.age',
       'person.retirementAge',
       'investing.taxableMonthlyContribution',
-      'investing.investedBalance',
+      'portfolio.accounts',
     ]);
   });
 
@@ -103,7 +116,7 @@ describe('leverage form: screens', () => {
   });
 
   it('leaves the path count and seed to the results (Model and caveats): no note on the market screen', () => {
-    const market = LEVERAGE_FORM.screens[2];
+    const market = LEVERAGE_FORM.screens[3];
     expect(visibleScreenNotes(market, fromDefaults())).toEqual([]);
   });
 });
@@ -121,10 +134,18 @@ describe('leverage form: the comparison fields', () => {
     );
     expect(resolveText(years.nullable!.autoLabel, get)).toBe('From your age to the age you plan to stop contributing');
     expect(resolveText(balance.nullable!.autoLabel, get)).toBe('What you already have invested');
-    // Defaults: taxable $500, age 25 to 65, $25,000 invested.
+    // Defaults: taxable $500, age 25 to 65, $25,000 invested (16,225 typed in the
+    // 401(k) + 8,775 of brokerage holdings).
     const auto = (field: FieldSpec, g = get) => (field.nullable!.overrideDefault as (g: typeof get) => number)(g);
     expect([auto(contribution), auto(years), auto(balance)]).toEqual([500, 40, 25000]);
-    expect(auto(contribution, fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toBe(1500);
+    // Taxable 0: monthly investing, Auto from the answers: round2(693.33... + 346.66...) = 1,040.
+    const monthly = (8 / 100) * ((4000 * 26) / 12) + (4 / 100) * ((4000 * 26) / 12);
+    expect(Math.round(monthly * 100) / 100).toBe(1040);
+    expect(auto(contribution, fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toBe(1040);
+    // A Custom monthly investing figure wins over Auto.
+    expect(
+      auto(contribution, fromDefaults({ 'investing.taxableMonthlyContribution': 0, 'investing.monthlyContribution': 1500 }))
+    ).toBe(1500);
   });
 
   it('keeps the old units and bounds, with one short help line each', () => {
@@ -166,7 +187,7 @@ describe('leverage form: the comparison fields', () => {
   });
 
   it('summarizes each screen in one line, auto values included', () => {
-    const [comparison, , market] = LEVERAGE_FORM.screens;
+    const [comparison, , , market] = LEVERAGE_FORM.screens;
     expect(summarizeScreen(LEVERAGE_FORM, comparison, fromDefaults())).toBe('$500/mo, 40 years, $25,000 start, 2x fund');
     expect(
       summarizeScreen(LEVERAGE_FORM, comparison, fromDefaults({ 'leverage.monthlyContribution': 750, 'leverage.years': 1 }))
@@ -200,7 +221,7 @@ describe('leverage intake: validation', () => {
     expect(validateIntakeScreen('leverage', comparison, get)).toEqual({
       'strategy.leverageRatio': 'Leverage ratio must be between 1 and 3.',
     });
-    const market = LEVERAGE_FORM.screens[2];
+    const market = LEVERAGE_FORM.screens[3];
     expect(validateIntakeScreen('leverage', market, get)).toEqual({
       'assumptions.leverage.indexVolatility': 'Index annual volatility must be between 0% and 60%.',
       'assumptions.leverage.financingRate': 'Financing rate on borrowed exposure must be between 0% and 20%.',
@@ -209,26 +230,31 @@ describe('leverage intake: validation', () => {
 });
 
 describe("leverage intake: 'remaining' mode", () => {
-  it('asks 1 screen after the core, without the age', () => {
+  it('asks 2 screens after the core, the facts without the age', () => {
     const screens = getIntakeScreens('leverage', fromDefaults(), { mode: 'remaining', provided: [...CORE_PATHS] });
     expect(screens.map((s) => [s.id, s.fields])).toEqual([
-      ['facts', ['person.retirementAge', 'investing.taxableMonthlyContribution', 'investing.investedBalance']],
+      ['facts', ['person.retirementAge', 'investing.taxableMonthlyContribution']],
+      ['accounts', ['portfolio.accounts']],
     ]);
     // 'all' mode keeps the age on the facts screen.
     expect(getIntakeScreens('leverage', fromDefaults())[0].fields[0]).toBe('person.age');
   });
 
   it('drops a screen once every fact on it is answered', () => {
-    const facts = ['person.retirementAge', 'investing.taxableMonthlyContribution', 'investing.investedBalance'];
+    const facts = ['person.retirementAge', 'investing.taxableMonthlyContribution', 'portfolio.accounts'];
     // A partly answered facts screen still shows.
-    expect(remainingIds([...CORE_PATHS, facts[0]])).toEqual(['facts']);
+    expect(remainingIds([...CORE_PATHS, facts[0], 'portfolio.accounts'])).toEqual(['facts']);
+    expect(remainingIds([...CORE_PATHS, facts[0], facts[1]])).toEqual(['accounts']);
     // Neither the ratio nor the market assumptions hold the intake back.
     expect(remainingIds([...CORE_PATHS, ...facts])).toEqual([]);
   });
 
   it('matches what /start/leverage asks on arrival, from the saved profile', () => {
     const profile = { ...getDefaultFinancialProfile(), provided: [...CORE_PATHS, ...MARKET_PATHS] };
-    expect(remainingIntakeScreens('leverage', profile).map((s) => s.id)).toEqual(['facts']);
-    expect(remainingIntakeScreens('leverage', { ...getDefaultFinancialProfile(), provided: [...CORE_PATHS] }).map((s) => s.id)).toEqual(['facts']);
+    expect(remainingIntakeScreens('leverage', profile).map((s) => s.id)).toEqual(['facts', 'accounts']);
+    expect(remainingIntakeScreens('leverage', { ...getDefaultFinancialProfile(), provided: [...CORE_PATHS] }).map((s) => s.id)).toEqual([
+      'facts',
+      'accounts',
+    ]);
   });
 });

@@ -54,17 +54,17 @@ describe('Wizard, portfolio intent', () => {
     await user.click(screen.getByRole('radio', { name: /60% stocks, 40% bonds/ }));
     await user.click(next());
 
-    expect(screen.getByRole('heading', { name: 'How much new cash are you investing this month?' })).toBeInTheDocument();
+    // The shared accounts screen; the new cash is asked on the rebalancer page.
+    expect(screen.getByRole('heading', { name: 'What do you have saved and invested?' })).toBeInTheDocument();
     expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
-    expect(screen.getByText('This is an example. Change it to match yours, or skip.')).toBeInTheDocument();
-    const brokerage = screen.getByRole('group', { name: 'Brokerage' });
-    fireEvent.change(within(brokerage).getByRole('textbox', { name: 'New cash' }), { target: { value: '2400' } });
+    expect(screen.queryByText('New cash this month')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: '401(k) or similar balance' }), { target: { value: '20000' } });
     await user.click(next());
 
     expect(screen.getByRole('heading', { name: 'What does each account hold today?' })).toBeInTheDocument();
     expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
-    expect(screen.getByText('This is an example. Change it to match yours, or skip.')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Roth IRA holdings' })).toBeInTheDocument();
+    // Only the account with holdings has a holdings section; the 401(k) has a typed balance.
+    expect(screen.getByRole('region', { name: 'Brokerage (taxable) holdings' })).toBeInTheDocument();
     fireEvent.change(within(screen.getByTestId('holding-shares-0')).getByRole('textbox'), { target: { value: '12' } });
     await user.click(screen.getByRole('button', { name: /Finish/ }));
 
@@ -76,8 +76,12 @@ describe('Wizard, portfolio intent', () => {
     expect(replace).toHaveBeenCalledWith(DESTINATION);
     const saved = profile();
     expect(saved.investing.targetMix).toBe('60-40');
-    expect(saved.portfolio.accounts[1].deposit).toBe(2400);
-    expect(saved.portfolio.holdings[0].shares).toBe(12);
+    expect(saved.portfolio.accounts.map((a) => [a.id, a.balance])).toEqual([
+      ['acc-401k', 20000],
+      ['acc-brok', 0],
+    ]);
+    expect(saved.portfolio.newCash).toEqual([]);
+    expect(saved.portfolio.holdings[0]).toMatchObject({ id: 'hld-brok-vti', shares: 12 });
     expect(saved.provided).toEqual(
       expect.arrayContaining([
         'investing.targetMix',

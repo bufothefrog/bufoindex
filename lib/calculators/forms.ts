@@ -21,6 +21,7 @@
  */
 
 import {
+  ACCOUNTS_SCREEN,
   CORE_FIELDS,
   CORE_SCREENS,
   NET_PAY_AT_MOST_GROSS,
@@ -56,22 +57,28 @@ export const CORE_FORM: FormSpec = {
   onSubmit: intakeDerivedWrites,
 };
 
-/** The order the profile asks each calculator's screens in. */
-export const PROFILE_FORM_ORDER: readonly CalculatorId[] = ['retirement', 'paycheck', 'portfolio', 'leverage'];
+/**
+ * The order the profile asks each calculator's screens in. The paycheck
+ * form comes first, so the 401(k), HSA, IRA and taxable answers come before
+ * the account list that they suggest rows for.
+ */
+export const PROFILE_FORM_ORDER: readonly CalculatorId[] = ['paycheck', 'retirement', 'portfolio', 'leverage'];
 
 /**
  * The section each profile screen belongs to, for the profile intake's
  * progress label. The leverage form's
  * profile screen (the taxable contribution) sits with the portfolio
- * questions, so the two calculators share one section.
+ * questions, so the two calculators share one section. The shared account
+ * list (ACCOUNTS_SCREEN) is its own section, whichever form it is taken from.
  */
-export type ProfileFormSection = 'core' | 'retirement' | 'paycheck' | 'portfolio' | 'cash' | 'optional';
+export type ProfileFormSection = 'core' | 'retirement' | 'paycheck' | 'portfolio' | 'accounts' | 'cash' | 'optional';
 
 export const PROFILE_FORM_SECTION_LABELS: Readonly<Record<ProfileFormSection, string>> = {
   core: 'The basics',
   retirement: 'Retirement',
   paycheck: 'Paycheck',
   portfolio: 'Portfolio',
+  accounts: 'Accounts',
   cash: 'Cash',
   optional: 'Optional',
 };
@@ -121,7 +128,7 @@ export function composeProfileForm(
     // Screen ids are unique per form; prefix one that another form already used.
     const id = sections.has(screen.id) ? `${source.id}-${screen.id}` : screen.id;
     screens.push({ ...screen, id, fields: kept });
-    sections.set(id, section);
+    sections.set(id, screen.id === ACCOUNTS_SCREEN.id ? 'accounts' : section);
   };
 
   // Optional screens wait until every other screen is taken, then come last.

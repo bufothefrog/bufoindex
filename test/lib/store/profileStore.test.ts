@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROFILE_STORAGE_KEY, useProfileStore } from '@/lib/store/profileStore';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { MIGRATION_EXAMPLES, defaultPayloadAt90ef4ed, storedAt90ef4ed } from '@/test/factories/profile-90ef4ed-v2';
 
 const store = useProfileStore;
 const getState = () => store.getState();
@@ -60,7 +61,7 @@ describe('setFields', () => {
     const { profile, hasProfile } = getState();
     expect(profile.person).toEqual({ age: 41, state: 'CA', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 });
     expect(profile.investing.monthlyContribution).toBe(2000);
-    expect(profile.investing.investedBalance).toBe(25000);
+    expect(profile.investing.taxableMonthlyContribution).toBe(500);
     expect(profile.income).toEqual(getDefaultFinancialProfile().income);
     expect(profile.provided).toEqual(['person.age', 'person.state', 'investing.monthlyContribution']);
     expect(profile.updatedAt).toBe(1760000000000);
@@ -101,10 +102,10 @@ describe('setFields', () => {
 
   it('ignores provided, version and updatedAt inside the patch', () => {
     vi.spyOn(Date, 'now').mockReturnValue(42);
-    getState().setFields({ provided: ['person.age'], version: 2, updatedAt: 7 }, []);
+    getState().setFields({ provided: ['person.age'], version: 3, updatedAt: 7 }, []);
     expect(getState().profile.provided).toEqual([]);
     expect(getState().profile.updatedAt).toBe(42);
-    expect(getState().profile.version).toBe(2);
+    expect(getState().profile.version).toBe(3);
   });
 
   it('merges nested sections leaf by leaf and replaces a list whole', () => {
@@ -125,27 +126,24 @@ describe('setFields', () => {
     // debts is empty, so 'debts.0.balance' names no row and does not mark debts.
     expect(getState().profile.provided).toEqual(['person.age']);
     // A row path to a row that exists is recorded by its list path.
-    getState().setFields({}, ['portfolio.accounts.1.deposit']);
+    getState().setFields({}, ['portfolio.accounts.1.balance']);
     expect(getState().profile.provided).toEqual(['person.age', 'portfolio.accounts']);
   });
 
-  it('records the new cash on the Brokerage deposit only (the v1 leaf is gone)', () => {
+  it('records the new cash on the per-account new cash list only (the v1 leaf is gone)', () => {
     getState().setFields({}, ['investing.newCashThisMonth']);
     expect(getState().profile.provided).toEqual([]);
-    getState().setFields({ portfolio: { accounts: [
-      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
-      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 2400 },
-    ] } }, ['portfolio.accounts']);
+    getState().setFields({ portfolio: { newCash: [{ id: 'acc-brok', amount: 2400 }] } }, ['portfolio.newCash']);
     const { profile } = getState();
     expect(profile.investing).not.toHaveProperty('newCashThisMonth');
-    expect(profile.portfolio.accounts.find((a) => a.name === 'Brokerage')?.deposit).toBe(2400);
-    expect(profile.provided).toEqual(['portfolio.accounts']);
+    expect(profile.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 2400 }]);
+    expect(profile.provided).toEqual(['portfolio.newCash']);
   });
 
   it('persists only the profile', () => {
     getState().setFields({ person: { age: 50 } }, ['person.age']);
     const persisted = readPersisted();
-    expect(persisted?.version).toBe(2);
+    expect(persisted?.version).toBe(3);
     expect(Object.keys(persisted!.state)).toEqual(['profile']);
     expect((persisted!.state.profile as { person: { age: number } }).person.age).toBe(50);
   });
@@ -182,10 +180,10 @@ describe('setValues', () => {
   it('records list rows and row fields by their list path', () => {
     const debt = { id: 'd1', name: 'Card', balance: 900, interestRate: 0.24, minimumPayment: 35, extraPayment: 0, taxDeductible: false };
     getState().setValues([{ path: 'debts.0', value: debt }]);
-    getState().setValues([{ path: 'debts.0.balance', value: 750 }, { path: 'portfolio.accounts.0.deposit', value: 300 }]);
+    getState().setValues([{ path: 'debts.0.balance', value: 750 }, { path: 'portfolio.accounts.0.balance', value: 300 }]);
     const { profile } = getState();
     expect(profile.debts).toEqual([{ ...debt, balance: 750 }]);
-    expect(profile.portfolio.accounts[0].deposit).toBe(300);
+    expect(profile.portfolio.accounts[0].balance).toBe(300);
     expect(profile.provided).toEqual(['debts', 'portfolio.accounts']);
   });
 
@@ -332,7 +330,7 @@ describe('rehydration from localStorage', () => {
     saved.investing.targetMix = '60-40';
     saved.provided = ['person.age', 'investing.targetMix'];
     saved.updatedAt = 999;
-    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
+    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 3 }));
 
     expect(getState().hasHydrated).toBe(true);
     expect(getState().profile).toEqual(saved);
@@ -369,7 +367,7 @@ describe('rehydration from localStorage', () => {
     expect(getState().hasProfile).toBe(true);
   });
 
-  it('loads a saved v1 payload by normalizing it, keeping every v2 leaf, and saves it back as v2', async () => {
+  it('loads a saved v1 payload by migrating it, keeping every leaf it holds, and saves it back as v3', async () => {
     const v1 = {
       version: 1,
       updatedAt: 1761000000000,
@@ -393,7 +391,7 @@ describe('rehydration from localStorage', () => {
     const { profile, hasProfile, hasHydrated } = getState();
     expect(hasHydrated).toBe(true);
     expect(hasProfile).toBe(true);
-    expect(profile.version).toBe(2);
+    expect(profile.version).toBe(3);
     expect(profile.updatedAt).toBe(1761000000000);
     expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 90 });
     expect(profile.income).toEqual({ ...getDefaultFinancialProfile().income, ...v1.income });
@@ -403,47 +401,72 @@ describe('rehydration from localStorage', () => {
     expect(profile.workplace).toEqual({ ...getDefaultFinancialProfile().workplace, ...v1.workplace });
     // The removed strategy preset is dropped with it.
     expect(profile.strategy).toEqual({ leverageRatio: 1.5 });
-    // The v1 new cash is no v2 leaf: it is dropped and not moved anywhere,
-    // so the Brokerage deposit keeps its default.
-    expect(profile.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
+    // The v1 new cash is no leaf: it is dropped and not moved anywhere. The
+    // invested balance and the monthly contribution were not answered, so
+    // they give way to the example accounts and to Auto.
+    expect(profile.investing).toEqual({ monthlyContribution: null, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(profile.portfolio).toEqual(getDefaultFinancialProfile().portfolio);
     expect(profile.assumptions).toEqual(getDefaultFinancialProfile().assumptions);
     expect(profile.provided).toEqual(['person.age']);
 
     const persisted = readPersisted();
-    expect(persisted?.version).toBe(2);
+    expect(persisted?.version).toBe(3);
     expect(persisted?.state.profile).toEqual(profile);
   });
 
-  it('loads a saved v2 profile that still holds the removed new-cash leaf, dropping only that leaf', async () => {
+  it('loads a saved v3 profile that still holds the removed new-cash leaf, dropping only that leaf', async () => {
     const saved = getDefaultFinancialProfile();
     saved.person.age = 44;
-    saved.portfolio.accounts[1].deposit = 400;
+    saved.portfolio.newCash = [{ id: 'acc-brok', amount: 400 }];
     saved.provided = ['person.age', 'portfolio.accounts', 'investing.newCashThisMonth'];
     const stored = JSON.parse(JSON.stringify(saved));
     stored.investing.newCashThisMonth = 9000;
-    await rehydrateWith(JSON.stringify({ state: { profile: stored }, version: 2 }));
+    await rehydrateWith(JSON.stringify({ state: { profile: stored }, version: 3 }));
 
     expect(getState().hasHydrated).toBe(true);
     expect(getState().hasProfile).toBe(true);
     expect(getState().profile).toEqual({ ...saved, provided: ['person.age', 'portfolio.accounts'] });
     expect(getState().profile.investing).not.toHaveProperty('newCashThisMonth');
-    expect(getState().profile.portfolio.accounts[1].deposit).toBe(400);
+    expect(getState().profile.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 400 }]);
+  });
+
+  it('hydrates the 90ef4ed default saved under version 2 as the v3 default, and saves it back as v3', async () => {
+    await rehydrateWith(storedAt90ef4ed());
+    expect(getState().hasHydrated).toBe(true);
+    expect(getState().profile).toEqual(getDefaultFinancialProfile());
+    expect(readPersisted()?.version).toBe(3);
+    expect(readPersisted()?.state.profile).toEqual(getDefaultFinancialProfile());
+  });
+
+  it('keeps the money of a v2 profile whose lists and invested balance were answered (example 3)', async () => {
+    await rehydrateWith(storedAt90ef4ed(MIGRATION_EXAMPLES['3']()));
+    const { profile } = getState();
+    expect(profile.version).toBe(3);
+    expect(profile.portfolio.accounts.map((a) => [a.id, a.kind, a.balance])).toEqual([
+      ['acc-roth', 'roth-ira', 0],
+      ['acc-brok', 'brokerage', 0],
+      ['acc-other', '401k', 17125],
+    ]);
+    // The holdings (4,100 + 8,775) and the remainder make the typed 30,000.
+    expect(profile.portfolio.holdings).toEqual((defaultPayloadAt90ef4ed().portfolio as { holdings: unknown[] }).holdings);
+    expect(profile.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 1000 }]);
+    expect(profile.provided).toContain('portfolio.accounts');
+    expect(profile.provided).not.toContain('investing.investedBalance');
   });
 
   it('reads a payload saved by a later version but never overwrites it', async () => {
     const saved = {
       ...getDefaultFinancialProfile(),
-      version: 3,
+      version: 4,
       newSection: { x: 1 },
       person: { ...getDefaultFinancialProfile().person, age: 44, extra: 1 },
       provided: ['person.age'],
     };
-    const raw = JSON.stringify({ state: { profile: saved }, version: 3 });
+    const raw = JSON.stringify({ state: { profile: saved }, version: 4 });
     await rehydrateWith(raw);
 
     expect(getState().hasHydrated).toBe(true);
-    expect(getState().profile.version).toBe(2);
+    expect(getState().profile.version).toBe(3);
     expect(getState().profile.person.age).toBe(44);
     expect(getState().profile).not.toHaveProperty('newSection');
     expect(window.localStorage.getItem(PROFILE_STORAGE_KEY)).toBe(raw);
@@ -454,9 +477,9 @@ describe('rehydration from localStorage', () => {
     expect(window.localStorage.getItem(PROFILE_STORAGE_KEY)).toBe(raw);
 
     // The next hydration of a current payload saves normally again.
-    await rehydrateWith(JSON.stringify({ state: { profile: getDefaultFinancialProfile() }, version: 2 }));
+    await rehydrateWith(JSON.stringify({ state: { profile: getDefaultFinancialProfile() }, version: 3 }));
     getState().setFields({ person: { age: 46 } }, ['person.age']);
-    expect(readPersisted()?.version).toBe(2);
+    expect(readPersisted()?.version).toBe(3);
     expect((readPersisted()?.state.profile as { person: { age: number } }).person.age).toBe(46);
   });
 
@@ -470,7 +493,7 @@ describe('rehydration from localStorage', () => {
   it('drops provided row paths whose row does not exist', async () => {
     const saved = getDefaultFinancialProfile();
     saved.provided = ['debts.7.balance', 'portfolio.holdings.0', 'person.age'];
-    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 2 }));
+    await rehydrateWith(JSON.stringify({ state: { profile: saved }, version: 3 }));
     expect(getState().profile.debts).toEqual([]);
     expect(getState().profile.provided).toEqual(['portfolio.holdings', 'person.age']);
   });

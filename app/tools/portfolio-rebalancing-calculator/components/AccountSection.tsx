@@ -4,13 +4,12 @@ import React from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Account,
   ClassTarget,
   CustomAssetClass,
   Holding,
   Security,
 } from '@/lib/calculations/portfolioRebalancing';
-import { accountLabel } from '@/lib/calculators/portfolio/fields';
+import { accountDisplayName, type AccountRow } from '@/lib/profile/accounts';
 import {
   addHolding,
   linkHoldingByTicker,
@@ -24,8 +23,8 @@ import { cn } from '@/lib/utils';
 import { HoldingRow } from './HoldingRow';
 
 export interface AccountSectionProps {
-  account: Account;
-  /** The account's place in the accounts list (its label and test ids). */
+  account: AccountRow;
+  /** The account's place in the holdings editor (its test ids). */
   index: number;
   /** Every holding of the portfolio; the section shows the account's own. */
   holdings: Holding[];
@@ -49,7 +48,7 @@ export function AccountSection({
   className,
 }: AccountSectionProps) {
   const holdings = allHoldings.filter(h => h.accountId === account.id);
-  const title = accountLabel(account, index);
+  const title = accountDisplayName(account);
 
   return (
     <section

@@ -37,6 +37,8 @@ const PROFILES = {
     workplace: { matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
     // The 3bb0132 default benefit, answered (the default is Auto since PR 3).
     retirementIncome: { socialSecurityBenefit: 30000 },
+    // The 3bb0132 monthly contribution, as Custom monthly investing (Auto since profile v3).
+    investing: { monthlyContribution: 1500 },
   },
   /** The PR 3 default profile, with only the age answered (25, its default). */
   example: { person: { age: 25 } },
@@ -47,7 +49,12 @@ const PROFILES = {
     spending: { necessaryMonthly: 4200, funMoneyMin: 300, funMoneyMax: 800, targetRetirementIncome: 90000 },
     cash: { emergencyFundBalance: 30000, emergencyFundApy: 0.04 },
     workplace: { has401k: true, matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.08 },
-    investing: { investedBalance: 250000, monthlyContribution: 2500, taxableMonthlyContribution: 700, targetMix: '60-40' },
+    investing: { monthlyContribution: 2500, taxableMonthlyContribution: 700, targetMix: '60-40' },
+    // The invested 250,000 as one account (profile v3 keeps balances on the account rows).
+    portfolio: {
+      accounts: [{ id: 'acc-other', kind: '401k', name: '', balance: 250000, holdsEmergencyFund: false }],
+      holdings: [],
+    },
     strategy: { leverageRatio: 3 },
     retirementIncome: { socialSecurityBenefit: 30000 },
   },
@@ -63,7 +70,11 @@ const PROFILES = {
     workplace: { matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
     income: { grossPerPaycheck: 5200, netPerPaycheck: 3900, frequency: 'monthly' },
     cash: { emergencyFundBalance: 1500, emergencyFundApy: 0.01, targetMonths: 2 },
-    investing: { investedBalance: 40000, monthlyContribution: 0, taxableMonthlyContribution: 0, targetMix: 'custom' },
+    investing: { monthlyContribution: 0, taxableMonthlyContribution: 0, targetMix: 'custom' },
+    portfolio: {
+      accounts: [{ id: 'acc-other', kind: '401k', name: '', balance: 40000, holdsEmergencyFund: false }],
+      holdings: [],
+    },
     strategy: { leverageRatio: 1.5 },
     retirementIncome: { socialSecurityBenefit: 30000 },
   },
@@ -172,8 +183,10 @@ describe('RetirementOddsCard', () => {
   it.each<[ProfileName, string, string, string, string, string]>([
     ['basics', '5%', 'Share of 1,000 seeded paths with money left at age 85, retiring at 60', '$1,037,677', '$2,000,000',
       "Saving $500 more per month moves the simulated success rate from 5% to 36.4% and the projected balance to $1,343,473 in today's dollars (same simulated markets)."],
-    ['example', '100%', 'Share of 1,000 seeded paths with money left at age 90, retiring at 65', '$1,735,749', '$1,025,000',
-      "Saving $500 more per month moves the simulated success rate from 100% to 100% and the projected balance to $2,249,490 in today's dollars (same simulated markets)."],
+    // Monthly investing is Auto in profile v3: 1,540 a month (1,500 before), so the projection moves
+    // from $1,735,749 (lever: $2,249,490) to the figures below.
+    ['example', '100%', 'Share of 1,000 seeded paths with money left at age 90, retiring at 65', '$1,776,849', '$1,025,000',
+      "Saving $500 more per month moves the simulated success rate from 100% to 100% and the projected balance to $2,290,589 in today's dollars (same simulated markets)."],
     ['rich', '8.3%', 'Share of 1,000 seeded paths with money left at age 92, retiring at 60', '$1,350,387', '$2,250,000',
       "Saving $500 more per month moves the simulated success rate from 8.3% to 18% and the projected balance to $1,495,138 in today's dollars (same simulated markets)."],
     ['lean', '0%', 'Share of 1,000 seeded paths with money left at age 85, retiring at 67', '$72,086', '$2,000,000',
@@ -332,7 +345,7 @@ describe('LeverageCard', () => {
   });
 
   it('says so instead of comparing when nothing is invested', () => {
-    resetProfileStore({ profile: { investing: { investedBalance: 0, monthlyContribution: 0, taxableMonthlyContribution: 0 } } });
+    resetProfileStore({ profile: { investing: { monthlyContribution: 0, taxableMonthlyContribution: 0 }, portfolio: { accounts: [], holdings: [] } } });
     render(<OverviewDashboard />);
     const leverage = card('leverage');
     expect(leverage).toHaveTextContent('The profile has no monthly investing contribution yet, so there is no cash flow to compare.');
@@ -467,7 +480,8 @@ describe('the one dollar display mode on /overview', () => {
     resetProfileStore({
       profile: {
         person: { retirementAge: 70, lifeExpectancy: 65 },
-        investing: { investedBalance: 0, monthlyContribution: 0, taxableMonthlyContribution: 0 },
+        investing: { monthlyContribution: 0, taxableMonthlyContribution: 0 },
+        portfolio: { accounts: [], holdings: [] },
       },
     });
     render(<OverviewDashboard />);
@@ -477,7 +491,7 @@ describe('the one dollar display mode on /overview', () => {
   });
 
   it('shows the toggle while only one of the two cards has figures', () => {
-    resetProfileStore({ profile: { investing: { investedBalance: 0, monthlyContribution: 0, taxableMonthlyContribution: 0 } } });
+    resetProfileStore({ profile: { investing: { monthlyContribution: 0, taxableMonthlyContribution: 0 }, portfolio: { accounts: [], holdings: [] } } });
     render(<OverviewDashboard />);
     expect(screen.getByRole('radiogroup', { name: 'Dollar display mode' })).toBeInTheDocument();
   });

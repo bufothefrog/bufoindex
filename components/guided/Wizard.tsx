@@ -34,6 +34,8 @@ import {
 import { applyWrites, getAt, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, listRows, relationErrors, visibleScreenFields } from '@/lib/fields/runtime';
 import type { FieldErrors, FieldSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
+import { acceptAccounts } from '@/lib/calculators/portfolio/accountWrites';
+import { ACCOUNTS } from '@/lib/fields/shared';
 import { DERIVED_PATHS, withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { useProfileStore } from '@/lib/store/profileStore';
@@ -290,8 +292,21 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
   const form = intakeForm(flow, mode);
   const renderers = renderersFor(flow);
   const single = onlyScreen !== undefined;
-  const screensAt = (values: FinancialProfile) =>
-    flowScreens(flow, makeGet(values), mode, initiallyProvided, onlyScreen);
+  // Every get over the working answers reads 'provided' as the paths
+  // answered on arrival, answered in this visit or edited in it, so the
+  // account list (lib/profile/accounts.ts) sees a Yes given earlier in this
+  // visit (a suggested account) and an edit of the list in this visit (it
+  // is the visitor's own list, no longer the example).
+  const getOver = (values: FinancialProfile, answered: readonly string[]): Get =>
+    makeGet({ ...values, provided: answered });
+  const screensAt = (values: FinancialProfile, answered: readonly string[]) =>
+    flowScreens(flow, getOver(values, answered), mode, initiallyProvided, onlyScreen);
+  /** The answered and edited paths of a progress (see getOver). */
+  const answeredIn = (state: WizardProgress): string[] => [
+    ...initiallyProvided,
+    ...state.provided,
+    ...Object.values(state.touched).flat(),
+  ];
 
   // Answered on arrival or in this visit: shown with the saved value.
   const answeredPaths = useMemo(
@@ -311,7 +326,10 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
   // The typical value of each derived leaf, ignoring the visitor's edit of it
   // (the choice's "Typical" tag once another option is picked).
   const typicals = useMemo(() => withDerivedValues(progress.answers, answeredPaths), [progress.answers, answeredPaths]);
-  const get = useMemo(() => makeGet(answers), [answers]);
+  const get = useMemo(
+    () => makeGet({ ...answers, provided: [...answeredPaths, ...editedPaths] }),
+    [answers, answeredPaths, editedPaths]
+  );
   const arrival = useMemo(() => makeGet(seed), [seed]);
   const screens = useMemo(
     () => flowScreens(flow, get, mode, initiallyProvided, onlyScreen),
@@ -389,10 +407,11 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
   const advance = (writes?: Write[]) => {
     if (submitting) return;
     const raw = writes ? applyWrites(progress.answers, writes) : progress.answers;
-    const nextAnswers = writes ? derivedOver(raw, [...editedPaths, ...writes.map((w) => w.path)]) : answers;
-    const nextScreens = writes ? screensAt(nextAnswers) : screens;
+    const edited = [...editedPaths, ...(writes ?? []).map((w) => w.path)];
+    const nextAnswers = writes ? derivedOver(raw, edited) : answers;
+    const nextScreens = writes ? screensAt(nextAnswers, [...answeredPaths, ...edited]) : screens;
     const current = nextScreens[Math.min(step, nextScreens.length - 1)];
-    const nextGet = makeGet(nextAnswers);
+    const nextGet = getOver(nextAnswers, [...answeredPaths, ...edited]);
     // Next takes a blank derived leaf's grey value as the answer, like any
     // typical value: it is written before the screen is marked answered.
     const own = visibleScreenFields(form, current, nextGet).map((spec) => spec.path);
@@ -427,7 +446,13 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
       return;
     }
 
-    const confirmed = answerScreen(form, progress, current, [...derivedWrites, ...(writes ?? [])]);
+    // Next on the account list while it is still the example stores the
+    // accounts in effect (the hidden example rows go, with their holdings),
+    // after this screen's own writes; the screen then marks it answered.
+    const accepted = visibleScreenFields(form, current, nextGet).some((spec) => spec.path === ACCOUNTS.path)
+      ? acceptAccounts(nextGet)
+      : [];
+    const confirmed = answerScreen(form, progress, current, [...derivedWrites, ...(writes ?? []), ...accepted]);
     setProgress(confirmed);
     save(confirmed);
     clearErrors();
@@ -437,7 +462,9 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
       router.push(reviewTopicReturnHref(current.id) as Route);
       return;
     }
-    if (step >= nextScreens.length - 1) finish();
+    // Storing the accounts can hide later screens (holdings, targets).
+    const after = accepted.length > 0 ? screensAt(confirmed.answers, answeredIn(confirmed)) : nextScreens;
+    if (step >= after.length - 1) finish();
     else setIndex(step + 1);
   };
 
@@ -447,7 +474,7 @@ function WizardFlow({ flow, mode, next, onlyScreen, initialProfile }: WizardFlow
     setProgress(skipped);
     save(skipped);
     clearErrors();
-    const nextScreens = screensAt(skipped.answers);
+    const nextScreens = screensAt(skipped.answers, answeredIn(skipped));
     if (step >= nextScreens.length - 1) finish();
     else setIndex(step + 1);
   };

@@ -99,6 +99,10 @@ describe('intake intents', () => {
     expect(isIntakeIntent('emergency')).toBe(false);
     expect(getIntentOption('portfolio').title).toBe('Rebalance my accounts with new cash');
   });
+
+  it('says the rebalancer opens with the accounts and the target mix (the new cash is asked on the page)', () => {
+    expect(getIntentOption('portfolio').resultHint).toBe('Opens the Portfolio Rebalancer with your accounts and target mix.');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -158,7 +162,8 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
       const spec = specs.get(screen.id)!;
       expect(spec.optional, `${id}:${spec.id}`).not.toBe(true);
       if (spec.tier === 'core' || spec.tier === 'assumption' || spec.surface === 'calculator') continue;
-      take(id, screen, FORM_SECTIONS[id]);
+      // The shared accounts screen takes the section 'accounts', whichever form asks it first.
+      take(id, screen, screen.id === 'accounts' ? 'accounts' : FORM_SECTIONS[id]);
     }
   }
   const extras = oldScreens(OLD_PROFILE_EXTRA_FLOW, OLD_PROFILE_EXTRA_SCREENS, OLD_PROFILE_EXTRA_QUESTIONS);
@@ -313,9 +318,9 @@ describe('each intent intake asks only its calculator\'s profile questions', () 
       'ira-taxable',
       'debts',
     ]);
-    expect(screenIds('retirement')).toEqual(['about', 'pay', 'must-pay', 'savings', 'target']);
+    expect(screenIds('retirement')).toEqual(['about', 'pay', 'must-pay', 'accounts', 'target']);
     expect(screenIds('portfolio')).toEqual(['targets', 'accounts', 'holdings']);
-    expect(screenIds('leverage')).toEqual(['facts']);
+    expect(screenIds('leverage')).toEqual(['facts', 'accounts']);
   });
 
   it('lists the screens each intake asks after the core', () => {
@@ -327,9 +332,9 @@ describe('each intent intake asks only its calculator\'s profile questions', () 
       'ira-taxable',
       'debts',
     ]);
-    expect(remainingIds('retirement', [...CORE_PATHS])).toEqual(['savings', 'target']);
+    expect(remainingIds('retirement', [...CORE_PATHS])).toEqual(['accounts', 'target']);
     expect(remainingIds('portfolio', [...CORE_PATHS])).toEqual(['targets', 'accounts', 'holdings']);
-    expect(remainingIds('leverage', [...CORE_PATHS])).toEqual(['facts']);
+    expect(remainingIds('leverage', [...CORE_PATHS])).toEqual(['facts', 'accounts']);
   });
 
   it('never asks an assumption, optional or calculator-only screen in any intent (intentAsksScreen)', () => {

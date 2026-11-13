@@ -87,7 +87,7 @@ export const INTENT_OPTIONS: IntentOption[] = [
     title: 'Rebalance my accounts with new cash',
     description: 'Which funds to buy with new cash to move your accounts toward a target mix.',
     icon: Scale,
-    resultHint: 'Opens the Portfolio Rebalancer with your target mix and new cash.',
+    resultHint: 'Opens the Portfolio Rebalancer with your accounts and target mix.',
   },
   {
     id: 'leverage',

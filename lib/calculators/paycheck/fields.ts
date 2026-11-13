@@ -303,15 +303,6 @@ export const IRA_TRADITIONAL_MONTHLY: FieldSpec = {
   summary: (value) => `traditional IRA ${money(value)}/mo`,
 };
 
-export const IRA_TRADITIONAL_BALANCE: FieldSpec = {
-  path: 'ira.traditionalBalance',
-  kind: 'money',
-  label: 'Traditional IRA balance',
-  min: 0,
-  tier: 'details',
-  visibleWhen: hasTraditionalIra,
-};
-
 export const IRA_ROTH: FieldSpec = {
   path: 'ira.roth',
   kind: 'boolean',
@@ -328,15 +319,6 @@ export const IRA_ROTH_MONTHLY: FieldSpec = {
   tier: 'details',
   visibleWhen: hasRothIra,
   summary: (value) => `Roth IRA ${money(value)}/mo`,
-};
-
-export const IRA_ROTH_BALANCE: FieldSpec = {
-  path: 'ira.rothBalance',
-  kind: 'money',
-  label: 'Roth IRA balance',
-  min: 0,
-  tier: 'details',
-  visibleWhen: hasRothIra,
 };
 
 // ---------------------------------------------------------------------------

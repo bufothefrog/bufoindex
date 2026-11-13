@@ -127,10 +127,8 @@ describe('paycheck form: screens and fields', () => {
       'ira-taxable': [
         'ira.traditional',
         'ira.traditionalMonthly',
-        'ira.traditionalBalance',
         'ira.roth',
         'ira.rothMonthly',
-        'ira.rothBalance',
         'investing.taxableMonthlyContribution',
       ],
       debts: ['debts'],
@@ -309,7 +307,6 @@ describe('paycheck form: visibility', () => {
     expect(visible('ira-taxable', fromDefaults({ 'ira.traditional': true }))).toEqual([
       'ira.traditional',
       'ira.traditionalMonthly',
-      'ira.traditionalBalance',
       'ira.roth',
       'investing.taxableMonthlyContribution',
     ]);
@@ -317,7 +314,6 @@ describe('paycheck form: visibility', () => {
       'ira.traditional',
       'ira.roth',
       'ira.rothMonthly',
-      'ira.rothBalance',
       'investing.taxableMonthlyContribution',
     ]);
     expect(notes('ira-taxable', fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toEqual([]);

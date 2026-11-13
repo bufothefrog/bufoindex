@@ -1,8 +1,9 @@
 /**
- * The retirement form (slice c1): the five screens after the core (plan
- * sections 2.12 and 2.14), of which the intent intake asks two (the Social
- * Security and healthcare screen is optional, the claiming age is a
- * calculator-only control, and the assumptions stay on the page), what each
+ * The retirement form: the six screens after the core (plan sections 2.12
+ * and 2.14), of which the intent intake asks two, the shared accounts screen
+ * and the target (monthly investing and the claiming age are calculator-only
+ * controls, the Social Security and healthcare screen is optional, and the
+ * assumptions stay on the page), what each
  * asks, its visibility rules,
  * validation and 'remaining' mode, the nullable overrides, and proof that
  * every question the old intake asked is still asked.
@@ -62,13 +63,14 @@ const profileWith = (provided: string[]): FinancialProfile => ({ ...getDefaultFi
 const CUSTOM = { 'assumptions.retirement.riskProfile': 'custom' };
 
 describe('retirement form: screens', () => {
-  it('asks the core, then savings and target; Social Security and healthcare is optional, claiming is page-only', () => {
-    expect(ids()).toEqual(['about', 'pay', 'must-pay', 'savings', 'target']);
+  it('asks the core, then accounts and target; Social Security and healthcare is optional, monthly investing and claiming are page-only', () => {
+    expect(ids()).toEqual(['about', 'pay', 'must-pay', 'accounts', 'target']);
     expect(RETIREMENT_FORM.screens.map((s) => [s.id, s.tier, s.surface, s.optional])).toEqual([
       ['about', 'core', undefined, undefined],
       ['pay', 'core', undefined, undefined],
       ['must-pay', 'core', undefined, undefined],
-      ['savings', 'details', undefined, undefined],
+      ['accounts', 'details', 'both', undefined],
+      ['monthly-investing', 'details', 'calculator', undefined],
       ['target', 'details', undefined, undefined],
       ['ss-healthcare', 'details', undefined, true],
       ['claiming', 'details', 'calculator', undefined],
@@ -77,12 +79,22 @@ describe('retirement form: screens', () => {
   });
 
   it('asks 2 screens after the core in the intent intake (plan section 2.12, less the optional, claiming and assumptions)', () => {
-    expect(remainingIds([...CORE_PATHS])).toEqual(['savings', 'target']);
+    expect(remainingIds([...CORE_PATHS])).toEqual(['accounts', 'target']);
   });
 
   it('keeps the optional screen on the calculator page, and adds the claiming-age control after it', () => {
     const page = screensFor(RETIREMENT_FORM, fromDefaults(), { mode: 'all', surface: 'calculator' }).map((s) => s.id);
-    expect(page).toEqual(['about', 'pay', 'must-pay', 'savings', 'target', 'ss-healthcare', 'claiming', 'assumptions']);
+    expect(page).toEqual([
+      'about',
+      'pay',
+      'must-pay',
+      'accounts',
+      'monthly-investing',
+      'target',
+      'ss-healthcare',
+      'claiming',
+      'assumptions',
+    ]);
   });
 
   it('asks the optional screen at the end of the profile form, in the section "Optional"', () => {
@@ -96,7 +108,8 @@ describe('retirement form: screens', () => {
     expect(
       RETIREMENT_FORM.screens.slice(3).map((s) => ({ id: s.id, title: s.title, question: s.question, description: s.description }))
     ).toEqual([
-      { id: 'savings', title: 'What are you investing today?', question: undefined, description: undefined },
+      { id: 'accounts', title: 'What do you have saved and invested?', question: undefined, description: undefined },
+      { id: 'monthly-investing', title: 'Monthly investing', question: undefined, description: undefined },
       {
         id: 'target',
         title: 'When would you like to retire?',
@@ -130,7 +143,8 @@ describe('retirement form: screens', () => {
       // No take-home pay: no retirement binding reads it.
       pay: ['income.grossPerPaycheck', 'income.frequency'],
       'must-pay': ['spending.necessaryMonthly'],
-      savings: ['investing.monthlyContribution', 'investing.investedBalance'],
+      accounts: ['portfolio.accounts'],
+      'monthly-investing': ['investing.monthlyContribution'],
       target: ['person.retirementAge', 'spending.targetRetirementIncome', 'person.lifeExpectancy'],
       'ss-healthcare': ['retirementIncome.socialSecurityBenefit', 'retirementIncome.annualHealthcareCost'],
       claiming: ['retirementIncome.socialSecurityAge'],
@@ -228,7 +242,14 @@ describe('retirement form: screens', () => {
         fromDefaults({ ...CUSTOM, 'assumptions.retirement.effectiveTaxRate': 0.15 })
       )
     ).toBe('8% / 6% returns, 15% volatility, 3% inflation, 15% tax rate, 1x healthcare');
-    expect(summarizeScreen(RETIREMENT_FORM, screen('savings'), fromDefaults())).toBe('saving $1,500/mo, $25,000 invested');
+    expect(summarizeScreen(RETIREMENT_FORM, screen('accounts'), fromDefaults())).toBe(
+      '401(k) or similar $16,225; Brokerage (taxable) $8,775 (3 holdings)'
+    );
+    // Auto sums the normal contributions: 693.33 own 401(k) (8% of 8,666.67 a month) + 346.67 match (4%) + 500 taxable.
+    expect(summarizeScreen(RETIREMENT_FORM, screen('monthly-investing'), fromDefaults())).toBe('saving $1,540/mo');
+    expect(
+      summarizeScreen(RETIREMENT_FORM, screen('monthly-investing'), fromDefaults({ 'investing.monthlyContribution': 1500 }))
+    ).toBe('saving $1,500/mo');
     expect(summarizeScreen(RETIREMENT_FORM, screen('target'), fromDefaults())).toBe('retire at 65, $41,000/yr target, plan to age 90');
     // Auto reads as an estimate (104,000 a year of pay: $40,359), never as the visitor's number.
     expect(summarizeScreen(RETIREMENT_FORM, screen('ss-healthcare'), fromDefaults())).toBe(
@@ -245,7 +266,7 @@ describe('retirement form: screens', () => {
   });
 
   it('takes the typical values on Next on the topic screens and the assumptions', () => {
-    expect(['savings', 'target', 'ss-healthcare', 'assumptions'].map((id) => nextNeedsOwnAnswer(screen(id)))).toEqual([
+    expect(['accounts', 'target', 'ss-healthcare', 'assumptions'].map((id) => nextNeedsOwnAnswer(screen(id)))).toEqual([
       false,
       false,
       false,
@@ -328,27 +349,27 @@ describe('retirement form: validation', () => {
 
 describe("retirement form: 'remaining' mode", () => {
   it('drops the core and the fully answered screens, and keeps a partly answered one whole', () => {
-    expect(remainingIds([])).toEqual(['savings', 'target']);
-    expect(remainingIds([...CORE_PATHS, 'investing.investedBalance'])).toEqual(['savings', 'target']);
-    expect(remainingIds(['investing.investedBalance', 'investing.monthlyContribution', 'person.retirementAge'])).toEqual([
-      'target',
-    ]);
+    expect(remainingIds([])).toEqual(['accounts', 'target']);
+    expect(remainingIds([...CORE_PATHS, 'person.retirementAge'])).toEqual(['accounts', 'target']);
+    expect(remainingIds(['portfolio.accounts', 'person.retirementAge'])).toEqual(['target']);
     expect(remainingIds(intakePaths('retirement'))).toEqual([]);
   });
 
   it('never asks the assumptions or the claiming age, answered or not', () => {
-    expect(remainingIds([], CUSTOM)).toEqual(['savings', 'target']);
-    expect(remainingIds(['retirementIncome.socialSecurityAge'])).toEqual(['savings', 'target']);
+    expect(remainingIds([], CUSTOM)).toEqual(['accounts', 'target']);
+    expect(remainingIds(['retirementIncome.socialSecurityAge'])).toEqual(['accounts', 'target']);
+    // Monthly investing is calculator-only: answered or not, the intake does not ask it.
+    expect(remainingIds(['investing.monthlyContribution'])).toEqual(['accounts', 'target']);
   });
 
   it('matches what /start/retirement asks on arrival, from the saved profile', () => {
-    const profile = profileWith([...CORE_PATHS, 'investing.investedBalance', 'investing.monthlyContribution']);
+    const profile = profileWith([...CORE_PATHS, 'portfolio.accounts']);
     expect(remainingIntakeScreens('retirement', profile).map((s) => s.id)).toEqual(['target']);
   });
 
   it('asks the same screens whether or not the optional facts were saved earlier', () => {
     const optional = screen('ss-healthcare').fields;
-    const base = [...CORE_PATHS, 'investing.investedBalance', 'investing.monthlyContribution'];
+    const base = [...CORE_PATHS, 'portfolio.accounts'];
     const ids = (provided: string[]) => remainingIntakeScreens('retirement', profileWith(provided)).map((s) => s.id);
     expect(ids([...base, ...optional])).toEqual(ids(base));
   });
@@ -356,13 +377,22 @@ describe("retirement form: 'remaining' mode", () => {
 
 describe('retirement form: the old intake question set is still asked', () => {
   // Captured from the intake before slice w1 (the provisional form carried
-  // these three after the core, one per screen); the help is the copy
-  // slice b1 trimmed.
+  // the retirement age, the invested balance and the monthly contribution
+  // after the core, one per screen). In v3 the invested balance is the sum of
+  // the account list's balances, and the monthly contribution is Auto from
+  // the contribution answers, a calculator-only control.
   const OLD_QUESTIONS: readonly OldQuestion[] = [
     { path: 'person.retirementAge', label: 'Target retirement age', kind: 'number', min: 30, max: 85, step: 1 },
-    { path: 'investing.investedBalance', label: 'Invested balance', kind: 'money', help: 'Total across 401(k), IRA and brokerage, not your emergency fund.', min: 0 },
-    { path: 'investing.monthlyContribution', label: 'Monthly investing contribution', kind: 'money', help: 'All accounts together, including your own 401(k) contributions.', min: 0 },
   ];
+
+  it('asks the account list where the invested balance was, and keeps monthly investing on the page', () => {
+    const asked = askedScreens('retirement');
+    expect(asked.find((s) => s.id === 'accounts')?.questions.map((q) => q.path)).toEqual(['portfolio.accounts']);
+    const paths = asked.flatMap((s) => s.questions.map((q) => q.path));
+    expect(paths).not.toContain('investing.investedBalance');
+    expect(paths).not.toContain('investing.monthlyContribution');
+    expect(screen('monthly-investing').surface).toBe('calculator');
+  });
 
   it('asks the old core screens first and every old question with its wording and bounds', () => {
     const asked = askedScreens('retirement');

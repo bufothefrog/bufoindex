@@ -72,7 +72,7 @@ describe('with a saved profile', () => {
     resetProfileStore({ profile: { investing: { targetMix } } });
     render(<OverviewDashboard />);
     expect(screen.getByText(/Also seeded from this profile/)).toHaveTextContent(
-      `Also seeded from this profile: the portfolio rebalancer, ${text} and this month's new cash.`
+      `Also seeded from this profile: the portfolio rebalancer, ${text} and your accounts.`
     );
     expect(screen.getByRole('link', { name: /Open the rebalancer/ })).toHaveAttribute(
       'href',
@@ -97,16 +97,17 @@ describe('ProfileCompletenessCard', () => {
   it('counts topics and lists the unanswered ones by title', () => {
     render(<ProfileCompletenessCard profile={withProvided(['person.age', 'person.state', 'person.filingStatus'])} />);
     const { total } = profileCompleteness(withProvided([]));
-    expect(screen.getByText(`1 of ${total}`)).toBeInTheDocument();
+    expect(total).toBe(13);
+    expect(screen.getByText('1 of 13')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Profile topics answered' })).toHaveAttribute('aria-valuenow', '1');
     const missing = screen.getAllByRole('listitem').map((item) => item.textContent);
     expect(missing).toEqual([
       '-What does a typical paycheck look like?',
       '-What do you have to pay each month?',
-      '-What are you investing today?',
-      '-When would you like to retire?',
       '-Fun money and bonuses',
       '-Emergency fund',
+      '-401(k) or similar plan',
+      '-Health savings account',
     ]);
     expect(screen.getByText(`and ${total - 1 - 6} more.`)).toBeInTheDocument();
   });

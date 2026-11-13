@@ -4,8 +4,8 @@
  * The cards run each calculator through its definition (engineInputsFor and
  * the calculator's headline function); what is here is only what the
  * dashboard shows and no calculator page does: the cash buffer against the
- * emergency fund target, the automation checklist and the retirement "save
- * more" lever. Nothing here feeds back into a calculation or a store.
+ * emergency fund target, the account list, the automation checklist and the
+ * retirement "save more" lever. Nothing here feeds back into a calculation or a store.
  * No React or DOM imports.
  */
 
@@ -19,7 +19,15 @@ import {
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { allocationDisplayText } from '@/lib/constants/financialSteps';
 import { RetirementConstants } from '@/lib/constants/retirement';
+import { makeGet } from '@/lib/fields/paths';
 import { formatPercent } from '@/lib/format';
+import {
+  accountDisplayName,
+  accountLines,
+  emergencyFundAccounts,
+  emergencyFundBalance,
+  investedBalance,
+} from '@/lib/profile/accounts';
 import { withDerivedValues } from '@/lib/profile/derived';
 import type { FinancialProfile } from '@/lib/profile/types';
 import type { AllocationItem } from '@/lib/types';
@@ -37,6 +45,8 @@ export const ASSUMED_PORTFOLIO_RETURN = 0.07;
 
 export interface CashBufferSummary {
   balance: number;
+  /** Display names of the accounts that hold the emergency fund; [] when the typed balance is used. */
+  heldIn: string[];
   necessaryMonthly: number;
   /** null when necessary expenses are not set (months on hand is undefined). */
   monthsOnHand: number | null;
@@ -52,14 +62,18 @@ export interface CashBufferSummary {
 }
 
 /**
- * The cash buffer of `profile`. An unanswered emergency fund balance is its
+ * The cash buffer of `profile`. While accounts hold the emergency fund (a
+ * cash account, or a brokerage with the tick), the balance is their value;
+ * otherwise it is the typed emergency fund, whose unanswered value is its
  * derived typical value, three months of must-pay costs (withDerivedValues;
  * a no-op when the caller already applied it).
  */
 export function summarizeCashBuffer(stored: FinancialProfile): CashBufferSummary {
   const profile = withDerivedValues(stored);
+  const get = makeGet(profile);
   const necessaryMonthly = Math.max(0, profile.spending.necessaryMonthly);
-  const balance = Math.max(0, profile.cash.emergencyFundBalance);
+  const balance = Math.max(0, emergencyFundBalance(get));
+  const heldIn = emergencyFundAccounts(get).map(accountDisplayName);
   const targetMonths = Math.max(0, profile.cash.targetMonths);
   const target = targetMonths * necessaryMonthly;
   const excess = Math.max(0, balance - target);
@@ -68,6 +82,7 @@ export function summarizeCashBuffer(stored: FinancialProfile): CashBufferSummary
 
   return {
     balance,
+    heldIn,
     necessaryMonthly,
     monthsOnHand: necessaryMonthly > 0 ? balance / necessaryMonthly : null,
     targetMonths,
@@ -76,6 +91,36 @@ export function summarizeCashBuffer(stored: FinancialProfile): CashBufferSummary
     shortfall,
     costSpread,
     annualCostOfExcess: excess * costSpread,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Accounts                                                           */
+/* ------------------------------------------------------------------ */
+
+export interface AccountsSummary {
+  /** One line per account in effect, then one per suggested account (accountLines). */
+  lines: string[];
+  /** The invested total: every account but those holding the emergency fund. */
+  invested: number;
+  emergencyFund: {
+    /** The emergency fund balance (the accounts that hold it, or the typed balance). */
+    balance: number;
+    /** Display names of the accounts that hold it; [] when the typed balance is used. */
+    heldIn: string[];
+  };
+}
+
+/** The account list of `stored` for the overview, read with its derived leaves filled (withDerivedValues). */
+export function summarizeAccounts(stored: FinancialProfile): AccountsSummary {
+  const get = makeGet(withDerivedValues(stored));
+  return {
+    lines: accountLines(get),
+    invested: investedBalance(get),
+    emergencyFund: {
+      balance: emergencyFundBalance(get),
+      heldIn: emergencyFundAccounts(get).map(accountDisplayName),
+    },
   };
 }
 

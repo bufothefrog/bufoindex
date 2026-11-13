@@ -3,9 +3,10 @@
  * in lib/fields/types.ts), place by place: such a screen is never in the
  * profile form, the profile wizard, the review page, the completeness figure
  * or any /start/<intent> intake, and it is shown on its calculator page. The
- * two calculator-only screens with profile leaves are the leverage
- * comparison (the leverage ratio and the three overrides) and the retirement
- * claiming age.
+ * four calculator-only screens with profile leaves are the retirement monthly
+ * investing (Auto from the contribution answers) and claiming age, the
+ * rebalancer's new cash for this run, and the leverage comparison (the
+ * leverage ratio and the three overrides).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -32,13 +33,17 @@ const profileWith = (provided: string[]): FinancialProfile => ({ ...getDefaultFi
 const pathsOf = (screens: readonly ScreenSpec[]) => screens.flatMap((screen) => screen.fields);
 
 describe('calculator-only screens', () => {
-  it('are the leverage comparison and the retirement claiming age', () => {
+  it('are the retirement monthly investing and claiming age, the new cash and the leverage comparison', () => {
     expect(CALCULATOR_ONLY.map(({ id, screen }) => [id, screen.id])).toEqual([
+      ['retirement', 'monthly-investing'],
       ['retirement', 'claiming'],
+      ['portfolio', 'new-cash'],
       ['leverage', 'comparison'],
     ]);
     expect(CALCULATOR_ONLY_PATHS).toEqual([
+      'investing.monthlyContribution',
       'retirementIncome.socialSecurityAge',
+      'portfolio.newCash',
       'leverage.monthlyContribution',
       'leverage.years',
       'leverage.startingBalance',

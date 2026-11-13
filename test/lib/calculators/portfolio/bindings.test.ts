@@ -1,15 +1,14 @@
 /**
- * Portfolio bindings: the profile feeds RebalanceInputsV2 exactly as the
- * old mapper (toRebalanceInputs) did, every engine input is bound or
+ * Portfolio bindings: the profile feeds RebalanceInputsV2 from the one
+ * account list (lib/profile/accounts.ts), every engine input is bound or
  * engine-only, and the engine's checks land on the fields that show them.
  *
- * Golden fixture. Each GOLDEN entry was captured on 2026-11-12 from the
- * former lib/profile/mappers.ts (deleted in phase 5): what its
- * toRebalanceInputs returned for that profile, for v1-shaped profiles (a v1
- * payload loaded through normalizeProfile, as any stored profile is; the
- * Brokerage deposit set directly where a case needs new cash) and a v2
- * profile with several accounts, holdings and a custom class. No documented
- * exception.
+ * v3 (contract section 9): the rebalancer receives only the rebalanced
+ * accounts (not the emergency fund, not cash, with holdings or new cash),
+ * each named by accountDisplayName, typed by its kind's tax treatment, with
+ * this run's new cash (the visitor's own figure, else the normal
+ * contributions routed to it) as the deposit; only their holdings and the
+ * securities those refer to are sent.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -19,65 +18,43 @@ import {
   PORTFOLIO_ENGINE_ONLY,
   classTargetsFor,
 } from '@/lib/calculators/portfolio/bindings';
-import { PORTFOLIO_CALCULATOR, validateRebalanceInputs } from '@/lib/calculators/portfolio/definition';
+import {
+  NO_REBALANCED_ACCOUNT_MESSAGE,
+  PORTFOLIO_CALCULATOR,
+  validateRebalanceInputs,
+} from '@/lib/calculators/portfolio/definition';
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
-import { isDerivedBinding } from '@/lib/fields/binding';
+import { engineErrorsToFields, isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { applyProfileWrites, BROKERAGE_ACCOUNT_ID, getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
+import { notRebalancedNote } from '@/lib/profile/accounts';
+import { applyProfileWrites, getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
-import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 
-const V1_DEFAULT = {
-  version: 1,
-  updatedAt: 0,
-  person: { age: 30, state: 'TX', filingStatus: 'single', retirementAge: 60 },
-  income: { grossPerPaycheck: 3500, netPerPaycheck: 2600, frequency: 'bi-weekly' },
-  spending: { necessaryMonthly: 3000, funMoneyMin: 300, funMoneyMax: 600, targetRetirementIncome: 80000 },
-  cash: { emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 3 },
-  workplace: { has401k: true, matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
-  investing: {
-    investedBalance: 25000,
-    monthlyContribution: 1500,
-    taxableMonthlyContribution: 500,
-    targetMix: '80-20',
-    newCashThisMonth: 1000,
-  },
-  strategy: { leverageRatio: 2 },
-  provided: [] as string[],
+/** The default profile with these writes, the account list answered. */
+const profileWith = (writes: Write[]): FinancialProfile => {
+  const profile = applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
+  return { ...profile, provided: [...profile.provided, 'portfolio.accounts'] };
 };
 
-/**
- * A v1 payload loaded over the 3bb0132 defaults the fixture was captured on
- * (the worked example's securities come from there), every field answered
- * (test/factories/profile-3bb0132.ts).
- */
-function fromV1(investing: Partial<typeof V1_DEFAULT.investing>): FinancialProfile {
-  return answeredEverywhere(
-    normalizeProfile({ ...V1_DEFAULT, investing: { ...V1_DEFAULT.investing, ...investing } }, defaultProfileAt3bb0132())
-  );
-}
-
-/** `profile` with the Brokerage account's deposit (its new cash) set to `deposit`, past the store's own checks. */
-function withBrokerageDeposit(profile: FinancialProfile, deposit: number): FinancialProfile {
-  const accounts = profile.portfolio.accounts.map((account) =>
-    account.id === BROKERAGE_ACCOUNT_ID ? { ...account, deposit } : account
-  );
-  return { ...profile, portfolio: { ...profile.portfolio, accounts } };
-}
-
-const profileWith = (writes: Write[]): FinancialProfile =>
-  applyProfileWrites(getDefaultFinancialProfile(), writes).profile;
-
-/** Three accounts, five holdings over four securities, a custom class and custom targets. */
+/** Three accounts, five holdings over four securities, a custom class, custom targets and new cash on each. */
 const SEVERAL: Write[] = [
   { path: 'investing.targetMix', value: 'custom' },
   {
     path: 'portfolio.accounts',
     value: [
-      { id: 'acc-401k', name: 'Work 401(k)', accountType: 'tax-deferred', deposit: 750.25 },
-      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 500 },
-      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 2000 },
+      { id: 'acc-401k', kind: '401k', name: 'Work 401(k)', balance: 0, holdsEmergencyFund: false },
+      { id: 'acc-roth', kind: 'roth-ira', name: '', balance: 0, holdsEmergencyFund: false },
+      { id: 'acc-brok', kind: 'brokerage', name: 'Brokerage', balance: 0, holdsEmergencyFund: false },
+    ],
+  },
+  {
+    path: 'portfolio.newCash',
+    value: [
+      { id: 'acc-401k', amount: 750.25 },
+      { id: 'acc-roth', amount: 500 },
+      { id: 'acc-brok', amount: 2000 },
     ],
   },
   {
@@ -114,113 +91,100 @@ const SEVERAL: Write[] = [
   { path: 'assumptions.portfolio.showPlacementAdvice', value: false },
 ];
 
-/** The worked example's securities and holdings, which every v1 profile and the default carry. */
-const EXAMPLE_SECURITIES = [
-  { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 250, assetClass: 'us-stock' },
-  { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: 60, assetClass: 'intl-stock' },
-  { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 75, assetClass: 'bonds' },
-];
-const EXAMPLE_HOLDINGS = [
-  { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
-  { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
-  { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
-  { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
-];
-
-/** The old mapper's output for the worked example with this Brokerage deposit and these portfolio-wide weights (us, intl, bonds, cash). */
-function exampleInputs(brokerageDeposit: number, [us, intl, bonds, cash]: readonly number[]): RebalanceInputsV2 {
-  return {
-    setupMode: 'multi-shared',
-    securities: EXAMPLE_SECURITIES,
-    accounts: [
-      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
-      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: brokerageDeposit },
-    ],
-    holdings: EXAMPLE_HOLDINGS,
-    classTargets: [
-      { accountId: null, assetClass: 'us-stock', target: us },
-      { accountId: null, assetClass: 'intl-stock', target: intl },
-      { accountId: null, assetClass: 'bonds', target: bonds },
-      { accountId: null, assetClass: 'cash', target: cash },
-    ],
-    customAssetClasses: [],
-    allowTaxableSelling: false,
-    showPlacementAdvice: true,
-    mode: 'whole',
-  };
-}
-
 /** The value of the SEVERAL write at `path`. */
 const severalValue = (path: string): unknown => SEVERAL.find((write) => write.path === path)?.value;
 
-describe('portfolio bindings: golden against the old mapper output', () => {
-  const GOLDEN: [string, FinancialProfile, RebalanceInputsV2][] = [
-    ['the 3bb0132 default profile, every field answered', answeredEverywhere(defaultProfileAt3bb0132()), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
-    ['the v1 default', fromV1({}), exampleInputs(1000, [0.6, 0.2, 0.2, 0])],
-    [
-      'a v1 100/0 mix with a $2,400 Brokerage deposit',
-      withBrokerageDeposit(fromV1({ targetMix: '100-0' }), 2400),
-      exampleInputs(2400, [0.75, 0.25, 0, 0]),
-    ],
-    [
-      'a v1 60/40 mix with no Brokerage deposit',
-      withBrokerageDeposit(fromV1({ targetMix: '60-40' }), 0),
-      exampleInputs(0, [0.45, 0.15, 0.4, 0]),
-    ],
-    [
-      'several accounts, holdings and a custom class',
-      profileWith(SEVERAL),
-      {
-        setupMode: 'multi-shared',
-        securities: severalValue('portfolio.securities'),
-        accounts: severalValue('portfolio.accounts'),
-        holdings: severalValue('portfolio.holdings'),
-        classTargets: severalValue('portfolio.classTargets'),
-        customAssetClasses: severalValue('portfolio.customAssetClasses'),
-        allowTaxableSelling: true,
-        showPlacementAdvice: false,
-        mode: 'fractional',
-      } as RebalanceInputsV2,
-    ],
-  ];
+/** The owner fixture (test/factories/accountsFixtures.ts) as a stored v3 profile. */
+const owner = (): FinancialProfile => normalizeProfile(ownerRaw());
 
-  it.each(GOLDEN)('%s', (_name, profile, expected) => {
-    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual(expected);
-  });
-
-  it('passes a negative deposit through unclamped; the engine check reports it on its row', () => {
-    const profile = withBrokerageDeposit(fromV1({ targetMix: '60-40' }), -50);
-    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual(exampleInputs(-50, [0.45, 0.15, 0.4, 0]));
-    expect(prepareRun(PORTFOLIO_CALCULATOR, profile).errors).toEqual({
-      'portfolio.accounts.1.deposit': 'New cash must be at least $0.',
+describe('portfolio bindings: the engine inputs (contract section 9)', () => {
+  it('sends the default its one rebalanced account: the example brokerage, with the taxable 500 as new cash', () => {
+    const profile = getDefaultFinancialProfile();
+    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profile)).toEqual<RebalanceInputsV2>({
+      setupMode: 'multi-shared',
+      securities: profile.portfolio.securities,
+      accounts: [{ id: 'acc-brok', name: 'Brokerage (taxable)', accountType: 'taxable', deposit: 500 }],
+      holdings: [
+        { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
+        { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+        { id: 'hld-brok-bnd', accountId: 'acc-brok', securityId: 'sec-bnd', shares: 0 },
+      ],
+      // The 80/20 preset: 60% US, 20% intl, 20% bonds, 0% cash.
+      classTargets: [
+        { accountId: null, assetClass: 'us-stock', target: 0.6 },
+        { accountId: null, assetClass: 'intl-stock', target: 0.2 },
+        { accountId: null, assetClass: 'bonds', target: 0.2 },
+        { accountId: null, assetClass: 'cash', target: 0 },
+      ],
+      customAssetClasses: [],
+      allowTaxableSelling: false,
+      showPlacementAdvice: true,
+      mode: 'whole',
     });
-  });
-
-  it('pins the default profile inputs and their rebalance (PR 3 example prices)', () => {
-    const inputs = engineInputsFor(PORTFOLIO_CALCULATOR, getDefaultFinancialProfile());
-    expect(inputs.setupMode).toBe('multi-shared');
-    expect(inputs.securities.map((sec) => [sec.ticker, sec.price])).toEqual([
+    expect(profile.portfolio.securities.map((sec) => [sec.ticker, sec.price])).toEqual([
       ['VTI', 375],
       ['VXUS', 85],
       ['BND', 70],
     ]);
-    expect(inputs.holdings).toEqual(EXAMPLE_HOLDINGS);
-    expect(inputs.accounts.map((a) => [a.id, a.deposit])).toEqual([
-      ['acc-roth', 0],
-      ['acc-brok', 1000],
+    // The 401(k) has a typed balance and no holdings: the page says why it is left out.
+    expect(notRebalancedNote(makeGet(profile))).toBe('Not rebalanced: 401(k) or similar (no holdings entered).');
+  });
+
+  it('pins the default rebalance (PR 3 example prices, measured on the v3 inputs)', () => {
+    const result = PORTFOLIO_CALCULATOR.calculate(engineInputsFor(PORTFOLIO_CALCULATOR, getDefaultFinancialProfile()));
+    // Brokerage 20 x 375 + 15 x 85 + 0 x 70 = 8,775.
+    expect(result.totalValueBefore).toBe(8775);
+    // 1,000 before (the Roth 0 and the Brokerage 1,000 deposits); 500 now.
+    expect(result.totalDeposit).toBe(500);
+    expect(result.totalSpent).toBe(495);
+    expect(result.cashLeftover).toBe(5);
+    expect(result.totalDriftBefore).toBeCloseTo(0.5094017094017094, 10);
+    expect(result.totalDriftAfter).toBeCloseTo(0.4181229773462784, 10);
+  });
+
+  it('sends several accounts with their own new cash, display names and tax treatments', () => {
+    expect(engineInputsFor(PORTFOLIO_CALCULATOR, profileWith(SEVERAL))).toEqual<RebalanceInputsV2>({
+      setupMode: 'multi-shared',
+      securities: severalValue('portfolio.securities') as RebalanceInputsV2['securities'],
+      accounts: [
+        { id: 'acc-401k', name: 'Work 401(k)', accountType: 'tax-deferred', deposit: 750.25 },
+        { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 500 },
+        { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 2000 },
+      ],
+      holdings: severalValue('portfolio.holdings') as RebalanceInputsV2['holdings'],
+      classTargets: severalValue('portfolio.classTargets') as RebalanceInputsV2['classTargets'],
+      customAssetClasses: [{ id: 'cac-1', label: 'Crypto' }],
+      allowTaxableSelling: true,
+      showPlacementAdvice: false,
+      mode: 'fractional',
+    });
+  });
+
+  it('sends the owner the Roth IRA and the brokerage only, with their holdings and the securities they hold', () => {
+    const inputs = engineInputsFor(PORTFOLIO_CALCULATOR, owner());
+    expect(inputs.accounts).toEqual([
+      { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 625 },
+      { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 400 },
     ]);
-    // The 80/20 preset: 60% US, 20% intl, 20% bonds, 0% cash.
-    expect(inputs.classTargets.map((t) => [t.assetClass, t.target])).toEqual([
-      ['us-stock', 0.6],
-      ['intl-stock', 0.2],
-      ['bonds', 0.2],
-      ['cash', 0],
+    expect(inputs.holdings).toEqual([
+      { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 20 },
+      { id: 'hld-roth-vxus', accountId: 'acc-roth', securityId: 'sec-vxus', shares: 30 },
+      { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 10 },
     ]);
-    expect([inputs.mode, inputs.allowTaxableSelling, inputs.showPlacementAdvice]).toEqual(['whole', false, true]);
-    // Roth 10 x 375 + 5 x 70 = 4,100; Brokerage 20 x 375 + 15 x 85 = 8,775.
-    const result = PORTFOLIO_CALCULATOR.calculate(inputs);
-    expect(result.totalValueBefore).toBe(12875);
-    expect(result.totalDeposit).toBe(1000);
+    // BOXX is held only by the emergency-fund brokerage, BND by nobody.
+    expect(inputs.securities.map((sec) => sec.ticker)).toEqual(['VTI', 'VXUS']);
+  });
+
+  it("sends the visitor's own new cash in place of the normal contributions", () => {
+    const base = owner();
+    const custom: FinancialProfile = {
+      ...base,
+      portfolio: { ...base.portfolio, newCash: [{ id: 'acc-roth', amount: 7500 }] },
+    };
+    expect(engineInputsFor(PORTFOLIO_CALCULATOR, custom).accounts.map((a) => [a.id, a.deposit])).toEqual([
+      ['acc-roth', 7500],
+      ['acc-brok', 400],
+    ]);
   });
 
   it("uses the profile's class targets for the custom mix and the preset's weights otherwise", () => {
@@ -267,7 +231,6 @@ describe('portfolio bindings: every engine input is bound or engine-only', () =>
   it('binds the lists and settings to their profile homes', () => {
     const direct = PORTFOLIO_BINDINGS.filter((b) => !isDerivedBinding(b)).map((b) => [b.engine, 'profile' in b && b.profile]);
     expect(direct).toEqual([
-      ['accounts', 'portfolio.accounts'],
       ['customAssetClasses', 'portfolio.customAssetClasses'],
       ['allowTaxableSelling', 'assumptions.portfolio.allowTaxableSelling'],
       ['showPlacementAdvice', 'assumptions.portfolio.showPlacementAdvice'],
@@ -276,6 +239,7 @@ describe('portfolio bindings: every engine input is bound or engine-only', () =>
     const derived = PORTFOLIO_BINDINGS.filter(isDerivedBinding).map((b) => [b.engine, b.errorPath]);
     expect(derived).toEqual([
       ['securities', 'portfolio.holdings'],
+      ['accounts', 'portfolio.newCash'],
       ['holdings', 'portfolio.holdings'],
       ['classTargets', 'portfolio.classTargets'],
     ]);
@@ -333,28 +297,39 @@ describe('portfolio definition', () => {
     });
   });
 
-  it('shows holding and price errors on the holdings editor, and account rows on their row', () => {
+  it('shows holding and price errors on the holdings editor', () => {
     const base = profileWith(SEVERAL);
-    const holdings = base.portfolio.holdings.map((h, i) => (i === 0 ? { ...h, accountId: 'acc-gone' } : h));
-    const securities = base.portfolio.securities.map((s, i) => (i === 1 ? { ...s, price: -5 } : s));
+    const securities = base.portfolio.securities.map((sec, i) => (i === 1 ? { ...sec, price: -5 } : sec));
     // The engine inputs are built from the profile directly, past the store's own checks.
-    const broken: FinancialProfile = { ...base, portfolio: { ...base.portfolio, holdings, securities } };
+    const broken: FinancialProfile = { ...base, portfolio: { ...base.portfolio, securities } };
     expect(prepareRun(PORTFOLIO_CALCULATOR, broken).errors).toEqual({
       'portfolio.holdings': 'Price cannot be negative.',
     });
-    const negative: FinancialProfile = {
-      ...base,
-      portfolio: { ...base.portfolio, accounts: base.portfolio.accounts.map((a, i) => (i === 2 ? { ...a, deposit: -1 } : a)) },
-    };
-    expect(prepareRun(PORTFOLIO_CALCULATOR, negative).errors).toEqual({
-      'portfolio.accounts.2.deposit': 'New cash must be at least $0.',
-    });
   });
 
-  it('needs at least one account', () => {
-    const none: FinancialProfile = profileWith([{ path: 'portfolio.accounts', value: [] }]);
-    expect(prepareRun(PORTFOLIO_CALCULATOR, none).errors).toMatchObject({
-      'portfolio.accounts': 'Accounts needs at least 1 entry.',
+  it('shows an account check (a negative deposit) on the new cash card', () => {
+    const inputs = engineInputsFor(PORTFOLIO_CALCULATOR, profileWith(SEVERAL));
+    const errors = validateRebalanceInputs({
+      ...inputs,
+      accounts: inputs.accounts.map((a, i) => (i === 0 ? { ...a, deposit: -1 } : a)),
     });
+    expect(Object.keys(errors)).toEqual(['accounts[0].deposit']);
+    expect(engineErrorsToFields(PORTFOLIO_BINDINGS, errors)).toEqual({ 'portfolio.newCash': errors['accounts[0].deposit'] });
+  });
+
+  it('says what to add when no account is rebalanced', () => {
+    // Typed balances only: nothing has holdings, and a typed balance is no candidate.
+    const typed = profileWith([
+      {
+        path: 'portfolio.accounts',
+        value: [{ id: 'acc-401k', kind: '401k', name: '', balance: 5000, holdsEmergencyFund: false }],
+      },
+      { path: 'portfolio.holdings', value: [] },
+    ]);
+    expect(engineInputsFor(PORTFOLIO_CALCULATOR, typed).accounts).toEqual([]);
+    expect(prepareRun(PORTFOLIO_CALCULATOR, typed).errors).toEqual({ calculation: NO_REBALANCED_ACCOUNT_MESSAGE });
+    expect(NO_REBALANCED_ACCOUNT_MESSAGE).toBe('Add holdings to an account, or new cash to an empty one, to rebalance.');
+    const none = profileWith([{ path: 'portfolio.accounts', value: [] }]);
+    expect(prepareRun(PORTFOLIO_CALCULATOR, none).errors).toEqual({ calculation: NO_REBALANCED_ACCOUNT_MESSAGE });
   });
 });

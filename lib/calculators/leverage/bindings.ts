@@ -5,10 +5,12 @@
  * The contribution, the horizon and the starting balance are nullable
  * overrides (profile.leverage); null derives each one from the profile:
  *
- * - monthlyContribution: the taxable monthly contribution, or the total
- *   monthly contribution when no taxable contribution is set.
+ * - monthlyContribution: the taxable monthly contribution, or the monthly
+ *   investing total (monthlyInvesting in lib/profile/accounts.ts) when no
+ *   taxable contribution is set.
  * - years: retirement age minus age, rounded, clamped to the bounds.
- * - startingBalance: the invested balance.
+ * - startingBalance: the invested total of the account list, the emergency
+ *   fund left out (investedBalance).
  *
  * A derived contribution or balance is clamped to LEVERAGE_INPUT_BOUNDS, as
  * the old query reader did, so a profile value the comparison does not
@@ -20,8 +22,9 @@ import { LEVERAGE_INPUT_BOUNDS } from '@/lib/constants/leverage';
 import type { DcaComparisonInputs } from '@/lib/calculations/leverageComparison';
 import type { Binding } from '@/lib/fields/binding';
 import { isFiniteNumber } from '@/lib/fields/runtime';
-import { AGE, INVESTED_BALANCE, MONTHLY_INVESTING, RETIREMENT_AGE, TAXABLE_MONTHLY } from '@/lib/fields/shared';
+import { AGE, RETIREMENT_AGE, TAXABLE_MONTHLY } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
+import { investedBalance, monthlyInvesting } from '@/lib/profile/accounts';
 import { clamp } from '@/lib/utils';
 
 export const MONTHLY_CONTRIBUTION_PATH = 'leverage.monthlyContribution';
@@ -45,7 +48,7 @@ export function usesTaxableContribution(get: Get): boolean {
 export function derivedMonthlyContribution(get: Get): number {
   const monthly = usesTaxableContribution(get)
     ? numberAt(get, TAXABLE_MONTHLY.path)
-    : numberAt(get, MONTHLY_INVESTING.path);
+    : monthlyInvesting(get);
   return clamp(monthly, 0, BOUNDS.maxMonthlyContribution);
 }
 
@@ -55,9 +58,9 @@ export function derivedYears(get: Get): number {
   return clamp(span, BOUNDS.minYears, BOUNDS.maxYears);
 }
 
-/** The invested balance (the auto value of leverage.startingBalance). */
+/** The invested total of the account list (the auto value of leverage.startingBalance). */
 export function derivedStartingBalance(get: Get): number {
-  return clamp(numberAt(get, INVESTED_BALANCE.path), 0, BOUNDS.maxStartingBalance);
+  return clamp(investedBalance(get), 0, BOUNDS.maxStartingBalance);
 }
 
 /** The override at `path` when it is set, otherwise the derived value. */

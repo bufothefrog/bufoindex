@@ -146,7 +146,7 @@ export function FieldInput({
     switch (spec.kind) {
       case 'money':
         // MoneyInput is whole dollars; a money field with decimals types
-        // into a NumberInput with a $ prefix (the rebalancer's new cash).
+        // into a NumberInput with a $ prefix.
         if ((spec.precision ?? 0) > 0) {
           return (
             <NumberInput
@@ -345,6 +345,22 @@ export function FieldInput({
         );
       }
       case 'list':
+        // A list with a registered renderer (the compact account list) draws
+        // itself; without one it is the generic editable list.
+        if (spec.renderer && renderers?.[spec.renderer]) {
+          return (
+            <CustomSlot
+              rendererId={spec.renderer}
+              renderers={renderers}
+              spec={spec}
+              get={get}
+              value={value}
+              onWrite={onWrite}
+              error={error}
+              size={size}
+            />
+          );
+        }
         return (
           <FieldListBase
             renderField={FieldInput}

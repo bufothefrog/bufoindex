@@ -2,28 +2,43 @@
  * Portfolio rebalancer bindings (docs/rebuild-plan.md section 2.5): how the
  * profile feeds RebalanceInputsV2. Pure.
  *
- * - Accounts (with their deposits, the new cash), securities, holdings and
- *   custom asset classes come from the profile's portfolio lists.
+ * - Accounts: only the accounts the rebalancer works on (rebalancedAccounts
+ *   in lib/profile/accounts.ts: not the emergency fund, not cash, with
+ *   holdings or new cash), each with its display name, the tax treatment of
+ *   its kind and this run's new cash as the deposit (newCashFor: the
+ *   visitor's own figure, else its normal contributions).
+ * - Holdings: those of the rebalanced accounts; securities: those that
+ *   these holdings refer to, so a security held only by an account left out
+ *   (BOXX in an emergency-fund brokerage) is never sent.
  * - Class targets: a preset target mix gives its TARGET_MIX_WEIGHTS; 'custom'
- *   uses portfolio.classTargets.
+ *   uses portfolio.classTargets. Custom asset classes come from the profile.
  * - The three settings come from assumptions.portfolio.
  *
- * Engine errors land where the page can show them: account rows on the
- * accounts list (1:1, so the row is kept), securities and holdings on the
- * holdings editor, which covers both, and target errors (the 100% sum) on
- * the class-targets editor.
+ * Engine errors land where the page can show them: account errors (a
+ * deposit) on the new cash card, securities and holdings on the holdings
+ * editor, which covers both, and target errors (the 100% sum) on the
+ * class-targets editor.
  */
 
-import { validateRebalanceInputsV2, type ClassTarget, type RebalanceInputsV2 } from '@/lib/calculations/portfolioRebalancing';
+import {
+  validateRebalanceInputsV2,
+  type Account,
+  type ClassTarget,
+  type Holding,
+  type RebalanceInputsV2,
+  type Security,
+} from '@/lib/calculations/portfolioRebalancing';
 import type { Binding } from '@/lib/fields/binding';
 import type { Get } from '@/lib/fields/types';
+import { ACCOUNT_KINDS, accountDisplayName, newCashFor, rebalancedAccounts } from '@/lib/profile/accounts';
 import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/lib/profile/defaults';
-import { PORTFOLIO_LIST_PATHS } from './reducers';
+import { PORTFOLIO_LIST_PATHS, readPortfolio } from './reducers';
 
 export const TARGET_MIX_PATH = 'investing.targetMix';
 export const ACCOUNTS_PATH = PORTFOLIO_LIST_PATHS.accounts;
 export const SECURITIES_PATH = PORTFOLIO_LIST_PATHS.securities;
 export const HOLDINGS_PATH = PORTFOLIO_LIST_PATHS.holdings;
+export const NEW_CASH_PATH = PORTFOLIO_LIST_PATHS.newCash;
 export const CLASS_TARGETS_PATH = PORTFOLIO_LIST_PATHS.classTargets;
 export const CUSTOM_ASSET_CLASSES_PATH = PORTFOLIO_LIST_PATHS.customAssetClasses;
 export const MODE_PATH = 'assumptions.portfolio.mode';
@@ -67,10 +82,33 @@ export function classTargetsError(get: Get): string | undefined {
   return errors.find(({ field }) => field === 'classTargets' || field.startsWith('classTargets.'))?.message;
 }
 
+/** The engine accounts: the rebalanced accounts with their tax treatment and this run's new cash. */
+export function engineAccounts(get: Get): Account[] {
+  return rebalancedAccounts(get).map((account) => ({
+    id: account.id,
+    name: accountDisplayName(account),
+    // A rebalanced account is never kind 'cash', the one kind without a treatment.
+    accountType: ACCOUNT_KINDS[account.kind].taxTreatment ?? 'taxable',
+    deposit: newCashFor(get, account.id),
+  }));
+}
+
+/** The holdings of the rebalanced accounts. */
+export function engineHoldings(get: Get): Holding[] {
+  const ids = new Set(rebalancedAccounts(get).map((account) => account.id));
+  return readPortfolio(get).holdings.filter((holding) => ids.has(holding.accountId));
+}
+
+/** The securities the rebalanced accounts' holdings refer to, in registry order. */
+export function engineSecurities(get: Get): Security[] {
+  const referenced = new Set(engineHoldings(get).map((holding) => holding.securityId));
+  return readPortfolio(get).securities.filter((security) => referenced.has(security.id));
+}
+
 export const PORTFOLIO_BINDINGS: readonly Binding<RebalanceInputsV2>[] = [
-  { engine: 'securities', read: (get) => get(SECURITIES_PATH), errorPath: HOLDINGS_PATH },
-  { profile: ACCOUNTS_PATH, engine: 'accounts' },
-  { engine: 'holdings', read: (get) => get(HOLDINGS_PATH), errorPath: HOLDINGS_PATH },
+  { engine: 'securities', read: engineSecurities, errorPath: HOLDINGS_PATH },
+  { engine: 'accounts', read: engineAccounts, errorPath: NEW_CASH_PATH },
+  { engine: 'holdings', read: engineHoldings, errorPath: HOLDINGS_PATH },
   { engine: 'classTargets', read: classTargetsFor, errorPath: CLASS_TARGETS_PATH },
   { profile: CUSTOM_ASSET_CLASSES_PATH, engine: 'customAssetClasses' },
   { profile: ALLOW_TAXABLE_SELLING_PATH, engine: 'allowTaxableSelling' },

@@ -1,6 +1,6 @@
 /**
  * Shared financial profile store (Zustand + persist, localStorage key
- * 'bufo-profile', version 2). Only `profile` is persisted; `hasProfile` is
+ * 'bufo-profile', version 3). Only `profile` is persisted; `hasProfile` is
  * derived from it and `hasHydrated` is runtime-only.
  *
  * Hydration and SSR: on the server there is no localStorage, so nothing
@@ -11,11 +11,11 @@
  * profile-dependent UI on `hasHydrated`.
  *
  * Persisted data saved under another version goes through migrateProfile
- * (today a normalize only: an older payload keeps every leaf that still
- * exists), and every payload is normalized, so a hand-edited value can never
- * break the engine bindings. A payload saved under a later version is read
- * (normalized to v2) but never overwritten in that session, so a rollback
- * cannot delete the fields the later version added.
+ * (a version 2 payload is reshaped into the v3 account list first, then
+ * normalized), and every payload is normalized, so a hand-edited value can
+ * never break the engine bindings. A payload saved under a later version is
+ * read (normalized to v3) but never overwritten in that session, so a
+ * rollback cannot delete the fields the later version added.
  */
 
 import { create } from 'zustand';
@@ -83,7 +83,7 @@ function commit(
 
 // True while the stored payload was saved by a later version (e.g. after a
 // rollback). That payload is kept as it is: the session works on its
-// normalized v2 copy, but nothing is written back, so the fields the later
+// normalized v3 copy, but nothing is written back, so the fields the later
 // version added survive. Reset at the start of every hydration.
 let storedPayloadIsNewer = false;
 

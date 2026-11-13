@@ -30,10 +30,11 @@ import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { type Binding, isDerivedBinding, toEngineInputs } from '@/lib/fields/binding';
 import { applyWrites, makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
-import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
+import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
 import { withDerivedValues } from '@/lib/profile/derived';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { PaycheckProfile } from '@/lib/types';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
 /**
@@ -130,7 +131,7 @@ const CUSTOM_V1: ProfilePatch = {
   person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
   income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
   spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
-  investing: { investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900 },
+  investing: { monthlyContribution: 2200, taxableMonthlyContribution: 900 },
 };
 
 /** A non-integer figure of the captured output, compared to 9 decimals. */
@@ -298,7 +299,14 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       { path: 'hsa.investing', value: true },
       { path: 'ira.roth', value: true },
       { path: 'ira.rothMonthly', value: 500 },
-      { path: 'ira.rothBalance', value: 20000 },
+      // The Roth IRA balance lives on its account row in profile v3.
+      {
+        path: 'portfolio.accounts',
+        value: [
+          ...defaultProfileAt3bb0132().portfolio.accounts,
+          { id: 'acc-roth-ira', kind: 'roth-ira', name: '', balance: 20000, holdsEmergencyFund: false },
+        ],
+      },
       { path: 'debts', value: debts },
       { path: 'assumptions.paycheck.riskTolerance', value: 'optimizer' },
       { path: 'assumptions.paycheck.optimizationGoal', value: 'wealth_maximization' },
@@ -649,5 +657,21 @@ describe('the definition and its relations', () => {
       'spending.funMoneyMax': 'The minimum is above the maximum. Adjust one of them.',
     });
     expect(prepareRun(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()).errors).toEqual({});
+  });
+});
+
+describe('profile v3: the account list feeds the emergency fund and the IRA balances', () => {
+  it('reads the default: the derived 9,000 fund and no IRA rows', () => {
+    const inputs = engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile());
+    expect(inputs.preferences.currentEmergencyFund).toBe(9000);
+    expect(inputs.benefits.ira.currentBalances).toEqual({ traditional: 0, roth: 0 });
+  });
+
+  it('reads the owner fixture: the ticked Robinhood account is the fund, the Roth IRA holdings the Roth balance', () => {
+    const inputs = engineInputsFor(PAYCHECK_CALCULATOR, normalizeProfile(ownerRaw()));
+    // BOXX 90 x 115 = 10,350 (the typed 10,000 gives way to the account).
+    expect(inputs.preferences.currentEmergencyFund).toBe(10350);
+    // VTI 20 x 375 + VXUS 30 x 85 = 10,050.
+    expect(inputs.benefits.ira.currentBalances).toEqual({ traditional: 0, roth: 10050 });
   });
 });

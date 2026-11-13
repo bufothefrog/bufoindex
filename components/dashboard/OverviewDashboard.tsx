@@ -16,6 +16,7 @@ import type { FinancialProfile } from '@/lib/profile/types';
 import { usePreferencesStore } from '@/lib/store/preferencesStore';
 import { useProfileStore } from '@/lib/store/profileStore';
 import type { AllocationResult } from '@/lib/types';
+import { AccountsCard } from './AccountsCard';
 import { AutomationChecklistCard } from './AutomationChecklistCard';
 import { CardLinkButton } from './CardLinkButton';
 import { CashBufferCard } from './CashBufferCard';
@@ -109,6 +110,7 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
         <PaycheckCard inputs={paycheckInputs} allocation={allocation} />
         <RetirementOddsCard profile={profile} />
         <CashBufferCard profile={profile} />
+        <AccountsCard profile={profile} />
         <LeverageCard profile={profile} />
         <AutomationChecklistCard profile={profile} allocation={allocation} />
         <ProfileCompletenessCard profile={profile} />
@@ -117,7 +119,7 @@ function ProfileOverview({ profile }: ProfileOverviewProps) {
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           Also seeded from this profile: the portfolio rebalancer, with the{' '}
-          {TARGET_MIX_LABELS[profile.investing.targetMix].toLowerCase()} target mix and this month&apos;s new cash.
+          {TARGET_MIX_LABELS[profile.investing.targetMix].toLowerCase()} target mix and your accounts.
         </p>
         <CardLinkButton href={calculatorHref('portfolio', { fromProfile: true }) as Route}>Open the rebalancer</CardLinkButton>
       </div>

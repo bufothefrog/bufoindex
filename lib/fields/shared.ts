@@ -15,12 +15,20 @@
  */
 
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
-import { FILING_STATUS_META, FILING_STATUS_OPTIONS } from '@/lib/constants/labels';
+import { ACCOUNT_KIND_OPTIONS, FILING_STATUS_META, FILING_STATUS_OPTIONS } from '@/lib/constants/labels';
 import { formatCurrency } from '@/lib/format';
+import {
+  ACCOUNT_PATHS,
+  accountDisplayName,
+  accountValue,
+  accountsSummary,
+  emergencyFundAccounts,
+  monthlyInvestingAuto,
+} from '@/lib/profile/accounts';
 import { PAY_FREQUENCIES } from '@/lib/profile/defaults';
 import type { FilingStatus, PayFrequency } from '@/lib/profile/types';
 import { isFiniteNumber } from './runtime';
-import type { CrossFieldRule, FieldOption, FieldSpec, Get, ScreenSpec, Write } from './types';
+import type { CrossFieldRule, FieldOption, FieldSpec, Get, ScreenNote, ScreenSpec, Write } from './types';
 
 /** A shared spec with a form's own wording or tier; the path and kind stay. */
 export function withOverrides(spec: FieldSpec, overrides: Partial<Omit<FieldSpec, 'path' | 'kind'>>): FieldSpec {
@@ -187,21 +195,21 @@ export const RETIREMENT_AGE: FieldSpec = {
   tier: 'details',
 };
 
-export const INVESTED_BALANCE: FieldSpec = {
-  path: 'investing.investedBalance',
-  kind: 'money',
-  label: 'Invested balance',
-  help: 'Total across 401(k), IRA and brokerage, not your emergency fund.',
-  min: 0,
-  tier: 'details',
-};
-
+/**
+ * The monthly investing total: Auto (null) is the sum of the normal
+ * contributions the other answers give (monthlyInvestingAuto: 401(k) with
+ * the match, HSA with the employer's part, IRAs and taxable); Custom is the
+ * visitor's own figure for one run. Asked only on the retirement page.
+ */
 export const MONTHLY_INVESTING: FieldSpec = {
   path: 'investing.monthlyContribution',
   kind: 'money',
-  label: 'Monthly investing contribution',
-  help: 'All accounts together, including your own 401(k) contributions.',
+  label: 'Monthly investing',
   min: 0,
+  nullable: {
+    autoLabel: (get) => `From your answers: ${formatCurrency(monthlyInvestingAuto(get))} a month`,
+    overrideDefault: (get) => monthlyInvestingAuto(get),
+  },
   tier: 'details',
 };
 
@@ -214,12 +222,37 @@ export const TAXABLE_MONTHLY: FieldSpec = {
   tier: 'details',
 };
 
+/** True while no account holds the emergency fund, so the typed balance is the one in use. */
+export function usesTypedEmergencyFund(get: Get): boolean {
+  return emergencyFundAccounts(get).length === 0;
+}
+
+/**
+ * The typed emergency fund. Hidden while an account holds the fund (a cash
+ * account, or a brokerage with the tick): their value is the fund then, and
+ * the stored answer is kept for when none does.
+ */
 export const EMERGENCY_FUND_BALANCE: FieldSpec = {
   path: 'cash.emergencyFundBalance',
   kind: 'money',
   label: 'Cash set aside for emergencies',
   min: 0,
   tier: 'details',
+  visibleWhen: usesTypedEmergencyFund,
+};
+
+/** "Held in your accounts: Robinhood $10,350." while accounts hold the emergency fund; undefined otherwise. */
+export function emergencyFundHeldText(get: Get): string | undefined {
+  const accounts = emergencyFundAccounts(get);
+  if (accounts.length === 0) return undefined;
+  const items = accounts.map((a) => `${accountDisplayName(a)} ${formatCurrency(accountValue(get, a))}`);
+  return `Held in your accounts: ${items.join(', ')}.`;
+}
+
+/** The note an emergency fund screen shows in place of the balance input while accounts hold the fund. */
+export const EMERGENCY_FUND_HELD_NOTE: ScreenNote = {
+  text: emergencyFundHeldText,
+  visibleWhen: (get) => !usesTypedEmergencyFund(get),
 };
 
 export const EMERGENCY_FUND_APY: FieldSpec = {
@@ -249,6 +282,61 @@ export const EMERGENCY_FUND_MONTHS: FieldSpec = {
   unit: { suffix: ' months' },
   tier: 'details',
   summary: (value) => `${value as number}-month emergency fund`,
+};
+
+// ---------------------------------------------------------------------------
+// Accounts
+// ---------------------------------------------------------------------------
+
+/** Renderer id of the compact account list (components/calculators/renderers/accounts.tsx). */
+export const ACCOUNTS_RENDERER = 'accounts';
+
+const isBrokerageRow = (row: Get): boolean => row('kind') === 'brokerage';
+
+/**
+ * The single list of what the visitor owns (lib/profile/accounts.ts): kind,
+ * name and one balance per account, with optional holdings. The accounts
+ * renderer edits the holdings and securities with it, so it covers them;
+ * this run's new cash is the rebalancer's own (calculator-only) question.
+ */
+export const ACCOUNTS: FieldSpec = {
+  path: ACCOUNT_PATHS.accounts,
+  kind: 'list',
+  label: 'Accounts',
+  renderer: ACCOUNTS_RENDERER,
+  covers: [ACCOUNT_PATHS.holdings, ACCOUNT_PATHS.securities],
+  row: [
+    { path: 'kind', kind: 'select', label: 'Kind', options: ACCOUNT_KIND_OPTIONS, tier: 'details' },
+    {
+      path: 'name',
+      kind: 'text',
+      label: 'Account name',
+      maxLength: 40,
+      tier: 'details',
+      testId: 'account-name-{i}',
+    },
+    { path: 'balance', kind: 'money', label: 'Balance', min: 0, hint: "Today's balance.", tier: 'details' },
+    {
+      path: 'holdsEmergencyFund',
+      kind: 'boolean',
+      label: 'Holds my emergency fund',
+      visibleWhen: isBrokerageRow,
+      tier: 'details',
+    },
+  ],
+  addLabel: 'Add account',
+  minRows: 0,
+  tier: 'details',
+  summary: (_value, get) => accountsSummary(get),
+};
+
+/** The one screen that asks the account list; the retirement, portfolio and leverage forms share it. */
+export const ACCOUNTS_SCREEN: ScreenSpec = {
+  id: 'accounts',
+  title: 'What do you have saved and invested?',
+  tier: 'details',
+  surface: 'both',
+  fields: [ACCOUNTS.path],
 };
 
 // ---------------------------------------------------------------------------
@@ -307,6 +395,7 @@ export const PROFILE_EXTRA_SCREENS: readonly ScreenSpec[] = [
     title: 'What does your emergency fund look like today?',
     tier: 'details',
     fields: [EMERGENCY_FUND_BALANCE.path, EMERGENCY_FUND_APY.path, EMERGENCY_FUND_MONTHS.path],
+    notes: [EMERGENCY_FUND_HELD_NOTE],
   },
 ];
 

@@ -21,7 +21,12 @@ export function CashBufferCard({ profile }: CashBufferCardProps) {
       label: 'Emergency fund',
       value: cash.balance,
       format: 'currency',
-      hint: `Earning ${formatPercent(profile.cash.emergencyFundApy)} APY`,
+      // Accounts that hold the fund (a cash account, or a brokerage with the
+      // tick) are named; the typed fund shows its APY.
+      hint:
+        cash.heldIn.length > 0
+          ? `Held in ${cash.heldIn.join(', ')}`
+          : `Earning ${formatPercent(profile.cash.emergencyFundApy)} APY`,
     },
     {
       id: 'months',

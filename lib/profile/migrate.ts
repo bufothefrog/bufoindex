@@ -1,10 +1,15 @@
 /**
- * Migration of persisted profiles to the current version (2).
+ * Migration of persisted profiles to the current version (3).
  *
- * There is no migration step today: every stored payload, of any version,
- * is normalized against the v2 defaults. Leaves that still exist keep their
- * values, missing leaves and lists get their defaults, and anything that is
- * not a v2 profile path is dropped. `provided` paths carry over.
+ * - Version 3 made portfolio.accounts the single list of what the visitor
+ *   owns. A payload saved under version 2 or earlier first goes through
+ *   migrateV2Payload (./migrateV2.ts), which turns the typed invested and
+ *   IRA balances and the account deposits into account rows and new cash
+ *   rows, losing no money the visitor entered and counting none twice.
+ * - Every payload is then normalized against the v3 defaults: leaves that
+ *   still exist keep their values, missing leaves and lists get their
+ *   defaults, and anything that is not a v3 profile path is dropped.
+ *   `provided` paths carry over.
  *
  * This is the seam the persist `migrate` hook calls (lib/store/profileStore.ts).
  * A later schema change that renames or moves a leaf bumps PROFILE_VERSION
@@ -13,9 +18,10 @@
  */
 
 import { normalizeProfile } from './defaults';
+import { migrateV2Payload } from './migrateV2';
 import type { FinancialProfile } from './types';
 
-export const PROFILE_VERSION: FinancialProfile['version'] = 2;
+export const PROFILE_VERSION: FinancialProfile['version'] = 3;
 
 /**
  * Brings a persisted profile saved under `fromVersion` to the current
@@ -24,6 +30,6 @@ export const PROFILE_VERSION: FinancialProfile['version'] = 2;
  * current (normalized only).
  */
 export function migrateProfile(persisted: unknown, fromVersion: number): FinancialProfile {
-  void fromVersion;
+  if (fromVersion < 3) return normalizeProfile(migrateV2Payload(persisted));
   return normalizeProfile(persisted);
 }
