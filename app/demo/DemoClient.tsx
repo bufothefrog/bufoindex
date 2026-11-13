@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, Compass, LayoutTemplate, Moon, Palette, Rows3, Sliders, Sun, Table2, Type } from 'lucide-react';
+import { BarChart3, Compass, Landmark, LayoutTemplate, Moon, Palette, Rows3, Sliders, Sun, Table2, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
+import AccountsSection from './sections/AccountsSection';
 import ChartsSection from './sections/ChartsSection';
 import ColorsSection from './sections/ColorsSection';
 import ControlsSection from './sections/ControlsSection';
@@ -16,10 +17,20 @@ import LayoutsSection from './sections/LayoutsSection';
 import ResultsSection from './sections/ResultsSection';
 import TypographySection from './sections/TypographySection';
 
-type SectionKey = 'fields' | 'controls' | 'results' | 'charts' | 'guided' | 'layouts' | 'colors' | 'typography';
+type SectionKey =
+  | 'fields'
+  | 'accounts'
+  | 'controls'
+  | 'results'
+  | 'charts'
+  | 'guided'
+  | 'layouts'
+  | 'colors'
+  | 'typography';
 
 const SECTIONS: readonly { key: SectionKey; label: string; icon: LucideIcon }[] = [
   { key: 'fields', label: 'Fields', icon: Rows3 },
+  { key: 'accounts', label: 'Accounts', icon: Landmark },
   { key: 'controls', label: 'Controls', icon: Sliders },
   { key: 'results', label: 'Results', icon: Table2 },
   { key: 'charts', label: 'Charts', icon: BarChart3 },
@@ -34,6 +45,8 @@ function Section({ section, idPrefix }: { section: SectionKey; idPrefix: string 
   switch (section) {
     case 'fields':
       return <FieldsSection idPrefix={idPrefix} />;
+    case 'accounts':
+      return <AccountsSection />;
     case 'controls':
       return <ControlsSection idPrefix={idPrefix} />;
     case 'results':
