@@ -638,7 +638,7 @@ export function normalizeProfile(
   }
   const profile = out as unknown as FinancialProfile;
   out.provided = Array.isArray(source.provided) ? normalizeProvided(source.provided, profile) : [...base.provided];
-  return Array.isArray(source.provided) ? loadUnansweredAsDefault(profile) : profile;
+  return Array.isArray(source.provided) ? loadAnsweredAsWhole(loadUnansweredAsDefault(profile)) : profile;
 }
 
 /**
@@ -667,6 +667,29 @@ function loadUnansweredAsDefault(profile: FinancialProfile): FinancialProfile {
     (next, [path, value]) => (answered.has(path) || getAt(next, path) === value ? next : setAt(next, path, value)),
     profile
   );
+}
+
+/**
+ * Leaves the form asks in whole units within a range, whose answered stored
+ * value may predate that rule: before PR 3, cash.targetMonths took any
+ * number, so a stored answer of 2.5 months would block the allocator (whole
+ * months only) while the overview computed with 2.5. An answered value loads
+ * as the nearest whole number, half up (2.5 is 3), within the range, and
+ * stays answered; every page then reads the same value. Like
+ * UNANSWERED_LOADS_AS, the rule applies to stored payloads only.
+ */
+const ANSWERED_LOADS_AS_WHOLE: Readonly<Record<string, { min: number; max: number }>> = {
+  'cash.targetMonths': { min: 0, max: 60 },
+};
+
+function loadAnsweredAsWhole(profile: FinancialProfile): FinancialProfile {
+  const answered = new Set(profile.provided);
+  return Object.entries(ANSWERED_LOADS_AS_WHOLE).reduce((next, [path, { min, max }]) => {
+    const value = getAt(next, path);
+    if (!answered.has(path) || typeof value !== 'number') return next;
+    const whole = Math.min(max, Math.max(min, Math.floor(value + 0.5)));
+    return whole === value ? next : setAt(next, path, whole);
+  }, profile);
 }
 
 // ---------------------------------------------------------------------------

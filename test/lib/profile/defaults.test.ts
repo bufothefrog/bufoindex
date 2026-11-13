@@ -625,6 +625,42 @@ describe('normalizeProfile', () => {
   });
 });
 
+describe('a stored answered emergency fund target loads as whole months', () => {
+  const MONTHS = 'cash.targetMonths';
+  const stored = (months: number, provided: string[]) => ({
+    cash: { emergencyFundBalance: 9000, emergencyFundApy: 0.04, targetMonths: months },
+    provided,
+  });
+
+  it.each<[number, number]>([
+    [2.5, 3],
+    [2.4, 2],
+    [0.5, 1],
+    [61.2, 60],
+    [-1, 0],
+  ])('an answered %s loads as %s and stays answered', (months, whole) => {
+    const p = normalizeProfile(stored(months, [MONTHS]));
+    expect(p.cash.targetMonths).toBe(whole);
+    expect(p.provided).toEqual([MONTHS]);
+  });
+
+  it('leaves an answered whole value untouched', () => {
+    for (const months of [0, 1, 6, 60]) {
+      expect(normalizeProfile(stored(months, [MONTHS])).cash.targetMonths).toBe(months);
+    }
+  });
+
+  it('still loads an unanswered value as the typical 3', () => {
+    expect(normalizeProfile(stored(2.5, [])).cash.targetMonths).toBe(3);
+    expect(normalizeProfile(stored(1, ['person.age'])).cash.targetMonths).toBe(3);
+  });
+
+  it('leaves a partial patch normalized over a base alone', () => {
+    const base = { ...getDefaultFinancialProfile(), provided: [MONTHS] };
+    expect(normalizeProfile({ cash: { targetMonths: 2.5 } }, base).cash.targetMonths).toBe(2.5);
+  });
+});
+
 describe('applyProfileWrites', () => {
   const base = getDefaultFinancialProfile();
 
