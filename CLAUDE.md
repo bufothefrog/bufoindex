@@ -71,7 +71,7 @@ test/
 - **Dev server:** `npm run dev`; **Build:** `npm run build`; **Type check:** `npm run type-check`; **Lint:** `npm run lint`
 - **Tests:** `npm run test` (watch) / `npm run test:run` (one-shot) / `npm run test:coverage` (instruments all of `lib/` and enforces the thresholds in `vitest.config.ts`)
 - **Pre-commit (husky + lint-staged):** `eslint --fix` + `tsc --noEmit` on staged TS/TSX.
-- **CI (`.github/workflows/test.yml`):** type-check, lint with `--max-warnings=0` (any warning fails the build), and the test suite on a Node 22 + 24 matrix (coverage + Codecov upload on Node 22 only), then separate Node 22 production-build and audit jobs. The audit job blocks on `npm audit --audit-level=high --omit=dev` (production dependencies only) and also runs the full `npm audit --audit-level=high` as a non-blocking report.
+- **CI (`.github/workflows/test.yml`):** type-check, lint with `--max-warnings=0` (any warning fails the build), and the test suite with coverage and the Codecov upload, all on Node 26 only (the version Vercel builds with; `engines.node` is `26.x`, `.nvmrc` says `26`), then separate Node 26 production-build and audit jobs. The audit job blocks on `npm audit --audit-level=high --omit=dev` (production dependencies only) and also runs the full `npm audit --audit-level=high` as a non-blocking report.
 
 There is no editorial-language grep gate, no orchestration shell script wrapping these commands, and no benchmark workflow in CI. Don't add one without discussion.
 
