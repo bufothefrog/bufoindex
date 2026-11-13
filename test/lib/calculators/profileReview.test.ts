@@ -186,3 +186,28 @@ describe('review links', () => {
     expect(isProfileScreenId('nope')).toBe(false);
   });
 });
+
+describe('the Social Security benefit on the review page', () => {
+  const SS = 'retirementIncome.socialSecurityBenefit';
+  const HEALTH = 'retirementIncome.annualHealthcareCost';
+
+  it('reads Auto as an estimate, never as the visitor\'s number', () => {
+    // Next on the optional screen with both fields on Auto answers them as null.
+    const get = makeGet(getDefaultFinancialProfile());
+    const result = reviewTopic(PROFILE_FORM, screenOf('ss-healthcare'), get, [SS, HEALTH]);
+    // 4,000 every two weeks = 104,000 a year: a $40,359 estimate.
+    expect(result).toEqual({ status: 'answered', summary: 'Social Security estimate $40,359/yr, typical healthcare cost' });
+  });
+
+  it('reads a Custom benefit as the visitor\'s number', () => {
+    const profile = getDefaultFinancialProfile();
+    const custom = { ...profile, retirementIncome: { ...profile.retirementIncome, socialSecurityBenefit: 26000 } };
+    const result = reviewTopic(PROFILE_FORM, screenOf('ss-healthcare'), makeGet(custom), [SS, HEALTH]);
+    expect(result.summary).toBe('Social Security $26,000/yr, typical healthcare cost');
+  });
+
+  it('shows "Not answered" while the optional screen is unanswered, although Auto has a value', () => {
+    const get = makeGet(getDefaultFinancialProfile());
+    expect(reviewTopic(PROFILE_FORM, screenOf('ss-healthcare'), get, []).summary).toBe(NOT_ANSWERED);
+  });
+});

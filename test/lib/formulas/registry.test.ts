@@ -27,6 +27,7 @@ import {
   runMonteCarloSimulation,
   type RetirementInputs,
 } from '@/lib/calculations/retirement'
+import { estimateSocialSecurityBenefit } from '@/lib/calculations/socialSecurityEstimate'
 import { boxMullerRandom, createSeededRng } from '@/lib/utils/random'
 import { RetirementConstants } from '@/lib/constants/retirement'
 
@@ -98,6 +99,7 @@ const ENGINE_BY_FUNCTION_NAME: Record<
   runMonteCarloSimulation: (i) =>
     runMonteCarloSimulation(monteCarloPlanFromExample(i), i.N),
   calculateTDFReturnForAge: (i) => calculateTDFReturnForAge(i.age),
+  estimateSocialSecurityBenefit: (i) => estimateSocialSecurityBenefit(i.P),
 }
 
 /**
@@ -125,6 +127,7 @@ describe('formula registry <-> calculation engine consistency', () => {
       'retirement-required-retirement-balance',
       'retirement-simulated-annual-return-draw',
       'retirement-social-security-benefit-at-claiming-age',
+      'retirement-social-security-benefit-estimate',
       'retirement-target-date-glide-path-return',
     ])
     // The calculator index and the global map agree.

@@ -224,9 +224,13 @@ describe('retirement form: screens', () => {
     ).toBe('8% / 6% returns, 15% volatility, 3% inflation, 15% tax rate, 1x healthcare');
     expect(summarizeScreen(RETIREMENT_FORM, screen('savings'), fromDefaults())).toBe('saving $1,500/mo, $25,000 invested');
     expect(summarizeScreen(RETIREMENT_FORM, screen('target'), fromDefaults())).toBe('retire at 65, $41,000/yr target, plan to age 90');
+    // Auto reads as an estimate (104,000 a year of pay: $40,359), never as the visitor's number.
     expect(summarizeScreen(RETIREMENT_FORM, screen('ss-healthcare'), fromDefaults())).toBe(
-      'Social Security $30,000/yr, typical healthcare cost'
+      'Social Security estimate $40,359/yr, typical healthcare cost'
     );
+    expect(
+      summarizeScreen(RETIREMENT_FORM, screen('ss-healthcare'), fromDefaults({ 'retirementIncome.socialSecurityBenefit': 30000 }))
+    ).toBe('Social Security $30,000/yr, typical healthcare cost');
     expect(summarizeScreen(RETIREMENT_FORM, screen('claiming'), fromDefaults())).toBe('claim at 67 (full)');
     // A stored age between the choices reads as the nearest choice.
     expect(

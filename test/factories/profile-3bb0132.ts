@@ -28,6 +28,7 @@ export function defaultProfileAt3bb0132(): FinancialProfile {
     income: { ...p.income, grossPerPaycheck: 3500, netPerPaycheck: 2600 },
     spending: { ...p.spending, targetRetirementIncome: 80000 },
     cash: { ...p.cash, emergencyFundBalance: 5000 },
+    retirementIncome: { ...p.retirementIncome, socialSecurityBenefit: 30000 },
     workplace: { ...p.workplace, matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
     portfolio: {
       ...p.portfolio,

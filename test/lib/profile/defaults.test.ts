@@ -130,7 +130,7 @@ describe('getDefaultFinancialProfile', () => {
         taxableMonthlyContribution: 500,
         targetMix: '80-20',
       },
-      retirementIncome: { socialSecurityBenefit: 30000, socialSecurityAge: 67, annualHealthcareCost: null },
+      retirementIncome: { socialSecurityBenefit: null, socialSecurityAge: 67, annualHealthcareCost: null },
       debts: [],
       portfolio: {
         accounts: [
@@ -588,6 +588,39 @@ describe('normalizeProfile', () => {
 
     it('has a row default for every list', () => {
       expect(Object.keys(PROFILE_LIST_ROW_DEFAULTS).sort()).toEqual([...PROFILE_LIST_PATHS].sort());
+    });
+  });
+
+  describe('the Social Security benefit (Auto since PR 3)', () => {
+    const SS = 'retirementIncome.socialSecurityBenefit';
+    const stored = (benefit: unknown, provided: string[]) => ({
+      retirementIncome: { socialSecurityBenefit: benefit, socialSecurityAge: 67, annualHealthcareCost: null },
+      provided,
+    });
+
+    it('is null (Auto) by default and accepts null or a number', () => {
+      expect(getDefaultFinancialProfile().retirementIncome.socialSecurityBenefit).toBeNull();
+      expect(isValidProfileValue(SS, null)).toBe(true);
+      expect(isValidProfileValue(SS, 24000)).toBe(true);
+      expect(isValidProfileValue(SS, 'x')).toBe(false);
+    });
+
+    it('loads a stored number that was never answered (the old 30,000 default) as Auto', () => {
+      expect(normalizeProfile(stored(30000, [])).retirementIncome.socialSecurityBenefit).toBeNull();
+      expect(normalizeProfile(stored(30000, ['person.age'])).retirementIncome.socialSecurityBenefit).toBeNull();
+    });
+
+    it('keeps an answered stored number, and an answered Auto', () => {
+      expect(normalizeProfile(stored(30000, [SS])).retirementIncome.socialSecurityBenefit).toBe(30000);
+      expect(normalizeProfile(stored(0, [SS])).retirementIncome.socialSecurityBenefit).toBe(0);
+      const auto = normalizeProfile(stored(null, [SS]));
+      expect(auto.retirementIncome.socialSecurityBenefit).toBeNull();
+      expect(auto.provided).toEqual([SS]);
+    });
+
+    it('leaves a partial patch normalized over a base (no provided list of its own) alone', () => {
+      const base = { ...getDefaultFinancialProfile(), retirementIncome: { socialSecurityBenefit: 30000, socialSecurityAge: 67, annualHealthcareCost: null } };
+      expect(normalizeProfile({ person: { age: 40 } }, base).retirementIncome.socialSecurityBenefit).toBe(30000);
     });
   });
 });

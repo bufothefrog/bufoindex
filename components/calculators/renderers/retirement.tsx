@@ -18,7 +18,8 @@ import {
   nearestClaimingAge,
   type ClaimingAgeBenefit,
 } from '@/lib/calculators/retirement/claiming';
-import { CLAIMING_AGE_RENDERER, SOCIAL_SECURITY_BENEFIT } from '@/lib/calculators/retirement/fields';
+import { CLAIMING_AGE_RENDERER } from '@/lib/calculators/retirement/fields';
+import { isSocialSecurityAuto, resolveSocialSecurityBenefit } from '@/lib/calculators/retirement/socialSecurity';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { retirementRunner } from '@/lib/store/retirementStore';
 
@@ -32,13 +33,17 @@ const BENEFIT_COLUMNS: readonly DataTableColumn<ClaimingAgeBenefit>[] = [
 /**
  * The claiming-age control: the stored age shows as the nearest of the three
  * choices (nothing is written until the visitor picks one), and the table
- * shows the yearly benefit at each age from the entered benefit, through
- * the engine's claiming-age adjustment.
+ * shows the yearly benefit at each age from the benefit in use (the entered
+ * one, or the estimate from pay on Auto), through the engine's claiming-age
+ * adjustment.
  */
 function ClaimingAgeControl({ spec, get, onWrite, error }: CustomRendererProps) {
   const id = useId();
   const shown = String(nearestClaimingAge(get(spec.path)));
-  const rows = claimingAgeBenefits(get(SOCIAL_SECURITY_BENEFIT.path));
+  const rows = claimingAgeBenefits(resolveSocialSecurityBenefit(get));
+  const caption = isSocialSecurityAuto(get)
+    ? 'Estimated yearly Social Security benefit at each claiming age'
+    : 'Yearly Social Security benefit at each claiming age';
   return (
     <div className="space-y-3" data-testid="claiming-age">
       <SegmentedControl
@@ -51,7 +56,7 @@ function ClaimingAgeControl({ spec, get, onWrite, error }: CustomRendererProps) 
       />
       <FieldMessages id={id} error={error} />
       <DataTable
-        caption="Yearly Social Security benefit at each claiming age"
+        caption={caption}
         columns={BENEFIT_COLUMNS}
         rows={rows}
         rowKey={(row) => String(row.age)}

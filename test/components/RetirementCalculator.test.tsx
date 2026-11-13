@@ -134,6 +134,38 @@ describe('RetirementCalculator', () => {
     expect(within(tax).getByRole('textbox', { name: 'Effective tax rate' })).toBeInTheDocument();
   });
 
+  it('runs the Social Security estimate on auto, labeled as an estimate, and starts an override from it', async () => {
+    renderWithProfile(<RetirementCalculator />);
+    await findResults();
+
+    const benefit = screen.getByRole('group', { name: 'Social Security benefit' });
+    // 4,000 every two weeks = 104,000 a year: a $40,359 estimate at full retirement age.
+    expect(benefit).toHaveTextContent('Estimate from your pay: $40,359');
+    expect(within(benefit).queryByRole('textbox', { name: 'Social Security benefit' })).not.toBeInTheDocument();
+    expect(useProfileStore.getState().profile.retirementIncome.socialSecurityBenefit).toBeNull();
+    expect(useRetirementStore.getState().inputs?.socialSecurityBenefit).toBe(40359);
+
+    await userEvent.setup().click(within(benefit).getByRole('radio', { name: 'Custom' }));
+    expect(useProfileStore.getState().profile.retirementIncome.socialSecurityBenefit).toBe(40359);
+    expect(within(benefit).getByRole('textbox', { name: 'Social Security benefit' })).toBeInTheDocument();
+    expect(benefit).not.toHaveTextContent('Estimate from your pay');
+
+    await userEvent.setup().click(within(benefit).getByRole('radio', { name: 'Auto' }));
+    expect(useProfileStore.getState().profile.retirementIncome.socialSecurityBenefit).toBeNull();
+  });
+
+  it('keeps an entered Social Security benefit and follows a pay change on auto', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { retirementIncome: { socialSecurityBenefit: 18000 } } });
+    await findResults();
+    expect(within(screen.getByRole('group', { name: 'Social Security benefit' })).getByRole('radio', { name: 'Custom' })).toHaveAttribute('aria-checked', 'true');
+    expect(useRetirementStore.getState().inputs?.socialSecurityBenefit).toBe(18000);
+
+    act(() => useProfileStore.getState().setValues([{ path: 'retirementIncome.socialSecurityBenefit', value: null }, { path: 'income.grossPerPaycheck', value: 2000 }]));
+    // 2,000 x 26 = 52,000 a year; AIME 4,333.33: 1,157.40 + 0.32 x 3,047.33 = 2,132.55 a month, 25,590.60 a year.
+    await waitFor(() => expect(useRetirementStore.getState().inputs?.socialSecurityBenefit).toBe(25591));
+    expect(screen.getByRole('group', { name: 'Social Security benefit' })).toHaveTextContent('Estimate from your pay: $25,591');
+  });
+
   it('notes a filing status the model runs as single, and drops the note once it is one it has (O10)', async () => {
     renderWithProfile(<RetirementCalculator />, { profile: { person: { filingStatus: 'headOfHousehold' } } });
     await findResults();
@@ -205,8 +237,10 @@ describe('RetirementCalculator: the Social Security claiming age', () => {
     within(claiming())
       .getAllByRole('radio')
       .map((radio) => [radio.textContent, radio.getAttribute('aria-checked')]);
-  const tableRows = () =>
-    within(screen.getByRole('table', { name: 'Yearly Social Security benefit at each claiming age' }))
+  const ENTERED = 'Yearly Social Security benefit at each claiming age';
+  const ESTIMATED = 'Estimated yearly Social Security benefit at each claiming age';
+  const tableRows = (name: string = ENTERED) =>
+    within(screen.getByRole('table', { name }))
       .getAllByRole('row')
       .map((row) => Array.from(row.querySelectorAll('th, td')).map((cell) => cell.textContent));
 
@@ -219,6 +253,21 @@ describe('RetirementCalculator: the Social Security claiming age', () => {
       ['67 (full)', 'true'],
       ['70 (late)', 'false'],
     ]);
+    // Auto by default: the estimate from 104,000 a year of pay is $40,359 at
+    // 67 (test/lib/calculations/socialSecurityEstimate.test.ts); 30% less at
+    // 62 (28,251.30) and 24% more at 70 (50,045.16), the engine's adjustment.
+    expect(tableRows(ESTIMATED)).toEqual([
+      ['Claiming age', 'Yearly benefit'],
+      ['62 (early)', '$28,251'],
+      ['67 (full)', '$40,359'],
+      ['70 (late)', '$50,045'],
+    ]);
+    expect(useRetirementStore.getState().inputs?.socialSecurityBenefit).toBe(40359);
+  });
+
+  it('shows the entered benefit at each age, under the plain caption', async () => {
+    renderWithProfile(<RetirementCalculator />, { profile: { retirementIncome: { socialSecurityBenefit: 30000 } } });
+    await findResults();
     // $30,000 at 67: 30% less at 62, 24% more at 70 (the engine's adjustment).
     expect(tableRows()).toEqual([
       ['Claiming age', 'Yearly benefit'],
@@ -226,6 +275,7 @@ describe('RetirementCalculator: the Social Security claiming age', () => {
       ['67 (full)', '$30,000'],
       ['70 (late)', '$37,200'],
     ]);
+    expect(screen.queryByRole('table', { name: ESTIMATED })).not.toBeInTheDocument();
   });
 
   it('reruns the calculator with the chosen age, as any input does', async () => {

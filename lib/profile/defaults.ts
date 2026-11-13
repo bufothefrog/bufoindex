@@ -180,7 +180,7 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       targetMix: '80-20',
     },
     retirementIncome: {
-      socialSecurityBenefit: 30000,
+      socialSecurityBenefit: null,
       socialSecurityAge: RetirementConstants.SS_FULL_RETIREMENT_AGE,
       annualHealthcareCost: null,
     },
@@ -339,6 +339,7 @@ interface ValueRule {
 
 /** The type of each leaf or row field whose default is null. */
 const NULLABLE_TYPES: Readonly<Record<string, ValueType>> = {
+  'retirementIncome.socialSecurityBenefit': 'number',
   'retirementIncome.annualHealthcareCost': 'number',
   'leverage.monthlyContribution': 'number',
   'leverage.years': 'number',
@@ -638,7 +639,24 @@ export function normalizeProfile(
   }
   const profile = out as unknown as FinancialProfile;
   out.provided = Array.isArray(source.provided) ? normalizeProvided(source.provided, profile) : [...base.provided];
-  return profile;
+  return Array.isArray(source.provided) ? loadUnansweredAsAuto(profile) : profile;
+}
+
+/**
+ * Nullable leaves whose Auto (null) replaced a fixed default in PR 3: a
+ * stored profile that holds a number there without the path in `provided`
+ * holds the old default, never confirmed, so it loads as Auto. An answered
+ * number is kept. The rule applies to stored payloads, which always carry
+ * their own `provided` list, not to a partial patch normalized over a base.
+ */
+const UNANSWERED_LOADS_AS_AUTO: readonly string[] = ['retirementIncome.socialSecurityBenefit'];
+
+function loadUnansweredAsAuto(profile: FinancialProfile): FinancialProfile {
+  const answered = new Set(profile.provided);
+  return UNANSWERED_LOADS_AS_AUTO.reduce(
+    (next, path) => (answered.has(path) ? next : setAt(next, path, null)),
+    profile
+  );
 }
 
 // ---------------------------------------------------------------------------

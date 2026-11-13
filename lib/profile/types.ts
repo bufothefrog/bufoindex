@@ -146,8 +146,11 @@ export interface FinancialProfile {
     targetMix: TargetMixPreset;
   };
   retirementIncome: {
-    /** Annual benefit in today's dollars. */
-    socialSecurityBenefit: number;
+    /**
+     * Annual benefit at full retirement age in today's dollars; null estimates
+     * it from pay (lib/calculators/retirement/socialSecurity.ts).
+     */
+    socialSecurityBenefit: number | null;
     socialSecurityAge: number;
     /** Annual healthcare cost; null derives it from the retirement model. */
     annualHealthcareCost: number | null;

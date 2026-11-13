@@ -80,12 +80,14 @@ describe('migrateProfile from an older version (normalize only)', () => {
   it('keeps the old example values the v1 default stored; the leaves it lacks take today\'s defaults', () => {
     // The stored leaves are 3bb0132's example (30, TX, $3,500 ...); life
     // expectancy and the portfolio were not in v1, so they come from the
-    // PR 3 defaults. Nothing is marked answered.
+    // PR 3 defaults. Nothing is marked answered, so the stored Social
+    // Security benefit (the old 30,000 default) loads as Auto (null).
     const today = getDefaultFinancialProfile();
     const old = defaultProfileAt3bb0132();
     expect(migrateProfile(V1_DEFAULT, 1)).toEqual({
       ...old,
       person: { ...old.person, lifeExpectancy: today.person.lifeExpectancy },
+      retirementIncome: { ...old.retirementIncome, socialSecurityBenefit: null },
       portfolio: today.portfolio,
     });
   });

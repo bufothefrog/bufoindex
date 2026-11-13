@@ -22,6 +22,7 @@ import type { CrossFieldRule, FieldOption, FieldSpec, Get, Write } from '@/lib/f
 import type { FilingStatus } from '@/lib/profile/types';
 import { retirementFilingStatus } from './bindings';
 import { SOCIAL_SECURITY_AGE_PATH, claimingAgeLabel } from './claiming';
+import { SOCIAL_SECURITY_BENEFIT_PATH, estimatedSocialSecurityBenefit } from './socialSecurity';
 
 const RISK_PROFILE_PATH = 'assumptions.retirement.riskProfile';
 
@@ -75,15 +76,25 @@ export const LIFE_EXPECTANCY_AFTER_RETIREMENT: CrossFieldRule = {
 // Social Security and healthcare
 // ---------------------------------------------------------------------------
 
+/**
+ * The benefit at full retirement age. Auto (null, the default) is an estimate
+ * from pay (./socialSecurity.ts), which is also where an override starts; the
+ * Auto label and the summary say "estimate", so it never reads as the
+ * visitor's own number.
+ */
 export const SOCIAL_SECURITY_BENEFIT: FieldSpec = {
-  path: 'retirementIncome.socialSecurityBenefit',
+  path: SOCIAL_SECURITY_BENEFIT_PATH,
   kind: 'money',
   label: 'Social Security benefit',
   hint: 'A yearly amount; ssa.gov/myaccount shows your estimate.',
   placeholder: '30,000',
   min: 0,
+  nullable: { autoLabel: 'Estimate from your pay', overrideDefault: estimatedSocialSecurityBenefit },
   tier: 'details',
-  summary: (value) => `Social Security ${formatCurrency(value as number)}/yr`,
+  summary: (value, get) =>
+    value === null
+      ? `Social Security estimate ${formatCurrency(estimatedSocialSecurityBenefit(get))}/yr`
+      : `Social Security ${formatCurrency(value as number)}/yr`,
 };
 
 /** Renderer id of the claiming-age control (components/calculators/renderers/retirement.tsx). */

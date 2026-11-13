@@ -3,60 +3,35 @@
  * value feeds each RetirementInputs leaf. The golden fixture in
  * test/lib/calculators/retirement/bindings.test.ts pins the result. Pure.
  *
- * Two leaves are derived:
+ * Three leaves are derived:
  *
  * - Income. The engine takes an amount and a period (incomeAmount,
  *   incomePeriod) and the annual figure (currentIncome); the profile holds the
- *   gross pay per paycheck and the pay frequency (O11). Bi-weekly,
- *   semi-monthly and monthly pay keep their period; weekly pay, which the
- *   engine has no period for, enters as a yearly amount.
+ *   gross pay per paycheck and the pay frequency (O11, ./income.ts).
  * - Filing status. The engine models single and married filing jointly; the
  *   other two statuses run as single (O10), with a note on the page
  *   (filingStatusNote).
+ * - Social Security benefit. The profile leaf is null on Auto; the engine
+ *   gets the estimate from pay then (./socialSecurity.ts).
  */
 
-import { annualizeIncome, type IncomePeriod, type RetirementInputs } from '@/lib/calculations/retirement';
+import type { RetirementInputs } from '@/lib/calculations/retirement';
 import { FILING_STATUS_META } from '@/lib/constants/labels';
-import { PAY_FREQUENCY_META, type PayFrequency } from '@/lib/constants/frequency';
 import type { Binding } from '@/lib/fields/binding';
 import {
   AGE,
   FILING_STATUS,
-  GROSS_PAY,
   INVESTED_BALANCE,
   MONTHLY_INVESTING,
   NECESSARY_MONTHLY,
-  PAY_FREQUENCY,
   RETIREMENT_AGE,
   STATE,
 } from '@/lib/fields/shared';
-import type { Get } from '@/lib/fields/types';
 import type { FilingStatus } from '@/lib/profile/types';
+import { GROSS_PATH, incomeEntry, yearlyGrossPay } from './income';
+import { SOCIAL_SECURITY_BENEFIT_PATH, resolveSocialSecurityBenefit } from './socialSecurity';
 
-const GROSS_PATH = GROSS_PAY.path;
-const FREQUENCY_PATH = PAY_FREQUENCY.path;
 const FILING_PATH = FILING_STATUS.path;
-
-/** The engine's period for each pay frequency; weekly has none and enters as yearly. */
-const INCOME_PERIOD: Readonly<Record<PayFrequency, IncomePeriod | null>> = {
-  weekly: null,
-  'bi-weekly': 'biweekly',
-  'semi-monthly': 'semimonthly',
-  monthly: 'monthly',
-};
-
-interface IncomeEntry {
-  amount: number;
-  period: IncomePeriod;
-}
-
-/** The engine's income entry for the profile's gross pay and frequency. */
-function incomeEntry(get: Get): IncomeEntry {
-  const gross = get(GROSS_PATH) as number;
-  const frequency = get(FREQUENCY_PATH) as PayFrequency;
-  const period = INCOME_PERIOD[frequency];
-  return period ? { amount: gross, period } : { amount: gross * PAY_FREQUENCY_META[frequency].perYear, period: 'yearly' };
-}
 
 /** The filing status the retirement engine runs for a profile status (O10). */
 export function retirementFilingStatus(status: FilingStatus): RetirementInputs['filingStatus'] {
@@ -80,10 +55,7 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   { profile: INVESTED_BALANCE.path, engine: 'startingBalance' },
   {
     engine: 'currentIncome',
-    read: (get) => {
-      const { amount, period } = incomeEntry(get);
-      return annualizeIncome(amount, period);
-    },
+    read: yearlyGrossPay,
     errorPath: GROSS_PATH,
   },
   {
@@ -98,7 +70,11 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   { profile: 'assumptions.retirement.retirementReturn', engine: 'retirementReturn' },
   { profile: 'assumptions.retirement.inflationRate', engine: 'inflationRate' },
   { profile: 'retirementIncome.socialSecurityAge', engine: 'socialSecurityAge' },
-  { profile: 'retirementIncome.socialSecurityBenefit', engine: 'socialSecurityBenefit' },
+  {
+    engine: 'socialSecurityBenefit',
+    read: resolveSocialSecurityBenefit,
+    errorPath: SOCIAL_SECURITY_BENEFIT_PATH,
+  },
   { profile: 'assumptions.retirement.healthcareCostMultiplier', engine: 'healthcareCostMultiplier' },
   { profile: 'assumptions.retirement.volatility', engine: 'volatility' },
   {

@@ -84,7 +84,7 @@ describe('Wizard, retirement intent', () => {
     expect(profile.spending.targetRetirementIncome).toBe(70000);
     expect(profile.person.lifeExpectancy).toBe(90);
     expect(profile.assumptions.retirement.riskProfile).toBe('tdf');
-    expect(profile.retirementIncome).toEqual({ socialSecurityBenefit: 30000, socialSecurityAge: 67, annualHealthcareCost: null });
+    expect(profile.retirementIncome).toEqual({ socialSecurityBenefit: null, socialSecurityAge: 67, annualHealthcareCost: null });
     expect(profile.provided).toEqual([
       ...CORE_PATHS,
       'investing.monthlyContribution',
