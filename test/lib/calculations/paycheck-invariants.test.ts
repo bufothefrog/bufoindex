@@ -30,9 +30,8 @@ import {
   updateLegacyIncomeFields,
   paycheckToMonthly,
   calculateCompoundGrowth,
-  formatCurrency,
-  formatPercent,
 } from '@/lib/calculations/core'
+import { formatCurrency, formatPercent } from '@/lib/format'
 import { ALLOCATION_PRIORITY } from '@/lib/calculations/optimization'
 import { calculateStepStatus } from '@/lib/utils/stepStatusUtils'
 import { FINANCIAL_STEPS, StepStatus } from '@/lib/constants/financialSteps'

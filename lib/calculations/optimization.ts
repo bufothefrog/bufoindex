@@ -5,7 +5,8 @@ import {
 } from '../types';
 import { CONTRIBUTION_LIMITS_2026, ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '../constants/irs-2026';
 import { calculateIncomeTaxRate, calculateHSATaxRate } from '../utils';
-import { formatCurrency, formatPercent, paycheckToMonthly, monthlyToPaycheck } from './core';
+import { formatCurrency, formatPercent } from '@/lib/format';
+import { paycheckToMonthly, monthlyToPaycheck } from './core';
 
 /**
  * Priority attached to each allocation.

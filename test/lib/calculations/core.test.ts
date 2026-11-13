@@ -1,21 +1,20 @@
 /**
  * Core Paycheck Optimization Test Suite
- * Covers allocation ordering, validation, formatting, and frequency conversion.
+ * Covers allocation ordering, formatting, and frequency conversion.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   calculateOptimalAllocation,
   getDefaultProfile,
-  formatCurrency,
-  formatPercent,
   calculateCompoundGrowth,
   calculateOpportunityCost,
   paycheckToMonthly,
   monthlyToPaycheck,
   updateLegacyIncomeFields,
-  FREQUENCY_MULTIPLIERS
 } from '@/lib/calculations/core'
+import { FREQUENCY_MULTIPLIERS } from '@/lib/constants/frequency'
+import { formatCurrency, formatPercent } from '@/lib/format'
 import type { PaycheckProfile } from '@/lib/types'
 import { createPaycheckProfile, createDebtData } from '@/test/factories/test-data-factory'
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition'

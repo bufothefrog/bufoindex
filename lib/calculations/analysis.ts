@@ -1,5 +1,6 @@
 import { AllocationItem, PaycheckProfile, SkippedItem } from '../types';
-import { formatCurrency, formatPercent, calculateOpportunityCost } from './core';
+import { formatCurrency, formatPercent } from '@/lib/format';
+import { calculateOpportunityCost } from './core';
 import { calculateIncomeTaxRate } from '../utils';
 import { monthlyRateOf } from './contributionSchedule';
 

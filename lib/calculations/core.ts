@@ -20,7 +20,6 @@ import { calculateProjections } from './projections';
 /**
  * Paycheck frequency conversion utilities
  */
-export { FREQUENCY_MULTIPLIERS } from '../constants/frequency';
 import { FREQUENCY_MULTIPLIERS } from '../constants/frequency';
 
 /**
@@ -293,12 +292,6 @@ export function getDefaultProfile(): PaycheckProfile {
     source: 'user_input',
   };
 }
-
-/**
- * Currency and percentage display, from the shared formatters (byte-identical
- * default output).
- */
-export { formatCurrency, formatPercent } from '@/lib/format';
 
 /**
  * Calculate compound growth
