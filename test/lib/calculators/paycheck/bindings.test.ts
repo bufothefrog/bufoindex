@@ -12,7 +12,9 @@
  * Non-integer figures are compared to 9 decimals. One captured leaf changed
  * on purpose in PR 3 (slice c4): taxes.federalBracket was a fixed 22% and is
  * now the bracket of the profile's taxable pay, which for the custom profile
- * is 12% (see that case).
+ * is 12% (see that case). One leaf is new in PR 5 and not from the old
+ * mapper: preferences.investedBalance (the invested total of the account
+ * list, emergency fund left out), measured with the binding in place.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -112,6 +114,7 @@ const LEAVES: readonly string[] = [
   'preferences.age',
   'preferences.hasTaxableAccount',
   'preferences.taxableAccountContribution',
+  'preferences.investedBalance',
   'preferences.isPeakEarnings',
   'preferences.expectedRetirementBracket',
   'preferences.riskTolerance',
@@ -196,6 +199,8 @@ const DEFAULT_ENGINE = {
     age: 30,
     hasTaxableAccount: true,
     taxableAccountContribution: 500,
+    // New in PR 5 (not from the old mapper): the example accounts' invested total.
+    investedBalance: 25000,
     isPeakEarnings: false,
     expectedRetirementBracket: 0.12,
     riskTolerance: 'moderate',
@@ -335,6 +340,8 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
         debts,
         'preferences.emergencyFundMonths': 6,
         'preferences.currentEmergencyFund': 12000,
+        // 25,000 example accounts + the 20,000 Roth IRA row (new in PR 5).
+        'preferences.investedBalance': 45000,
         'preferences.expectedRetirementBracket': 0.22,
         'preferences.riskTolerance': 'optimizer',
         'preferences.optimizationGoal': 'wealth_maximization',
@@ -371,6 +378,8 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       age: 25,
       hasTaxableAccount: true,
       taxableAccountContribution: 500,
+      // PR 5: 401(k) 16,225 + brokerage 8,775 (the example accounts).
+      investedBalance: 25000,
     });
     expect({ version: inputs.version, lastUpdated: inputs.lastUpdated, source: inputs.source }).toEqual({
       version: '1.0',
@@ -665,6 +674,8 @@ describe('profile v3: the account list feeds the emergency fund and the IRA bala
     const inputs = engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile());
     expect(inputs.preferences.currentEmergencyFund).toBe(9000);
     expect(inputs.benefits.ira.currentBalances).toEqual({ traditional: 0, roth: 0 });
+    // The invested total: 401(k) 16,225 + brokerage 8,775.
+    expect(inputs.preferences.investedBalance).toBe(25000);
   });
 
   it('reads the owner fixture: the ticked Robinhood account is the fund, the Roth IRA holdings the Roth balance', () => {
@@ -673,5 +684,8 @@ describe('profile v3: the account list feeds the emergency fund and the IRA bala
     expect(inputs.preferences.currentEmergencyFund).toBe(10350);
     // VTI 20 x 375 + VXUS 30 x 85 = 10,050.
     expect(inputs.benefits.ira.currentBalances).toEqual({ traditional: 0, roth: 10050 });
+    // Every invested account, the emergency fund left out:
+    // 401(k) 80,000 + HSA 12,000 + Roth IRA 10,050 + brokerage 3,750 = 105,800.
+    expect(inputs.preferences.investedBalance).toBeCloseTo(105800, 6);
   });
 });

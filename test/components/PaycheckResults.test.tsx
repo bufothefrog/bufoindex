@@ -89,11 +89,13 @@ describe('ResultsSection', () => {
     renderResults(hsaProfile(56));
 
     expect(screen.getByRole('heading', { name: 'Your Monthly Paycheck Allocation' })).toBeInTheDocument();
-    expect(screen.getByText('Optimization Progress: 3 of 7 steps')).toBeInTheDocument();
-    expect(screen.getByText('43% Complete')).toBeInTheDocument();
+    // PR 5: the one-month step is gone, so 6 steps apply (debt and the mega
+    // backdoor do not) and 2 are complete (the match and the emergency fund).
+    expect(screen.getByText('Optimization Progress: 2 of 6 steps')).toBeInTheDocument();
+    expect(screen.getByText('33% Complete')).toBeInTheDocument();
     const progress = screen.getByRole('progressbar', { name: 'Optimization progress' });
-    expect(progress).toHaveAttribute('aria-valuenow', '43');
-    expect(progress).toHaveAttribute('aria-valuetext', '3 of 7 steps');
+    expect(progress).toHaveAttribute('aria-valuenow', '33');
+    expect(progress).toHaveAttribute('aria-valuetext', '2 of 6 steps');
     expect(screen.getByText('3 Optimizations')).toBeInTheDocument();
   });
 
@@ -101,11 +103,10 @@ describe('ResultsSection', () => {
     renderResults(hsaProfile(56));
 
     const steps = screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent);
-    expect(steps.slice(0, 9)).toEqual([
-      'Starter Emergency Fund',
+    expect(steps.slice(0, 8)).toEqual([
       'Employer 401k Match',
       'High-Interest Debt (7%+)',
-      'Complete Emergency Fund',
+      'Emergency Fund',
       'HSA Maximum',
       'Roth IRA Maximum',
       '401k Maximum',
@@ -166,10 +167,16 @@ describe('ResultsSection', () => {
     renderResults(hsaProfile(56));
 
     expect(screen.getByRole('heading', { name: 'Long-Term Impact' })).toBeInTheDocument();
-    expect(valueOf(document.body, 'Current Path (10 years)')).toBe('$234,904');
-    expect(valueOf(document.body, 'Optimized Path (10 years)')).toBe('$847,642');
-    expect(valueOf(document.body, 'Improvement')).toBe('+$612,738');
-    expect(screen.getByText('24 years 1 month earlier')).toBeInTheDocument();
+    // PR 5: each yearly stream is 12 end-of-month deposits at 1.07^(1/12) - 1, so a
+    // stream dollar is worth 14.2543 after 10 years (13.8164 before). Net worth 29,000
+    // (9,000 fund + 20,000 IRA balances) grows to 57,047.39. Current stream 18,720,
+    // optimized 78,320.57: 323,888.09 / 1,173,453.08 nominal, / 1.03^10 in today's
+    // dollars (before: $234,904 / $847,642 / +$612,738, 24 years 1 month).
+    expect(valueOf(document.body, 'Current Path (10 years)')).toBe('$241,003');
+    expect(valueOf(document.body, 'Optimized Path (10 years)')).toBe('$873,159');
+    expect(valueOf(document.body, 'Improvement')).toBe('+$632,156');
+    // FI: 56 + 32.59 against 56 + 8.74, 23.85 years earlier.
+    expect(screen.getByText('23 years 10 months earlier')).toBeInTheDocument();
   });
 
   it('warns when necessary expenses exceed take-home pay', () => {

@@ -43,10 +43,9 @@ export function calculateStepStatus(
       switch (step.id) {
         case 'employer-match':
           return a.category === 'employer_match' || a.account.toLowerCase().includes('match');
-        case 'emergency-1month':
-          return a.category === 'emergency_fund' && a.account.toLowerCase().includes('emergency') && a.priority <= 2;
         case 'emergency-full':
-          return a.category === 'emergency_fund' && a.account.toLowerCase().includes('emergency') && a.priority >= 3;
+          // The allocator has one emergency step, so any emergency-fund allocation is it.
+          return a.category === 'emergency_fund';
         case 'high-interest-debt':
           return a.category === 'high_interest_debt' || a.category === 'debt_payoff' || a.account.toLowerCase().includes('debt');
         case 'hsa-max':
@@ -85,17 +84,14 @@ export function calculateStepStatus(
       if (isNotApplicable) return false;
 
       switch (step.id) {
-        // A target of $0 means necessary expenses have not been entered yet, not
-        // that the fund is funded: `0 >= 0` must not read as complete.
-        case 'emergency-1month':
-          return profile.preferences.necessaryExpenses > 0 &&
-                 profile.preferences.currentEmergencyFund >= profile.preferences.necessaryExpenses;
         case 'employer-match':
           return profile.benefits.employer401k.available &&
                  profile.benefits.employer401k.currentContribution >= profile.benefits.employer401k.matchLimit;
         case 'high-interest-debt':
           return profile.debts.length === 0 ||
                  !profile.debts.some(d => d.interestRate > HIGH_INTEREST_THRESHOLD && d.balance > 0);
+        // A target of $0 means necessary expenses have not been entered yet, not
+        // that the fund is funded: `0 >= 0` must not read as complete.
         case 'emergency-full': {
           const fullTarget = profile.preferences.necessaryExpenses * profile.preferences.emergencyFundMonths;
           return fullTarget > 0 && profile.preferences.currentEmergencyFund >= fullTarget;
@@ -131,8 +127,6 @@ export function calculateStepStatus(
         case 'employer-match':
           return profile.benefits.employer401k.available &&
                  profile.benefits.employer401k.currentContribution < profile.benefits.employer401k.matchLimit;
-        case 'emergency-1month':
-          return profile.preferences.currentEmergencyFund < profile.preferences.necessaryExpenses;
         default:
           return false;
       }
@@ -202,12 +196,6 @@ export function calculateStepStatus(
     // Get implementation steps
     const getImplementationSteps = (): string[] => {
       switch (step.id) {
-        case 'emergency-1month':
-          return [
-            "Open a high-yield savings account (4%+ APY)",
-            "Set up automatic transfer for emergency fund",
-            "Start with $100-200/month until you reach target"
-          ];
         case 'employer-match':
           return [
             "Log into your company's 401k portal",
@@ -280,14 +268,12 @@ export function calculateStepStatus(
     // Get "why it matters" explanation
     const getWhyItMatters = (): string => {
       switch (step.id) {
-        case 'emergency-1month':
-          return "Prevents debt accumulation during minor emergencies. Having $1,000+ available reduces financial stress and gives you breathing room.";
         case 'employer-match':
           return "An employer match adds contributions on top of yours, up to the match limit. Contributing below the limit forgoes part of that match - an immediate return at the match rate.";
         case 'high-interest-debt':
           return "High-interest debt compounds against you. Every month you delay costs you more in interest than most investments can earn.";
         case 'emergency-full':
-          return "Full emergency fund provides true financial security. It allows you to invest more aggressively and take calculated risks.";
+          return "Cash for necessary expenses during a job loss or a large bill, held outside the market.";
         case 'hsa-max':
           return "HSA is the only triple tax-advantaged account: deductible contributions, tax-free growth, tax-free medical withdrawals.";
         case 'roth-ira':
@@ -306,7 +292,6 @@ export function calculateStepStatus(
     // Get implementation time estimate
     const getImplementationTime = (): string => {
       switch (step.id) {
-        case 'emergency-1month':
         case 'emergency-full':
           return "3-6 months";
         case 'employer-match':
@@ -328,12 +313,6 @@ export function calculateStepStatus(
     // Get recommendation text
     const getRecommendation = () => {
       switch (step.id) {
-        case 'emergency-1month':
-          if (isComplete) return `Emergency fund complete (${formatCurrency(profile.preferences.currentEmergencyFund)})`;
-          if (profile.preferences.necessaryExpenses <= 0) return NO_EXPENSE_TARGET;
-          if (isUrgent) return `Need ${formatCurrency(profile.preferences.necessaryExpenses)} emergency fund`;
-          return allocation ? `Building emergency fund` : `Build starter emergency fund`;
-
         case 'employer-match':
           if (isComplete) return `Employer match maximized`;
           if (isUrgent) return `Below match limit - increasing 401k to ${formatPercent(profile.benefits.employer401k.matchLimit)} captures the full match`;
@@ -347,9 +326,9 @@ export function calculateStepStatus(
         }
 
         case 'emergency-full':
-          if (isComplete) return `Full emergency fund complete (${profile.preferences.emergencyFundMonths} months)`;
+          if (isComplete) return `Emergency fund complete (${profile.preferences.emergencyFundMonths} months)`;
           if (profile.preferences.necessaryExpenses <= 0) return NO_EXPENSE_TARGET;
-          return allocation ? `Building full emergency fund` : `Complete ${profile.preferences.emergencyFundMonths}-month emergency fund`;
+          return allocation ? `Building emergency fund` : `Complete ${profile.preferences.emergencyFundMonths}-month emergency fund`;
 
         case 'hsa-max':
           return allocation ? `Maximizing HSA contributions` : profile.benefits.hsa.eligible ? `Contribute to HSA for triple tax advantage` : `Not HSA eligible`;

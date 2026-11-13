@@ -157,7 +157,7 @@ function generateQuickActions(profile: PaycheckProfile): QuickAction[] {
 
   // Emergency fund under one month of expenses (important). The figure is
   // the months on hand, rounded down so it never reads as a full month; the
-  // one-month line is the engine's first step, not a target.
+  // one-month line describes cash on hand; it is not a target.
   const { currentEmergencyFund, necessaryExpenses } = profile.preferences;
   if (currentEmergencyFund < necessaryExpenses) {
     const monthsOnHand = Math.max(0, Math.floor((currentEmergencyFund / necessaryExpenses) * 10) / 10);

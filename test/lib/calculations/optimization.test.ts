@@ -26,7 +26,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   ALLOCATION_PRIORITY,
-  calculate1MonthEmergency,
   calculateEmergencyFundCompletion,
   calculateEmployerMatch,
   calculateHighInterestDebt,
@@ -38,6 +37,7 @@ import {
   calculateAdditional401k,
   calculateMegaBackdoorRoth,
   calculateTaxableInvestment,
+  bracketComparison,
 } from '@/lib/calculations/optimization'
 import { CONTRIBUTION_LIMITS_2026, ROTH_IRA_PHASEOUT_2026, TOTAL_415C_BY_AGE } from '@/lib/constants/irs-2026'
 import {
@@ -65,113 +65,93 @@ const emptyIRA = () =>
   })
 
 describe('optimization.ts — paycheck allocation decisions', () => {
-  // ────────────────────────────────────────────────────────────────────────
-  // Emergency fund (FOO Step 1 + Step 4)
-  // ────────────────────────────────────────────────────────────────────────
-  describe('calculate1MonthEmergency', () => {
-    it('returns an allocation when current emergency fund is below 1 month of expenses', () => {
+  // ------------------------------------------------------------------------
+  // Emergency fund: one step, to the target months
+  // ------------------------------------------------------------------------
+  describe('calculateEmergencyFundCompletion', () => {
+    it('funds from zero cash: there is no separate one-month step any more', () => {
       const profile = createPaycheckProfile({
         preferences: createUserPreferences({
           necessaryExpenses: 3000,
-          currentEmergencyFund: 500,
+          emergencyFundMonths: 3,
+          currentEmergencyFund: 0,
+          emergencyFundAPY: 0.04,
         }),
       })
 
-      const result = calculate1MonthEmergency(profile, 1000)
-
+      const result = calculateEmergencyFundCompletion(profile, 1000)
       expect(result).not.toBeNull()
-      expect(result!.id).toBe('1-month-emergency')
+      expect(result!.id).toBe('emergency-fund-completion')
+      expect(result!.account).toBe('Emergency Fund')
       expect(result!.category).toBe('emergency_fund')
-      expect(result!.priority).toBe(ALLOCATION_PRIORITY.oneMonthEmergency)
-      // amountNeeded = 3000 - 500 = 2500, available = 1000 → use 1000
       expect(result!.amount).toBe(1000)
       expect(result!.taxImpact).toBe(0)
+      expect(result!.priority).toBe(ALLOCATION_PRIORITY.emergencyFundCompletion)
+      // target 9000, remaining 9000 - 1000 = 8000
+      expect(result!.implementation).toBe(
+        'Save $1,000 per paycheck toward the 3-month emergency fund ($8,000 more needed)'
+      )
+      expect(result!.reasoning).toBe(
+        'Builds cash from 0.0 to 3 months of necessary expenses, held at 4.0% APY.'
+      )
     })
 
-    it('caps allocation at the remaining gap when available exceeds the gap', () => {
+    it('funds below one month of expenses (1,000 of a 3,000 month)', () => {
       const profile = createPaycheckProfile({
         preferences: createUserPreferences({
           necessaryExpenses: 3000,
-          currentEmergencyFund: 2500, // gap is $500
+          emergencyFundMonths: 3,
+          currentEmergencyFund: 1000, // < 1 month
+          emergencyFundAPY: 0.01,
         }),
       })
 
-      const result = calculate1MonthEmergency(profile, 5000)
-
+      const result = calculateEmergencyFundCompletion(profile, 500)
+      expect(result).not.toBeNull()
       expect(result!.amount).toBe(500)
-      expect(result!.implementation).toContain('complete 1-month emergency fund')
+      expect(result!.reasoning).toBe(
+        'Builds cash from 0.3 to 3 months of necessary expenses, held at 1.0% APY.'
+      )
+      // 9000 - 1000 - 500 = 7500
+      expect(result!.implementation).toContain('($7,500 more needed)')
     })
 
-    it('returns null when the user already has 1+ months saved', () => {
+    it('says complete when the payment closes the gap', () => {
       const profile = createPaycheckProfile({
         preferences: createUserPreferences({
           necessaryExpenses: 3000,
-          currentEmergencyFund: 3000, // exactly 1 month
+          emergencyFundMonths: 3,
+          currentEmergencyFund: 8500,
         }),
       })
-      expect(calculate1MonthEmergency(profile, 1000)).toBeNull()
+      const result = calculateEmergencyFundCompletion(profile, 5000)
+      expect(result!.amount).toBe(500)
+      expect(result!.implementation).toBe('Save $500 per paycheck to complete the 3-month emergency fund')
+    })
 
-      const profileOver = createPaycheckProfile({
-        preferences: createUserPreferences({
-          necessaryExpenses: 3000,
-          currentEmergencyFund: 9999,
-        }),
-      })
-      expect(calculate1MonthEmergency(profileOver, 1000)).toBeNull()
+    it('returns null when the target is $0 (expenses or target months not entered)', () => {
+      // A $0 target must not read as "already funded" via `0 >= 0`.
+      for (const prefs of [
+        { necessaryExpenses: 0, emergencyFundMonths: 3, currentEmergencyFund: 0 },
+        { necessaryExpenses: 0, emergencyFundMonths: 3, currentEmergencyFund: 1500 },
+        { necessaryExpenses: -500, emergencyFundMonths: 3, currentEmergencyFund: 0 },
+        { necessaryExpenses: 3000, emergencyFundMonths: 0, currentEmergencyFund: 0 },
+      ]) {
+        const profile = createPaycheckProfile({ preferences: createUserPreferences(prefs) })
+        expect(calculateEmergencyFundCompletion(profile, 1000)).toBeNull()
+      }
     })
 
     it('returns null when no money is available to allocate', () => {
       const profile = createPaycheckProfile({
         preferences: createUserPreferences({
           necessaryExpenses: 3000,
-          currentEmergencyFund: 0,
-        }),
-      })
-      expect(calculate1MonthEmergency(profile, 0)).toBeNull()
-      expect(calculate1MonthEmergency(profile, -100)).toBeNull()
-    })
-
-    it('returns null when the target is $0 (necessary expenses not entered yet)', () => {
-      // A $0 target must not read as "already funded" via `0 >= 0` — with no
-      // monthly expenses on file there is nothing to size the fund against.
-      const emptyFund = createPaycheckProfile({
-        preferences: createUserPreferences({
-          necessaryExpenses: 0,
-          currentEmergencyFund: 0,
-        }),
-      })
-      expect(calculate1MonthEmergency(emptyFund, 1000)).toBeNull()
-
-      const partialFund = createPaycheckProfile({
-        preferences: createUserPreferences({
-          necessaryExpenses: 0,
-          currentEmergencyFund: 1500,
-        }),
-      })
-      expect(calculate1MonthEmergency(partialFund, 1000)).toBeNull()
-
-      // Negative expenses are equally meaningless
-      const negativeExpenses = createPaycheckProfile({
-        preferences: createUserPreferences({
-          necessaryExpenses: -500,
-          currentEmergencyFund: 0,
-        }),
-      })
-      expect(calculate1MonthEmergency(negativeExpenses, 1000)).toBeNull()
-    })
-  })
-
-  describe('calculateEmergencyFundCompletion', () => {
-    it('returns null when 1-month base has not been built yet (Step 1 should run first)', () => {
-      const profile = createPaycheckProfile({
-        preferences: createUserPreferences({
-          necessaryExpenses: 3000,
           emergencyFundMonths: 3,
-          currentEmergencyFund: 1000, // < 1 month
+          currentEmergencyFund: 0,
         }),
       })
-
-      expect(calculateEmergencyFundCompletion(profile, 500)).toBeNull()
+      expect(calculateEmergencyFundCompletion(profile, 0)).toBeNull()
+      expect(calculateEmergencyFundCompletion(profile, -100)).toBeNull()
     })
 
     it('returns an allocation when at 1 month but below target', () => {
@@ -1497,7 +1477,6 @@ describe('optimization.ts — paycheck allocation decisions', () => {
 
     it('matches the Financial Order of Operations execution order in core.ts', () => {
       expect(Object.keys(ALLOCATION_PRIORITY)).toEqual([
-        'oneMonthEmergency',
         'employerMatch',
         'highInterestDebt',
         'emergencyFundCompletion',
@@ -1509,12 +1488,110 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       ])
     })
 
-    it('keeps the two emergency steps on opposite sides of stepStatusUtils 2/3 boundary', () => {
-      // lib/utils/stepStatusUtils.ts matches 'emergency-1month' on priority <= 2
-      // and 'emergency-full' on priority >= 3. Breaking this makes the two step
-      // cards claim each other's allocation.
-      expect(ALLOCATION_PRIORITY.oneMonthEmergency).toBeLessThanOrEqual(2)
-      expect(ALLOCATION_PRIORITY.emergencyFundCompletion).toBeGreaterThanOrEqual(3)
+    it('has no one-month emergency priority: the emergency fund is one step', () => {
+      expect(ALLOCATION_PRIORITY).not.toHaveProperty('oneMonthEmergency')
+      expect(ALLOCATION_PRIORITY.emergencyFundCompletion).toBe(4)
+    })
+  })
+
+  // ------------------------------------------------------------------------
+  // Neutral texts: the brackets compared, no "optimal" / "recommended"
+  // ------------------------------------------------------------------------
+  describe('neutral Roth / Traditional and step texts', () => {
+    const withBrackets = (age: number, current: number, retirement: number | undefined) =>
+      createPaycheckProfile({
+        // gross is monthly: 6,500 a month is 78,000 a year, under the Roth phase-out
+        income: createIncomeData({ gross: 6500 }),
+        taxes: createTaxData({ federalBracket: current }),
+        preferences: createUserPreferences({ age, expectedRetirementBracket: retirement }),
+        benefits: {
+          employer401k: createEmployerBenefits({ available: true, currentContribution: 0.03, afterTaxAvailable: true }),
+          hsa: createHSABenefits(),
+          ira: emptyIRA(),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+    const BANNED = /optimal|recommended|peak earnings|VTI|VTSAX/
+
+    it('prints both brackets on the under-30 branch (the default visitor: 25, 22% now, 12% entered)', () => {
+      const profile = withBrackets(25, 0.22, 0.12)
+      expect(bracketComparison(profile)).toBe('22% bracket now, 12% expected in retirement')
+      expect(calculateRothIRA(profile, 1000)!.reasoning).toBe(
+        'Age 25 (under 30); 22% bracket now, 12% expected in retirement. Roth pays the tax now; Traditional defers it.'
+      )
+      expect(calculateAdditional401k(profile, 1000)!.reasoning).toBe(
+        'Age 25 (under 30); 22% bracket now, 12% expected in retirement. Roth 401k pays the tax now; Traditional defers it.'
+      )
+    })
+
+    it('owner brackets (25, 24% now, 12%): the Roth 401k text', () => {
+      expect(calculateAdditional401k(withBrackets(25, 0.24, 0.12), 1000)!.reasoning).toBe(
+        'Age 25 (under 30); 24% bracket now, 12% expected in retirement. Roth 401k pays the tax now; Traditional defers it.'
+      )
+    })
+
+    it('equal brackets at 35: 12/12 is roth, 22/22 is mixed', () => {
+      const low = withBrackets(35, 0.12, 0.12)
+      expect(calculateRothIRA(low, 1000)!.reasoning).toBe(
+        '12% bracket now and expected in retirement. Roth pays the tax now; Traditional defers it.'
+      )
+      const mid = withBrackets(35, 0.22, 0.22)
+      expect(determineRothVsTraditional(mid)).toBe('mixed')
+      expect(calculateRothIRA(mid, 1000)!.reasoning).toBe(
+        '22% bracket now and expected in retirement. Split between Roth and Traditional, the tax is paid partly now and partly in retirement.'
+      )
+      expect(calculateAdditional401k(mid, 1000)!.reasoning).toBe(
+        '22% bracket now and expected in retirement. Split between Roth and Traditional 401k, the tax is paid partly now and partly in retirement.'
+      )
+    })
+
+    it('a roth result above the 12% bracket at 35 prints the comparison with no age lead', () => {
+      // 22% now, 24% entered: not under 30, not <= 12%, not >= 24% now, so 'mixed';
+      // 10% now with 0.8 fallback is 'roth' through the low-bracket branch.
+      const fallback = withBrackets(35, 0.10, undefined)
+      expect(bracketComparison(fallback)).toBe('10% bracket now, 8% assumed in retirement')
+      expect(calculateRothIRA(fallback, 1000)!.reasoning).toBe(
+        '10% bracket now, 8% assumed in retirement. Roth pays the tax now; Traditional defers it.'
+      )
+    })
+
+    it('traditional 401k text when the bracket now is above the one entered', () => {
+      const profile = withBrackets(40, 0.32, 0.12)
+      expect(determineRothVsTraditional(profile)).toBe('traditional')
+      expect(calculateAdditional401k(profile, 1000)!.reasoning).toBe(
+        '32% bracket now, 12% expected in retirement. Traditional 401k defers the tax; Roth would pay it now.'
+      )
+    })
+
+    it('mega backdoor and taxable texts carry no product names or verdicts', () => {
+      const highEarner = createPaycheckProfile({
+        income: createIncomeData({ gross: 30000, monthlyGross: 30000, net: 20000, monthlyNet: 20000 }),
+        benefits: {
+          employer401k: createEmployerBenefits({ available: true, afterTaxAvailable: true, currentContribution: 0.06 }),
+          hsa: createHSABenefits(),
+          ira: emptyIRA(),
+          other: { fsaElection: 0, transitBenefits: 0, lifeInsurance: 0 },
+        },
+      })
+      const mega = calculateMegaBackdoorRoth(highEarner, 5000)
+      expect(mega!.reasoning).toBe('After-tax 401k contributions converted to Roth grow untaxed.')
+      const taxable = calculateTaxableInvestment(createPaycheckProfile(), 116.15)
+      expect(taxable!.reasoning).toBe('Money left after the tax-advantaged steps above, invested in a taxable account.')
+      expect(taxable!.implementation).toBe('Invest $116 per paycheck in a taxable account')
+      for (const item of [mega!, taxable!]) expect(item.reasoning).not.toMatch(BANNED)
+    })
+
+    it('no reasoning matches the banned words for any bracket pair', () => {
+      for (const age of [25, 35, 55]) {
+        for (const cur of [0.1, 0.12, 0.22, 0.24, 0.32, 0.37]) {
+          for (const ret of [undefined, 0.12, 0.22, 0.32]) {
+            const profile = withBrackets(age, cur, ret)
+            for (const item of [calculateRothIRA(profile, 1000), calculateAdditional401k(profile, 1000)]) {
+              if (item) expect(item.reasoning).not.toMatch(BANNED)
+            }
+          }
+        }
+      }
     })
   })
 
@@ -1561,7 +1638,7 @@ describe('optimization.ts — paycheck allocation decisions', () => {
       const snapshotIncome = JSON.stringify(profile.income)
       const snapshotPrefs = JSON.stringify(profile.preferences)
 
-      calculate1MonthEmergency(profile, 500)
+      calculateEmergencyFundCompletion(profile, 500)
       calculateEmployerMatch(profile, 500)
       calculateHighInterestDebt(profile, 500)
       calculateHSAOptimal(profile, 500)

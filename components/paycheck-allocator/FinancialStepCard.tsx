@@ -36,7 +36,7 @@ function StepHeaderRight({ step, profile }: { step: StepStatus; profile: Paychec
   if (step.isComplete || step.isNotApplicable) return null;
 
   // For allocation-based steps, show per-paycheck allocation amount
-  if (step.allocation && ['employer-match', 'high-interest-debt', 'emergency-1month', 'emergency-full', 'taxable-investment'].includes(step.id)) {
+  if (step.allocation && ['employer-match', 'high-interest-debt', 'emergency-full', 'taxable-investment'].includes(step.id)) {
     return (
       <div className="text-right">
         <div className={cn('text-sm font-bold font-mono tabular-nums', TONE_TEXT.info)}>

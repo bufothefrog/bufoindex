@@ -4,8 +4,7 @@ import {
   AllocationItem,
   IncomeData
 } from '../types';
-import { 
-  calculate1MonthEmergency,
+import {
   calculateEmployerMatch,
   calculateHSAOptimal,
   calculateHighInterestDebt,
@@ -124,16 +123,13 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   
   // Step 2: Execute Financial Order of Operations
   const priorityAllocations = [
-    // Step 1: 1-Month Emergency Fund (basic security first)
-    () => calculate1MonthEmergency(updatedProfile, availableAmount),
-    
-    // Step 2: Employer 401k Match
+    // Employer 401k Match
     () => calculateEmployerMatch(updatedProfile, availableAmount),
     
-    // Step 3: High-Interest Debt (over 7%)
+    // High-Interest Debt (over 7%)
     () => calculateHighInterestDebt(updatedProfile, availableAmount),
     
-    // Step 4: Complete Emergency Fund (1 month → 3 months)
+    // Emergency fund to the target months
     () => calculateEmergencyFundCompletion(updatedProfile, availableAmount),
     
     // Step 5: Roth IRA & HSA Max (tax-free growth)
@@ -290,6 +286,7 @@ export function getDefaultProfile(): PaycheckProfile {
       age: 30,
       hasTaxableAccount: false,
       taxableAccountContribution: 0,
+      investedBalance: 0,
       isPeakEarnings: false,
       expectedRetirementBracket: 0.12, // Optional, defaults to 12% bracket
       riskTolerance: 'moderate',

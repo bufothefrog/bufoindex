@@ -325,8 +325,10 @@ describe('identifySkippedOptimizations', () => {
     it('flags extra payments on debt below the 5% risk-adjusted threshold', () => {
       // 3% debt, $100/mo extra, not deductible: effective rate 3% < 5% threshold
       //   monthly = 100 * (0.07 - 0.03) / 12 = $0.3333; annual = $4.00
-      //   twentyYear = FV of $100/mo annuity at (0.04/12) for 240 months, minus principal:
-      //     100 * ((1 + 0.04/12)^240 - 1) / (0.04/12) - 24000 = 36677.46 - 24000 = $12,677.46
+      //   twentyYear = FV of $100/mo annuity at the effective monthly rate
+      //   i = 1.04^(1/12) - 1 = 0.00327374 for 240 months, minus principal:
+      //     100 * (1.04^20 - 1) / i - 24000 = 36384.17 - 24000 = $12,384.17
+      //   (r/12 gave 12,677.46 before the one monthly-rate convention)
       const profile = createPaycheckProfile({
         debts: [createDebtData({ id: 'car', name: 'Car Loan', interestRate: 0.03, extraPayment: 100 })],
       })
@@ -335,15 +337,28 @@ describe('identifySkippedOptimizations', () => {
       expect(item).toBeDefined()
       expect(item!.opportunityCost.monthly).toBeCloseToCurrency(0.33)
       expect(item!.opportunityCost.annual).toBeCloseToCurrency(4)
-      expect(item!.opportunityCost.twentyYear).toBeCloseToCurrency(12677.46)
+      expect(item!.opportunityCost.twentyYear).toBeCloseToCurrency(12384.17)
       expect(item!.riskLevel).toBe('low') // 0.03 < 0.04
+    })
+
+    it('E10: 100 a month for 240 months at a 3% spread costs 8,685.44 at the effective monthly rate', () => {
+      // 4% debt, not deductible: spread 0.07 - 0.04 = 0.03.
+      // i = 1.03^(1/12) - 1 = 0.002466269772; 100 * (1.03^20 - 1) / i = 32,685.4444
+      // minus 24,000 principal = 8,685.4444 (r/12 = 0.0025 gave 8,830.1998).
+      const profile = createPaycheckProfile({
+        debts: [createDebtData({ id: 'loan', name: 'Loan', interestRate: 0.04, extraPayment: 100 })],
+      })
+      const item = findItem(identifySkippedOptimizations(profile), 'debt-strategy-loan')
+      expect(item!.opportunityCost.twentyYear).toBeCloseTo(8685.4444, 3)
+      expect(item!.education).toBe('The debt costs 4.0%; investing is modeled at 7% with market risk.')
     })
 
     it('applies the tax deduction to the effective rate for deductible debt', () => {
       // 6.5% mortgage, deductible, 24% federal bracket in no-income-tax TX:
       //   effective = 0.065 * (1 - 0.24) = 4.94% < 5% threshold
       //   monthly = 200 * (0.07 - 0.0494) / 12 = $0.3433; annual = $4.12
-      //   twentyYear = 200 * ((1 + 0.0206/12)^240 - 1) / (0.0206/12) - 48000 = $11,336.06
+      //   twentyYear = 200 * (1.0206^20 - 1) / i - 48000, i = 1.0206^(1/12) - 1 = 0.00170067:
+      //     59215.20 - 48000 = $11,215.20 (r/12 gave 11,336.06)
       const profile = createPaycheckProfile({
         taxes: createTaxData({ federalBracket: 0.24, state: 'TX' }),
         debts: [
@@ -361,7 +376,7 @@ describe('identifySkippedOptimizations', () => {
       expect(item).toBeDefined()
       expect(item!.opportunityCost.monthly).toBeCloseToCurrency(0.34)
       expect(item!.opportunityCost.annual).toBeCloseToCurrency(4.12)
-      expect(item!.opportunityCost.twentyYear).toBeCloseToCurrency(11336.06)
+      expect(item!.opportunityCost.twentyYear).toBeCloseToCurrency(11215.2)
       expect(item!.riskLevel).toBe('medium') // 0.0494 >= 0.04
     })
 
@@ -516,6 +531,114 @@ describe('identifySkippedOptimizations', () => {
 
       const items = identifySkippedOptimizations(profile)
       expect(findItem(items, 'missed-employer-match')).toBeUndefined()
+    })
+  })
+
+  describe('education and alternative texts carry no dollar figure', () => {
+    it("case 3: 'Cash at 1.0% APY; ...' for a 1.0% APY", () => {
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({ currentEmergencyFund: 9000, emergencyFundAPY: 0.01 }),
+      })
+      const item = findItem(identifySkippedOptimizations(profile), 'low-emergency-fund-apy')
+      expect(item!.education).toBe(
+        'Cash at 1.0% APY; this model assumes high-yield savings pay 4.0% with the same deposit insurance.'
+      )
+    })
+
+    it('cash-holding cost branch points at the headline instead of printing the 10-year figure', () => {
+      const profile = createPaycheckProfile({
+        preferences: createUserPreferences({ currentEmergencyFund: 21000 }),
+      })
+      const item = findItem(identifySkippedOptimizations(profile), 'excessive-emergency-fund')
+      expect(item!.education).toBe(
+        'The balance above target earns 4.5% APY against the 7% assumed for invested dollars; the 10-year cost is shown above.'
+      )
+    })
+
+    it('low-interest debt: both branches, no em-dash', () => {
+      const spread = findItem(
+        identifySkippedOptimizations(
+          createPaycheckProfile({ debts: [createDebtData({ interestRate: 0.06, extraPayment: 300 })] })
+        ),
+        'low-interest-debt-prepayment'
+      )
+      expect(spread!.education).toBe(
+        "Prepaying returns the debt's 6.0% with certainty; investing is modeled at 7%; the 10-year difference on this payment stream is shown above."
+      )
+      const flat = findItem(
+        identifySkippedOptimizations(
+          createPaycheckProfile({ debts: [createDebtData({ interestRate: 0.07, extraPayment: 300 })] })
+        ),
+        'low-interest-debt-prepayment'
+      )
+      expect(flat!.education).toBe(
+        "Prepaying returns the debt's 7.0%, the same rate this model assumes for invested dollars, so no dollar difference is modeled; and the debt payoff is the certain side of that comparison."
+      )
+    })
+
+    it('deductible low-rate debt: the after-tax rate sentence', () => {
+      const profile = createPaycheckProfile({
+        taxes: createTaxData({ federalBracket: 0.24, state: 'TX' }),
+        debts: [createDebtData({ id: 'm', interestRate: 0.065, extraPayment: 200, taxDeductible: true })],
+      })
+      expect(findItem(identifySkippedOptimizations(profile), 'debt-strategy-m')!.education).toBe(
+        'The interest is tax-deductible, so its after-tax rate is lower than the stated rate; investing is modeled at 7% with market risk.'
+      )
+    })
+
+    it('peak-earnings Roth case prints both brackets, no verdict', () => {
+      // The hypothetical 45% bracket of the case above is the only way to reach it.
+      const profile = createPaycheckProfile({
+        taxes: createTaxData({ federalBracket: 0.45 }),
+        preferences: createUserPreferences({ age: 45, isPeakEarnings: true, expectedRetirementBracket: 0.24 }),
+      })
+      const item = findItem(identifySkippedOptimizations(profile), 'roth-vs-traditional')
+      expect(item!.education).toBe('Traditional defers tax at 45% now; withdrawals are taxed at the bracket then (24% assumed).')
+    })
+
+    it('zero-cash note names the target months, not a one-month step', () => {
+      const withTarget = findItem(
+        identifySkippedOptimizations(
+          createPaycheckProfile({ preferences: createUserPreferences({ currentEmergencyFund: 0 }) })
+        ),
+        'no-emergency-fund'
+      )
+      expect(withTarget!.alternative).toBe('Build cash toward your 3-month target ($9,000)')
+      const noTarget = findItem(
+        identifySkippedOptimizations(
+          createPaycheckProfile({
+            preferences: createUserPreferences({ currentEmergencyFund: 0, emergencyFundMonths: 0 }),
+          })
+        ),
+        'no-emergency-fund'
+      )
+      expect(noTarget!.alternative).toBe('Build a cash buffer of 3 to 6 months of necessary expenses')
+    })
+
+    it('no education string contains $ across a spread of profiles', () => {
+      const profiles = [
+        createPaycheckProfile(),
+        createPaycheckProfile({ preferences: createUserPreferences({ currentEmergencyFund: 50000, emergencyFundAPY: 0.01 }) }),
+        createPaycheckProfile({ preferences: createUserPreferences({ currentEmergencyFund: 15000, emergencyFundMonths: 6 }) }),
+        createPaycheckProfile({ preferences: createUserPreferences({ currentEmergencyFund: 9000, emergencyFundAPY: 0.01 }) }),
+        createPaycheckProfile({ preferences: createUserPreferences({ currentEmergencyFund: 0 }) }),
+        createPaycheckProfile({
+          taxes: createTaxData({ federalBracket: 0.45 }),
+          preferences: createUserPreferences({ age: 45, isPeakEarnings: true, expectedRetirementBracket: 0.24 }),
+          debts: [
+            createDebtData({ id: 'a', interestRate: 0.03, extraPayment: 100 }),
+            createDebtData({ id: 'b', interestRate: 0.06, extraPayment: 100, taxDeductible: true }),
+          ],
+        }),
+      ]
+      let seen = 0
+      for (const profile of profiles) {
+        for (const item of identifySkippedOptimizations(profile)) {
+          if (item.education !== undefined) seen += 1
+          expect(item.education ?? '').not.toContain('$')
+        }
+      }
+      expect(seen).toBeGreaterThan(6)
     })
   })
 

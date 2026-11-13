@@ -147,7 +147,6 @@ const total415cFor = (age: number): number => {
  * reproduce the order core.ts applied the steps in.
  */
 const EXPECTED_PRIORITY: Record<string, number> = {
-  '1-month-emergency': ALLOCATION_PRIORITY.oneMonthEmergency,
   'employer-match': ALLOCATION_PRIORITY.employerMatch,
   'high-interest-debt': ALLOCATION_PRIORITY.highInterestDebt,
   'emergency-fund-completion': ALLOCATION_PRIORITY.emergencyFundCompletion,
@@ -161,7 +160,6 @@ const EXPECTED_PRIORITY: Record<string, number> = {
 /** Step catalogue id -> the allocation id that step is meant to pick up. */
 const STEP_ALLOCATION_PAIRS: Array<[string, string]> = [
   ['employer-match', 'employer-match'],
-  ['emergency-1month', '1-month-emergency'],
   ['emergency-full', 'emergency-fund-completion'],
   ['high-interest-debt', 'high-interest-debt'],
   ['hsa-max', 'hsa-contribution'],
@@ -1720,8 +1718,9 @@ describe('step statuses', () => {
    *
    * Trigger profile: `weekly | zero-paycheck | ... | ef-partial |
    * prefs-zero-necessary-expenses` (necessaryExpenses 0, currentEmergencyFund
-   * 1500), where `emergency-1month` reported `isComplete = true` and "Emergency
-   * fund complete ($1,500)" — and reported the same for a $0 fund.
+   * 1500), where the former one-month step reported `isComplete = true` and
+   * "Emergency fund complete ($1,500)" (that step no longer exists; the one
+   * emergency step 'emergency-full' keeps the guard).
    */
   it('does not declare the emergency fund complete when necessary expenses are 0', () => {
     const zeroExpense = GRID.filter((c) => c.profile.preferences.necessaryExpenses === 0)
@@ -1730,7 +1729,7 @@ describe('step statuses', () => {
 
     const bad: string[] = []
     for (const c of zeroExpense) {
-      for (const stepId of ['emergency-1month', 'emergency-full']) {
+      for (const stepId of ['emergency-full']) {
         const step = c.steps.find((s) => s.id === stepId)!
         if (step.isComplete && bad.length < 6) {
           bad.push(`${c.label} :: step ${stepId} complete against a $0 target: "${step.recommendation}"`)
@@ -1792,7 +1791,6 @@ describe('tax impact', () => {
       'roth-ira',
       'mega-backdoor-roth',
       'taxable-investment',
-      '1-month-emergency',
       'emergency-fund-completion',
       'high-interest-debt',
     ])

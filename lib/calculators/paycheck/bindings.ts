@@ -19,6 +19,9 @@
  *   (lib/profile/accounts.ts): the value of the traditional and Roth IRA
  *   accounts, and the accounts that hold the emergency fund (or the typed
  *   emergency fund while none does).
+ * - The invested total (investedBalance): every account in effect except
+ *   the emergency-fund accounts, for the net worth the projections start
+ *   from. This leaf is new in PR 5; the old mapper had no such value.
  * - The current federal bracket (currentBracketFrom): the 2026 bracket of
  *   yearly gross pay (bonus included) minus the traditional 401(k) share
  *   and HSA payroll contributions (each capped at its 2026 limit) minus the
@@ -49,7 +52,14 @@ import {
   TAXABLE_MONTHLY,
 } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
-import { ACCOUNT_PATHS, emergencyFundBalance, iraBalances, split401k, type Election401k } from '@/lib/profile/accounts';
+import {
+  ACCOUNT_PATHS,
+  emergencyFundBalance,
+  investedBalance,
+  iraBalances,
+  split401k,
+  type Election401k,
+} from '@/lib/profile/accounts';
 import type { ContributionType, FilingStatus } from '@/lib/profile/types';
 import type { HSABenefits, IncomeData, PaycheckProfile } from '@/lib/types';
 
@@ -215,6 +225,7 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
     read: (get) => (get(TAXABLE_MONTHLY.path) as number) > 0,
   },
   { profile: TAXABLE_MONTHLY.path, engine: 'preferences.taxableAccountContribution' },
+  { engine: 'preferences.investedBalance', read: investedBalance, errorPath: ACCOUNT_PATHS.accounts },
   { engine: 'preferences.expectedRetirementBracket', read: retirementBracketFrom, errorPath: RETIREMENT_BRACKET_PATH },
   { profile: 'assumptions.paycheck.riskTolerance', engine: 'preferences.riskTolerance' },
   { profile: 'assumptions.paycheck.optimizationGoal', engine: 'preferences.optimizationGoal' },
@@ -249,6 +260,8 @@ export const PAYCHECK_ENGINE_ONLY: Readonly<Record<string, string>> = {
   'benefits.other.lifeInsurance': 'Other benefits have no input; base value 0.',
   'preferences.funMoney.current': 'Derived: the midpoint of the fun-money range.',
   'preferences.hasTaxableAccount': 'Derived: true when the taxable monthly contribution is above zero.',
+  'preferences.investedBalance':
+    'Derived: the invested total of portfolio.accounts, the emergency fund left out (investedBalance).',
   'preferences.isPeakEarnings': 'Stays internal (O12); base value false.',
   version: 'Engine metadata, not an input.',
   lastUpdated: 'Engine metadata, not an input.',

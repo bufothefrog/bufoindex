@@ -1,6 +1,7 @@
 import { PaycheckProfile, SkippedItem } from '../types';
 import { formatCurrency, formatPercent, calculateOpportunityCost } from './core';
 import { calculateIncomeTaxRate } from '../utils';
+import { monthlyRateOf } from './contributionSchedule';
 
 /**
  * Identify optimization opportunities and surface deprioritized items
@@ -82,16 +83,17 @@ function cashHoldingCost(amount: number, apy: number): CashHoldingCost {
 }
 
 /**
- * Education copy for a cash-holding comparison. The dollar framing appears only
- * when a dollar cost was actually computed, so no card ever claims a "$0
- * opportunity cost".
+ * Education copy for a cash-holding comparison. It carries no dollar figure:
+ * the card headline shows the cost, converted to the active dollar mode.
  */
 function cashHoldingEducation(subject: string, apy: number, cost: CashHoldingCost): string {
   if (cost.meetsMarket) {
     return `${subject} earns ${apyLabel(apy)} APY, at or above the ${MARKET_LABEL} this model assumes for invested dollars, so no opportunity cost is modeled here`;
   }
 
-  return `${subject} earns ${apyLabel(apy)} APY against the ${MARKET_LABEL} assumed for invested dollars: ${formatCurrency(cost.tenYear)} over 10 years`;
+  // The 10-year figure is left out on purpose: the card headline already shows
+  // it, converted to the active dollar mode.
+  return `${subject} earns ${apyLabel(apy)} APY against the ${MARKET_LABEL} assumed for invested dollars; the 10-year cost is shown above.`;
 }
 
 /**
@@ -180,7 +182,7 @@ function analyzeEmergencyFund(profile: PaycheckProfile): SkippedItem | null {
       },
       alternative: `Move to high-yield savings account (Marcus, Ally, etc.) for extra ${formatCurrency(additionalEarnings)}/year`,
       riskLevel: 'low',
-      education: 'Moving to HYSA is risk-free arbitrage - same safety, better returns',
+      education: `Cash at ${apyLabel(emergencyFundAPY)} APY; this model assumes high-yield savings pay ${apyLabel(betterAPY)} with the same deposit insurance.`,
     };
   }
   
@@ -196,7 +198,10 @@ function analyzeEmergencyFund(profile: PaycheckProfile): SkippedItem | null {
         monthly: 0,
         annual: 0,
       },
-      alternative: `Build 1 month of expenses first, then up to the ${CASH_MONTHS_CAP}-month cash maximum`,
+      alternative:
+        targetMonths > 0
+          ? `Build cash toward your ${targetMonths}-month target (${formatCurrency(targetAmount)})`
+          : 'Build a cash buffer of 3 to 6 months of necessary expenses',
       riskLevel: 'high',
       education: 'This is a risk note rather than a priced trade-off: a cash buffer is what keeps an unplanned expense from becoming high-rate debt',
     };
@@ -252,9 +257,9 @@ function analyzeDebtStrategy(profile: PaycheckProfile): SkippedItem[] {
           },
           alternative: `Pay minimum on ${debt.name}, invest extra ${formatCurrency(debt.extraPayment)}/month`,
           riskLevel: effectiveRate < 0.04 ? 'low' : 'medium',
-          education: debt.taxDeductible 
-            ? 'Tax-deductible debt is often better kept than paid off early, especially at low rates'
-            : 'Low-rate debt allows you to leverage cheap money for potentially higher investment returns',
+          education: debt.taxDeductible
+            ? `The interest is tax-deductible, so its after-tax rate is lower than the stated rate; investing is modeled at ${MARKET_LABEL} with market risk.`
+            : `The debt costs ${(debt.interestRate * 100).toFixed(1)}%; investing is modeled at ${MARKET_LABEL} with market risk.`,
         });
       }
     }
@@ -305,8 +310,9 @@ function calculateTwentyYearDebtOpportunityCost(
   monthlyExtra: number, 
   returnDifferential: number
 ): number {
-  // Future value of investing the extra payments instead
-  const monthlyRate = returnDifferential / 12;
+  // Future value of investing the extra payments instead, at the effective
+  // monthly rate (twelve months compound to exactly 1 + returnDifferential).
+  const monthlyRate = monthlyRateOf(returnDifferential);
   const months = 20 * 12;
   
   if (monthlyRate === 0) {
@@ -382,7 +388,7 @@ function analyzeRothVsTraditionalStrategy(profile: PaycheckProfile): SkippedItem
         },
         alternative: `Traditional IRA/401k saves ${formatCurrency(currentTaxSavings)}/year in taxes to invest now`,
         riskLevel: 'low',
-        education: `Peak earners often benefit from tax deferral: save ${(currentBracket * 100).toFixed(0)}% now, pay ${(expectedRetirementBracket * 100).toFixed(0)}% later`,
+        education: `Traditional defers tax at ${(currentBracket * 100).toFixed(0)}% now; withdrawals are taxed at the bracket then (${(expectedRetirementBracket * 100).toFixed(0)}% assumed).`,
       };
     }
   }
@@ -453,7 +459,7 @@ function analyzeLowInterestDebtStrategy(profile: PaycheckProfile): SkippedItem |
     riskLevel: 'medium',
     education:
       arbitrageReturn > 0
-        ? `Prepaying returns the debt's ${(debt.interestRate * 100).toFixed(1)}% with certainty; investing is modeled at ${MARKET_LABEL}, a ${formatCurrency(tenYearOpportunityCost)} difference over 10 years on this payment stream.`
-        : `Prepaying returns the debt's ${(debt.interestRate * 100).toFixed(1)}%, the same rate this model assumes for invested dollars, so no dollar difference is modeled — and the debt payoff is the certain side of that comparison.`,
+        ? `Prepaying returns the debt's ${(debt.interestRate * 100).toFixed(1)}% with certainty; investing is modeled at ${MARKET_LABEL}; the 10-year difference on this payment stream is shown above.`
+        : `Prepaying returns the debt's ${(debt.interestRate * 100).toFixed(1)}%, the same rate this model assumes for invested dollars, so no dollar difference is modeled; and the debt payoff is the certain side of that comparison.`,
   };
 }
