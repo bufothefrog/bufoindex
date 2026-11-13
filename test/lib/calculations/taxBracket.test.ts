@@ -16,12 +16,15 @@ import {
 } from '@/lib/calculations/taxBracket';
 import type { FilingStatusInput } from '@/lib/constants/irs-2026';
 
-/** Upper edges of the first six brackets per status (2026 tables, written out by hand). */
+/**
+ * Upper edges of the first six brackets per status (2026 tables, written out
+ * by hand from Rev. Proc. 2025-32 section 4.01 Tables 1 to 4).
+ */
 const EDGES: Readonly<Record<string, readonly number[]>> = {
   single: [12400, 50400, 105700, 201775, 256225, 640600],
   marriedJoint: [24800, 100800, 211400, 403550, 512450, 768700],
   marriedSeparate: [12400, 50400, 105700, 201775, 256225, 384350],
-  headOfHousehold: [17700, 67450, 105700, 201775, 256200, 640600],
+  headOfHousehold: [17700, 67450, 105700, 201750, 256200, 640600],
 };
 const RATES = [0.1, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37];
 

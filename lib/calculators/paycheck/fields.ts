@@ -414,17 +414,32 @@ export const OPTIMIZATION_GOAL: FieldSpec = {
 
 /** The 2026 bracket table's range, as taxable income for the filing status. */
 function bracketRange(bracket: TaxBracket, first: boolean): string {
-  if (first) return `taxable up to ${formatCurrency(bracket.max)}`;
-  if (!Number.isFinite(bracket.max)) return `taxable over ${formatCurrency(bracket.min)}`;
-  return `taxable ${formatCurrency(bracket.min)} to ${formatCurrency(bracket.max)}`;
+  if (first) return `Taxable up to ${formatCurrency(bracket.max)}`;
+  if (!Number.isFinite(bracket.max)) return `Taxable over ${formatCurrency(bracket.min)}`;
+  return `Taxable ${formatCurrency(bracket.min)} to ${formatCurrency(bracket.max)}`;
+}
+
+/**
+ * The taxable-income range of the bracket a stored retirement bracket reads
+ * as (its nearest rate), for the filing status: "Taxable $12,400 to
+ * $50,400". The select's help line shows it, so the option labels stay short
+ * enough for a phone.
+ */
+export function retirementBracketRange(filingStatus: FilingStatus, stored: number): string {
+  const brackets = getBracketsForStatus(filingStatus);
+  const rate = nearestBracketRate(stored);
+  const index = Math.max(0, brackets.findIndex((bracket) => bracket.rate === rate));
+  return bracketRange(brackets[index], index === 0);
 }
 
 /**
  * The retirement bracket options: the seven 2026 federal brackets for the
- * filing status, each labeled with its rate and taxable-income range, plus
- * the state's one rate when the state has an income tax ("12% federal +
- * 9.3% CA"). The value is the federal rate only, so the engine compares
- * federal with federal and the state rate is the same on both sides.
+ * filing status, each labeled with its rate, plus the state's one rate when
+ * the state has an income tax ("12% federal + 9.3% CA"). The labels stay
+ * short so a phone does not cut them off; the taxable-income range of the
+ * selected bracket is the field's help line. The value is the federal rate
+ * only, so the engine compares federal with federal and the state rate is
+ * the same on both sides.
  *
  * A stored value that is not one of the seven rates (the field was a free
  * percent before) is carried by the option of its nearest rate, so the
@@ -436,9 +451,9 @@ export function retirementBracketOptions(filingStatus: FilingStatus, state: stri
   // Two decimals at most, so 5.09% (GA) is not shown as 5.1%.
   const statePart = info?.hasStateTax ? ` + ${Number((info.rate * 100).toFixed(2))}% ${state}` : '';
   const carried = stored !== undefined && Number.isFinite(stored) ? nearestBracketRate(stored) : undefined;
-  return getBracketsForStatus(filingStatus).map((bracket, index) => ({
+  return getBracketsForStatus(filingStatus).map((bracket) => ({
     value: carried === bracket.rate ? (stored as number) : bracket.rate,
-    label: `${formatPercent(bracket.rate)} federal${statePart} (${bracketRange(bracket, index === 0)})`,
+    label: `${formatPercent(bracket.rate)} federal${statePart}`,
   }));
 }
 
@@ -454,7 +469,15 @@ export const EXPECTED_RETIREMENT_BRACKET: FieldSpec = {
       typeof stored === 'number' ? stored : undefined
     );
   },
-  help: (get) => `Compared with today's ${formatPercent(currentBracketFrom(get))} federal bracket; state rate assumed equal in both.`,
+  // "Taxable $12,400 to $50,400. Today: 22% federal; same state rate in both."
+  help: (get) => {
+    const stored = get(RETIREMENT_BRACKET_PATH);
+    const range =
+      typeof stored === 'number' && Number.isFinite(stored)
+        ? `${retirementBracketRange(get(FILING_STATUS.path) as FilingStatus, stored)}. `
+        : '';
+    return `${range}Today: ${formatPercent(currentBracketFrom(get))} federal; same state rate in both.`;
+  },
   tier: 'assumption',
   summary: (value) =>
     typeof value === 'number' ? `${formatPercent(nearestBracketRate(value))} retirement bracket` : null,

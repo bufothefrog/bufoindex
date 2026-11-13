@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { FORMS } from '@/lib/calculators/forms';
+import { retirementBracketRange } from '@/lib/calculators/paycheck/fields';
 import {
   CORE_PATHS,
   getIntakeScreens,
@@ -346,59 +347,75 @@ describe('paycheck form: the retirement bracket select', () => {
   const labels = (get: Get) => resolveOptions(field, get).map((option) => option.label);
   const values = (get: Get) => resolveOptions(field, get).map((option) => option.value);
 
-  it('is a select of the seven federal brackets with their single ranges and the CA rate (the worked example)', () => {
+  it('is a select of the seven federal brackets with the CA rate (the worked example), in labels short enough for a phone', () => {
     expect(field.kind).toBe('select');
     expect(values(fromDefaults())).toEqual([0.1, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]);
     expect(labels(fromDefaults())).toEqual([
-      '10% federal + 9.3% CA (taxable up to $12,400)',
-      '12% federal + 9.3% CA (taxable $12,400 to $50,400)',
-      '22% federal + 9.3% CA (taxable $50,400 to $105,700)',
-      '24% federal + 9.3% CA (taxable $105,700 to $201,775)',
-      '32% federal + 9.3% CA (taxable $201,775 to $256,225)',
-      '35% federal + 9.3% CA (taxable $256,225 to $640,600)',
-      '37% federal + 9.3% CA (taxable over $640,600)',
+      '10% federal + 9.3% CA',
+      '12% federal + 9.3% CA',
+      '22% federal + 9.3% CA',
+      '24% federal + 9.3% CA',
+      '32% federal + 9.3% CA',
+      '35% federal + 9.3% CA',
+      '37% federal + 9.3% CA',
     ]);
+    // Short enough for a 360 px select ("37% federal + 5.09% GA" is 21 characters).
+    for (const label of labels(fromDefaults({ 'person.state': 'GA' }))) expect(label.length).toBeLessThanOrEqual(22);
   });
 
-  it('shows federal only for a state without an income tax, and follows the filing status', () => {
+  it('shows federal only for a state without an income tax', () => {
     expect(labels(fromDefaults({ 'person.state': 'TX', 'person.filingStatus': 'marriedJoint' }))).toEqual([
-      '10% federal (taxable up to $24,800)',
-      '12% federal (taxable $24,800 to $100,800)',
-      '22% federal (taxable $100,800 to $211,400)',
-      '24% federal (taxable $211,400 to $403,550)',
-      '32% federal (taxable $403,550 to $512,450)',
-      '35% federal (taxable $512,450 to $768,700)',
-      '37% federal (taxable over $768,700)',
+      '10% federal',
+      '12% federal',
+      '22% federal',
+      '24% federal',
+      '32% federal',
+      '35% federal',
+      '37% federal',
     ]);
-    expect(labels(fromDefaults({ 'person.state': 'NY', 'person.filingStatus': 'marriedSeparate' }))).toEqual([
-      '10% federal + 6% NY (taxable up to $12,400)',
-      '12% federal + 6% NY (taxable $12,400 to $50,400)',
-      '22% federal + 6% NY (taxable $50,400 to $105,700)',
-      '24% federal + 6% NY (taxable $105,700 to $201,775)',
-      '32% federal + 6% NY (taxable $201,775 to $256,225)',
-      '35% federal + 6% NY (taxable $256,225 to $384,350)',
-      '37% federal + 6% NY (taxable over $384,350)',
-    ]);
-    const hoh = labels(fromDefaults({ 'person.state': 'GA', 'person.filingStatus': 'headOfHousehold' }));
-    expect(hoh[1]).toBe('12% federal + 5.09% GA (taxable $17,700 to $67,450)');
-    expect(hoh[4]).toBe('32% federal + 5.09% GA (taxable $201,775 to $256,200)');
+    expect(labels(fromDefaults({ 'person.state': 'GA' }))[1]).toBe('12% federal + 5.09% GA');
+  });
+
+  it('gives the taxable range of the selected bracket for the filing status (Rev. Proc. 2025-32 tables)', () => {
+    const range = (status: string, rate: number) =>
+      retirementBracketRange(status as Parameters<typeof retirementBracketRange>[0], rate);
+    expect(range('single', 0.1)).toBe('Taxable up to $12,400');
+    expect(range('single', 0.24)).toBe('Taxable $105,700 to $201,775');
+    expect(range('single', 0.32)).toBe('Taxable $201,775 to $256,225');
+    expect(range('single', 0.37)).toBe('Taxable over $640,600');
+    expect(range('marriedJoint', 0.12)).toBe('Taxable $24,800 to $100,800');
+    expect(range('marriedJoint', 0.37)).toBe('Taxable over $768,700');
+    expect(range('marriedSeparate', 0.35)).toBe('Taxable $256,225 to $384,350');
+    // Head of household: Table 2 puts the 24%/32% edge at $201,750, not the single $201,775.
+    expect(range('headOfHousehold', 0.24)).toBe('Taxable $105,700 to $201,750');
+    expect(range('headOfHousehold', 0.32)).toBe('Taxable $201,750 to $256,200');
+    // An old free percent reads as its nearest rate: 0.15 is the 12% bracket.
+    expect(range('single', 0.15)).toBe('Taxable $12,400 to $50,400');
   });
 
   it('lets the option of the nearest rate carry a stored value from the old free percent, so it validates', () => {
     const get = fromDefaults({ 'assumptions.paycheck.expectedRetirementBracket': 0.15 });
     expect(values(get)).toEqual([0.1, 0.15, 0.22, 0.24, 0.32, 0.35, 0.37]);
-    expect(labels(get)[1]).toBe('12% federal + 9.3% CA (taxable $12,400 to $50,400)');
+    expect(labels(get)[1]).toBe('12% federal + 9.3% CA');
     expect(validateFields(FORM, get, { screen: screen('assumptions') })).toEqual({});
     expect(summarizeScreen(FORM, screen('assumptions'), get)).toBe('moderate risk, balanced goal, 12% retirement bracket');
   });
 
-  it('says in its help which bracket it is compared with', () => {
+  it('says in its help the selected range and which bracket it is compared with', () => {
     expect(resolveText(field.help, fromDefaults())).toBe(
-      "Compared with today's 22% federal bracket; state rate assumed equal in both."
+      'Taxable $12,400 to $50,400. Today: 22% federal; same state rate in both.'
     );
-    expect(resolveText(field.help, fromDefaults({ 'income.grossPerPaycheck': 10000, 'income.netPerPaycheck': 6000 }))).toBe(
-      "Compared with today's 32% federal bracket; state rate assumed equal in both."
-    );
+    expect(
+      resolveText(
+        field.help,
+        fromDefaults({
+          'income.grossPerPaycheck': 10000,
+          'income.netPerPaycheck': 6000,
+          'assumptions.paycheck.expectedRetirementBracket': 0.24,
+          'person.filingStatus': 'marriedJoint',
+        })
+      )
+    ).toBe('Taxable $211,400 to $403,550. Today: 22% federal; same state rate in both.');
   });
 });
 

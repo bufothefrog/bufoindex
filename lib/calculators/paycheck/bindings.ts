@@ -17,7 +17,8 @@
  *   zero) and the current fun money (the midpoint of the range).
  * - The current federal bracket (currentBracketFrom): the 2026 bracket of
  *   yearly gross pay (bonus included) minus the traditional 401(k) share
- *   and HSA payroll contributions minus the standard deduction
+ *   and HSA payroll contributions (each capped at its 2026 limit) minus the
+ *   standard deduction
  *   (lib/calculations/taxBracket.ts).
  * - The retirement bracket, read as the nearest of the seven bracket rates
  *   (a stored value from the old free percent field is not rewritten).
@@ -28,6 +29,7 @@
  */
 
 import { updateLegacyIncomeFields } from '@/lib/calculations/core';
+import { limit401k, limitHsa } from '@/lib/calculations/contributionLimits';
 import { currentFederalBracket, nearestBracketRate } from '@/lib/calculations/taxBracket';
 import type { Binding } from '@/lib/fields/binding';
 import {
@@ -44,7 +46,7 @@ import {
 } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
 import type { ContributionType, FilingStatus } from '@/lib/profile/types';
-import type { IncomeData, PaycheckProfile } from '@/lib/types';
+import type { HSABenefits, IncomeData, PaycheckProfile } from '@/lib/types';
 
 export const CONTRIBUTION_TYPE_PATH = 'workplace.contributionType';
 export const CONTRIBUTION_PATH = 'workplace.contributionPercent';
@@ -107,15 +109,24 @@ const toCents = (value: number) => Math.round(value * 100) / 100;
  * income falls in for their filing status. Taxable income is yearly gross
  * pay (paychecks plus a regular bonus) minus the pre-tax payroll
  * contributions the profile describes (the traditional share of the 401(k)
- * election on regular pay, and HSA payroll contributions) minus the
- * standard deduction. The arithmetic is lib/calculations/taxBracket.ts.
+ * election on regular pay, and HSA payroll contributions, each capped at its
+ * 2026 limit) minus the standard deduction. The arithmetic is lib/calculations/taxBracket.ts.
  */
 export function currentBracketFrom(get: Get): number {
   const income = incomeFrom(get);
   const yearlyPay = income.monthlyGross * 12;
   const yearlyGross = yearlyPay + income.bonusExpected * 12;
-  const traditional401k = get('workplace.has401k') === true ? yearlyPay * electionFrom(get).traditional : 0;
-  const hsa = get('hsa.eligible') === true ? (get('hsa.monthlyContribution') as number) * 12 : 0;
+  const age = get(AGE.path) as number;
+  // Each deduction is capped at its 2026 limit for the age, as the engine
+  // applies them: the 402(g) deferral limit for the traditional share, and
+  // the HSA limit for the coverage less the employer's money for the HSA.
+  const traditional401k =
+    get('workplace.has401k') === true ? Math.min(yearlyPay * electionFrom(get).traditional, limit401k(age)) : 0;
+  const hsaRoom = Math.max(
+    0,
+    limitHsa(get('hsa.coverage') as HSABenefits['coverageType'], age) - (get('hsa.employerAnnualContribution') as number)
+  );
+  const hsa = get('hsa.eligible') === true ? Math.min((get('hsa.monthlyContribution') as number) * 12, hsaRoom) : 0;
   return currentFederalBracket({
     yearlyGross: toCents(yearlyGross),
     preTaxDeductions: toCents(traditional401k + hsa),

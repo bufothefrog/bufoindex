@@ -496,6 +496,31 @@ describe('the computed federal bracket', () => {
     expect(bracketOf(2800, hsa(false))).toBe(0.22);
   });
 
+  it('caps the traditional 401(k) deduction at the 2026 deferral limit for the age', () => {
+    const election: Write[] = [{ path: 'workplace.contributionPercent', value: 0.3 }];
+    // 9,500 x 26 = 247,000; 30% is 74,100, capped at 24,500: 247,000 - 24,500 - 16,100 = 206,400: 32%
+    // (uncapped, 156,800 would read 24%).
+    expect(bracketOf(9500, election)).toBe(0.32);
+    // At 55 the limit is 24,500 + 8,000: 247,000 - 32,500 - 16,100 = 198,400: 24%.
+    expect(bracketOf(9500, [...election, { path: 'person.age', value: 55 }])).toBe(0.24);
+  });
+
+  it('caps the HSA deduction at the coverage limit less the employer money', () => {
+    const hsa = (employer: number): Write[] => [
+      { path: 'hsa.eligible', value: true },
+      { path: 'hsa.coverage', value: 'individual' },
+      { path: 'hsa.monthlyContribution', value: 1000 },
+      { path: 'hsa.employerAnnualContribution', value: employer },
+    ];
+    // 3,000 x 26 = 78,000 - 4,680 - 16,100 = 57,220; 12,000 a year capped at 4,400: 52,820: 22%
+    // (uncapped, 45,220 would read 12%).
+    expect(bracketOf(3000, hsa(0))).toBe(0.22);
+    // 2,880 x 26 = 74,880 - 4,492.80 - 16,100 = 54,287.20. Room 4,400: 49,887.20: 12%.
+    expect(bracketOf(2880, hsa(0))).toBe(0.12);
+    // An employer 1,000 leaves 3,400 of room: 50,887.20: 22%.
+    expect(bracketOf(2880, hsa(1000))).toBe(0.22);
+  });
+
   it('matches the helper the note and the help read', () => {
     const profile = withWrites([{ path: 'income.grossPerPaycheck', value: 6000 }]);
     expect(currentBracketFrom(makeGet(profile))).toBe(engineInputsFor(PAYCHECK_CALCULATOR, profile).taxes.federalBracket);
