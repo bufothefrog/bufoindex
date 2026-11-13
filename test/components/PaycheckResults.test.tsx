@@ -87,6 +87,29 @@ describe('FinancialStepCard: HSA limit (bug 4)', () => {
   });
 });
 
+describe('FinancialStepCard: Financial Impact', () => {
+  it('prints each impact as its label over its value, the term followed by its definition', () => {
+    const profile = hsaProfile(56);
+    const steps = calculateStepStatus(FINANCIAL_STEPS, calculateOptimalAllocation(profile).allocations, profile);
+    const step = steps.find((candidate) => candidate.id === 'hsa-max')!;
+    render(<FinancialStepCard step={step} profile={profile} expanded onToggle={() => {}} />);
+
+    // The heading's own block holds one description list of two pairs.
+    const block = screen.getByRole('heading', { name: 'Financial Impact' }).parentElement!.parentElement!;
+    const list = block.querySelector('dl');
+    expect(list).not.toBeNull();
+    const terms = within(list!).getAllByRole('term');
+    expect(terms.map((term) => term.textContent)).toEqual(['Monthly Impact', 'Annual Impact']);
+    expect(terms.map((term) => term.nextElementSibling?.textContent)).toEqual(['+$195', '+$2,340']);
+    for (const term of terms) {
+      // Label over value: the term is the label text itself, not a bordered
+      // row that sets an icon and the label beside the value.
+      expect(term.childElementCount).toBe(0);
+      expect(term.nextElementSibling).toBe(within(term.parentElement!).getByRole('definition'));
+    }
+  });
+});
+
 describe('FinancialStepCard: Emergency Fund on the zero-cash default', () => {
   it('quotes the same monthly figure in the header and in How to Implement', async () => {
     // Default profile with the emergency fund answered 0: 1,026.92 per bi-weekly paycheck,
