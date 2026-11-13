@@ -91,8 +91,6 @@ const TRIMMED_SCREEN_COPY: Partial<Record<CalculatorId, Readonly<Record<string, 
     facts: {
       title: 'Leverage ratio',
       question: 'Which leverage ratio should the comparison use?',
-      description:
-        'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
     },
   },
 };

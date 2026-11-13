@@ -53,11 +53,8 @@ describe('Wizard, leverage intent', () => {
 
     expect(screen.getByRole('heading', { name: MARKET })).toBeInTheDocument();
     expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        '500 simulated paths with a fixed seed, so the same inputs always give the same results. A different seed would move the summary figures by a few percentage points.'
-      )
-    ).toBeInTheDocument();
+    // The path count and seed are stated with the results, not on the form.
+    expect(screen.queryByText(/simulated paths/)).not.toBeInTheDocument();
     expect(screen.getByText('Good enough to start. You can change any answer on the calculator.')).toBeInTheDocument();
     // The last screen has no "Skip the rest".
     expect(screen.queryByRole('button', { name: 'Skip the rest' })).not.toBeInTheDocument();

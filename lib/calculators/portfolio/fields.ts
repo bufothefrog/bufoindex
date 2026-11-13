@@ -137,7 +137,7 @@ export const ACCOUNT_DEPOSIT: FieldSpec = {
   path: 'deposit',
   kind: 'money',
   label: 'New cash',
-  help: 'Money you are ready to put into your accounts now.',
+  help: 'Money to invest now.',
   placeholder: '0.00',
   min: 0,
   precision: 2,
@@ -193,8 +193,8 @@ export const HOLDINGS: FieldSpec = {
 // ---------------------------------------------------------------------------
 
 const MODE_OPTIONS: readonly (FieldOption & { value: RebalanceMode })[] = [
-  { value: 'whole', label: 'Whole shares', description: 'Floor to integers; leftover kept as cash.' },
-  { value: 'fractional', label: 'Fractional', description: 'Exact-to-penny splits. Requires broker support.' },
+  { value: 'whole', label: 'Whole shares', description: 'Rounds down; leftover stays as cash.' },
+  { value: 'fractional', label: 'Fractional', description: 'Exact amounts to the penny.' },
 ];
 
 export const MODE: FieldSpec = {

@@ -24,12 +24,6 @@ import {
 
 const BOUNDS = LEVERAGE_INPUT_BOUNDS;
 
-/** The leverage ratio the profile holds, for labels that name the fund ("2x"). */
-function ratioLabel(get: Get): string {
-  const ratio = get(LEVERAGE_RATIO_PATH);
-  return formatMultiple(isFiniteNumber(ratio) ? ratio : 0);
-}
-
 /** A nullable field's summary: its override, or the value it derives. */
 function overrideSummary(derive: (get: Get) => number, format: (value: number) => string) {
   return (value: unknown, get: Get): string => format(isFiniteNumber(value) ? value : derive(get));
@@ -43,7 +37,7 @@ export const MONTHLY_CONTRIBUTION: FieldSpec = {
   path: MONTHLY_CONTRIBUTION_PATH,
   kind: 'money',
   label: 'Monthly contribution',
-  help: 'Invested at the start of every month, in both funds.',
+  help: "Added at each month's start, to both funds.",
   min: 0,
   max: BOUNDS.maxMonthlyContribution,
   nullable: {
@@ -59,7 +53,7 @@ export const YEARS: FieldSpec = {
   path: YEARS_PATH,
   kind: 'number',
   label: 'Years',
-  help: `${BOUNDS.minYears} to ${BOUNDS.maxYears} years of monthly contributions.`,
+  help: `${BOUNDS.minYears} to ${BOUNDS.maxYears} years.`,
   unit: { suffix: ' yrs' },
   min: BOUNDS.minYears,
   max: BOUNDS.maxYears,
@@ -76,7 +70,7 @@ export const STARTING_BALANCE: FieldSpec = {
   path: STARTING_BALANCE_PATH,
   kind: 'money',
   label: 'Starting balance',
-  help: 'Already invested at month 0. Use 0 to compare contributions only.',
+  help: 'Invested at month 0; 0 compares contributions only.',
   min: 0,
   max: BOUNDS.maxStartingBalance,
   nullable: {
@@ -97,10 +91,9 @@ export const LEVERAGE_RATIO: FieldSpec = {
     const ratio = get(LEVERAGE_RATIO_PATH);
     return leverageRatioOptions(isFiniteNumber(ratio) ? ratio : undefined);
   },
+  // Only at 1x does the model do something the label does not say.
   help: (get) =>
-    get(LEVERAGE_RATIO_PATH) === 1
-      ? 'At 1x the only difference from the index fund is the expense ratio in Assumptions.'
-      : 'Compared against a plain index fund receiving the same dollars on the same dates.',
+    get(LEVERAGE_RATIO_PATH) === 1 ? 'At 1x, the funds differ only in expense ratio.' : undefined,
   min: Math.min(...LEVERAGE_RATIO_OPTIONS),
   max: Math.max(...LEVERAGE_RATIO_OPTIONS),
   tier: 'details',
@@ -127,10 +120,6 @@ export const INDEX_VOLATILITY: FieldSpec = {
   path: 'assumptions.leverage.indexVolatility',
   kind: 'percent',
   label: 'Index annual volatility',
-  help: (get) => {
-    const L = ratioLabel(get);
-    return `The ${L} fund's volatility is about ${L} this figure.`;
-  },
   min: BOUNDS.minVolatility,
   max: BOUNDS.maxVolatility,
   precision: 1,
@@ -142,7 +131,7 @@ export const FINANCING_RATE: FieldSpec = {
   path: 'assumptions.leverage.financingRate',
   kind: 'percent',
   label: 'Financing rate on borrowed exposure',
-  help: 'Short-term rate plus a swap spread, charged on the extra (L - 1) exposure.',
+  help: 'Short-term rate plus swap spread, charged on the extra (L-1) exposure.',
   min: 0,
   max: BOUNDS.maxFinancingRate,
   precision: 2,

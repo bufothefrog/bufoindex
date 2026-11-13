@@ -40,14 +40,14 @@ export function GuidedSection() {
           <div className="mt-4 max-w-xl space-y-2" role="radiogroup" aria-label="Strategy preset (demo)">
             <OptionCard
               title="Standard"
-              description="About 3 months of must-pay costs in cash, then unleveraged index funds."
+              description="About 3 months of must-pay costs in cash."
               selected={preset === 'standard'}
               onSelect={() => setPreset('standard')}
               tabIndex={preset === 'standard' ? 0 : -1}
             />
             <OptionCard
               title="Cash-flow investor"
-              description="About 1 month in cash backed by a plan, automated contributions, and a leverage comparison for long horizons."
+              description="About 1 month of must-pay costs in cash."
               selected={preset === 'cashflow-investor'}
               onSelect={() => setPreset('cashflow-investor')}
               tabIndex={preset === 'cashflow-investor' ? 0 : -1}

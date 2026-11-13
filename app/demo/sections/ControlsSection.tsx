@@ -19,8 +19,8 @@ type Mode = 'whole' | 'fractional';
 type Span = '1y' | '5y' | '10y';
 
 const MODE_OPTIONS: readonly SegmentedControlOption<Mode>[] = [
-  { value: 'whole', label: 'Whole shares', description: 'Floor to integers; leftover kept as cash.', icon: Coins },
-  { value: 'fractional', label: 'Fractional', description: 'Exact splits, where the broker supports them.', icon: Scissors },
+  { value: 'whole', label: 'Whole shares', description: 'Rounds down; leftover stays as cash.', icon: Coins },
+  { value: 'fractional', label: 'Fractional', description: 'Exact amounts to the penny.', icon: Scissors },
 ];
 
 const SPAN_OPTIONS: readonly SegmentedControlOption<Span>[] = [

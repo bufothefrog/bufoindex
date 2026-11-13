@@ -102,13 +102,13 @@ describe('intake intents', () => {
 
 const OLD_PROFILE_EXTRA_SCREENS: Record<string, OldScreenCopy> = {
   'cash-buffer': { title: 'What does your emergency fund look like today?' },
-  strategy: { title: 'Which starting point should the calculators use?', description: 'This sets your starting emergency-fund target. Both presets run through the same math; your overview shows the other one next to it.' },
+  strategy: { title: 'Which starting point should the calculators use?' },
 };
 
 const OLD_PROFILE_EXTRA_QUESTIONS: Record<string, OldQuestion> = {
   'cash.emergencyFundBalance': { path: 'cash.emergencyFundBalance', label: 'Cash set aside for emergencies', kind: 'money', min: 0 },
-  'cash.emergencyFundApy': { path: 'cash.emergencyFundApy', label: 'Interest rate (APY) on that cash', kind: 'percent', help: 'The rate your savings account pays. A guess is fine.', min: 0, max: 0.2 },
-  'strategy.preset': { path: 'strategy.preset', label: 'Strategy preset', kind: 'choice', options: [{ value: 'standard', label: 'Standard', description: 'About 3 months of must-pay costs in cash, then unleveraged index funds.' }, { value: 'cashflow-investor', label: 'Cash-flow investor', description: 'About 1 month in cash backed by a plan, automated contributions, and a leverage comparison for long horizons.' }] },
+  'cash.emergencyFundApy': { path: 'cash.emergencyFundApy', label: 'Interest rate (APY) on that cash', kind: 'percent', min: 0, max: 0.2 },
+  'strategy.preset': { path: 'strategy.preset', label: 'Strategy preset', kind: 'choice', options: [{ value: 'standard', label: 'Standard', description: 'About 3 months of must-pay costs in cash.' }, { value: 'cashflow-investor', label: 'Cash-flow investor', description: 'About 1 month of must-pay costs in cash.' }] },
 };
 
 const OLD_PROFILE_EXTRA_FLOW: readonly OldScreen[] = [
@@ -131,8 +131,7 @@ const FORM_SECTIONS: Record<(typeof PROFILE_FORM_ORDER)[number], string> = {
 const TRIMMED_COPY: Readonly<Record<string, Pick<AskedScreen, 'title' | 'description'>>> = {
   'leverage:facts': {
     title: 'Leverage ratio',
-    description:
-      'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
+    description: undefined,
   },
 };
 

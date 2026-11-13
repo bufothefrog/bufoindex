@@ -194,7 +194,7 @@ export const INVESTED_BALANCE: FieldSpec = {
   path: 'investing.investedBalance',
   kind: 'money',
   label: 'Invested balance',
-  help: 'A rough total across 401(k), IRA, and brokerage accounts is fine. Leave out your emergency fund.',
+  help: 'Total across 401(k), IRA and brokerage, not your emergency fund.',
   min: 0,
   tier: 'details',
 };
@@ -203,7 +203,7 @@ export const MONTHLY_INVESTING: FieldSpec = {
   path: 'investing.monthlyContribution',
   kind: 'money',
   label: 'Monthly investing contribution',
-  help: 'What you put toward investing each month across all accounts, including your own 401(k) contributions.',
+  help: 'All accounts together, including your own 401(k) contributions.',
   min: 0,
   tier: 'details',
 };
@@ -229,7 +229,6 @@ export const EMERGENCY_FUND_APY: FieldSpec = {
   path: 'cash.emergencyFundApy',
   kind: 'percent',
   label: 'Interest rate (APY) on that cash',
-  help: 'The rate your savings account pays. A guess is fine.',
   min: 0,
   max: 0.2,
   tier: 'details',
@@ -263,14 +262,12 @@ export const CORE_SCREENS: readonly ScreenSpec[] = [
   {
     id: 'about',
     title: 'A little about you',
-    description: 'Age sets the time horizon. State and filing status set the tax estimate.',
     tier: 'core',
     fields: [AGE.path, STATE.path, FILING_STATUS.path],
   },
   {
     id: 'pay',
     title: 'What does a typical paycheck look like?',
-    description: 'A close guess is fine.',
     tier: 'core',
     fields: [GROSS_PAY.path, PAY_FREQUENCY.path, NET_PAY.path],
   },
@@ -296,8 +293,6 @@ export const PROFILE_EXTRA_SCREENS: readonly ScreenSpec[] = [
   {
     id: 'strategy',
     title: 'Which starting point should the calculators use?',
-    description:
-      'This sets your starting emergency-fund target. Both presets run through the same math; your overview shows the other one next to it.',
     tier: 'details',
     fields: [STRATEGY_PRESET.path],
   },

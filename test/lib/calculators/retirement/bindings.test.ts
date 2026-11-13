@@ -273,10 +273,10 @@ describe('the definition', () => {
 describe('filingStatusNote', () => {
   it('names the saved status when the model runs it as single', () => {
     expect(filingStatusNote('headOfHousehold')).toBe(
-      'Retirement estimates model two filing statuses, single and married filing jointly. Your saved status, head of household, runs here as single.'
+      'Retirement estimates model only single and married filing jointly, so head of household runs here as single.'
     );
     expect(filingStatusNote('marriedSeparate')).toBe(
-      'Retirement estimates model two filing statuses, single and married filing jointly. Your saved status, married filing separately, runs here as single.'
+      'Retirement estimates model only single and married filing jointly, so married filing separately runs here as single.'
     );
   });
 

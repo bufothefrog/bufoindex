@@ -74,7 +74,7 @@ describe('retirement form: screens', () => {
         id: 'ss-healthcare',
         title: 'Social Security and healthcare',
         question: 'What will Social Security and healthcare look like?',
-        description: "Estimates in today's dollars are fine.",
+        description: "Amounts are in today's dollars.",
       },
       {
         id: 'assumptions',
@@ -150,7 +150,7 @@ describe('retirement form: screens', () => {
         label: 'Target Date Fund',
         description: `Age-based: 90% stocks, ${Math.round(at30.accumulationReturn * 100)}% / ${Math.round(at30.retirementReturn * 100)}% returns`,
       },
-      { value: 'custom', label: 'Custom', description: 'Set your own values' },
+      { value: 'custom', label: 'Custom' },
     ]);
     // Age 65 is down to 40% stocks.
     expect(resolveOptions(spec, fromDefaults({ 'person.age': 65 }))[0].description).toMatch(/^Age-based: 40% stocks, /);
@@ -316,11 +316,12 @@ describe("retirement form: 'remaining' mode", () => {
 
 describe('retirement form: the old intake question set is still asked', () => {
   // Captured from the intake before slice w1 (the provisional form carried
-  // these three after the core, one per screen).
+  // these three after the core, one per screen); the help is the copy
+  // slice b1 trimmed.
   const OLD_QUESTIONS: readonly OldQuestion[] = [
     { path: 'person.retirementAge', label: 'Target retirement age', kind: 'number', min: 30, max: 85, step: 1 },
-    { path: 'investing.investedBalance', label: 'Invested balance', kind: 'money', help: 'A rough total across 401(k), IRA, and brokerage accounts is fine. Leave out your emergency fund.', min: 0 },
-    { path: 'investing.monthlyContribution', label: 'Monthly investing contribution', kind: 'money', help: 'What you put toward investing each month across all accounts, including your own 401(k) contributions.', min: 0 },
+    { path: 'investing.investedBalance', label: 'Invested balance', kind: 'money', help: 'Total across 401(k), IRA and brokerage, not your emergency fund.', min: 0 },
+    { path: 'investing.monthlyContribution', label: 'Monthly investing contribution', kind: 'money', help: 'All accounts together, including your own 401(k) contributions.', min: 0 },
   ];
 
   it('asks the old core screens first and every old question with its wording and bounds', () => {

@@ -131,9 +131,8 @@ describe('PROFILE_FORM', () => {
     expect(facts).toMatchObject({
       title: 'Leverage ratio',
       question: 'Which leverage ratio should the comparison use?',
-      description:
-        'The leverage comparison runs a leveraged fund against a plain index fund that receives the same contributions.',
     });
+    expect(facts.description).toBeUndefined();
     // The leverage intake asks the whole screen, with its own wording.
     expect(FORMS.leverage.screens.find((screen) => screen.id === 'facts')?.title).toBe('What goes into the comparison?');
     // A screen that keeps every field keeps its wording even with copy for it.

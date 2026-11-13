@@ -40,7 +40,6 @@ import {
   HSA_EMPLOYER_CONTRIBUTION,
   HSA_INVESTING,
   HSA_MONTHLY_CONTRIBUTION,
-  HSA_NOTES,
   IRA_ROTH,
   IRA_ROTH_BALANCE,
   IRA_ROTH_MONTHLY,
@@ -53,21 +52,17 @@ import {
   RISK_TOLERANCE,
   ROTH_CONTRIBUTION_PERCENT,
   TARGET_MONTHS,
-  TAXABLE_NOTE,
   TAX_NOTE,
 } from './fields';
 
-// The basics as the allocator page asks them: the old input cards' help and
-// placeholders. Core screens show on the calculator page only (the intake
-// asks the shared core), so this copy never reaches the wizard.
+// The basics as the allocator page asks them: the shared help, with the
+// old input cards' placeholders. Core screens show on the calculator page
+// only (the intake asks the shared core).
 const BASICS_OWN: readonly FieldSpec[] = [
-  withOverrides(AGE, { help: 'Used for catch-up contribution eligibility', placeholder: '30' }),
+  withOverrides(AGE, { placeholder: '30' }),
   withOverrides(GROSS_PAY, { placeholder: '2,500' }),
   withOverrides(NET_PAY, { placeholder: '1,900' }),
-  withOverrides(NECESSARY_MONTHLY, {
-    help: 'Rent, utilities, groceries, minimum debt payments, insurance, etc.',
-    placeholder: '2,500',
-  }),
+  withOverrides(NECESSARY_MONTHLY, { placeholder: '2,500' }),
 ];
 const BASICS: readonly FieldSpec[] = CORE_FIELDS.map(
   (spec) => BASICS_OWN.find((own) => own.path === spec.path) ?? spec
@@ -133,7 +128,6 @@ export const PAYCHECK_FORM: FormSpec = {
       id: 'spending-bonus',
       title: 'Fun money and bonuses',
       question: 'How much fun money do you want each month?',
-      description: 'Spending on things you enjoy, beyond the must-pay costs. A range is fine.',
       tier: 'details',
       fields: [FUN_MONEY_MIN.path, FUN_MONEY_MAX.path, HAS_BONUS.path, BONUS_AMOUNT.path, BONUS_FREQUENCY.path],
       notes: [BONUS_NOTE],
@@ -149,8 +143,6 @@ export const PAYCHECK_FORM: FormSpec = {
       id: '401k',
       title: '401(k) or similar plan',
       question: 'Does your employer offer a 401(k) or similar plan?',
-      description:
-        'Matches are often written as "50% of the first 6% of pay". A guess is fine; your benefits portal has the exact terms.',
       tier: 'details',
       fields: [
         HAS_401K.path,
@@ -174,7 +166,6 @@ export const PAYCHECK_FORM: FormSpec = {
         HSA_EMPLOYER_CONTRIBUTION.path,
         HSA_INVESTING.path,
       ],
-      notes: HSA_NOTES,
     },
     {
       id: 'ira-taxable',
@@ -190,7 +181,6 @@ export const PAYCHECK_FORM: FormSpec = {
         IRA_ROTH_BALANCE.path,
         TAXABLE.path,
       ],
-      notes: [TAXABLE_NOTE],
     },
     {
       id: 'debts',

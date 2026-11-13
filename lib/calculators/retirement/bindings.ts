@@ -69,7 +69,7 @@ export function retirementFilingStatus(status: FilingStatus): RetirementInputs['
  */
 export function filingStatusNote(status: FilingStatus): string | null {
   if (retirementFilingStatus(status) === status) return null;
-  return `Retirement estimates model two filing statuses, single and married filing jointly. Your saved status, ${FILING_STATUS_META[status].phrase}, runs here as single.`;
+  return `Retirement estimates model only single and married filing jointly, so ${FILING_STATUS_META[status].phrase} runs here as single.`;
 }
 
 export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [

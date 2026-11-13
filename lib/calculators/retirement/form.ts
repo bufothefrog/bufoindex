@@ -3,11 +3,10 @@
  * every field the retirement engine uses, in topic screens. The calculator
  * page shows them all; the retirement intake asks the four screens after
  * the core, the assumptions last (O3). The basics are the core facts the
- * engine reads, with the old calculator's help; take-home pay is not one.
+ * engine reads, with the shared help; take-home pay is not one.
  */
 
 import {
-  AGE,
   CORE_FIELDS,
   CORE_SCREENS,
   FILING_STATUS,
@@ -43,16 +42,11 @@ import {
   VOLATILITY,
 } from './fields';
 
-// The basics as the retirement page asks them: the old calculator's help on
-// the facts it asked. Core screens show on the calculator page only (the
-// intake asks the shared core), so this copy never reaches the wizard.
-const CURRENT_AGE = withOverrides(AGE, { help: 'Your current age' });
-const HOME_STATE = withOverrides(STATE, { help: 'For state tax calculations', placeholder: 'Select your state...' });
-const MUST_PAY = withOverrides(NECESSARY_MONTHLY, {
-  help: 'Essential monthly expenses',
-  hint: NECESSARY_MONTHLY.help,
-  placeholder: '4,000',
-});
+// The basics as the retirement page asks them: the shared help, with the
+// old calculator's placeholders. Core screens show on the calculator page
+// only (the intake asks the shared core).
+const HOME_STATE = withOverrides(STATE, { placeholder: 'Select your state...' });
+const MUST_PAY = withOverrides(NECESSARY_MONTHLY, { placeholder: '4,000' });
 
 /**
  * O10: the filing status says when the saved one runs as single, whatever
@@ -79,7 +73,7 @@ const FILING_STATUS_NOTE: ScreenNote = {
  * gross pay hold results back here).
  */
 const BASICS: readonly FieldSpec[] = CORE_FIELDS.filter((spec) => spec !== NET_PAY).map(
-  (spec) => [CURRENT_AGE, HOME_STATE, FILING, MUST_PAY].find((own) => own.path === spec.path) ?? spec
+  (spec) => [HOME_STATE, FILING, MUST_PAY].find((own) => own.path === spec.path) ?? spec
 );
 
 const BASICS_SCREENS: readonly ScreenSpec[] = CORE_SCREENS.map((screen) => ({
@@ -140,7 +134,7 @@ export const RETIREMENT_FORM: FormSpec = {
       id: 'ss-healthcare',
       title: 'Social Security and healthcare',
       question: 'What will Social Security and healthcare look like?',
-      description: "Estimates in today's dollars are fine.",
+      description: "Amounts are in today's dollars.",
       tier: 'details',
       fields: [SOCIAL_SECURITY_BENEFIT.path, SOCIAL_SECURITY_AGE.path, ANNUAL_HEALTHCARE_COST.path],
     },

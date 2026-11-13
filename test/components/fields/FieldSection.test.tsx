@@ -155,6 +155,31 @@ describe('FieldSection', () => {
     expect(screen.getByText('Nothing saved here yet.')).toBeInTheDocument();
   });
 
+  it('shows "Not answered yet" while collapsed when there is neither a summary nor a description', () => {
+    render(
+      <FieldHarness initial={VALUES}>
+        {({ get, onWrite }) => (
+          <FieldSection form={FORM} screen={SCREENS.intake} get={get} errors={{}} onWrite={onWrite} collapsed />
+        )}
+      </FieldHarness>
+    );
+    const region = screen.getByRole('region', { name: 'Intake screen' });
+    expect(within(region).getByText(/./, { selector: 'p' })).toHaveTextContent(/^Not answered yet$/);
+  });
+
+  it('shows "Not answered yet" instead of the values when summaries are turned off and there is no description', () => {
+    render(
+      <FieldHarness initial={VALUES}>
+        {({ get, onWrite }) => (
+          <FieldSection form={FORM} screen={SCREENS.about} get={get} errors={{}} onWrite={onWrite} collapsed summarize={false} />
+        )}
+      </FieldHarness>
+    );
+    const region = screen.getByRole('region', { name: 'About you' });
+    expect(within(region).getByText('Not answered yet')).toBeInTheDocument();
+    expect(within(region).queryByText('age 30, $3,500 per paycheck')).not.toBeInTheDocument();
+  });
+
   it('shows the core cards of a calculator as compact values while collapsed', () => {
     const form = FORMS.paycheck;
     render(

@@ -6,6 +6,10 @@
  * calculator's own questions live in its test/lib/calculators/<id>/form.test.ts,
  * so a calculator slice that grows its form edits only its own files.
  *
+ * Slice b1 (fewer explainers) trimmed the help and descriptions; the
+ * tables below carry the trimmed copy, so the pins now check that every
+ * old question is still asked, with today's wording.
+ *
  * askedScreens(flow) reads what the intake asks now, in the same shape as
  * oldScreens(...), so a test compares the two question by question;
  * intakePaths(flow) lists every path a flow's intake can ask.
@@ -43,8 +47,8 @@ export interface OldScreenCopy {
 export type OldScreen = readonly [id: string, section: string, questions: readonly string[]];
 
 export const OLD_CORE_SCREENS: Readonly<Record<string, OldScreenCopy>> = {
-  about: { title: 'A little about you', description: 'Age sets the time horizon. State and filing status set the tax estimate.' },
-  pay: { title: 'What does a typical paycheck look like?', description: 'A close guess is fine.' },
+  about: { title: 'A little about you' },
+  pay: { title: 'What does a typical paycheck look like?' },
   'must-pay': { title: 'What do you have to pay each month?' },
 };
 

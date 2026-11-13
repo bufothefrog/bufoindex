@@ -18,7 +18,7 @@ import {
   skipLabelFor,
   validateIntakeScreen,
 } from '@/lib/constants/intake';
-import { summarizeScreen, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
+import { resolveOptions, resolveText, summarizeScreen, visibleScreenFields, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
@@ -42,17 +42,17 @@ const AFTER_CORE = ['spending-bonus', 'emergency-fund', '401k', 'hsa', 'ira-taxa
 
 /** The questions the old paycheck intake asked, captured before w1 (see intakeFixture). */
 const OLD_SCREENS: Record<string, OldScreenCopy> = {
-  'fun-money': { title: 'How much fun money do you want each month?', description: 'Spending on things you enjoy, beyond the must-pay costs. A range is fine.' },
+  'fun-money': { title: 'How much fun money do you want each month?' },
   workplace: { title: 'Does your employer offer a 401(k) or similar plan?' },
-  match: { title: 'How does the employer match work?', description: 'Often written as "50% of the first 6% of pay". A guess is fine; your benefits portal has the exact terms.' },
+  match: { title: 'How does the employer match work?' },
 };
 
 const OLD_QUESTIONS: Record<string, OldQuestion> = {
   'spending.funMoneyMin': { path: 'spending.funMoneyMin', label: 'At least, per month', kind: 'money', min: 0 },
   'spending.funMoneyMax': { path: 'spending.funMoneyMax', label: 'At most, per month', kind: 'money', min: 0 },
-  'workplace.has401k': { path: 'workplace.has401k', label: 'Workplace retirement plan', kind: 'choice', options: [{ value: true, label: 'Yes', description: 'Not sure? Pick Yes and check your benefits portal later.' }, { value: false, label: 'No' }] },
-  'workplace.matchPercent': { path: 'workplace.matchPercent', label: 'Employer match rate', kind: 'percent', help: 'What your employer adds per dollar you contribute. 50% means 50 cents per dollar.', min: 0, max: 2 },
-  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'In "50% of the first 6%", this is the 6%.', min: 0, max: 1 },
+  'workplace.has401k': { path: 'workplace.has401k', label: 'Workplace retirement plan', kind: 'choice', options: [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] },
+  'workplace.matchPercent': { path: 'workplace.matchPercent', label: 'Employer match rate', kind: 'percent', help: 'Per dollar you contribute; 50% means 50 cents.', min: 0, max: 2 },
+  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'The 6% in "50% of the first 6%".', min: 0, max: 1 },
 };
 
 const OLD_FLOW: readonly OldScreen[] = [
@@ -146,9 +146,9 @@ describe('paycheck form: screens and fields', () => {
     expect(
       FORM.screens.slice(3).map((s) => [s.id, s.title, s.question, s.description, s.tier])
     ).toEqual([
-      ['spending-bonus', 'Fun money and bonuses', 'How much fun money do you want each month?', 'Spending on things you enjoy, beyond the must-pay costs. A range is fine.', 'details'],
+      ['spending-bonus', 'Fun money and bonuses', 'How much fun money do you want each month?', undefined, 'details'],
       ['emergency-fund', 'Emergency fund', 'What does your emergency fund look like today?', undefined, 'details'],
-      ['401k', '401(k) or similar plan', 'Does your employer offer a 401(k) or similar plan?', 'Matches are often written as "50% of the first 6% of pay". A guess is fine; your benefits portal has the exact terms.', 'details'],
+      ['401k', '401(k) or similar plan', 'Does your employer offer a 401(k) or similar plan?', undefined, 'details'],
       ['hsa', 'Health savings account', 'Do you have a health savings account (HSA)?', undefined, 'details'],
       ['ira-taxable', 'IRAs and taxable investing', 'Do you invest in an IRA or a taxable account?', undefined, 'details'],
       ['debts', 'Debts', 'Do you have any debts?', undefined, 'details'],
@@ -271,7 +271,7 @@ describe('paycheck form: visibility', () => {
     ).toEqual(['workplace.has401k']);
   });
 
-  it('shows the HSA details and notes only when eligible, the investing note by the investing answer', () => {
+  it('shows the HSA details only when eligible, with no notes either way', () => {
     expect(visible('hsa')).toEqual(['hsa.eligible']);
     expect(notes('hsa')).toEqual([]);
     const eligible = fromDefaults({ 'hsa.eligible': true });
@@ -282,34 +282,23 @@ describe('paycheck form: visibility', () => {
       'hsa.employerAnnualContribution',
       'hsa.investing',
     ]);
-    const cashNotes = notes('hsa', eligible);
-    expect(cashNotes.map((note) => note.text.split(':')[0])).toEqual([
-      'Three tax advantages',
-      '$4,400/year limit',
-      'Reimbursement timing',
-      'HSA and Roth IRA compared',
-    ]);
-    expect(cashNotes[1].text).toBe('$4,400/year limit: $367 per month');
-    expect(cashNotes[3].tone).toBe('caution');
-    const investing = notes('hsa', fromDefaults({ 'hsa.eligible': true, 'hsa.investing': true }));
-    expect(investing.map((note) => note.text.split(':')[0])).toEqual([
-      'Three tax advantages',
-      '$4,400/year limit',
-      'Reimbursement timing',
-      'Held as an investment',
-    ]);
-    expect(investing[3].tone).toBe('info');
+    expect(notes('hsa', eligible)).toEqual([]);
+    expect(notes('hsa', fromDefaults({ 'hsa.eligible': true, 'hsa.investing': true }))).toEqual([]);
   });
 
-  it('states the HSA limit the step card uses: the coverage tier plus the catch-up at 55 and over (bug 4)', () => {
-    const limitNote = (overrides: Record<string, unknown>) =>
-      notes('hsa', fromDefaults({ 'hsa.eligible': true, ...overrides }))[1].text;
-    expect(limitNote({ 'person.age': 54 })).toBe('$4,400/year limit: $367 per month');
-    expect(limitNote({ 'person.age': 55 })).toBe('$5,400/year limit: $450 per month');
-    expect(limitNote({ 'person.age': 58, 'hsa.coverage': 'family' })).toBe('$9,750/year limit: $813 per month');
+  it('states the HSA limit the step card uses, once, as the monthly contribution help: the coverage tier plus the catch-up at 55 and over (bug 4)', () => {
+    const spec = FORM.fields.find((field) => field.path === 'hsa.monthlyContribution')!;
+    const limitHelp = (overrides: Record<string, unknown>) =>
+      resolveText(spec.help, fromDefaults({ 'hsa.eligible': true, ...overrides }));
+    expect(limitHelp({ 'person.age': 54 })).toBe('Up to $4,400 a year ($367 a month).');
+    expect(limitHelp({ 'person.age': 55 })).toBe('Up to $5,400 a year ($450 a month).');
+    expect(limitHelp({ 'person.age': 58, 'hsa.coverage': 'family' })).toBe('Up to $9,750 a year ($813 a month).');
+    // The coverage options name the tier only; the limit is not repeated there.
+    const coverage = FORM.fields.find((field) => field.path === 'hsa.coverage')!;
+    expect(resolveOptions(coverage, fromDefaults()).map((option) => option.label)).toEqual(['Individual', 'Family']);
   });
 
-  it('shows each IRA amount only with that IRA, and the taxable note only with a taxable contribution', () => {
+  it('shows each IRA amount only with that IRA, and no note on the screen', () => {
     expect(visible('ira-taxable', fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toEqual([
       'ira.traditional',
       'ira.roth',
@@ -330,7 +319,7 @@ describe('paycheck form: visibility', () => {
       'investing.taxableMonthlyContribution',
     ]);
     expect(notes('ira-taxable', fromDefaults({ 'investing.taxableMonthlyContribution': 0 }))).toEqual([]);
-    expect(notes('ira-taxable')).toHaveLength(1);
+    expect(notes('ira-taxable')).toEqual([]);
   });
 });
 
@@ -339,7 +328,7 @@ describe('paycheck form: the tax note (O9)', () => {
     const tax = notes('about');
     expect(tax).toEqual([
       {
-        text: 'Tax savings in this allocator use a fixed 22% federal bracket plus one 2026 rate for your state. Brackets are not calculated from your income.',
+        text: 'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.',
         tone: 'info',
       },
     ]);
@@ -414,20 +403,10 @@ describe('paycheck intake: every old question is still asked', () => {
     }
   });
 
-  it('keeps the old core screens word for word, and the page\'s basics differ only in the old cards\' help', () => {
+  it('keeps the old core screens, and the page\'s basics word them as the core does', () => {
     const old = oldScreens(OLD_CORE_FLOW, OLD_CORE_SCREENS, OLD_CORE_QUESTIONS);
     expect(askedScreens('core')).toEqual(old);
-    const page = askedScreens('paycheck').slice(0, 3);
-    const OLD_CARD_HELP: Record<string, string> = {
-      'person.age': 'Used for catch-up contribution eligibility',
-      'spending.necessaryMonthly': 'Rent, utilities, groceries, minimum debt payments, insurance, etc.',
-    };
-    expect(page).toEqual(
-      old.map((screen) => ({
-        ...screen,
-        questions: screen.questions.map((q) => (q.path in OLD_CARD_HELP ? { ...q, help: OLD_CARD_HELP[q.path] } : q)),
-      }))
-    );
+    expect(askedScreens('paycheck').slice(0, 3)).toEqual(old);
   });
 });
 
