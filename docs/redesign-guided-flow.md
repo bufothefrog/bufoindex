@@ -220,7 +220,8 @@ invalid inputs the last results stay on screen, marked stale (O17). Below
 `lg` the layout shows an Inputs | Results tab bar and a sticky bar whose one
 action is See results / Edit inputs; on desktop the two-column layout stays,
 except on the leverage comparison, whose few inputs sit as a row of collapsed
-cards (each showing its one-line summary) above full-width results.
+cards (each showing its one-line summary) above full-width results; those
+cards start collapsed on phones too.
 
 Field tiering per calculator (current fields, grouped):
 

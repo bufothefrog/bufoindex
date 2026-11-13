@@ -8,7 +8,6 @@ import type { CustomRenderers } from '@/components/fields';
 import { NextSteps } from '@/components/guided/NextSteps';
 import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
 import type { InputsPlacement } from '@/components/ui/layouts/ResponsiveGrid';
-import { LG_MEDIA_QUERY, useMediaQuery } from '@/components/ui/layouts/useMediaQuery';
 import { calculatorDisclaimer, calculatorMeta } from '@/lib/calculators/registry';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { makeGet } from '@/lib/fields/paths';
@@ -47,8 +46,9 @@ export interface CalculatorPageProps<E, R> {
   afterLayout?: React.ReactNode;
   /**
    * From lg up, the inputs beside the results (the default) or in a row of
-   * cards above them, each card starting collapsed to its summary line.
-   * Below lg both are the same.
+   * cards above them. With 'above' every input card starts collapsed to its
+   * summary line at every width, in the server render and the first client
+   * render alike, so nothing folds after load.
    */
   inputsPlacement?: InputsPlacement;
 }
@@ -61,10 +61,20 @@ const startCollapsed = () => true;
 /** The run store's key for an error that belongs to no field (createCalculatorStore). */
 const RUN_ERROR_PATH = 'calculation';
 
-/** Placeholder for the results column until the first run after hydration. */
-function ResultsSkeleton() {
+/**
+ * Placeholder for the results column until the first run after hydration.
+ * Under a row of inputs (from lg) it holds at least a screen's height, so
+ * what follows the results (the disclaimer) stays below the fold until the
+ * results arrive instead of jumping down out of view.
+ */
+function ResultsSkeleton({ belowInputs }: { belowInputs: boolean }) {
   return (
-    <div role="status" aria-busy="true" aria-label="Loading results" className="space-y-4">
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label="Loading results"
+      className={cn('space-y-4', belowInputs && 'lg:min-h-screen')}
+    >
       {Array.from({ length: 2 }, (_, i) => (
         <div key={i} className="space-y-3 rounded-lg border border-border bg-card p-4 sm:p-6">
           <div className="h-5 w-1/3 animate-pulse rounded bg-muted" />
@@ -130,12 +140,12 @@ export default function CalculatorPage<E, R>({
   const errors = store((state) => state.errors);
   const stale = store((state) => state.stale);
   const provided = values.provided;
-  // From lg up (after hydration, since the server snapshot is false) a row
-  // of cards above the results starts collapsed, so it shows each card's
-  // summary; below lg the tier defaults hold. Before the first edit or
-  // toggle, crossing lg re-applies the matching default.
+  // Inputs above the results start collapsed at every width, so each card
+  // shows its summary line. The rule reads no viewport, so the server and
+  // client markup match and no card folds after hydration. An error still
+  // forces a card open; the first edit freezes and a toggle pins
+  // (FieldSections).
   const inputsAbove = inputsPlacement === 'above';
-  const isDesktop = useMediaQuery(LG_MEDIA_QUERY);
 
   // The bootstrap's immediate submit already covers the first ready render;
   // this repeat is a memo hit (or joins the run in flight).
@@ -181,7 +191,7 @@ export default function CalculatorPage<E, R>({
       </StatusAlert>
     );
   } else if (!ready || !hasErrors) {
-    resultSection = <ResultsSkeleton />;
+    resultSection = <ResultsSkeleton belowInputs={inputsAbove} />;
   }
 
   return (
@@ -202,7 +212,7 @@ export default function CalculatorPage<E, R>({
             provided={provided}
             onRestoreDefaults={restoreDefaults}
             className={inputsAbove ? INPUTS_ROW_CLASS : undefined}
-            initiallyCollapsed={inputsAbove && isDesktop ? startCollapsed : undefined}
+            initiallyCollapsed={inputsAbove ? startCollapsed : undefined}
           />
         }
         resultSection={resultSection}
