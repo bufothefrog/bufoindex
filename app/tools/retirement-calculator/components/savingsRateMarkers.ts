@@ -114,22 +114,31 @@ function placed(x: number, baseline: number, textAnchor: PlacedLabel['textAnchor
   };
 }
 
+/** The horizontal room a label may use: right of the y axis, inside the SVG. */
+interface LabelBounds {
+  left: number;
+  right: number;
+}
+
 /**
- * A label above or below the dot, centered on it unless that would cross the
- * SVG edge; near an edge the text is anchored at the dot and runs inward.
- * `bottomAt` lifts a label above the dot higher, to clear the dashed line.
+ * A label above or below the dot, centered on it unless that would cross a
+ * bound (the y-axis line on the left, the SVG edge on the right); near a
+ * bound the text is anchored at the dot and runs inward. `bottomAt` lifts a
+ * label above the dot higher, to clear the dashed line.
  */
 function stacked(
   dot: { x: number; y: number },
   side: 'above' | 'below',
   width: number,
-  svgWidth: number,
+  bounds: LabelBounds,
   bottomAt = dot.y - MARKER_DOT_RADIUS - DOT_GAP,
 ) {
   const baseline = side === 'above' ? bottomAt - DESCENT : dot.y + MARKER_DOT_RADIUS + DOT_GAP + ASCENT;
-  if (dot.x - width / 2 < GAP) return placed(Math.max(GAP, dot.x - MARKER_DOT_RADIUS), baseline, 'start', width);
-  if (dot.x + width / 2 > svgWidth - GAP) {
-    return placed(Math.min(svgWidth - GAP, dot.x + MARKER_DOT_RADIUS), baseline, 'end', width);
+  if (dot.x - width / 2 < bounds.left) {
+    return placed(Math.max(bounds.left, dot.x - MARKER_DOT_RADIUS), baseline, 'start', width);
+  }
+  if (dot.x + width / 2 > bounds.right) {
+    return placed(Math.min(bounds.right, dot.x + MARKER_DOT_RADIUS), baseline, 'end', width);
   }
   return placed(dot.x, baseline, 'middle', width);
 }
@@ -156,7 +165,8 @@ function rateLabelAt(lineY: number, side: 'above' | 'below', width: number, plot
  * the far side of the dot from the dashed line (below a dot under the line,
  * above a dot over it), the near side, beside the dot to the right and to the
  * left, and last above both the dot and the line (a dot on the x axis with
- * the line just over it). It must stay inside the SVG, above the x-axis line
+ * the line just over it). It must stay right of the y-axis line (and so clear
+ * of its tick labels), inside the SVG, above the x-axis line
  * (and so clear of the tick labels) and off the dashed line. The rate label
  * then goes on the other side of the line from it when that fits, so the line
  * separates the two labels however close the dot sits to it; otherwise on the
@@ -170,9 +180,10 @@ export function savingsRateLabelPositions(geometry: SavingsRateLabelGeometry): S
   const axisY = plot.y + plot.height;
   const dotWidth = textWidth(dotText);
   const rateWidth = textWidth(rateText);
+  const bounds: LabelBounds = { left: plot.x + GAP, right: svgWidth - GAP };
 
   const insideChart = (box: LabelBox) =>
-    box.left >= 0 && box.right <= svgWidth && box.top >= 0 && box.bottom <= axisY - LINE_CLEARANCE;
+    box.left >= plot.x && box.right <= svgWidth && box.top >= 0 && box.bottom <= axisY - LINE_CLEARANCE;
   const offLine = (box: LabelBox) =>
     lineY === null || box.bottom <= lineY - LINE_CLEARANCE || box.top >= lineY + LINE_CLEARANCE;
 
@@ -190,13 +201,13 @@ export function savingsRateLabelPositions(geometry: SavingsRateLabelGeometry): S
 
   const dotUnderLine = lineY !== null && dot.y >= lineY;
   const dotCandidates = [
-    stacked(dot, dotUnderLine ? 'below' : 'above', dotWidth, svgWidth),
-    stacked(dot, dotUnderLine ? 'above' : 'below', dotWidth, svgWidth),
+    stacked(dot, dotUnderLine ? 'below' : 'above', dotWidth, bounds),
+    stacked(dot, dotUnderLine ? 'above' : 'below', dotWidth, bounds),
     beside(dot, 'right', dotWidth),
     beside(dot, 'left', dotWidth),
     ...(lineY === null
       ? []
-      : [stacked(dot, 'above', dotWidth, svgWidth, Math.min(dot.y - MARKER_DOT_RADIUS - DOT_GAP, lineY - GAP))]),
+      : [stacked(dot, 'above', dotWidth, bounds, Math.min(dot.y - MARKER_DOT_RADIUS - DOT_GAP, lineY - GAP))]),
   ];
   const dotBox: LabelBox = {
     left: dot.x - MARKER_DOT_RADIUS,
