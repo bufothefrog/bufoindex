@@ -9,6 +9,7 @@ area followed:
     ab9f0cc s3-gallery-and-docs: accounts in the /demo gallery, architecture notes and this note
     584fd6a Merge branch 'next' (8e70553, Node 26 only) into claude/next-4-accounts
     eb8021d .. db5e4be  the review fixes (section "Review fixes" below), then a docs commit with this note
+    de98a1c .. d3ca471  the second fix round (same section), then a docs commit with this note
 
 The project and CI run on Node 26 only since 8e70553.
 
@@ -152,6 +153,10 @@ screens show). A profile completed at 90ef4ed loads as N of N.
   account, or new cash to an empty one, to rebalance." when no account is rebalanced; the "Target allocation" card and the "Holdings" card
   are then hidden (both show only while an account is rebalanced or has holdings; example 4a shows neither, where 90ef4ed showed both).
   Holdings regions are named by the account's display name ("Brokerage holdings" -> "Brokerage (taxable) holdings").
+  From that state, Edit on an account, then "List holdings instead", adds a blank holding: the Holdings card and the Target allocation
+  card appear, and a ticker and shares give a plan.
+- Rebalancer (second fix round): the Target allocation card also shows while an account that could be rebalanced has normal
+  contributions above 0 but a Custom new cash of 0 (it was hidden then; the profile's targets screen shows in that case, so the two agree).
 - Holdings editor (rebalancer page and the wizard's "What does each account hold today?"): every account but cash accounts has a section,
   so an account known only by a typed balance shows "No holdings yet. Add one below." and "Add holding" (the default's "401(k) or similar").
 - Paycheck intake: "Traditional IRA balance" and "Roth IRA balance" are no longer asked.
@@ -162,6 +167,14 @@ screens show). A profile completed at 90ef4ed loads as N of N.
   toggle, which shows "Done") and "Remove <name>"; rows that share a display name are numbered ("Brokerage (taxable) 1 balance",
   "Brokerage (taxable) 2 balance"), and so are their rows in "New cash this month". The Kind select of an account with holdings does not
   offer "Cash or savings".
+- Rows that share a display name (second fix round): the number shows everywhere the account is named, visible text included: the account
+  list line ("Brokerage (taxable)" twice -> "Brokerage (taxable) 1" and "Brokerage (taxable) 2"; on the name line for a named row), the
+  Holdings card ("Brokerage (taxable) holdings" twice -> "Brokerage (taxable) 1 holdings" and "... 2 holdings", and the holding control
+  names "Shares, Brokerage (taxable) 1 holding 1"), "Not rebalanced: ... Brokerage (taxable) 2 (no holdings or new cash).", the account and
+  new cash summaries, the overview Accounts card lines, "Held in your accounts: ...", the cash card "Held in ...", the Remove and "Use one
+  balance instead" confirms and the account names in the rebalancer results. A uniquely named row reads as before.
+- Wizard accounts screen (second fix round): with no account in effect (no 401(k), HSA or IRA, taxable 0) the line "This is an example.
+  Change it to match yours, or skip." no longer shows above "No accounts yet."; it shows while an example account is on the screen.
 
 ## The v2 double count that only the tick removes (example 6)
 
@@ -238,6 +251,20 @@ Three reviews checked the branch; the fixes, one commit per area:
 - Field specs (d47a497, db5e4be): the monthly investing Auto line read "From your answers: $1,540 a month: $1,540" and now reads "From your
   answers: $1,540"; the unrendered account balance hint "Today's balance." is gone from the row spec.
 - Cash card test (dedd765), 3bb0132 fixture header (a846b90), card header icon (c7a1969), CLAUDE.md (a78e382).
+
+Second fix round, one commit per item:
+
+- Profile screens (de98a1c): the completeness fix above covered the count only. The review page and the intake screens still read a
+  Custom new cash: with one empty brokerage and taxable 0, a Custom 300 left "11 of 11 topics answered" while the review listed Target
+  allocation as unanswered with "Answer the remaining questions", and remaining mode asked the targets screen. One function,
+  intakeScreens in lib/calculators/forms.ts, now decides the profile screens for completeness, the review page, the intake screens and
+  remaining mode, and reads every calculator-only value (the fields of the calculator-only screens) as unset. The targets fields show
+  while a rebalance candidate has holdings, normal contributions above 0 or a new cash above 0 (hasTargetsInEffect), so a targets screen
+  the profile asks always shows its target mix; the rebalancer page still follows a Custom new cash.
+- Account names (f7a8aad): accountLabels names every row a visitor sees (list above).
+- Wizard accounts screen (b6af5e2): the example line counts the rows in effect, not the stored list.
+- Rebalancer empty state (d3ca471): checked, no code change. For example 4a the page shows no Target allocation and no Holdings card;
+  Edit, "List holdings instead", a ticker and shares lead to a plan with controls visible at each step. A page test pins the path.
 
 ## Known behavior left as built
 
