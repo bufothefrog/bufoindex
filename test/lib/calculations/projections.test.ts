@@ -21,12 +21,13 @@ import {
   calculateAnnualFederalTax,
   calculateFIAge,
   estimateCurrentNetWorth,
+  debtStreamFutureValue,
 } from '@/lib/calculations/projections'
 import { monthlyRateOf, scheduleFutureValue } from '@/lib/calculations/contributionSchedule'
 import { calculateOptimalAllocation, getDefaultProfile } from '@/lib/calculations/core'
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition'
 import { engineInputsFor } from '@/lib/calculators/runtime'
-import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults'
+import { applyProfileWrites, getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults'
 import { ownerRaw } from '@/test/factories/accountsFixtures'
 import { getBracketsForStatus, STANDARD_DEDUCTIONS_2026 } from '@/lib/constants/irs-2026'
 import type { AllocationItem } from '@/lib/types'
@@ -400,11 +401,16 @@ describe('projections.ts — tax model and growth projections', () => {
         makeAllocation({ id: 'debt', amount: 100, taxImpact: 0, category: 'debt_payoff' }),
       ])
       // current  = 49,178.78 + 960 x 14.2543109380 = 49,178.78 + 13,684.14 = 62,862.92
-      // optimized= 49,178.78 + 2,600 x 25.4038520288 = 49,178.78 + 66,050.02 = 115,228.80
+      // optimized: 2,600 a year = 216.67 a month clears the 5,000 in 5,000 / 216.67 = 23.0769 months.
+      //   At 18% until then: 216.67 x (1.18^(23.0769/12) - 1) / 0.0138884 = 216.67 x 0.3747845 / 0.0138884 = 5,846.83,
+      //   grown 96.9231 months at 7%: x 1.07^(96.9231/12) = x 1.7271518 = 10,098.37;
+      //   then 216.67 a month at 7%: 216.67 x 0.7271518 / 0.00565415 = 27,864.43. Debt stream 37,962.80.
+      //   optimized = 49,178.78 + 37,962.80 = 87,141.58
+      // (2,600 a year at 18% for all ten years, 66,050.02, counted interest on a balance already paid off.)
       expect(result.currentPath.tenYear).toBeCloseTo(62862.92, 1)
-      expect(result.optimizedPath.tenYear).toBeCloseTo(115228.8, 1)
-      // The shared net-worth term cancels: 66,050.02 - 13,684.14 = 52,365.88
-      expect(result.improvement.tenYear).toBeCloseTo(52365.88, 1)
+      expect(result.optimizedPath.tenYear).toBeCloseTo(87141.58, 1)
+      // The shared net-worth term cancels: 37,962.80 - 13,684.14 = 24,278.66
+      expect(result.improvement.tenYear).toBeCloseTo(24278.66, 1)
     })
 
     it('treats a positive taxImpact as a cost, never as a saving', () => {
@@ -856,5 +862,49 @@ describe('projections.ts — tax model and growth projections', () => {
       expect(optimizationScore.comparison).toBe(76)
       expect(optimizationScore.overall).toBeGreaterThanOrEqual(optimizationScore.comparison)
     })
+  })
+})
+
+describe('debtStreamFutureValue: extra debt principal earns the debt rate only until the balance is paid', () => {
+  it('pays off a 3,000 balance in 3 months at 1,000 a month, then invests at 7%', () => {
+    // i_d = 1.24^(1/12) - 1 = 0.0180876; 3 months: 1,000 x (1.24^(1/4) - 1) / i_d = 1,000 x 0.0552501 / 0.0180876 = 3,054.59.
+    // That grows 117 months at 7%: x 1.07^(117/12) = x 1.9341575 = 5,908.06.
+    // The 1,000 a month after payoff, 117 months at i_m = 1.07^(1/12) - 1 = 0.00565415:
+    // 1,000 x (1.9341575 - 1) / 0.00565415 = 165,216.39. Total 171,124.45.
+    expect(debtStreamFutureValue(12000, 0.24, 3000)).toBeCloseTo(171124.45, 1)
+  })
+
+  it('keeps the whole stream at the debt rate when ten years of payments do not clear the balance', () => {
+    // 120 months < 200,000 / 1,000: 1,000 x (1.24^10 - 1) / i_d = 1,000 x 7.5944 / 0.0180876 = 419,869.57.
+    expect(debtStreamFutureValue(12000, 0.24, 200000)).toBeCloseTo(419869.57, 1)
+    expect(debtStreamFutureValue(12000, 0.24, 200000)).toBe(
+      scheduleFutureValue({ monthly: 1000, yearStart: 0 }, 0.24, 120)
+    )
+  })
+
+  it('is 0 for an empty stream', () => {
+    expect(debtStreamFutureValue(0, 0.24, 3000)).toBe(0)
+    expect(debtStreamFutureValue(NaN, 0.24, 3000)).toBe(0)
+  })
+
+  it('zero cash plus a 24% card (8,000): the payoff no longer compounds at 24% for ten years', () => {
+    // 934.62 per bi-weekly paycheck = 24,300 a year, 2,025 a month; 8,000 / 2,025 = 3.95 months
+    // at 24%, then 7%. Uncapped it was 24,300 a year at 24% for 120 months = 850,235.88.
+    const writes = [
+      { path: 'cash.emergencyFundBalance', value: 0 },
+      {
+        path: 'debts',
+        value: [{ id: 'card', name: 'Card', balance: 8000, interestRate: 0.24, minimumPayment: 200, extraPayment: 0, taxDeductible: false }],
+      },
+    ]
+    const { profile, accepted } = applyProfileWrites(getDefaultFinancialProfile(), writes)
+    const result = calculateOptimalAllocation(
+      engineInputsFor(PAYCHECK_CALCULATOR, { ...profile, provided: [...profile.provided, ...accepted] })
+    )
+    expect(debtStreamFutureValue(24300, 0.24, 8000)).toBeCloseTo(346666.45, 1)
+    expect(result.projections.currentPath.tenYear).toBeCloseTo(249394.38, 1)
+    // Optimized 1,090,910.44 before the cap; 1,090,910.44 - 850,235.88 + 346,666.45 = 587,341.00.
+    expect(result.projections.optimizedPath.tenYear).toBeCloseTo(587341.0, 1)
+    expect(result.projections.improvement.tenYear).toBeCloseTo(337946.62, 1)
   })
 })

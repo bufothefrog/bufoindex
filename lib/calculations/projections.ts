@@ -104,6 +104,39 @@ function debtReturn(profile: PaycheckProfile): number {
   return highest > 0 ? highest : MARKET_RETURN;
 }
 
+/** Balance of the highest-rate debt, the one calculateHighInterestDebt pays down (0 with no debts). */
+function highestRateDebtBalance(profile: PaycheckProfile): number {
+  let best: { rate: number; balance: number } | null = null;
+  for (const debt of profile.debts) {
+    const rate = finite(debt.interestRate);
+    if (best === null || rate > best.rate) best = { rate, balance: Math.max(0, finite(debt.balance)) };
+  }
+  return best ? best.balance : 0;
+}
+
+/**
+ * Ten-year value of a stream of extra debt principal (`annualContribution` a
+ * year, 12 end-of-month payments p). The payments earn the debt's rate only
+ * until they have covered `balance`, which takes k = balance / p months. From
+ * then on the debt is gone: the value reached at month k grows at
+ * MARKET_RETURN, and the same payment p is invested at MARKET_RETURN for the
+ * months left. A balance the stream does not clear within ten years keeps the
+ * whole stream at the debt's rate. Exported for tests.
+ */
+export function debtStreamFutureValue(annualContribution: number, debtRate: number, balance: number): number {
+  if (!Number.isFinite(annualContribution) || annualContribution <= 0) return 0;
+  const payment = annualContribution / 12;
+  const horizonMonths = PROJECTION_YEARS * 12;
+  const payoffMonths = Math.max(0, finite(balance)) / payment;
+  if (!(payoffMonths < horizonMonths)) return annualStreamFutureValue(annualContribution, debtRate);
+  const monthsLeft = horizonMonths - payoffMonths;
+  const atPayoff = scheduleFutureValue({ monthly: payment, yearStart: 0 }, debtRate, payoffMonths);
+  return (
+    atPayoff * Math.pow(1 + MARKET_RETURN, monthsLeft / 12) +
+    scheduleFutureValue({ monthly: payment, yearStart: 0 }, MARKET_RETURN, monthsLeft)
+  );
+}
+
 /**
  * Grow a set of streams for ten years on top of today's net worth. Existing net
  * worth is identical on both paths, so it cancels out of the improvement and is
@@ -118,7 +151,7 @@ function projectTenYearNetWorth(
     calculateCompoundGrowth(currentNetWorth, MARKET_RETURN, PROJECTION_YEARS) +
     annualStreamFutureValue(streams.market, MARKET_RETURN) +
     annualStreamFutureValue(streams.cash, cashReturn(profile)) +
-    annualStreamFutureValue(streams.debt, debtReturn(profile))
+    debtStreamFutureValue(streams.debt, debtReturn(profile), highestRateDebtBalance(profile))
   );
 }
 
