@@ -14,10 +14,22 @@ import {
 } from '@/lib/calculators/forms';
 import { CORE_SCREENS, PROFILE_EXTRA_SCREENS } from '@/lib/fields/shared';
 import { makeGet } from '@/lib/fields/paths';
-import { fieldMap, isFieldVisible, screensFor } from '@/lib/fields/runtime';
+import {
+  fieldMap,
+  isFieldVisible,
+  resolveText,
+  screenPaths,
+  screensFor,
+  visibleScreenFields,
+  visibleScreenNotes,
+} from '@/lib/fields/runtime';
 import type { CrossFieldRule, FieldSpec, FormSpec, Get, ScreenSpec } from '@/lib/fields/types';
-import { getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
+import { profileReview } from '@/lib/calculators/profileReview';
+import { getDefaultFinancialProfile, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
 import type { FinancialProfile } from '@/lib/profile/types';
+import { beginnerRaw, ownerRaw } from '@/test/factories/accountsFixtures';
+import { defaultPayloadAt90ef4ed } from '@/test/factories/profile-90ef4ed-v2';
 
 const ALL_FORMS: readonly FormSpec[] = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM];
 
@@ -137,13 +149,18 @@ describe('PROFILE_FORM', () => {
     expect(PROFILE_FORM.screens.map((screen) => screen.id)).not.toContain('facts');
   });
 
-  it('never asks a calculator-only screen (surface "calculator"): the leverage ratio and the claiming age', () => {
+  it('never asks a calculator-only screen (surface "calculator"): monthly investing, the claiming age, the new cash and the leverage ratio', () => {
     const calculatorOnly = PROFILE_FORM_ORDER.flatMap((id) =>
       FORMS[id].screens.filter((screen) => screen.surface === 'calculator')
     );
-    expect(calculatorOnly.map((screen) => screen.id)).toEqual(['claiming', 'comparison']);
+    expect(calculatorOnly.map((screen) => screen.id)).toEqual(['monthly-investing', 'claiming', 'new-cash', 'comparison']);
     const profilePaths = PROFILE_FORM.screens.flatMap((screen) => screen.fields);
-    for (const path of ['strategy.leverageRatio', 'retirementIncome.socialSecurityAge']) {
+    for (const path of [
+      'strategy.leverageRatio',
+      'retirementIncome.socialSecurityAge',
+      'investing.monthlyContribution',
+      'portfolio.newCash',
+    ]) {
       expect(profilePaths, path).not.toContain(path);
       expect(fieldMap(PROFILE_FORM).has(path), path).toBe(false);
     }
@@ -165,8 +182,19 @@ describe('PROFILE_FORM', () => {
     expect(built.form.screens).toEqual([]);
   });
 
-  it('pins the profile order: retirement, paycheck, portfolio, then leverage', () => {
-    expect(PROFILE_FORM_ORDER).toEqual(['retirement', 'paycheck', 'portfolio', 'leverage']);
+  it('pins the profile order: paycheck, retirement, portfolio, then leverage (the yes/no answers before the accounts)', () => {
+    expect(PROFILE_FORM_ORDER).toEqual(['paycheck', 'retirement', 'portfolio', 'leverage']);
+  });
+
+  it('asks the shared accounts screen once, in its own section "Accounts", and no removed path', () => {
+    expect(PROFILE_FORM.screens.filter((s) => s.fields.includes('portfolio.accounts')).map((s) => s.id)).toEqual(['accounts']);
+    expect(profileFormSection('accounts')).toBe('accounts');
+    expect(PROFILE_FORM_SECTION_LABELS.accounts).toBe('Accounts');
+    const paths = [CORE_FORM, ...Object.values(FORMS), PROFILE_FORM].flatMap((form) => form.screens.flatMap((s) => s.fields));
+    for (const removed of ['investing.investedBalance', 'ira.traditionalBalance', 'ira.rothBalance']) {
+      expect(paths, removed).not.toContain(removed);
+    }
+    expect(paths.some((path) => path.endsWith('.deposit'))).toBe(false);
   });
 
   it('walks the profile sections in order: the basics, each calculator, then the optional screens', () => {
@@ -175,13 +203,15 @@ describe('PROFILE_FORM', () => {
     );
     // Consecutive screens of one section collapse to one entry, so the forms can grow without changing this list.
     const sections = walked.filter((section, i) => i === 0 || section !== walked[i - 1]);
-    expect(sections).toEqual(['core', 'retirement', 'paycheck', 'portfolio', 'optional']);
+    expect(sections).toEqual(['core', 'paycheck', 'accounts', 'retirement', 'portfolio', 'optional']);
   });
 
   it('labels every screen with its section', () => {
     const middle = PROFILE_FORM.screens.slice(CORE_SCREENS.length, PROFILE_FORM.screens.length - TAIL);
     const labelOf = (id: string) =>
-      PROFILE_PARTS.find(({ form }) => profileEligible(form).some((s) => s.id === id || `${form.id}-${s.id}` === id))!.label;
+      id === 'accounts'
+        ? PROFILE_FORM_SECTION_LABELS.accounts
+        : PROFILE_PARTS.find(({ form }) => profileEligible(form).some((s) => s.id === id || `${form.id}-${s.id}` === id))!.label;
     expect(PROFILE_FORM.screens.map((screen) => PROFILE_FORM_SECTION_LABELS[profileFormSection(screen.id)!])).toEqual([
       ...CORE_SCREENS.map(() => 'The basics'),
       ...middle.map((screen) => labelOf(screen.id)),
@@ -344,9 +374,25 @@ describe('profileCompleteness (by topic screen)', () => {
     const empty = profileCompleteness(getDefaultFinancialProfile());
     expect(empty.total).toBe(topics(getDefaultFinancialProfile()).length - OPTIONAL_IDS.length);
     expect(empty.total).toBe(REQUIRED.length);
-    expect(empty.total).toBe(14);
+    expect(empty.total).toBe(13);
     expect(empty.provided).toBe(0);
     expect(empty.missing.map((s) => s.id)).toEqual(REQUIRED.map((s) => s.id));
+  });
+
+  it('does not change the count when a calculator-only new cash figure is set on the rebalancer', () => {
+    // One stored empty brokerage, no 401(k), no taxable money: the rebalancer works on no account,
+    // so the targets screen is hidden. A custom new cash of 300 would make the rebalancer work on it.
+    const profile = getDefaultFinancialProfile();
+    profile.workplace.has401k = false;
+    profile.investing.taxableMonthlyContribution = 0;
+    profile.portfolio.accounts = [{ id: 'acc-b', kind: 'brokerage', name: '', balance: 0, holdsEmergencyFund: false }];
+    profile.portfolio.holdings = [];
+    profile.portfolio.securities = [];
+    profile.provided = ['workplace.has401k', 'investing.taxableMonthlyContribution', 'portfolio.accounts'];
+    const before = profileCompleteness(profile);
+    const after = profileCompleteness({ ...profile, portfolio: { ...profile.portfolio, newCash: [{ id: 'acc-b', amount: 300 }] } });
+    expect(after).toEqual(before);
+    expect(before.missing.map((s) => s.id)).not.toContain('targets');
   });
 
   it('leaves the optional screens out of the count, answered or not', () => {
@@ -356,38 +402,39 @@ describe('profileCompleteness (by topic screen)', () => {
     const withOptional = profileCompleteness(profileWith([...CORE_SCREENS[0].fields, ...optionalPaths]));
     const withoutOptional = profileCompleteness(profileWith([...CORE_SCREENS[0].fields]));
     expect(withOptional).toEqual(withoutOptional);
-    expect(withOptional).toMatchObject({ provided: 1, total: 14 });
+    expect(withOptional).toMatchObject({ provided: 1, total: 13 });
     expect(withOptional.missing.map((s) => s.id)).not.toContain('ss-healthcare');
     // Everything else answered is complete whether the optional facts are or not.
-    expect(profileCompleteness(profileWith(rest))).toEqual({ provided: 14, total: 14, missing: [] });
-    expect(profileCompleteness(profileWith([...rest, ...optionalPaths]))).toEqual({ provided: 14, total: 14, missing: [] });
+    expect(profileCompleteness(profileWith(rest))).toEqual({ provided: 13, total: 13, missing: [] });
+    expect(profileCompleteness(profileWith([...rest, ...optionalPaths]))).toEqual({ provided: 13, total: 13, missing: [] });
   });
 
-  it('counts the same answers against 14 topics where 3bb0132 counted 16', () => {
+  it('counts the same answers against 13 topics where 3bb0132 counted 16', () => {
     // At 3bb0132 the required topics were the 3 basics, retirement savings and target, the 6 paycheck
     // screens, the 3 portfolio screens, the leverage ratio (leverage "facts", trimmed) and the strategy
     // preset: 16. The leverage ratio became calculator-only and the preset was removed, so the denominator
     // lost those two topics: 14. The emergency fund months joined the emergency fund screen, which adds
     // no topic. A visitor who had answered the basics, the ratio and the preset read "5 of 16"; the same
-    // stored answers now read "3 of 14".
+    // stored answers read "3 of 14" at 90ef4ed. Profile v3 folds the retirement savings screen (the invested
+    // balance and the monthly contribution) into the shared accounts screen and the calculator-only monthly
+    // investing, and asks the accounts once for every calculator: 13, so the same answers read "3 of 13".
     const answers = [...CORE_SCREENS.flatMap((s) => s.fields), 'strategy.leverageRatio', 'strategy.preset'];
     const result = profileCompleteness(profileWith(answers));
-    expect(result).toMatchObject({ provided: 3, total: 14 });
-    expect(topicsAnsweredText(result)).toBe('3 of 14 topics answered');
+    expect(result).toMatchObject({ provided: 3, total: 13 });
+    expect(topicsAnsweredText(result)).toBe('3 of 13 topics answered');
     expect(PROFILE_FORM.screens.map((s) => s.id)).toEqual([
       'about',
       'pay',
       'must-pay',
-      'savings',
-      'target',
       'spending-bonus',
       'emergency-fund',
       '401k',
       'hsa',
       'ira-taxable',
       'debts',
-      'targets',
       'accounts',
+      'target',
+      'targets',
       'holdings',
       'ss-healthcare',
     ]);
@@ -444,5 +491,114 @@ describe('topicsAnsweredText', () => {
   it('reads the count the way every completeness card prints it', () => {
     expect(topicsAnsweredText({ provided: 3, total: 17 })).toBe('3 of 17 topics answered');
     expect(topicsAnsweredText({ provided: 0, total: 0 })).toBe('0 of 0 topics answered');
+  });
+});
+
+describe('profile v3: the accounts screen, question counts and completeness (contract section 10)', () => {
+  const required = (profile: FinancialProfile) =>
+    requiredScreens(screensFor(PROFILE_FORM, makeGet(profile), { mode: 'all', surface: 'intake' }));
+  const accountsScreen = PROFILE_FORM.screens.find((s) => s.id === 'accounts')!;
+
+  it('never puts the new cash on the accounts screen: it is calculator-only', () => {
+    expect(screenPaths(PROFILE_FORM, accountsScreen, makeGet(getDefaultFinancialProfile()))).not.toContain(
+      'portfolio.newCash'
+    );
+    expect(accountsScreen.fields).toEqual(['portfolio.accounts']);
+  });
+
+  it('asks the beginner 11 required screens and 28 inputs, counting a list as one', () => {
+    const beginner = normalizeProfile(beginnerRaw());
+    const get = makeGet(beginner);
+    const screens = required(beginner);
+    expect(screens.map((s) => s.id)).toEqual([
+      'about',
+      'pay',
+      'must-pay',
+      'spending-bonus',
+      'emergency-fund',
+      '401k',
+      'hsa',
+      'ira-taxable',
+      'debts',
+      'accounts',
+      'target',
+    ]);
+    const inputs = screens.map((s) => [s.id, visibleScreenFields(PROFILE_FORM, s, get).length]);
+    expect(Object.fromEntries(inputs)).toEqual({
+      about: 3,
+      pay: 3,
+      'must-pay': 1,
+      'spending-bonus': 3,
+      'emergency-fund': 3,
+      '401k': 6,
+      hsa: 1,
+      'ira-taxable': 3,
+      debts: 1,
+      accounts: 1,
+      target: 3,
+    });
+    expect(inputs.reduce((sum, [, count]) => sum + (count as number), 0)).toBe(28);
+    expect(profileCompleteness(beginner).total).toBe(11);
+  });
+
+  it('moves the total between 11 and 13 as the rebalanced accounts and the holdings change', () => {
+    // The default: the example brokerage has holdings, so the targets and holdings screens show.
+    expect(profileCompleteness(getDefaultFinancialProfile()).total).toBe(13);
+    // Answered with an empty brokerage that gets new cash: targets show, holdings do not.
+    const base = getDefaultFinancialProfile();
+    const noHoldings: FinancialProfile = {
+      ...base,
+      portfolio: { ...base.portfolio, holdings: [] },
+      provided: ['portfolio.accounts'],
+    };
+    expect(profileCompleteness(noHoldings)).toMatchObject({ total: 12 });
+    // No account is rebalanced (typed balances only, no taxable): both hide.
+    const typed: FinancialProfile = {
+      ...noHoldings,
+      investing: { ...base.investing, taxableMonthlyContribution: 0 },
+      portfolio: {
+        ...noHoldings.portfolio,
+        accounts: [{ id: 'acc-401k', kind: '401k', name: '', balance: 16225, holdsEmergencyFund: false }],
+      },
+    };
+    expect(profileCompleteness(typed)).toMatchObject({ total: 11 });
+  });
+
+  it('loads a profile completed at 90ef4ed as 13 of 13', () => {
+    const all = Array.from(new Set(PROFILE_FORM.screens.flatMap((s) => s.fields)));
+    const v2Paths = [
+      ...all.filter((path) => path !== 'portfolio.accounts'),
+      'investing.investedBalance',
+      'investing.monthlyContribution',
+      'portfolio.accounts',
+      'portfolio.holdings',
+    ];
+    const migrated = migrateProfile({ ...defaultPayloadAt90ef4ed(), provided: v2Paths }, 2);
+    expect(profileCompleteness(migrated)).toEqual({ provided: 13, total: 13, missing: [] });
+  });
+
+  it('reviews the owner fixture with the account summary of the worked example', () => {
+    const owner = normalizeProfile(ownerRaw());
+    const topic = profileReview(owner)
+      .groups.flatMap((group) => group.topics)
+      .find((each) => each.id === 'accounts')!;
+    expect(topic.status).toBe('answered');
+    expect(topic.summary).toBe(
+      '401(k) or similar $80,000; HSA $12,000; Roth IRA $10,050 (2 holdings); Brokerage $3,750 (1 holding); Robinhood $10,350 (1 holding) (emergency fund)'
+    );
+    expect(profileReview(owner).groups.map((group) => group.label)).toContain('Accounts');
+  });
+
+  it('hides the typed emergency fund for the owner and says where it is held', () => {
+    const owner = normalizeProfile(ownerRaw());
+    const get = makeGet(owner);
+    const screen = PROFILE_FORM.screens.find((s) => s.id === 'emergency-fund')!;
+    expect(visibleScreenFields(PROFILE_FORM, screen, get).map((spec) => spec.path)).toEqual([
+      'cash.emergencyFundApy',
+      'cash.targetMonths',
+    ]);
+    expect(visibleScreenNotes(screen, get).map((note) => resolveText(note.text, get))).toEqual([
+      'Held in your accounts: Robinhood $10,350.',
+    ]);
   });
 });

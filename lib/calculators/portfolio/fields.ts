@@ -1,59 +1,75 @@
 /**
  * Field specs only the portfolio rebalancer asks: the target mix and the
- * class-targets editor, the accounts list, the holdings editor and the three
- * settings. Wording is the rebalancer's from before the rebuild (the target
- * mix keeps the intake's); option labels come from lib/constants/labels.ts.
+ * class-targets editor, the holdings editor, this run's new cash and the
+ * three settings. The account list itself is the shared ACCOUNTS field
+ * (lib/fields/shared.ts). Wording is the rebalancer's from before the
+ * rebuild (the target mix keeps the intake's); option labels come from
+ * lib/constants/labels.ts.
  *
- * The holdings and class-targets editors are custom fields: their renderers
- * (components/calculators/renderers/portfolio.tsx) edit the related lists
- * through the reducers, so a field covers every list it writes.
+ * The holdings, class-targets and new cash editors are custom fields: their
+ * renderers (components/calculators/renderers/portfolio.tsx) edit the
+ * related lists through the reducers, so a field covers every list it
+ * writes.
  */
 
-import { getAssetClassLabel, type Account, type ClassTarget, type RebalanceMode } from '@/lib/calculations/portfolioRebalancing';
-import {
-  ACCOUNT_TYPE_OPTIONS,
-  TARGET_MIX_LABELS,
-  TARGET_MIX_OPTIONS,
-} from '@/lib/constants/labels';
+import { getAssetClassLabel, type ClassTarget, type RebalanceMode } from '@/lib/calculations/portfolioRebalancing';
+import { TARGET_MIX_LABELS, TARGET_MIX_OPTIONS } from '@/lib/constants/labels';
 import { listRows } from '@/lib/fields/runtime';
 import type { FieldOption, FieldSpec, Get, Write } from '@/lib/fields/types';
 import { formatCount, formatCurrency, formatPercent } from '@/lib/format';
+import {
+  accountDisplayName,
+  accountLabels,
+  accountsInEffect,
+  hasHoldings,
+  newCashFor,
+  normalNewCash,
+  rebalanceCandidates,
+} from '@/lib/profile/accounts';
 import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/lib/profile/defaults';
 import type { TargetMixPreset } from '@/lib/profile/types';
 import {
-  ACCOUNTS_PATH,
   ALLOW_TAXABLE_SELLING_PATH,
   CLASS_TARGETS_PATH,
   CUSTOM_ASSET_CLASSES_PATH,
   HOLDINGS_PATH,
   MODE_PATH,
+  NEW_CASH_PATH,
   SECURITIES_PATH,
   SHOW_PLACEMENT_ADVICE_PATH,
   TARGET_MIX_PATH,
   usesCustomTargets,
 } from './bindings';
-import { addAccount, portfolioWrites, readPortfolio, removeAccount } from './reducers';
+import { readPortfolio } from './reducers';
 
-/** Renderer ids (FieldSpec.renderer) of the two custom editors. */
+/** Renderer ids (FieldSpec.renderer) of the custom editors. */
 export const HOLDINGS_RENDERER = 'portfolio-holdings';
 export const CLASS_TARGETS_RENDERER = 'portfolio-class-targets';
+export const NEW_CASH_RENDERER = 'portfolio-new-cash';
 
 function plural(count: number, one: string, many: string): string {
   return `${formatCount(count)} ${count === 1 ? one : many}`;
 }
 
-function accountName(account: { name?: unknown }): string | null {
-  return typeof account.name === 'string' && account.name !== '' ? account.name : null;
+/**
+ * True while an account could be rebalanced (the targets then matter): a
+ * candidate with holdings, normal contributions above 0, or this run's new
+ * cash above 0. Where calculator-only values read as unset (the profile
+ * screens, intakeScreens in lib/calculators/forms.ts) the new cash is the
+ * normal contributions, so the targets screen follows the holdings and the
+ * normal contributions only; the calculator page also follows a Custom new
+ * cash. Every account rebalancedAccounts returns meets it, so it holds
+ * whenever the rebalancer works on an account.
+ */
+export function hasTargetsInEffect(get: Get): boolean {
+  return rebalanceCandidates(get).some(
+    (account) => hasHoldings(get, account.id) || normalNewCash(get, account.id) > 0 || newCashFor(get, account.id) > 0
+  );
 }
 
-/** An account's name, or its place in the list ('Account 2') while it has none. */
-export function accountLabel(account: { name?: unknown }, index: number): string {
-  return accountName(account) ?? `Account ${index + 1}`;
-}
-
-/** An account's name inside a sentence: its own name, else "account 2". */
-function accountInText(account: { name?: unknown }, index: number): string {
-  return accountName(account) ?? `account ${index + 1}`;
+/** True while an account in effect, other than a cash account, has a holding (the holdings screen shows). */
+export function hasHoldingsInEffect(get: Get): boolean {
+  return accountsInEffect(get).rows.some((account) => account.kind !== 'cash' && hasHoldings(get, account.id));
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +105,7 @@ export const TARGET_MIX: FieldSpec = {
   options: TARGET_MIX_OPTIONS,
   tier: 'details',
   onChange: targetsFromPreset,
+  visibleWhen: hasTargetsInEffect,
   summary: (value) => TARGET_MIX_LABELS[value as TargetMixPreset] ?? null,
 };
 
@@ -99,7 +116,7 @@ export const CLASS_TARGETS: FieldSpec = {
   label: 'Target allocation',
   renderer: CLASS_TARGETS_RENDERER,
   covers: [CUSTOM_ASSET_CLASSES_PATH],
-  visibleWhen: usesCustomTargets,
+  visibleWhen: (get) => usesCustomTargets(get) && hasTargetsInEffect(get),
   tier: 'details',
   summary: (value, get) => {
     const customs = readPortfolio(get).customAssetClasses;
@@ -107,69 +124,6 @@ export const CLASS_TARGETS: FieldSpec = {
       .filter((target) => target.accountId === null && target.target > 0)
       .map((target) => `${getAssetClassLabel(target.assetClass, customs)} ${formatPercent(target.target)}`);
     return parts.length > 0 ? parts.join(', ') : null;
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Accounts
-// ---------------------------------------------------------------------------
-
-export const ACCOUNT_NAME: FieldSpec = {
-  path: 'name',
-  kind: 'text',
-  label: 'Account name',
-  placeholder: 'Fidelity Roth IRA',
-  maxLength: 40,
-  tier: 'details',
-  testId: 'account-name-{i}',
-};
-
-export const ACCOUNT_TYPE: FieldSpec = {
-  path: 'accountType',
-  kind: 'select',
-  label: 'Type',
-  options: ACCOUNT_TYPE_OPTIONS,
-  tier: 'details',
-};
-
-/** The new cash going into the account: the one home of "new cash to invest this month". */
-export const ACCOUNT_DEPOSIT: FieldSpec = {
-  path: 'deposit',
-  kind: 'money',
-  label: 'New cash',
-  help: 'Money to invest now.',
-  placeholder: '0.00',
-  min: 0,
-  precision: 2,
-  tier: 'details',
-};
-
-export const ACCOUNTS: FieldSpec = {
-  path: ACCOUNTS_PATH,
-  kind: 'list',
-  label: 'Accounts',
-  row: [ACCOUNT_NAME, ACCOUNT_TYPE, ACCOUNT_DEPOSIT],
-  newRow: (get) => {
-    const { accounts } = addAccount(readPortfolio(get));
-    return { ...accounts[accounts.length - 1] };
-  },
-  itemLabel: (row, index) => accountLabel(row, index),
-  addLabel: 'Add account',
-  minRows: 1,
-  confirmRemove: (row, index) => `Delete ${accountInText(row, index)}? Its holdings will be removed too.`,
-  removeLabel: (row, index) => `Remove ${accountInText(row, index)}`,
-  // The account's holdings go with it, and so do the securities only they held.
-  removeRow: (get, index) => {
-    const portfolio = readPortfolio(get);
-    const account = portfolio.accounts[index];
-    if (!account) return [];
-    return portfolioWrites(portfolio, { ...removeAccount(portfolio, account.id), accounts: portfolio.accounts });
-  },
-  tier: 'details',
-  summary: (value) => {
-    const accounts = listRows(value) as unknown as Account[];
-    const newCash = accounts.reduce((sum, account) => sum + account.deposit, 0);
-    return `${plural(accounts.length, 'account', 'accounts')}, ${formatCurrency(newCash)} new cash`;
   },
 };
 
@@ -184,8 +138,33 @@ export const HOLDINGS: FieldSpec = {
   label: 'Holdings',
   renderer: HOLDINGS_RENDERER,
   covers: [SECURITIES_PATH],
+  visibleWhen: hasHoldingsInEffect,
   tier: 'details',
   summary: (value) => plural(listRows(value).length, 'holding', 'holdings'),
+};
+
+// ---------------------------------------------------------------------------
+// New cash (calculator-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * This run's new cash per account that can be rebalanced: Auto is the
+ * account's normal contributions (normalNewCash), Custom the visitor's own
+ * figure for this run (a portfolio.newCash row).
+ */
+export const NEW_CASH: FieldSpec = {
+  path: NEW_CASH_PATH,
+  kind: 'custom',
+  label: 'New cash this month',
+  renderer: NEW_CASH_RENDERER,
+  tier: 'details',
+  summary: (_value, get) => {
+    const labels = accountLabels(get);
+    const parts = rebalanceCandidates(get).map(
+      (account) => `${labels.get(account.id) ?? accountDisplayName(account)} ${formatCurrency(newCashFor(get, account.id))}`
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
+  },
 };
 
 // ---------------------------------------------------------------------------

@@ -151,6 +151,7 @@ export function TargetsCard({
                 />
               </div>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 onClick={() => {

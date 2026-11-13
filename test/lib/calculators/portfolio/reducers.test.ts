@@ -5,15 +5,15 @@
  * linking, target management with clamping, custom asset classes, and the
  * writes a change turns into.
  *
- * The seed is the default profile's worked example:
- *   Roth IRA:   10 VTI, 5 BND        (acc-roth, tax-free, no new cash)
- *   Brokerage:  20 VTI, 15 VXUS      (acc-brok, taxable, $1,000 new cash)
+ * The seed is the two-account worked example the reducers were written
+ * against (fixed here, since the v3 default holds a different example):
+ *   Roth IRA:   10 VTI, 5 BND        (acc-roth)
+ *   Brokerage:  20 VTI, 15 VXUS      (acc-brok)
  *   Targets:    60% US, 20% intl, 20% bonds, 0% cash (the 80/20 preset)
  */
 
 import { describe, expect, it } from 'vitest';
 import {
-  addAccount,
   addCustomAssetClass,
   addHolding,
   addSecurity,
@@ -35,7 +35,22 @@ import {
 import { makeGet } from '@/lib/fields/paths';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 
-const seed = (): Portfolio => getDefaultFinancialProfile().portfolio;
+const seed = (): Portfolio => ({
+  accounts: [
+    { id: 'acc-roth', kind: 'roth-ira', name: 'Roth IRA', balance: 0, holdsEmergencyFund: false },
+    { id: 'acc-brok', kind: 'brokerage', name: 'Brokerage', balance: 0, holdsEmergencyFund: false },
+  ],
+  securities: getDefaultFinancialProfile().portfolio.securities,
+  holdings: [
+    { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
+    { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
+    { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
+    { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+  ],
+  newCash: [],
+  classTargets: getDefaultFinancialProfile().portfolio.classTargets,
+  customAssetClasses: [],
+});
 
 const deepFreeze = <T>(value: T): T => {
   if (value && typeof value === 'object') {
@@ -51,6 +66,7 @@ describe('seed', () => {
     expect(p.securities.map((s) => s.ticker)).toEqual(['VTI', 'VXUS', 'BND']);
     expect(p.accounts.map((a) => a.name)).toEqual(['Roth IRA', 'Brokerage']);
     expect(p.holdings).toHaveLength(4);
+    expect(p.newCash).toEqual([]);
     // 60/20/20 (plus a 0% cash row) sum to exactly 1.
     expect(p.classTargets.reduce((s, t) => s + t.target, 0)).toBeCloseTo(1, 10);
     expect(p.customAssetClasses).toEqual([]);
@@ -63,7 +79,6 @@ describe('the reducers never mutate their input', () => {
     expect(() => {
       addSecurity(p);
       updateSecurity(p, 'sec-vti', { price: 1 });
-      addAccount(p);
       removeAccount(p, 'acc-roth');
       addHolding(p);
       updateHolding(p, 'hld-roth-vti', { shares: 1 });
@@ -107,19 +122,6 @@ describe('security actions', () => {
 });
 
 describe('account actions', () => {
-  it('addAccount appends a numbered taxable account with zero deposit', () => {
-    const { accounts } = addAccount(seed());
-    expect(accounts).toHaveLength(3);
-    expect(accounts[2]).toEqual({ id: 'acc-3', name: 'Account 3', accountType: 'taxable', deposit: 0 });
-  });
-
-  it('gives each new account an id no account has', () => {
-    const twice = addAccount(addAccount(seed()));
-    expect(twice.accounts.map((a) => a.id)).toEqual(['acc-roth', 'acc-brok', 'acc-3', 'acc-4']);
-    const gap = addAccount({ ...seed(), accounts: [{ id: 'acc-2', name: 'A', accountType: 'taxable', deposit: 0 }] });
-    expect(gap.accounts.map((a) => a.id)).toEqual(['acc-2', 'acc-3']);
-  });
-
   it('never gives a new row an id a row still refers to, so no dangling reference is taken over', () => {
     // VTI is assigned to a custom class, the class is removed (the reference
     // dangles), and a class with the same label is added again.
@@ -130,11 +132,6 @@ describe('account actions', () => {
     expect(goldId).toBe('cac-1');
     expect(againId).not.toBe(goldId);
     expect(again.securities.find((sec) => sec.id === 'sec-vti')?.assetClass).toBe(goldId);
-
-    // A holding left pointing at a removed account keeps it from being reused.
-    const dangling = { ...seed(), accounts: seed().accounts.filter((a) => a.id !== 'acc-brok') };
-    const withStray = { ...dangling, holdings: [...dangling.holdings, { ...seed().holdings[0], id: 'hld-x', accountId: 'acc-2' }] };
-    expect(addAccount(withStray).accounts.map((a) => a.id)).toEqual(['acc-roth', 'acc-3']);
   });
 
   it('removeAccount drops its holdings and garbage-collects orphaned securities', () => {
@@ -309,13 +306,14 @@ describe('asset-class targets', () => {
 });
 
 describe('reading and writing the profile lists', () => {
-  it('reads the five lists through a Get, and a missing list as empty', () => {
+  it('reads the six lists through a Get, and a missing list as empty', () => {
     const profile = getDefaultFinancialProfile();
     expect(readPortfolio(makeGet(profile))).toEqual(profile.portfolio);
     expect(readPortfolio(makeGet({}))).toEqual({
       accounts: [],
       securities: [],
       holdings: [],
+      newCash: [],
       classTargets: [],
       customAssetClasses: [],
     });
@@ -324,6 +322,8 @@ describe('reading and writing the profile lists', () => {
   it('writes each list an action changed, whole, and nothing else', () => {
     const before = seed();
     expect(portfolioWrites(before, before)).toEqual([]);
+    const withCash = { ...before, newCash: [{ id: 'acc-brok', amount: 500 }] };
+    expect(portfolioWrites(before, withCash)).toEqual([{ path: 'portfolio.newCash', value: withCash.newCash }]);
     const after = removeAccount(before, 'acc-roth');
     expect(portfolioWrites(before, after)).toEqual([
       { path: 'portfolio.accounts', value: [before.accounts[1]] },

@@ -10,7 +10,11 @@
  * app/tools/leverage-comparison/components/queryParams.ts, as
  * inputsFromQuery(new URLSearchParams(query)) for the query of
  * leverageLink(migrateProfile(v1, 1)); that query is kept as `link`. The
- * payloads now load through normalizeProfile, as any stored profile does.
+ * payloads now load through migrateProfile(v1, 1), as a stored v1 profile
+ * does, with the investing leaves a case edits answered: profile v3 keeps an
+ * answered invested balance as an account row ('Other investments') and an
+ * answered monthly contribution as the Custom monthly investing figure; an
+ * unanswered one gives way to the example accounts and to Auto.
  *
  * Documented exceptions (no v1 fixture hits them): a derived contribution or
  * balance is no longer rounded to whole dollars (the calculator never
@@ -35,7 +39,9 @@ import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
 import { isDerivedBinding } from '@/lib/fields/binding';
 import { makeGet } from '@/lib/fields/paths';
 import { applyProfileWrites, getDefaultFinancialProfile, normalizeProfile, patchWrites } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
 import type { FinancialProfile, ProfilePatch } from '@/lib/profile/types';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
 const V1_DEFAULT = {
@@ -63,13 +69,16 @@ type V1Edits = {
   strategy?: Partial<typeof V1_DEFAULT.strategy>;
 };
 
-function v1(edits: V1Edits) {
-  return {
+/** The v1 payload with `edits`, its edited investing leaves answered, loaded as a stored v1 profile is. */
+function v1(edits: V1Edits): FinancialProfile {
+  const payload = {
     ...V1_DEFAULT,
     person: { ...V1_DEFAULT.person, ...edits.person },
     investing: { ...V1_DEFAULT.investing, ...edits.investing },
     strategy: { ...V1_DEFAULT.strategy, ...edits.strategy },
+    provided: Object.keys(edits.investing ?? {}).map((key) => `investing.${key}`),
   };
+  return migrateProfile(payload, 1);
 }
 
 /** The model assumptions every captured link carried (the defaults). */
@@ -136,7 +145,7 @@ const withPatch = (patch: ProfilePatch): FinancialProfile =>
 
 describe('golden: engineInputsFor equals the old profile link, read by the old query reader', () => {
   it.each(GOLDEN)('$name', ({ edits, inputs }) => {
-    expect(engineInputsFor(LEVERAGE_CALCULATOR, normalizeProfile(v1(edits)))).toEqual(inputs);
+    expect(engineInputsFor(LEVERAGE_CALCULATOR, v1(edits))).toEqual(inputs);
   });
 });
 
@@ -209,7 +218,7 @@ describe('leverage bindings', () => {
 
   it('derives the auto values from the profile, within the bounds', () => {
     const get = (values: ProfilePatch) => makeGet(withPatch(values));
-    // Taxable first, then the total monthly contribution; clamped to $0..$1,000,000.
+    // Taxable first, then monthly investing (Custom, else Auto); clamped to $0..$1,000,000.
     expect(derivedMonthlyContribution(get({ investing: { taxableMonthlyContribution: 650 } }))).toBe(650);
     expect(derivedMonthlyContribution(get({ investing: { taxableMonthlyContribution: 0, monthlyContribution: 1200 } }))).toBe(1200);
     expect(derivedMonthlyContribution(get({ investing: { taxableMonthlyContribution: 2_500_000 } }))).toBe(1_000_000);
@@ -220,9 +229,25 @@ describe('leverage bindings', () => {
     expect(derivedYears(get({ person: { age: 30, retirementAge: 64.6 } }))).toBe(35);
     expect(derivedYears(get({ person: { age: 50, retirementAge: 50 } }))).toBe(1);
     expect(derivedYears(get({ person: { age: 16, retirementAge: 85 } }))).toBe(60);
-    // The invested balance, clamped to $0..$100,000,000.
-    expect(derivedStartingBalance(get({ investing: { investedBalance: 33_000 } }))).toBe(33_000);
-    expect(derivedStartingBalance(get({ investing: { investedBalance: 250_000_000 } }))).toBe(100_000_000);
+    // Taxable 0 and monthly investing on Auto: the normal contributions of the
+    // 3bb0132 default, 6% own + 3% match (50% up to 6%) of 3,500 x 26 / 12:
+    // 455 + 227.5 = 682.5.
+    expect(derivedMonthlyContribution(get({ investing: { taxableMonthlyContribution: 0, monthlyContribution: null } }))).toBeCloseTo(
+      682.5,
+      10
+    );
+    // The invested balance (the account values), clamped to $0..$100,000,000.
+    const withAccounts = (balance: number) =>
+      makeGet(
+        applyProfileWrites(withPatch({}), [
+          {
+            path: 'portfolio.accounts',
+            value: [{ id: 'acc-1', kind: 'brokerage', name: '', balance, holdsEmergencyFund: false }],
+          },
+        ]).profile
+      );
+    expect(derivedStartingBalance(withAccounts(33_000))).toBe(33_000);
+    expect(derivedStartingBalance(withAccounts(250_000_000))).toBe(100_000_000);
   });
 });
 
@@ -238,7 +263,7 @@ describe('validateDcaComparisonInputs', () => {
   });
 
   it('shows that error with the results, whether the contribution is derived or an override', () => {
-    const derived = normalizeProfile(v1(GOLDEN[5].edits));
+    const derived = v1(GOLDEN[5].edits);
     expect(prepareRun(LEVERAGE_CALCULATOR, derived).errors).toEqual({
       calculation: 'Enter a monthly contribution or a starting balance.',
     });
@@ -269,5 +294,29 @@ describe('validateDcaComparisonInputs', () => {
     expect(LEVERAGE_CALCULATOR.debounceMs).toBe(250);
     expect(LEVERAGE_CALCULATOR.engineBase()).toEqual(DEFAULT_DCA_COMPARISON_INPUTS);
     expect(LEVERAGE_CALCULATOR.engineBase()).not.toBe(DEFAULT_DCA_COMPARISON_INPUTS);
+  });
+});
+
+describe('profile v3: the account list and the taxable contribution feed the comparison', () => {
+  it('runs the owner fixture: 400 a month (the taxable answer) on 105,800 invested', () => {
+    const inputs = engineInputsFor(LEVERAGE_CALCULATOR, normalizeProfile(ownerRaw()));
+    expect(inputs.monthlyContribution).toBe(400);
+    // 80,000 + 12,000 + 10,050 + 3,750; the Robinhood emergency fund left out.
+    expect(inputs.startingBalance).toBe(105800);
+  });
+
+  it('runs the default with taxable answered 0 on Auto monthly investing: 1,040', () => {
+    const { profile } = applyProfileWrites(getDefaultFinancialProfile(), [
+      { path: 'investing.taxableMonthlyContribution', value: 0 },
+    ]);
+    // round2(8% + 4% of 4,000 x 26 / 12) = round2(693.33... + 346.66...).
+    const monthlyGross = (4000 * 26) / 12;
+    expect(Math.round((0.08 * monthlyGross + 0.04 * monthlyGross) * 100) / 100).toBe(1040);
+    expect(engineInputsFor(LEVERAGE_CALCULATOR, profile).monthlyContribution).toBe(1040);
+    expect(engineInputsFor(LEVERAGE_CALCULATOR, getDefaultFinancialProfile())).toMatchObject({
+      monthlyContribution: 500,
+      years: 40,
+      startingBalance: 25000,
+    });
   });
 });

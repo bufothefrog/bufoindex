@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { PAY_FREQUENCY_META } from '@/lib/constants/frequency';
 import { FILING_STATUS_META } from '@/lib/constants/labels';
 import {
+  ACCOUNTS,
+  ACCOUNTS_SCREEN,
   AGE,
   CORE_FIELDS,
   CORE_SCREENS,
   EMERGENCY_FUND_APY,
   EMERGENCY_FUND_BALANCE,
+  EMERGENCY_FUND_HELD_NOTE,
   EMERGENCY_FUND_MONTHS,
   FILING_STATUS,
   GROSS_PAY,
-  INVESTED_BALANCE,
   MONTHLY_INVESTING,
   NECESSARY_MONTHLY,
   NET_PAY,
@@ -30,11 +32,15 @@ import {
   payFrequencySummary,
   stateSummary,
   takeHomeSummary,
+  usesTypedEmergencyFund,
   withOverrides,
 } from '@/lib/fields/shared';
-import { relationErrors, resolveOptions, summarizeScreen } from '@/lib/fields/runtime';
+import { makeGet } from '@/lib/fields/paths';
+import { relationErrors, resolveOptions, resolveText, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FormSpec, Get } from '@/lib/fields/types';
-import { PAY_FREQUENCIES, PROFILE_ENUM_VALUES, isProfilePath } from '@/lib/profile/defaults';
+import { PAY_FREQUENCIES, PROFILE_ENUM_VALUES, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
+import { fromDefaults } from '@/test/utils/intakeFixture';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 
 const SHARED = [
   AGE,
@@ -45,7 +51,7 @@ const SHARED = [
   NET_PAY,
   NECESSARY_MONTHLY,
   RETIREMENT_AGE,
-  INVESTED_BALANCE,
+  ACCOUNTS,
   MONTHLY_INVESTING,
   TAXABLE_MONTHLY,
   EMERGENCY_FUND_BALANCE,
@@ -121,7 +127,7 @@ describe('shared field specs', () => {
     expect([AGE.min, AGE.max, AGE.step]).toEqual([16, 100, 1]);
     expect([RETIREMENT_AGE.min, RETIREMENT_AGE.max, RETIREMENT_AGE.step]).toEqual([30, 85, 1]);
     expect([EMERGENCY_FUND_APY.min, EMERGENCY_FUND_APY.max]).toEqual([0, 0.2]);
-    for (const spec of [GROSS_PAY, NET_PAY, NECESSARY_MONTHLY, INVESTED_BALANCE, MONTHLY_INVESTING, TAXABLE_MONTHLY]) {
+    for (const spec of [GROSS_PAY, NET_PAY, NECESSARY_MONTHLY, MONTHLY_INVESTING, TAXABLE_MONTHLY]) {
       expect(spec.min, spec.path).toBe(0);
     }
   });
@@ -129,6 +135,66 @@ describe('shared field specs', () => {
   it('marks the core facts as core and the rest as details', () => {
     expect(CORE_FIELDS.every((spec) => spec.tier === 'core')).toBe(true);
     expect(SHARED.filter((spec) => !CORE_FIELDS.includes(spec)).every((spec) => spec.tier === 'details')).toBe(true);
+  });
+});
+
+describe('the account list and monthly investing (profile v3)', () => {
+  it('asks the account list on one shared screen, with one row spec per account fact', () => {
+    expect(ACCOUNTS_SCREEN).toEqual({
+      id: 'accounts',
+      title: 'What do you have saved and invested?',
+      tier: 'details',
+      surface: 'both',
+      fields: ['portfolio.accounts'],
+    });
+    expect(ACCOUNTS).toMatchObject({
+      path: 'portfolio.accounts',
+      kind: 'list',
+      label: 'Accounts',
+      renderer: 'accounts',
+      covers: ['portfolio.holdings', 'portfolio.securities'],
+      minRows: 0,
+      addLabel: 'Add account',
+    });
+    expect(ACCOUNTS.covers).not.toContain('portfolio.newCash');
+    // No row field carries a line of text: the renderer draws none.
+    expect(ACCOUNTS.row!.map((row) => [row.path, row.help, row.hint])).toEqual([
+      ['kind', undefined, undefined],
+      ['name', undefined, undefined],
+      ['balance', undefined, undefined],
+      ['holdsEmergencyFund', undefined, undefined],
+    ]);
+  });
+
+  it('offers the emergency-fund tick on brokerage rows only', () => {
+    const tick = ACCOUNTS.row!.find((row) => row.path === 'holdsEmergencyFund')!;
+    expect(tick.visibleWhen!(getFrom({ kind: 'brokerage' }))).toBe(true);
+    for (const kind of ['cash', '401k', 'hsa', 'roth-ira']) expect(tick.visibleWhen!(getFrom({ kind })), kind).toBe(false);
+  });
+
+  it('summarizes the list with accountsSummary', () => {
+    expect(ACCOUNTS.summary!(undefined, fromDefaults())).toBe(
+      '401(k) or similar $16,225; Brokerage (taxable) $8,775 (3 holdings)'
+    );
+  });
+
+  it('runs monthly investing on Auto from the contribution answers; the field appends the figure to the label', () => {
+    expect(MONTHLY_INVESTING.label).toBe('Monthly investing');
+    expect(MONTHLY_INVESTING.help).toBeUndefined();
+    expect(resolveText(MONTHLY_INVESTING.nullable!.autoLabel, fromDefaults())).toBe('From your answers');
+    expect((MONTHLY_INVESTING.nullable!.overrideDefault as (get: Get) => number)(fromDefaults())).toBe(1540);
+  });
+
+  it('hides the typed emergency fund while an account holds it, and says where it is held', () => {
+    const owner = makeGet(normalizeProfile(ownerRaw()));
+    expect(usesTypedEmergencyFund(fromDefaults())).toBe(true);
+    expect(EMERGENCY_FUND_BALANCE.visibleWhen!(fromDefaults())).toBe(true);
+    expect(EMERGENCY_FUND_BALANCE.visibleWhen!(owner)).toBe(false);
+    const screen = { id: 'ef', title: 'Emergency fund', tier: 'details' as const, fields: [], notes: [EMERGENCY_FUND_HELD_NOTE] };
+    expect(visibleScreenNotes(screen, fromDefaults())).toEqual([]);
+    expect(visibleScreenNotes(screen, owner).map((note) => resolveText(note.text, owner))).toEqual([
+      'Held in your accounts: Robinhood $10,350.',
+    ]);
   });
 });
 
@@ -154,6 +220,7 @@ describe('CORE_SCREENS and PROFILE_EXTRA_SCREENS', () => {
     expect(PROFILE_EXTRA_SCREENS.map((s) => [s.id, s.fields])).toEqual([
       ['cash-buffer', ['cash.emergencyFundBalance', 'cash.emergencyFundApy', 'cash.targetMonths']],
     ]);
+    expect(PROFILE_EXTRA_SCREENS[0].notes).toEqual([EMERGENCY_FUND_HELD_NOTE]);
     expect(PROFILE_EXTRA_SCREENS.flatMap((s) => s.fields)).toEqual(PROFILE_EXTRA_FIELDS.map((spec) => spec.path));
   });
 });

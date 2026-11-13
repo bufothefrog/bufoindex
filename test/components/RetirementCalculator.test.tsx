@@ -46,7 +46,8 @@ describe('RetirementCalculator', () => {
       'A little about you',
       'What does a typical paycheck look like?',
       'What do you have to pay each month?',
-      'What are you investing today?',
+      'What do you have saved and invested?',
+      'Monthly investing',
       'When would you like to retire?',
       'Social Security and healthcare',
       'When to claim Social Security',
@@ -54,6 +55,9 @@ describe('RetirementCalculator', () => {
     ]) {
       expect(screen.getByRole('region', { name: title })).toBeInTheDocument();
     }
+    // Monthly investing on Auto names the figure once.
+    const monthly = screen.getByRole('region', { name: 'Monthly investing' });
+    expect(within(monthly).getByText(/^From your answers/)).toHaveTextContent(/^From your answers: \$1,540$/);
     expect(screen.queryByRole('button', { name: /Calculate/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Methodology' })).toHaveAttribute(
       'href',

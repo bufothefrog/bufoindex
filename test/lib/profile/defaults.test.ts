@@ -1,12 +1,11 @@
 /**
- * Profile v2 defaults, path registry, value rules, normalization and writes.
+ * Profile v3 defaults, path registry, value rules, normalization and writes.
  *
  * Default profile (lib/profile/defaults.ts, docs/rebuild-plan.md section 2.3):
- * the v1 placeholders (age 30, TX, single, retire at 60; $3,500 / $2,600
- * bi-weekly; ...) plus every calculator input's new home: life expectancy 85,
- * Social Security $30,000 at 67, the retirement and leverage model constants,
- * and the rebalancer's three-fund worked example with $1,000 of new cash on
- * the Brokerage account.
+ * the PR 3 worked example (25, CA, single, retire at 65; $4,000 every two
+ * weeks) plus every calculator input's home: the retirement and leverage
+ * model constants, and the account list's worked example (a 401(k) with a
+ * typed 16,225 and a brokerage holding 8,775 of three funds; PR 4).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -98,9 +97,9 @@ describe('the PR 3 worked example', () => {
 });
 
 describe('getDefaultFinancialProfile', () => {
-  it('returns the documented v2 placeholder values', () => {
+  it('returns the documented v3 placeholder values', () => {
     expect(getDefaultFinancialProfile()).toEqual({
-      version: 2,
+      version: 3,
       updatedAt: 0,
       person: { age: 25, state: 'CA', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 },
       income: {
@@ -123,10 +122,9 @@ describe('getDefaultFinancialProfile', () => {
         afterTaxAvailable: false,
       },
       hsa: { eligible: false, coverage: 'individual', monthlyContribution: 0, employerAnnualContribution: 0, investing: false },
-      ira: { traditional: false, roth: false, traditionalMonthly: 0, rothMonthly: 0, traditionalBalance: 0, rothBalance: 0 },
+      ira: { traditional: false, roth: false, traditionalMonthly: 0, rothMonthly: 0 },
       investing: {
-        investedBalance: 25000,
-        monthlyContribution: 1500,
+        monthlyContribution: null,
         taxableMonthlyContribution: 500,
         targetMix: '80-20',
       },
@@ -134,8 +132,8 @@ describe('getDefaultFinancialProfile', () => {
       debts: [],
       portfolio: {
         accounts: [
-          { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
-          { id: 'acc-brok', name: 'Brokerage', accountType: 'taxable', deposit: 1000 },
+          { id: 'acc-401k', kind: '401k', name: '', balance: 16225, holdsEmergencyFund: false },
+          { id: 'acc-brok', kind: 'brokerage', name: '', balance: 0, holdsEmergencyFund: false },
         ],
         securities: [
           { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: 375, assetClass: 'us-stock' },
@@ -143,11 +141,11 @@ describe('getDefaultFinancialProfile', () => {
           { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: 70, assetClass: 'bonds' },
         ],
         holdings: [
-          { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
-          { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
           { id: 'hld-brok-vti', accountId: 'acc-brok', securityId: 'sec-vti', shares: 20 },
           { id: 'hld-brok-vxus', accountId: 'acc-brok', securityId: 'sec-vxus', shares: 15 },
+          { id: 'hld-brok-bnd', accountId: 'acc-brok', securityId: 'sec-bnd', shares: 0 },
         ],
+        newCash: [],
         classTargets: [
           { accountId: null, assetClass: 'us-stock', target: 0.6 },
           { accountId: null, assetClass: 'intl-stock', target: 0.2 },
@@ -198,21 +196,28 @@ describe('getDefaultFinancialProfile', () => {
     expect(p.portfolio.classTargets).toEqual(presetClassTargets('80-20'));
   });
 
-  it('puts the default new cash on the Brokerage account', () => {
+  it('is the account list example: no stored new cash, the brokerage worth 20 x 375 + 15 x 85 + 0 x 70 = 8,775', () => {
     const p = getDefaultFinancialProfile();
-    expect(p.portfolio.accounts.find((a) => a.id === BROKERAGE_ACCOUNT_ID)?.deposit).toBe(1000);
+    expect(p.portfolio.newCash).toEqual([]);
+    expect(p.investing.monthlyContribution).toBeNull();
+    const price = new Map(p.portfolio.securities.map((s) => [s.id, s.price]));
+    const brokerage = p.portfolio.holdings
+      .filter((h) => h.accountId === BROKERAGE_ACCOUNT_ID)
+      .reduce((sum, h) => sum + h.shares * (price.get(h.securityId) ?? 0), 0);
+    expect(brokerage).toBe(8775);
+    expect(p.portfolio.accounts.find((a) => a.kind === '401k')?.balance).toBe(16225);
   });
 
   it('returns a fresh object each call', () => {
     const a = getDefaultFinancialProfile();
     a.person.age = 99;
     a.provided.push('person.age');
-    a.portfolio.accounts[0].deposit = 5;
+    a.portfolio.accounts[0].balance = 5;
     a.assumptions.retirement.volatility = 0.3;
     const b = getDefaultFinancialProfile();
     expect(b.person.age).toBe(25);
     expect(b.provided).toEqual([]);
-    expect(b.portfolio.accounts[0].deposit).toBe(0);
+    expect(b.portfolio.accounts[0].balance).toBe(16225);
     expect(b.assumptions.retirement.volatility).toBe(0.15);
   });
 });
@@ -241,14 +246,19 @@ describe('target mix', () => {
 });
 
 describe('v1 leaves, sections and preset constants', () => {
-  it('keeps every v1 leaf but the one-off new cash and the removed strategy preset, which are no v2 paths', () => {
+  it('keeps every v1 leaf but the invested balance, the one-off new cash and the removed strategy preset, which are no v3 paths', () => {
     expect(V1_LEAF_PATHS).toHaveLength(25);
     expect(V1_LEAF_PATHS.filter((path) => !PROFILE_LEAF_PATHS.includes(path))).toEqual([
+      'investing.investedBalance',
       'investing.newCashThisMonth',
       'strategy.preset',
     ]);
     expect(isProfilePath('investing.newCashThisMonth')).toBe(false);
     expect(isProfilePath('strategy.preset')).toBe(false);
+    // v3 keeps balances on the account rows only.
+    expect(isProfilePath('investing.investedBalance')).toBe(false);
+    expect(isProfilePath('ira.traditionalBalance')).toBe(false);
+    expect(isProfilePath('ira.rothBalance')).toBe(false);
   });
 
   it('excludes version, updatedAt and provided from the leaf paths', () => {
@@ -273,7 +283,7 @@ describe('v1 leaves, sections and preset constants', () => {
 
 describe('path registry', () => {
   it('lists every leaf of the default profile once, in section order', () => {
-    expect(PROFILE_LEAF_PATHS).toHaveLength(65);
+    expect(PROFILE_LEAF_PATHS).toHaveLength(62);
     expect(new Set(PROFILE_LEAF_PATHS).size).toBe(PROFILE_LEAF_PATHS.length);
     expect(PROFILE_LEAF_PATHS.slice(0, 5)).toEqual([
       'person.age',
@@ -291,12 +301,13 @@ describe('path registry', () => {
     }
   });
 
-  it('lists the six lists and none of them as leaves', () => {
+  it('lists the seven lists and none of them as leaves', () => {
     expect(PROFILE_LIST_PATHS).toEqual([
       'debts',
       'portfolio.accounts',
       'portfolio.securities',
       'portfolio.holdings',
+      'portfolio.newCash',
       'portfolio.classTargets',
       'portfolio.customAssetClasses',
     ]);
@@ -328,7 +339,7 @@ describe('path registry', () => {
     expect(providedPathFor('person.age')).toBe('person.age');
     expect(providedPathFor('debts')).toBe('debts');
     expect(providedPathFor('debts.3')).toBe('debts');
-    expect(providedPathFor('portfolio.accounts.1.deposit')).toBe('portfolio.accounts');
+    expect(providedPathFor('portfolio.accounts.1.balance')).toBe('portfolio.accounts');
     expect(providedPathFor('not.a.path')).toBeNull();
     expect(normalizeProvided(['debts.0.balance', 'person.age', 'debts', 7, 'nope', 'person.age'])).toEqual([
       'debts',
@@ -338,7 +349,7 @@ describe('path registry', () => {
 
   it('drops row paths whose row does not exist when given the profile', () => {
     const p = getDefaultFinancialProfile();
-    expect(normalizeProvided(['debts.7.balance', 'portfolio.holdings.3', 'portfolio.holdings.4', 'person.age'], p))
+    expect(normalizeProvided(['debts.7.balance', 'portfolio.holdings.2', 'portfolio.holdings.3', 'person.age'], p))
       .toEqual(['portfolio.holdings', 'person.age']);
     // A list path itself is an answer even when the list is empty ("I have no debts").
     expect(normalizeProvided(['debts'], p)).toEqual(['debts']);
@@ -349,8 +360,10 @@ describe('path registry', () => {
     expect(getProfileValue(p, 'income.grossPerPaycheck')).toBe(4000);
     expect(getProfileValue(p, 'workplace.has401k')).toBe(true);
     expect(getProfileValue(p, 'assumptions.retirement.effectiveTaxRate')).toBeNull();
-    expect(getProfileValue(p, 'portfolio.accounts.1.deposit')).toBe(1000);
-    expect(getProfileValue(p, 'portfolio.holdings')).toHaveLength(4);
+    expect(getProfileValue(p, 'portfolio.accounts.0.balance')).toBe(16225);
+    expect(getProfileValue(p, 'portfolio.accounts.1.kind')).toBe('brokerage');
+    expect(getProfileValue(p, 'portfolio.holdings')).toHaveLength(3);
+    expect(getProfileValue(p, 'portfolio.newCash')).toEqual([]);
     expect(getProfileValue(p, 'nope.nothing')).toBeUndefined();
     expect(getProfileValue(p, 'person')).toBeUndefined();
   });
@@ -411,8 +424,13 @@ describe('isValidProfileValue', () => {
     expect(isValidProfileValue('debts.0.taxDeductible', 'yes')).toBe(false);
     expect(isValidProfileValue('debts.0.name', '')).toBe(true);
     expect(isValidProfileValue('debts.0.id', '')).toBe(false);
-    expect(isValidProfileValue('portfolio.accounts.1.accountType', 'tax-deferred')).toBe(true);
-    expect(isValidProfileValue('portfolio.accounts.1.accountType', 'roth')).toBe(false);
+    expect(isValidProfileValue('portfolio.accounts.1.kind', 'roth-ira')).toBe(true);
+    expect(isValidProfileValue('portfolio.accounts.1.kind', 'tax-deferred')).toBe(false);
+    expect(isValidProfileValue('portfolio.accounts.1.balance', 0)).toBe(true);
+    expect(isValidProfileValue('portfolio.accounts.1.balance', -1)).toBe(false);
+    expect(isValidProfileValue('portfolio.accounts.1.holdsEmergencyFund', true)).toBe(true);
+    expect(isValidProfileValue('portfolio.newCash.0.amount', 250)).toBe(true);
+    expect(isValidProfileValue('portfolio.newCash.0.amount', -5)).toBe(false);
     expect(isValidProfileValue('portfolio.classTargets.0.accountId', null)).toBe(true);
     expect(isValidProfileValue('portfolio.classTargets.0.accountId', 'acc-1')).toBe(true);
     expect(isValidProfileValue('portfolio.securities.0.name', 'Total Market')).toBe(true);
@@ -440,7 +458,7 @@ describe('normalizeProfile', () => {
       nickname: 'Bufo',
       provided: ['person.age', 'person.age', 7, 'cash.targetMonths'],
     });
-    expect(p.version).toBe(2);
+    expect(p.version).toBe(3);
     expect(p.updatedAt).toBe(1234);
     expect(p.person).toEqual({ age: 45, state: 'NY', filingStatus: 'single', retirementAge: 65, lifeExpectancy: 90 });
     expect(p.income).toEqual(getDefaultFinancialProfile().income);
@@ -480,11 +498,11 @@ describe('normalizeProfile', () => {
     const p = normalizeProfile({}, base);
     p.person.age = 70;
     p.provided.push('person.age');
-    p.portfolio.accounts[1].deposit = 1;
+    p.portfolio.accounts[0].balance = 1;
     p.assumptions.portfolio.mode = 'fractional';
     expect(base.person.age).toBe(25);
     expect(base.provided).toEqual([]);
-    expect(base.portfolio.accounts[1].deposit).toBe(1000);
+    expect(base.portfolio.accounts[0].balance).toBe(16225);
     expect(base.assumptions.portfolio.mode).toBe('whole');
   });
 
@@ -507,22 +525,63 @@ describe('normalizeProfile', () => {
       ]);
     });
 
-    it('accounts: checks the account type and keeps an empty name', () => {
+    it('accounts: checks the kind, keeps an empty name and floors the balance at 0', () => {
       const p = normalizeProfile({
         portfolio: {
           accounts: [
-            { id: 'a1', name: '', accountType: 'tax-deferred', deposit: 250 },
-            { id: 'a2', name: 'Roth', accountType: 'roth', deposit: -5 },
+            { id: 'a1', name: '', kind: '401k', balance: 250, holdsEmergencyFund: false },
+            { id: 'a2', name: 'Roth', kind: 'roth', balance: -5 },
             { name: 'No id' },
           ],
         },
       });
       expect(p.portfolio.accounts).toEqual([
-        { id: 'a1', name: '', accountType: 'tax-deferred', deposit: 250 },
-        { id: 'a2', name: 'Roth', accountType: 'taxable', deposit: -5 },
+        { id: 'a1', name: '', kind: '401k', balance: 250, holdsEmergencyFund: false },
+        { id: 'a2', name: 'Roth', kind: 'brokerage', balance: 0, holdsEmergencyFund: false },
       ]);
       // The other portfolio lists keep the base (default) rows.
       expect(p.portfolio.holdings).toEqual(getDefaultFinancialProfile().portfolio.holdings);
+    });
+
+    it('accounts: forces the emergency-fund tick off on a kind that is not a brokerage', () => {
+      const p = normalizeProfile({
+        portfolio: {
+          accounts: [
+            { id: 'a1', name: 'Bank', kind: 'cash', balance: 4000, holdsEmergencyFund: true },
+            { id: 'a2', name: 'Broker', kind: 'brokerage', balance: 900, holdsEmergencyFund: true },
+            { id: 'a3', name: 'Odd', kind: 'pension', balance: 10, holdsEmergencyFund: true },
+          ],
+        },
+      });
+      expect(p.portfolio.accounts.map((a) => [a.kind, a.holdsEmergencyFund])).toEqual([
+        ['cash', false],
+        ['brokerage', true],
+        // An unknown kind reads as a brokerage, and a brokerage may hold the fund.
+        ['brokerage', true],
+      ]);
+    });
+
+    it('newCash: drops repeated ids and floors a negative amount at 0', () => {
+      const p = normalizeProfile({
+        portfolio: {
+          newCash: [
+            { id: 'acc-brok', amount: 500 },
+            { id: 'acc-401k', amount: -40 },
+            { id: 'acc-brok', amount: 900 },
+            { amount: 7 },
+          ],
+        },
+      });
+      expect(p.portfolio.newCash).toEqual([
+        { id: 'acc-brok', amount: 500 },
+        { id: 'acc-401k', amount: 0 },
+      ]);
+    });
+
+    it('keeps monthly investing null as Auto and a number as the override', () => {
+      expect(normalizeProfile({}).investing.monthlyContribution).toBeNull();
+      expect(normalizeProfile({ investing: { monthlyContribution: 1500 } }).investing.monthlyContribution).toBe(1500);
+      expect(normalizeProfile({ investing: { monthlyContribution: 'x' } }).investing.monthlyContribution).toBeNull();
     });
 
     it('securities: keeps the optional name only when it is a string', () => {
@@ -723,25 +782,46 @@ describe('applyProfileWrites', () => {
   });
 
   it('refuses a row or an id that would repeat another row id', () => {
-    const roth = base.portfolio.accounts[0];
+    const first = base.portfolio.accounts[0];
     const { profile, accepted } = applyProfileWrites(base, [
-      { path: 'portfolio.accounts.2', value: { ...roth, name: 'Copy' } },
-      { path: 'portfolio.accounts.1.id', value: 'acc-roth' },
-      { path: 'portfolio.accounts.0', value: { ...roth, name: 'Roth (renamed)' } },
+      { path: 'portfolio.accounts.2', value: { ...first, name: 'Copy' } },
+      { path: 'portfolio.accounts.1.id', value: 'acc-401k' },
+      { path: 'portfolio.accounts.0', value: { ...first, name: 'Work plan' } },
       { path: 'portfolio.accounts.1.id', value: 'acc-taxable' },
     ]);
     expect(profile.portfolio.accounts.map((account) => [account.id, account.name])).toEqual([
-      ['acc-roth', 'Roth (renamed)'],
-      ['acc-taxable', 'Brokerage'],
+      ['acc-401k', 'Work plan'],
+      ['acc-taxable', ''],
     ]);
     expect(accepted).toEqual(['portfolio.accounts.0', 'portfolio.accounts.1.id']);
   });
 
-  it('refuses a write to the removed v1 new-cash leaf and leaves the deposits alone', () => {
+  it('refuses a write to the removed v1 new-cash leaf and leaves the account balances alone', () => {
     const { profile, accepted } = applyProfileWrites(base, [{ path: 'investing.newCashThisMonth', value: 2400 }]);
     expect(profile).toEqual(base);
     expect(profile.investing).not.toHaveProperty('newCashThisMonth');
-    expect(profile.portfolio.accounts.map((account) => account.deposit)).toEqual([0, 1000]);
+    expect(profile.portfolio.accounts.map((account) => account.balance)).toEqual([16225, 0]);
     expect(accepted).toEqual([]);
+  });
+
+  it('refuses the emergency-fund tick on an account that is not a brokerage', () => {
+    const { profile, accepted } = applyProfileWrites(base, [
+      { path: 'portfolio.accounts.0.holdsEmergencyFund', value: true },
+      { path: 'portfolio.accounts.1.holdsEmergencyFund', value: true },
+    ]);
+    expect(profile.portfolio.accounts.map((account) => account.holdsEmergencyFund)).toEqual([false, true]);
+    expect(accepted).toEqual(['portfolio.accounts.1.holdsEmergencyFund']);
+  });
+
+  it('clears the tick when a brokerage changes to another kind', () => {
+    const ticked = applyProfileWrites(base, [{ path: 'portfolio.accounts.1.holdsEmergencyFund', value: true }]).profile;
+    const { profile } = applyProfileWrites(ticked, [{ path: 'portfolio.accounts.1.kind', value: 'cash' }]);
+    expect(profile.portfolio.accounts[1]).toEqual({
+      id: 'acc-brok',
+      kind: 'cash',
+      name: '',
+      balance: 0,
+      holdsEmergencyFund: false,
+    });
   });
 });

@@ -3,7 +3,7 @@
  * value feeds each RetirementInputs leaf. The golden fixture in
  * test/lib/calculators/retirement/bindings.test.ts pins the result. Pure.
  *
- * Three leaves are derived:
+ * Five leaves are derived:
  *
  * - Income. The engine takes an amount and a period (incomeAmount,
  *   incomePeriod) and the annual figure (currentIncome); the profile holds the
@@ -13,20 +13,25 @@
  *   (filingStatusNote).
  * - Social Security benefit. The profile leaf is null on Auto; the engine
  *   gets the estimate from pay then (./socialSecurity.ts).
+ * - Starting balance: the invested total of the account list, the
+ *   emergency fund left out (investedBalance in lib/profile/accounts.ts).
+ * - Monthly savings: the Custom monthly investing figure, or on Auto the
+ *   sum of the normal contributions (monthlyInvesting).
  */
 
 import type { RetirementInputs } from '@/lib/calculations/retirement';
 import { FILING_STATUS_META } from '@/lib/constants/labels';
 import type { Binding } from '@/lib/fields/binding';
 import {
+  ACCOUNTS,
   AGE,
   FILING_STATUS,
-  INVESTED_BALANCE,
   MONTHLY_INVESTING,
   NECESSARY_MONTHLY,
   RETIREMENT_AGE,
   STATE,
 } from '@/lib/fields/shared';
+import { investedBalance, monthlyInvesting } from '@/lib/profile/accounts';
 import type { FilingStatus } from '@/lib/profile/types';
 import { GROSS_PATH, incomeEntry, yearlyGrossPay } from './income';
 import { SOCIAL_SECURITY_BENEFIT_PATH, resolveSocialSecurityBenefit } from './socialSecurity';
@@ -52,7 +57,7 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
   { profile: RETIREMENT_AGE.path, engine: 'retirementAge' },
   { profile: 'person.lifeExpectancy', engine: 'lifeExpectancy' },
   { profile: 'spending.targetRetirementIncome', engine: 'targetIncome' },
-  { profile: INVESTED_BALANCE.path, engine: 'startingBalance' },
+  { engine: 'startingBalance', read: investedBalance, errorPath: ACCOUNTS.path },
   {
     engine: 'currentIncome',
     read: yearlyGrossPay,
@@ -64,7 +69,7 @@ export const RETIREMENT_BINDINGS: readonly Binding<RetirementInputs>[] = [
     errorPath: GROSS_PATH,
   },
   { engine: 'incomePeriod', read: (get) => incomeEntry(get).period },
-  { profile: MONTHLY_INVESTING.path, engine: 'monthlySavings' },
+  { engine: 'monthlySavings', read: monthlyInvesting, errorPath: MONTHLY_INVESTING.path },
   { profile: NECESSARY_MONTHLY.path, engine: 'necessaryMonthlyExpenses' },
   { profile: 'assumptions.retirement.accumulationReturn', engine: 'accumulationReturn' },
   { profile: 'assumptions.retirement.retirementReturn', engine: 'retirementReturn' },
@@ -96,4 +101,6 @@ export const RETIREMENT_ENGINE_ONLY: Readonly<Record<string, string>> = {
   currentIncome: 'The annual income, derived from income.grossPerPaycheck and income.frequency.',
   incomeAmount: 'The amount for incomePeriod, derived from income.grossPerPaycheck and income.frequency.',
   incomePeriod: 'Derived from income.frequency; weekly pay enters as a yearly amount.',
+  startingBalance: 'Derived: the invested total of portfolio.accounts, the emergency fund left out (investedBalance).',
+  monthlySavings: 'Derived: investing.monthlyContribution when Custom, else the normal contributions (monthlyInvesting).',
 };

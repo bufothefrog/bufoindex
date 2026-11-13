@@ -15,6 +15,10 @@
  *   and Roth shares.
  * - hasIRA (either IRA), hasTaxableAccount (a taxable contribution above
  *   zero) and the current fun money (the midpoint of the range).
+ * - The IRA balances and the emergency fund come from the account list
+ *   (lib/profile/accounts.ts): the value of the traditional and Roth IRA
+ *   accounts, and the accounts that hold the emergency fund (or the typed
+ *   emergency fund while none does).
  * - The current federal bracket (currentBracketFrom): the 2026 bracket of
  *   yearly gross pay (bonus included) minus the traditional 401(k) share
  *   and HSA payroll contributions (each capped at its 2026 limit) minus the
@@ -45,6 +49,7 @@ import {
   TAXABLE_MONTHLY,
 } from '@/lib/fields/shared';
 import type { Get } from '@/lib/fields/types';
+import { ACCOUNT_PATHS, emergencyFundBalance, iraBalances, split401k, type Election401k } from '@/lib/profile/accounts';
 import type { ContributionType, FilingStatus } from '@/lib/profile/types';
 import type { HSABenefits, IncomeData, PaycheckProfile } from '@/lib/types';
 
@@ -56,25 +61,8 @@ const NET_PATH = NET_PAY.path;
 const FREQUENCY_PATH = PAY_FREQUENCY.path;
 export const RETIREMENT_BRACKET_PATH = 'assumptions.paycheck.expectedRetirementBracket';
 
-/** The traditional and Roth shares of a 401(k) election. */
-export interface Election401k {
-  traditional: number;
-  roth: number;
-}
-
-/**
- * The 401(k) election split by contribution type: the whole contribution is
- * traditional or Roth, or for 'split' the Roth part (capped at the total)
- * and the rest traditional.
- */
-export function split401k(type: ContributionType, total: number, rothPart: number): Election401k {
-  if (type === 'roth') return { traditional: 0, roth: total };
-  if (type === 'split') {
-    const roth = Math.min(rothPart, total);
-    return { traditional: total - roth, roth };
-  }
-  return { traditional: total, roth: 0 };
-}
+// The 401(k) split lives with the account model; re-exported for the importers of this module.
+export { split401k, type Election401k };
 
 function electionFrom(get: Get): Election401k {
   return split401k(
@@ -195,15 +183,23 @@ export const PAYCHECK_BINDINGS: readonly Binding<PaycheckProfile>[] = [
   { profile: 'ira.roth', engine: 'benefits.ira.accountTypes.roth' },
   { profile: 'ira.traditionalMonthly', engine: 'benefits.ira.currentContributions.traditional' },
   { profile: 'ira.rothMonthly', engine: 'benefits.ira.currentContributions.roth' },
-  { profile: 'ira.traditionalBalance', engine: 'benefits.ira.currentBalances.traditional' },
-  { profile: 'ira.rothBalance', engine: 'benefits.ira.currentBalances.roth' },
+  {
+    engine: 'benefits.ira.currentBalances.traditional',
+    read: (get) => iraBalances(get).traditional,
+    errorPath: ACCOUNT_PATHS.accounts,
+  },
+  {
+    engine: 'benefits.ira.currentBalances.roth',
+    read: (get) => iraBalances(get).roth,
+    errorPath: ACCOUNT_PATHS.accounts,
+  },
 
   // Debts, row for row.
   { profile: 'debts', engine: 'debts' },
 
   // Preferences.
   { profile: 'cash.targetMonths', engine: 'preferences.emergencyFundMonths' },
-  { profile: EMERGENCY_FUND_BALANCE.path, engine: 'preferences.currentEmergencyFund' },
+  { engine: 'preferences.currentEmergencyFund', read: emergencyFundBalance, errorPath: EMERGENCY_FUND_BALANCE.path },
   { profile: EMERGENCY_FUND_APY.path, engine: 'preferences.emergencyFundAPY' },
   { profile: NECESSARY_MONTHLY.path, engine: 'preferences.necessaryExpenses' },
   { profile: 'spending.funMoneyMin', engine: 'preferences.funMoney.min' },
@@ -244,6 +240,10 @@ export const PAYCHECK_ENGINE_ONLY: Readonly<Record<string, string>> = {
   'benefits.employer401k.currentYTD': 'Year-to-date 401(k) contributions; no input, base value 0.',
   'benefits.hsa.currentYTD': 'Year-to-date HSA contributions; no input, base value 0.',
   'benefits.ira.hasIRA': 'Derived: true when either IRA is held.',
+  'benefits.ira.currentBalances.traditional': 'Derived: the value of the traditional IRA accounts (iraBalances).',
+  'benefits.ira.currentBalances.roth': 'Derived: the value of the Roth IRA accounts (iraBalances).',
+  'preferences.currentEmergencyFund':
+    'Derived: the accounts that hold the emergency fund, or the typed balance while none does (emergencyFundBalance).',
   'benefits.other.fsaElection': 'Other benefits have no input; base value 0.',
   'benefits.other.transitBenefits': 'Other benefits have no input; base value 0.',
   'benefits.other.lifeInsurance': 'Other benefits have no input; base value 0.',

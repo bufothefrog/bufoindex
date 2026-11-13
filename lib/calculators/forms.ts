@@ -21,6 +21,7 @@
  */
 
 import {
+  ACCOUNTS_SCREEN,
   CORE_FIELDS,
   CORE_SCREENS,
   NET_PAY_AT_MOST_GROSS,
@@ -29,7 +30,7 @@ import {
   intakeDerivedWrites,
 } from '@/lib/fields/shared';
 import { makeGet } from '@/lib/fields/paths';
-import { fieldMap, screensFor } from '@/lib/fields/runtime';
+import { fieldMap, screensFor, type ScreensForOptions } from '@/lib/fields/runtime';
 import type { CrossFieldRule, FieldSpec, FormSpec, Get, ScreenSpec, Write } from '@/lib/fields/types';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { LEVERAGE_FORM } from './leverage/form';
@@ -56,22 +57,28 @@ export const CORE_FORM: FormSpec = {
   onSubmit: intakeDerivedWrites,
 };
 
-/** The order the profile asks each calculator's screens in. */
-export const PROFILE_FORM_ORDER: readonly CalculatorId[] = ['retirement', 'paycheck', 'portfolio', 'leverage'];
+/**
+ * The order the profile asks each calculator's screens in. The paycheck
+ * form comes first, so the 401(k), HSA, IRA and taxable answers come before
+ * the account list that they suggest rows for.
+ */
+export const PROFILE_FORM_ORDER: readonly CalculatorId[] = ['paycheck', 'retirement', 'portfolio', 'leverage'];
 
 /**
  * The section each profile screen belongs to, for the profile intake's
  * progress label. The leverage form's
  * profile screen (the taxable contribution) sits with the portfolio
- * questions, so the two calculators share one section.
+ * questions, so the two calculators share one section. The shared account
+ * list (ACCOUNTS_SCREEN) is its own section, whichever form it is taken from.
  */
-export type ProfileFormSection = 'core' | 'retirement' | 'paycheck' | 'portfolio' | 'cash' | 'optional';
+export type ProfileFormSection = 'core' | 'retirement' | 'paycheck' | 'portfolio' | 'accounts' | 'cash' | 'optional';
 
 export const PROFILE_FORM_SECTION_LABELS: Readonly<Record<ProfileFormSection, string>> = {
   core: 'The basics',
   retirement: 'Retirement',
   paycheck: 'Paycheck',
   portfolio: 'Portfolio',
+  accounts: 'Accounts',
   cash: 'Cash',
   optional: 'Optional',
 };
@@ -121,7 +128,7 @@ export function composeProfileForm(
     // Screen ids are unique per form; prefix one that another form already used.
     const id = sections.has(screen.id) ? `${source.id}-${screen.id}` : screen.id;
     screens.push({ ...screen, id, fields: kept });
-    sections.set(id, section);
+    sections.set(id, screen.id === ACCOUNTS_SCREEN.id ? 'accounts' : section);
   };
 
   // Optional screens wait until every other screen is taken, then come last.
@@ -208,6 +215,35 @@ export interface ProfileCompleteness {
 }
 
 /**
+ * Calculator-only values (the fields of the calculator-only screens, Surface
+ * 'calculator', that no other screen asks): set for one run on a calculator
+ * page and never asked by the profile. Every place that decides which
+ * profile screens exist (completeness, the review page, the intake screens
+ * and remaining mode) reads them as unset through intakeScreens, so a figure
+ * typed on the rebalancer (this month's new cash) never changes which topics
+ * the profile has. The calculator page reads them as they are.
+ */
+const CALCULATOR_ONLY_PATHS: readonly string[] = (() => {
+  const screens = Object.values(FORMS).flatMap((form) => form.screens);
+  const elsewhere = new Set(screens.filter((screen) => screen.surface !== 'calculator').flatMap((screen) => screen.fields));
+  const only = screens.filter((screen) => screen.surface === 'calculator').flatMap((screen) => screen.fields);
+  return Array.from(new Set(only.filter((path) => !elsewhere.has(path))));
+})();
+
+function withoutCalculatorOnly(get: Get): Get {
+  return (path) =>
+    CALCULATOR_ONLY_PATHS.some((only) => path === only || path.startsWith(`${only}.`)) ? undefined : get(path);
+}
+
+/**
+ * The intake-surface screens of `form` for `get`, with the calculator-only
+ * values read as unset: the one rule for which profile screens exist.
+ */
+export function intakeScreens(form: FormSpec, get: Get, options: Omit<ScreensForOptions, 'surface'>): ScreenSpec[] {
+  return screensFor(form, withoutCalculatorOnly(get), { ...options, surface: 'intake' });
+}
+
+/**
  * Profile completeness counted by topic screen (O14): a PROFILE_FORM screen
  * counts once every fact visible on it is in profile.provided. A screen with
  * no visible fact (the employer match without a 401(k)) is left out, and so
@@ -215,10 +251,8 @@ export interface ProfileCompleteness {
  */
 export function profileCompleteness(profile: FinancialProfile): ProfileCompleteness {
   const get = makeGet(profile);
-  const total = requiredScreens(screensFor(PROFILE_FORM, get, { mode: 'all', surface: 'intake' })).length;
-  const missing = requiredScreens(
-    screensFor(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided, surface: 'intake' })
-  );
+  const total = requiredScreens(intakeScreens(PROFILE_FORM, get, { mode: 'all' })).length;
+  const missing = requiredScreens(intakeScreens(PROFILE_FORM, get, { mode: 'remaining', provided: profile.provided }));
   return { provided: total - missing.length, total, missing };
 }
 

@@ -22,6 +22,8 @@ import { resolveSocialSecurityBenefit } from '@/lib/calculators/retirement/socia
 import type { Write } from '@/lib/fields/types';
 import type { FilingStatus, FinancialProfile, PayFrequency, ProfilePatch } from '@/lib/profile/types';
 import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
+import { retirementHeadline } from '@/lib/calculators/retirement/headline';
 
 /**
  * A v1-shaped profile: the given sections over the 3bb0132 defaults the
@@ -64,7 +66,12 @@ const CUSTOM_V1: ProfilePatch = {
   person: { age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58 },
   income: { grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' },
   spending: { necessaryMonthly: 4200, funMoneyMin: 250, funMoneyMax: 900, targetRetirementIncome: 110000 },
-  investing: { investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900 },
+  investing: { monthlyContribution: 2200, taxableMonthlyContribution: 900 },
+  // The v1 invested balance of 140,000, as profile v3 keeps it: one account row.
+  portfolio: {
+    accounts: [{ id: 'acc-other', kind: '401k', name: 'Other investments', balance: 140000, holdsEmergencyFund: false }],
+    holdings: [],
+  },
 };
 
 /** The old mapper's output for the v1 default. */
@@ -135,12 +142,14 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
       lifeExpectancy: 90,
       // Derived while unanswered: 12 x (3,000 + 450) = 41,400, to the nearest 1,000.
       targetIncome: 41000,
+      // 16,225 typed in the example 401(k) + 8,775 of example brokerage holdings.
       startingBalance: 25000,
       // 4,000 every two weeks x 26.
       currentIncome: 104000,
       incomeAmount: 4000,
       incomePeriod: 'biweekly',
-      monthlySavings: 1500,
+      // Auto: round2(693.33... own 401(k) + 346.66... match + 500 taxable); 1,500 before profile v3.
+      monthlySavings: 1540,
       necessaryMonthlyExpenses: 3000,
       accumulationReturn: 0.08,
       retirementReturn: 0.06,
@@ -284,8 +293,14 @@ describe('every RetirementInputs leaf is bound or engine-only', () => {
     expect([...bound].sort()).toEqual(Object.keys(LEAVES).sort());
   });
 
-  it('lists the income leaves as engine-only, each still derived by a binding', () => {
-    expect(Object.keys(RETIREMENT_ENGINE_ONLY).sort()).toEqual(['currentIncome', 'incomeAmount', 'incomePeriod']);
+  it('lists the income leaves and the two account derivations as engine-only, each still derived by a binding', () => {
+    expect(Object.keys(RETIREMENT_ENGINE_ONLY).sort()).toEqual([
+      'currentIncome',
+      'incomeAmount',
+      'incomePeriod',
+      'monthlySavings',
+      'startingBalance',
+    ]);
     for (const [leaf, reason] of Object.entries(RETIREMENT_ENGINE_ONLY)) {
       expect(reason.length, leaf).toBeGreaterThan(0);
       const binding = RETIREMENT_BINDINGS.find((each) => each.engine === leaf)!;
@@ -351,5 +366,42 @@ describe('filingStatusNote', () => {
   it('is null for the two statuses the model has', () => {
     expect(filingStatusNote('single')).toBeNull();
     expect(filingStatusNote('marriedJoint')).toBeNull();
+  });
+});
+
+describe('profile v3: the account list and monthly investing feed the projection', () => {
+  it('runs Custom monthly investing as typed, and Auto from the contribution answers', () => {
+    const custom = applyProfileWrites(getDefaultFinancialProfile(), [{ path: 'investing.monthlyContribution', value: 1500 }]).profile;
+    expect(engineInputsFor(RETIREMENT_CALCULATOR, custom).monthlySavings).toBe(1500);
+    expect(engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile()).monthlySavings).toBe(1540);
+  });
+
+  it('runs the owner fixture: 105,800 invested (the emergency fund left out) and 3,195 a month', () => {
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, normalizeProfile(ownerRaw()));
+    // 401(k) 80,000 + HSA 12,000 + Roth IRA (20 x 375 + 30 x 85 = 10,050) + Brokerage (10 x 375 = 3,750);
+    // Robinhood (BOXX 90 x 115 = 10,350) holds the emergency fund.
+    expect(inputs.startingBalance).toBe(105800);
+    // 6,000 x 26 / 12 = 13,000 a month: 1,300 own 401(k) (10%) + 520 match (4%) + 250 HSA
+    // + 100 employer HSA (1,200 / 12) + 625 Roth IRA + 400 taxable.
+    expect(inputs.monthlySavings).toBe(3195);
+  });
+
+  it('pins the default projection (measured on the v3 inputs: 25,000 invested, 1,540 a month)', () => {
+    const inputs = engineInputsFor(RETIREMENT_CALCULATOR, getDefaultFinancialProfile());
+    const results = RETIREMENT_CALCULATOR.calculate(inputs);
+    const headline = Object.fromEntries(retirementHeadline(results, inputs, 'nominal').map((stat) => [stat.id, stat.value]));
+    // Before profile v3 (1,500 a month): projected 5,662,079.84, withdrawal rate 2.362%.
+    expect(headline.success).toBe(1);
+    expect(headline.projected).toBeCloseTo(5796147.137288305, 4);
+    expect(headline.required).toBeCloseTo(3343588.7367990543, 4);
+    expect(headline['withdrawal-rate']).toBeCloseTo(0.023074560790831363, 10);
+    const scenario = (id: string) => results.scenarios.find((each) => each.id === id)!;
+    expect(scenario('early-retirement').name).toBe('Retire 5 years early at 60');
+    expect(scenario('early-retirement').projectedBalance).toBeCloseTo(4100839.6963539924, 4);
+    expect(scenario('early-retirement').successProbability).toBeCloseTo(0.994, 10);
+    // Half of 1,540 is 770 (750 before).
+    expect(scenario('coast-mode').name).toBe('Coast: Save only $770/month (enjoy extra $770/month now)');
+    expect(scenario('coast-mode').projectedBalance).toBeCloseTo(3215351.5697522396, 4);
+    expect(scenario('coast-mode').successProbability).toBeCloseTo(0.973, 10);
   });
 });

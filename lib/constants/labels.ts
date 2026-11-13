@@ -9,6 +9,7 @@
 import { formatMultiple } from '@/lib/format';
 import { LEVERAGE_RATIO_OPTIONS } from './leverage';
 import type { AccountType } from '@/lib/calculations/portfolioRebalancing';
+import type { AccountKind } from '@/lib/profile/accountTypes';
 import type {
   BonusFrequency,
   ContributionType,
@@ -85,6 +86,26 @@ export const ACCOUNT_TYPE_LABELS: Readonly<Record<AccountType, string>> = {
 export const ACCOUNT_TYPE_OPTIONS = optionsFrom<AccountType>(
   ['taxable', 'tax-deferred', 'tax-free'],
   ACCOUNT_TYPE_LABELS,
+);
+
+// ---------------------------------------------------------------------------
+// Account kind (the profile's account list)
+// ---------------------------------------------------------------------------
+
+/** What an account is; ACCOUNT_KINDS in lib/profile/accounts.ts adds the tax treatment. */
+export const ACCOUNT_KIND_LABELS: Readonly<Record<AccountKind, string>> = {
+  '401k': '401(k) or similar',
+  'roth-401k': 'Roth 401(k)',
+  'traditional-ira': 'Traditional IRA',
+  'roth-ira': 'Roth IRA',
+  hsa: 'HSA',
+  brokerage: 'Brokerage (taxable)',
+  cash: 'Cash or savings',
+};
+
+export const ACCOUNT_KIND_OPTIONS = optionsFrom<AccountKind>(
+  ['401k', 'roth-401k', 'traditional-ira', 'roth-ira', 'hsa', 'brokerage', 'cash'],
+  ACCOUNT_KIND_LABELS,
 );
 
 // ---------------------------------------------------------------------------

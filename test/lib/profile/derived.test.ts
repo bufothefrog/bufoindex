@@ -273,6 +273,8 @@ const REVIEWED: Readonly<Record<string, string>> = {
   'lib/calculators/retirement/fields.ts': 'Field specs read through the get of useCalculatorValues or the wizard, both derived.',
   'lib/fields/shared.ts': 'Field specs read through the get of useCalculatorValues or the wizard, both derived.',
   'lib/dashboard/derive.ts': 'summarizeCashBuffer applies withDerivedValues.',
+  'lib/profile/accounts.ts': 'Reads cash.emergencyFundBalance and hsa.coverage only through the derived get its callers pass.',
+  'lib/calculators/portfolio/accountWrites.ts': 'Copies cash.emergencyFundBalance from the derived get of the accounts renderer.',
 };
 
 function sourceFiles(dir: string): string[] {

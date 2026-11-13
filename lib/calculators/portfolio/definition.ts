@@ -16,13 +16,18 @@ import type { FieldErrors } from '@/lib/fields/types';
 import { PORTFOLIO_BINDINGS } from './bindings';
 import { PORTFOLIO_FORM } from './form';
 
+/** The 'calculation' message while no account is rebalanced (the page's empty state). */
+export const NO_REBALANCED_ACCOUNT_MESSAGE = 'Add holdings to an account, or new cash to an empty one, to rebalance.';
+
 /**
  * The engine's checks keyed by engine path ('accounts[0].deposit',
- * 'classTargets.sum'), the first message per path. The bindings map them
- * onto the fields that show them.
+ * 'classTargets.sum'), the first message per path, plus a 'calculation'
+ * error while no account is rebalanced. The bindings map them onto the
+ * fields that show them.
  */
 export function validateRebalanceInputs(inputs: RebalanceInputsV2): FieldErrors {
   const errors: FieldErrors = {};
+  if (inputs.accounts.length === 0) errors.calculation = NO_REBALANCED_ACCOUNT_MESSAGE;
   for (const { field, message } of validateRebalanceInputsV2(inputs)) {
     if (!Object.prototype.hasOwnProperty.call(errors, field)) errors[field] = message;
   }

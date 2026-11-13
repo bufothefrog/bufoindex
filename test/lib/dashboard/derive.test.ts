@@ -12,6 +12,7 @@ import {
   ASSUMED_PORTFOLIO_RETURN,
   buildChecklistRows,
   sortAllocations,
+  summarizeAccounts,
   summarizeCashBuffer,
   summarizeRetirement,
 } from '@/lib/dashboard/derive';
@@ -19,7 +20,8 @@ import { currentPlanScenario } from '@/lib/calculators/retirement/headline';
 import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import { engineInputsFor } from '@/lib/calculators/runtime';
 import { formatCurrency } from '@/lib/format';
-import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
+import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
+import { ownerRaw } from '@/test/factories/accountsFixtures';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 import type { AllocationItem } from '@/lib/types';
@@ -248,5 +250,32 @@ describe('summarizeRetirement', () => {
       messages: ['The retirement analysis could not run.'],
     });
     spy.mockRestore();
+  });
+});
+
+describe('the account list on the overview (profile v3)', () => {
+  it('reads the default: the typed 9,000 fund held nowhere, 25,000 invested over two lines', () => {
+    const profile = getDefaultFinancialProfile();
+    expect(summarizeCashBuffer(profile)).toMatchObject({ balance: 9000, heldIn: [] });
+    expect(summarizeAccounts(profile)).toEqual({
+      lines: ['401(k) or similar $16,225', 'Brokerage (taxable) $8,775 (3 holdings)'],
+      invested: 25000,
+      emergencyFund: { balance: 9000, heldIn: [] },
+    });
+  });
+
+  it('reads the owner fixture: Robinhood holds the 10,350 fund, 105,800 is invested', () => {
+    const owner = normalizeProfile(ownerRaw());
+    expect(summarizeCashBuffer(owner)).toMatchObject({ balance: 10350, heldIn: ['Robinhood'] });
+    const accounts = summarizeAccounts(owner);
+    expect(accounts.invested).toBe(105800);
+    expect(accounts.emergencyFund).toEqual({ balance: 10350, heldIn: ['Robinhood'] });
+    expect(accounts.lines).toEqual([
+      '401(k) or similar $80,000',
+      'HSA $12,000',
+      'Roth IRA $10,050 (2 holdings)',
+      'Brokerage $3,750 (1 holding)',
+      'Robinhood $10,350 (1 holding) (emergency fund)',
+    ]);
   });
 });

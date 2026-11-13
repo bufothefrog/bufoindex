@@ -1,7 +1,9 @@
 /**
- * migrateProfile: the seam the persist `migrate` hook calls. It has no
- * migration step today; a payload of any version is normalized against the
- * v2 defaults.
+ * migrateProfile: the seam the persist `migrate` hook calls. A payload saved
+ * before version 3 (v1 included) goes through migrateV2Payload (the account
+ * list becomes the one home of the invested money, contract section 8) and
+ * is then normalized against the v3 defaults; a v3 payload is normalized
+ * only.
  *
  * The older-version fixtures are what the v1 store wrote to localStorage
  * under 'bufo-profile' (the `state.profile` part of `{ state, version: 1 }`):
@@ -11,8 +13,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { makeGet } from '@/lib/fields/paths';
+import { emergencyFundBalance, investedBalance, iraBalances } from '@/lib/profile/accounts';
 import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
+import { migrateV2Payload } from '@/lib/profile/migrateV2';
 import { migrateProfile, PROFILE_VERSION } from '@/lib/profile/migrate';
+import type { FinancialProfile } from '@/lib/profile/types';
+import { MIGRATION_EXAMPLES } from '@/test/factories/profile-90ef4ed-v2';
 import { defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
 
 /** v1 getDefaultFinancialProfile(), as JSON.parse returns it. */
@@ -82,12 +89,15 @@ describe('migrateProfile from an older version (normalize only)', () => {
     // expectancy and the portfolio were not in v1, so they come from the
     // PR 3 defaults. Nothing is marked answered, so the stored Social
     // Security benefit (the old 30,000 default) loads as Auto (null).
+    // Nothing was answered, so the stored invested balance and monthly
+    // contribution give way to the example accounts and to Auto.
     const today = getDefaultFinancialProfile();
     const old = defaultProfileAt3bb0132();
     expect(migrateProfile(V1_DEFAULT, 1)).toEqual({
       ...old,
       person: { ...old.person, lifeExpectancy: today.person.lifeExpectancy },
       retirementIncome: { ...old.retirementIncome, socialSecurityBenefit: null },
+      investing: today.investing,
       portfolio: today.portfolio,
     });
   });
@@ -99,7 +109,7 @@ describe('migrateProfile from an older version (normalize only)', () => {
     }).not.toThrow();
     if (!p) throw new Error('no profile');
     const defaults = getDefaultFinancialProfile();
-    expect(p.version).toBe(2);
+    expect(p.version).toBe(3);
     expect(p.updatedAt).toBe(1761000000000);
     expect(p.person).toEqual({ age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58, lifeExpectancy: 90 });
     expect(p.income).toEqual({ ...defaults.income, grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' });
@@ -107,15 +117,27 @@ describe('migrateProfile from an older version (normalize only)', () => {
     // The 1 month was never asked in v1 (not in provided): it loads as the typical 3.
     expect(p.cash).toEqual({ ...V1_ALL_PROVIDED.cash, targetMonths: 3 });
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
-    expect(p.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
+    // The answered monthly contribution is the Custom monthly investing figure.
+    expect(p.investing).toEqual({ monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(p.investing).not.toHaveProperty('newCashThisMonth');
+    expect(p.investing).not.toHaveProperty('investedBalance');
     expect(p.strategy).toEqual({ leverageRatio: 1.5 });
-    expect(p.provided).toEqual(
-      V1_ALL_PROVIDED.provided.filter((path) => path !== 'investing.newCashThisMonth' && path !== 'strategy.preset')
-    );
-    // The v1 new cash is not moved anywhere: the portfolio keeps its defaults,
-    // the Brokerage deposit included.
-    for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'portfolio', 'assumptions'] as const) {
+    expect(p.provided).toEqual([
+      ...V1_ALL_PROVIDED.provided.filter(
+        (path) => !['investing.newCashThisMonth', 'strategy.preset', 'investing.investedBalance'].includes(path)
+      ),
+      'portfolio.accounts',
+    ]);
+    // The answered 140,000 is one "Other investments" 401(k) row (has401k yes);
+    // v1 had no lists, so no example holdings are kept. The v1 new cash is not
+    // moved anywhere.
+    expect(p.portfolio.accounts).toEqual([
+      { id: 'acc-other', kind: '401k', name: 'Other investments', balance: 140000, holdsEmergencyFund: false },
+    ]);
+    expect(p.portfolio.holdings).toEqual([]);
+    expect(p.portfolio.newCash).toEqual([]);
+    expect(investedBalance(makeGet(p))).toBe(140000);
+    for (const key of ['hsa', 'ira', 'retirementIncome', 'debts', 'leverage', 'assumptions'] as const) {
       expect(p[key]).toEqual(defaults[key]);
     }
   });
@@ -174,10 +196,10 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(normalizeProfile({ cash: { targetMonths: 1 } }).cash.targetMonths).toBe(1);
   });
 
-  it('treats every version the same: the result is normalizeProfile of the payload', () => {
+  it('treats every version before 3 the same: the result is normalizeProfile of the migrated payload', () => {
     for (const payload of [V1_DEFAULT, V1_ALL_PROVIDED, V1_GARBAGE]) {
-      const expected = normalizeProfile(payload);
-      for (const version of [0, 1, 2, 3]) expect(migrateProfile(payload, version)).toEqual(expected);
+      const expected = normalizeProfile(migrateV2Payload(payload));
+      for (const version of [0, 1, 2]) expect(migrateProfile(payload, version)).toEqual(expected);
     }
   });
 
@@ -188,31 +210,164 @@ describe('migrateProfile from an older version (normalize only)', () => {
 });
 
 describe('migrateProfile at the current version', () => {
-  it('is version 2', () => {
-    expect(PROFILE_VERSION).toBe(2);
+  it('is version 3', () => {
+    expect(PROFILE_VERSION).toBe(3);
   });
 
-  it('normalizes only: a stored v2 profile that still holds the removed new-cash leaf loses that leaf and nothing else', () => {
+  it('normalizes only: a stored v3 profile that holds removed v2 leaves loses those leaves and nothing else', () => {
     const saved = getDefaultFinancialProfile();
     saved.person.age = 44;
-    saved.portfolio.accounts[1].deposit = 400;
+    saved.portfolio.newCash = [{ id: 'acc-brok', amount: 400 }];
     saved.provided = ['person.age', 'portfolio.accounts', 'investing.newCashThisMonth'];
     const stored = JSON.parse(JSON.stringify(saved));
     stored.investing.newCashThisMonth = 9000;
+    stored.investing.investedBalance = 70000;
     const expected = { ...saved, provided: ['person.age', 'portfolio.accounts'] };
 
     let p: ReturnType<typeof migrateProfile> | undefined;
     expect(() => {
-      p = migrateProfile(stored, 2);
+      p = migrateProfile(stored, 3);
     }).not.toThrow();
     expect(p).toEqual(expected);
     expect(p?.investing).not.toHaveProperty('newCashThisMonth');
-    expect(p?.portfolio.accounts[1].deposit).toBe(400);
-    expect(migrateProfile(stored, 3)).toEqual(expected);
+    expect(p?.investing).not.toHaveProperty('investedBalance');
+    expect(p?.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 400 }]);
+    expect(migrateProfile(stored, 4)).toEqual(expected);
   });
 
   it('is idempotent across a v1 load and a later load', () => {
     const once = migrateProfile(V1_ALL_PROVIDED, 1);
-    expect(migrateProfile(JSON.parse(JSON.stringify(once)), 2)).toEqual(once);
+    expect(migrateProfile(JSON.parse(JSON.stringify(once)), 3)).toEqual(once);
+  });
+});
+
+/** The rows of the migrated list as [id, kind, name, balance]. */
+const rows = (p: FinancialProfile) => p.portfolio.accounts.map((a) => [a.id, a.kind, a.name, a.balance]);
+const answered = (p: FinancialProfile) => p.provided.includes('portfolio.accounts');
+const migrated = (example: string) => migrateProfile(MIGRATION_EXAMPLES[example](), 2);
+
+describe('migrateProfile(payload, 2): the examples of contract section 8, normalized', () => {
+  it('every example loads as version 3 without the three removed leaves or their answers', () => {
+    for (const [name, payload] of Object.entries(MIGRATION_EXAMPLES)) {
+      const p = migrateProfile(payload(), 2);
+      expect(p.version, name).toBe(3);
+      expect(p.investing, name).not.toHaveProperty('investedBalance');
+      expect(p.ira, name).not.toHaveProperty('traditionalBalance');
+      expect(p.ira, name).not.toHaveProperty('rothBalance');
+      for (const path of ['investing.investedBalance', 'ira.traditionalBalance', 'ira.rothBalance']) {
+        expect(p.provided, name).not.toContain(path);
+      }
+      // Migrating again is a no-op.
+      expect(migrateProfile(JSON.parse(JSON.stringify(p)), 3), name).toEqual(p);
+    }
+  });
+
+  it('1: the v2 default gives the v3 default', () => {
+    expect(migrated('1')).toEqual(getDefaultFinancialProfile());
+  });
+
+  it('2: the typed 60,000 becomes one "Other investments" 401(k); the 2,000 a month is Custom', () => {
+    const p = migrated('2');
+    expect(rows(p)).toEqual([['acc-other', '401k', 'Other investments', 60000]]);
+    expect([p.portfolio.holdings, p.portfolio.newCash]).toEqual([[], []]);
+    expect(p.portfolio.securities.map((sec) => sec.ticker)).toEqual(['VTI', 'VXUS', 'BND']);
+    expect(p.investing.monthlyContribution).toBe(2000);
+    expect(answered(p)).toBe(true);
+    expect(investedBalance(makeGet(p))).toBe(60000);
+  });
+
+  it('3: both accounts kept by their holdings, 30,000 - 12,875 = 17,125 added, the 1,000 deposit kept as new cash', () => {
+    const p = migrated('3');
+    expect(rows(p)).toEqual([
+      ['acc-roth', 'roth-ira', 'Roth IRA', 0],
+      ['acc-brok', 'brokerage', 'Brokerage', 0],
+      ['acc-other', '401k', 'Other investments', 17125],
+    ]);
+    expect(p.portfolio.holdings).toHaveLength(4);
+    expect(p.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 1000 }]);
+    expect(p.investing.monthlyContribution).toBeNull();
+    expect(investedBalance(makeGet(p))).toBe(30000);
+    expect(iraBalances(makeGet(p))).toEqual({ traditional: 0, roth: 4100 });
+  });
+
+  it('3b: B = 10,000 adds no row; the holdings win at 12,875', () => {
+    const p = migrated('3b');
+    expect(rows(p).map(([id]) => id)).toEqual(['acc-roth', 'acc-brok']);
+    expect(investedBalance(makeGet(p))).toBe(12875);
+  });
+
+  it('4a: the typed IRA balances become the only rows', () => {
+    const p = migrated('4a');
+    expect(rows(p)).toEqual([
+      ['acc-trad-ira', 'traditional-ira', '', 20000],
+      ['acc-roth-ira', 'roth-ira', '', 6000],
+    ]);
+    expect(p.portfolio.holdings).toEqual([]);
+    expect(iraBalances(makeGet(p))).toEqual({ traditional: 20000, roth: 6000 });
+    expect(investedBalance(makeGet(p))).toBe(26000);
+  });
+
+  it('4b: the Roth IRA holdings count, and the rest 6,000 - 4,100 = 1,900 is added', () => {
+    const p = migrated('4b');
+    expect(rows(p)).toEqual([
+      ['acc-roth', 'roth-ira', 'Roth IRA', 0],
+      ['acc-brok', 'brokerage', 'Brokerage', 0],
+      ['acc-trad-ira', 'traditional-ira', '', 20000],
+      ['acc-roth-ira', 'roth-ira', 'Roth IRA (rest)', 1900],
+    ]);
+    expect(p.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 1000 }]);
+    expect(iraBalances(makeGet(p))).toEqual({ traditional: 20000, roth: 6000 });
+    expect(investedBalance(makeGet(p))).toBe(34775);
+  });
+
+  it('5: yes answers alone keep the unanswered v3 example', () => {
+    const p = migrated('5');
+    expect(p.portfolio).toEqual(getDefaultFinancialProfile().portfolio);
+    expect(answered(p)).toBe(false);
+  });
+
+  it('6: the BOXX account is kept unticked; 40,000 - 20,400 = 19,600 added; the typed fund stands', () => {
+    const p = migrated('6');
+    expect(rows(p)).toEqual([
+      ['acc-fid', 'roth-ira', 'Fidelity Roth IRA', 0],
+      ['acc-rh', 'brokerage', 'Robinhood', 0],
+      ['acc-other', '401k', 'Other investments', 19600],
+    ]);
+    expect(p.portfolio.accounts.every((a) => !a.holdsEmergencyFund)).toBe(true);
+    expect(p.portfolio.newCash).toEqual([]);
+    expect(investedBalance(makeGet(p))).toBe(40000);
+    expect(emergencyFundBalance(makeGet(p))).toBe(10000);
+    expect(iraBalances(makeGet(p)).roth).toBe(10050);
+  });
+
+  it('7: a tax-free account with no name hint is a Roth IRA; the rest 1,900 is added', () => {
+    const p = migrated('7');
+    expect(rows(p)).toEqual([
+      ['acc-1', 'roth-ira', 'Fidelity', 0],
+      ['acc-roth-ira', 'roth-ira', 'Roth IRA (rest)', 1900],
+    ]);
+    expect(iraBalances(makeGet(p)).roth).toBe(6000);
+    expect(investedBalance(makeGet(p))).toBe(6000);
+  });
+
+  it('8: the accepted 25,000 and example lists: 25,000 - 12,875 = 12,125 added', () => {
+    const p = migrated('8');
+    expect(rows(p)).toEqual([
+      ['acc-roth', 'roth-ira', 'Roth IRA', 0],
+      ['acc-brok', 'brokerage', 'Brokerage', 0],
+      ['acc-other', '401k', 'Other investments', 12125],
+    ]);
+    expect(p.portfolio.newCash).toEqual([{ id: 'acc-brok', amount: 1000 }]);
+    expect(investedBalance(makeGet(p))).toBe(25000);
+    expect(iraBalances(makeGet(p)).roth).toBe(4100);
+  });
+
+  it('9: a price edit keeps the unanswered example with VTI at 400', () => {
+    const p = migrated('9');
+    expect(answered(p)).toBe(false);
+    expect(p.provided).toContain('portfolio.securities');
+    expect(p.portfolio.securities.find((sec) => sec.id === 'sec-vti')?.price).toBe(400);
+    // 16,225 + (20 x 400 + 15 x 85) = 16,225 + 9,275.
+    expect(investedBalance(makeGet(p))).toBe(25500);
   });
 });

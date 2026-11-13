@@ -91,16 +91,16 @@ describe('ContinueProfileCard', () => {
     expect(link).toHaveAttribute('href', '/start/choose');
     // Default core values, all marked as answered.
     expect(link).toHaveTextContent(
-      '25, CA, single, $4,000 gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs. 3 of 14 topics answered, saved in this browser.'
+      '25, CA, single, $4,000 gross every 2 weeks, $2,550 take-home, $3,000 a month in must-pay costs. 3 of 13 topics answered, saved in this browser.'
     );
   });
 
   it('drops the summary when no summarized answer is saved', () => {
-    useProfileStore.getState().setFields({}, ['investing.investedBalance']);
+    useProfileStore.getState().setFields({}, ['cash.emergencyFundApy']);
     render(<ContinueProfileCard />);
     const link = screen.getByRole('link', { name: /Continue with my profile/ });
-    // One invested-balance answer completes no topic (O14).
-    expect(link).toHaveTextContent('0 of 14 topics answered, saved in this browser.');
+    // One answer on the three-question emergency fund screen completes no topic (O14).
+    expect(link).toHaveTextContent('0 of 13 topics answered, saved in this browser.');
     expect(link).not.toHaveTextContent('must-pay');
   });
 });

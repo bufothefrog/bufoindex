@@ -46,9 +46,9 @@ describe('LearnChooser', () => {
       '/start/leverage',
     ]);
     expect(links[0]).toHaveTextContent('Finish your profile');
-    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 11 more questions.');
+    expect(links[0]).toHaveTextContent('Answer the rest once; every calculator and your overview use it. 10 more questions.');
     expect(links[2]).toHaveTextContent('See if I am on track to retire');
-    // Savings and target; the assumptions stay on the calculator page.
+    // The accounts and the target; monthly investing and the assumptions stay on the calculator page.
     expect(links[2]).toHaveTextContent('2 more questions.');
     expect(replace).not.toHaveBeenCalled();
   });
@@ -67,8 +67,9 @@ describe('LearnChooser', () => {
 
     const links = optionLinks();
     expect(links[2]).toHaveTextContent('Nothing more to ask; opens with your answers.');
-    // The deprecated new cash answers no portfolio screen: targets, accounts and holdings are left.
-    expect(links[3]).toHaveTextContent('3 more questions.');
+    // The deprecated new cash answers no portfolio screen; retirement answered the shared accounts
+    // screen, so the targets and holdings are left.
+    expect(links[3]).toHaveTextContent('2 more questions.');
     // Retirement covered the leverage horizon and balance; the taxable contribution is left. The ratio
     // (calculator-only) and the market assumptions are asked on the comparison page.
     expect(links[4]).toHaveTextContent('1 more question.');
@@ -126,7 +127,7 @@ describe('LearnChooser', () => {
   });
 
   it('sends a visitor who has not answered the basics to /start', () => {
-    answer(['person.age', 'investing.investedBalance']);
+    answer(['person.age', 'portfolio.accounts']);
     render(<LearnChooser />);
 
     expect(replace).toHaveBeenCalledWith('/start');

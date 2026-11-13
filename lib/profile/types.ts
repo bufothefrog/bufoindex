@@ -1,5 +1,5 @@
 /**
- * Shared financial profile (v2).
+ * Shared financial profile (v3).
  *
  * One client-side record (persisted by lib/store/profileStore.ts under the
  * localStorage key 'bufo-profile') that holds every input of every
@@ -10,8 +10,13 @@
  * - Facts about the person live in topic sections (person, income, ...).
  * - Model assumptions live under assumptions.<calculator>.
  * - Nullable leaves are overrides: null means "derive from the profile".
- * - Lists (debts and the portfolio lists) are first-class; their rows reuse
- *   the engine row types so the bindings copy them without reshaping.
+ * - Lists (debts and the portfolio lists) are first-class. Most rows reuse
+ *   the engine row types so the bindings copy them without reshaping; the
+ *   account rows (./accountTypes.ts) are the visitor's own list, which the
+ *   portfolio bindings turn into engine accounts.
+ * - portfolio.accounts is the single list of what the visitor owns; the
+ *   invested total, the IRA balances and the monthly investing total are
+ *   computed from it (./accounts.ts), not stored.
  *
  * Units: money is US dollars; every rate or percentage is a decimal
  * (0.5 = 50%, 0.04 = 4% APY), matching PercentInput and the calculator
@@ -19,7 +24,6 @@
  */
 
 import type {
-  Account,
   ClassTarget,
   CustomAssetClass,
   Holding,
@@ -27,6 +31,7 @@ import type {
   Security,
 } from '@/lib/calculations/portfolioRebalancing';
 import type { RetirementInputs } from '@/lib/calculations/retirement';
+import type { AccountRow, NewCashRow } from './accountTypes';
 import type {
   DebtData,
   EmployerBenefits,
@@ -54,8 +59,7 @@ export type OptimizationGoal = UserPreferences['optimizationGoal'];
 
 /** One debt (paycheck allocator). Rates are decimals. */
 export type DebtRow = DebtData;
-/** One portfolio account; `deposit` is the new cash going into it. */
-export type AccountRow = Account;
+export type { AccountKind, AccountRow, NewCashRow } from './accountTypes';
 /** One entry of the securities registry shared by every account. */
 export type SecurityRow = Security;
 /** Shares of one security held in one account. */
@@ -66,7 +70,7 @@ export type ClassTargetRow = ClassTarget;
 export type CustomAssetClassRow = CustomAssetClass;
 
 export interface FinancialProfile {
-  version: 2;
+  version: 3;
   /** Epoch milliseconds of the last edit; 0 for an untouched default profile. */
   updatedAt: number;
   person: {
@@ -133,14 +137,13 @@ export interface FinancialProfile {
     roth: boolean;
     traditionalMonthly: number;
     rothMonthly: number;
-    traditionalBalance: number;
-    rothBalance: number;
   };
   investing: {
-    /** Invested balance across accounts, excluding the emergency fund. */
-    investedBalance: number;
-    /** Total monthly investing contribution (all accounts). */
-    monthlyContribution: number;
+    /**
+     * Total monthly investing contribution (all accounts); null is Auto, the
+     * sum of the normal contributions (monthlyInvestingAuto in ./accounts.ts).
+     */
+    monthlyContribution: number | null;
     /** Portion of the monthly contribution going to a taxable brokerage. */
     taxableMonthlyContribution: number;
     targetMix: TargetMixPreset;
@@ -160,6 +163,8 @@ export interface FinancialProfile {
     accounts: AccountRow[];
     securities: SecurityRow[];
     holdings: HoldingRow[];
+    /** Calculator-only: this run's new cash per account; an account without a row uses its normal new cash. */
+    newCash: NewCashRow[];
     /** Used when investing.targetMix is 'custom'. */
     classTargets: ClassTargetRow[];
     customAssetClasses: CustomAssetClassRow[];
@@ -219,6 +224,7 @@ export type ProfileListPath =
   | 'portfolio.accounts'
   | 'portfolio.securities'
   | 'portfolio.holdings'
+  | 'portfolio.newCash'
   | 'portfolio.classTargets'
   | 'portfolio.customAssetClasses';
 

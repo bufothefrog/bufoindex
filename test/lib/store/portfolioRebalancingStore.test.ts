@@ -6,10 +6,11 @@
  * entity actions are pure reducers now (test/lib/calculators/portfolio/
  * reducers.test.ts).
  *
- * Portfolio value of the default profile, hand-computed:
- *   Roth IRA:   10 VTI x $250 = $2,500 ; 5 BND x $75 = $375   -> $2,875
- *   Brokerage:  20 VTI x $250 = $5,000 ; 15 VXUS x $60 = $900 -> $5,900
- *   Total holdings value: $8,775 ; deposits: $0 + $1,000 = $1,000
+ * Portfolio value of the default profile, hand-computed: the one rebalanced
+ * account is the example brokerage (the 401(k) has a typed balance and no
+ * holdings):
+ *   Brokerage:  20 VTI x $375 = $7,500 ; 15 VXUS x $85 = $1,275 ; 0 BND -> $8,775
+ *   New cash: the taxable $500 a month, routed to the brokerage.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -56,13 +57,12 @@ describe('usePortfolioRebalancingStore', () => {
     expect(errors).toEqual({});
     expect(hasCalculatedOnce).toBe(true);
     expect(results).toEqual(rebalancePortfolioV2(inputs!));
-    // Roth 10 x 375 + 5 x 70 = 4,100; Brokerage 20 x 375 + 15 x 85 = 8,775.
-    expect(results!.totalValueBefore).toBe(12875);
-    expect(results!.totalDeposit).toBe(1000);
-    expect(results!.accounts).toHaveLength(2);
+    expect(results!.totalValueBefore).toBe(8775);
+    expect(results!.totalDeposit).toBe(500);
+    expect(results!.accounts).toHaveLength(1);
     expect(results!.mode).toBe('whole');
     // Money conservation: after = before + deposit - uninvested cash.
-    expect(results!.totalValueAfter).toBeCloseTo(12875 + 1000 - results!.cashLeftover, 6);
+    expect(results!.totalValueAfter).toBeCloseTo(8775 + 500 - results!.cashLeftover, 6);
   });
 
   it('keeps the last results, marked stale, when custom targets do not sum to 100%', () => {
@@ -79,10 +79,10 @@ describe('usePortfolioRebalancingStore', () => {
 
   it('recalculates an edit on the next submit', () => {
     store.getState().submit(profile());
-    // Doubling the Roth VTI position adds 10 x $375 = $3,750 -> $16,625.
-    edit((p) => updateHolding(p, 'hld-roth-vti', { shares: 20 }));
+    // Ten more VTI in the brokerage add 10 x $375 = $3,750 -> $12,525.
+    edit((p) => updateHolding(p, 'hld-brok-vti', { shares: 30 }));
     store.getState().submit(profile());
-    expect(store.getState().results?.totalValueBefore).toBe(12875 + 3750);
+    expect(store.getState().results?.totalValueBefore).toBe(8775 + 3750);
     expect(store.getState().stale).toBe(false);
   });
 

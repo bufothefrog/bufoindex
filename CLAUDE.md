@@ -48,7 +48,7 @@ lib/
   calculators/           # registry.ts, forms.ts, runtime.ts, types.ts,
                          #   <id>/{form,fields,bindings,definition,headline}.ts per calculator
   fields/                # Field schema: types, paths, runtime (validation), binding, shared
-  profile/               # The shared profile: types, defaults, migrate
+  profile/               # The shared profile: types, defaults, migrate (+ migrateV2), accounts, accountTypes
   store/                 # profileStore, preferencesStore, createCalculatorStore + one run
                          #   store per calculator
   workers/               # createWorkerRunner, exposeCalculation, retirementWorker
@@ -121,7 +121,7 @@ Forbidden: hardcoded color literals (`#fff`, `bg-blue-500`, `text-gray-600`), ch
 - **Pure functions in `lib/calculations/`** - no React, DOM, or storage imports. Each module has a matching `test/lib/calculations/*.test.ts` asserting real numeric values, hand-computed where practical.
 - **One shared profile.** Every input lives in the `FinancialProfile` (`lib/profile/types.ts`), persisted by `lib/store/profileStore.ts` (localStorage key `bufo-profile`). Calculator edits write through to it. The dollar display mode is the one site-wide preference (`lib/store/preferencesStore.ts`).
 - **Field schema.** A field is a `FieldSpec` keyed by its profile path and grouped into topic screens by a `FormSpec` (`lib/fields/types.ts`). The same spec drives the wizard, the calculator sections, validation and profile completeness.
-- **A calculator is five files** in `lib/calculators/<id>/`: `form.ts` (its FormSpec), `fields.ts` (its own FieldSpecs), `bindings.ts` (profile to engine inputs), `definition.ts` (the `CalculatorDefinition`: form, bindings, engine checks, calculate) and `headline.ts` (the summary the dashboard shows). A few carry one extra module (`reducers.ts`, `narrative.ts`). Names, paths and disclaimers live only in `lib/calculators/registry.ts`; the profile form is composed in `lib/calculators/forms.ts`.
+- **A calculator is five files** in `lib/calculators/<id>/`: `form.ts` (its FormSpec), `fields.ts` (its own FieldSpecs), `bindings.ts` (profile to engine inputs), `definition.ts` (the `CalculatorDefinition`: form, bindings, engine checks, calculate) and `headline.ts` (the summary the dashboard shows). A few carry extra modules (`reducers.ts` and `accountWrites.ts` in portfolio, `narrative.ts`). Names, paths and disclaimers live only in `lib/calculators/registry.ts`; the profile form is composed in `lib/calculators/forms.ts`.
 - **Run stores.** Each calculator has a run store made by `createCalculatorStore` (`lib/store/createCalculatorStore.ts`): it validates, memoizes, debounces and runs, holds results only and persists nothing. Slow engines pass a runner from `lib/workers/createWorkerRunner.ts`.
 - **No URL-hash sharing.** Links into a calculator carry only `?from=profile` (`calculatorHref` in `lib/calculators/registry.ts`); old share links are not supported.
 - **Sourced constants:** tax brackets, contribution limits, and rates live in `lib/constants/` with citation comments (see `irs-2026.ts`, `states-2026.ts`). Update only the constants file when a new tax year lands.

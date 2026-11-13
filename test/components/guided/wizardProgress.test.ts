@@ -30,6 +30,7 @@ import {
   type IntakeFlow,
   type IntakeMode,
 } from '@/lib/constants/intake';
+import { addAccountRow, setHoldsEmergencyFund } from '@/lib/calculators/portfolio/accountWrites';
 import { makeGet } from '@/lib/fields/paths';
 import { fieldWrites, resolveOptions, visibleScreenFields } from '@/lib/fields/runtime';
 import type { FieldSpec, Get, Write } from '@/lib/fields/types';
@@ -310,6 +311,48 @@ describe('saving as you go leaves unconfirmed edits out', () => {
     });
   });
 });
+
+describe('Next keeps an answer whose field is hidden now', () => {
+  it('keeps the typed emergency fund when Next is pressed again after an account took the fund over', () => {
+    const seed = getDefaultFinancialProfile();
+    const form = intakeForm('profile', 'all');
+    const fund = form.screens.find((s) => s.id === 'emergency-fund')!;
+    const accounts = form.screens.find((s) => s.id === 'accounts')!;
+    const balance = form.fields.find((f) => f.path === 'cash.emergencyFundBalance')!;
+    load(seed);
+    const apply = (save: ReturnType<typeof saveWrites>) => useProfileStore.getState().setValues(save.writes, save.options);
+
+    // 10,000 typed on the emergency fund screen, Next.
+    let progress = editScreen(form, startProgress(seed), fund, fieldWrites(balance, 10000, makeGet(seed)));
+    progress = answerScreen(form, progress, fund);
+    let save = saveWrites('profile', seed, progress, EMPTY_LEDGER, form.screens);
+    apply(save);
+    expect(useProfileStore.getState().profile.cash.emergencyFundBalance).toBe(10000);
+
+    // On the accounts screen: a new brokerage, ticked "Holds my emergency fund", Next.
+    const added = addAccountRow(makeGet(progress.answers), 'brokerage');
+    progress = editScreen(form, progress, accounts, added.writes);
+    progress = editScreen(form, progress, accounts, setHoldsEmergencyFund(makeGet(progress.answers), added.id, true));
+    progress = answerScreen(form, progress, accounts);
+    save = saveWrites('profile', seed, progress, save.ledger, form.screens);
+    apply(save);
+    expect(useProfileStore.getState().profile.cash.emergencyFundBalance).toBe(10000);
+
+    // Back to the emergency fund screen, where the balance is hidden now, and Next.
+    expect(screenFieldsOf(form, fund, progress).map((f) => f.path)).not.toContain('cash.emergencyFundBalance');
+    progress = answerScreen(form, progress, fund);
+    save = saveWrites('profile', seed, progress, save.ledger, form.screens);
+    apply(save);
+    const stored = useProfileStore.getState().profile;
+    expect(stored.cash.emergencyFundBalance).toBe(10000);
+    expect(stored.provided).toContain('cash.emergencyFundBalance');
+  });
+});
+
+/** The visible fields of `screen` over the working copy. */
+function screenFieldsOf(form: ReturnType<typeof intakeForm>, screen: (typeof form.screens)[number], progress: WizardProgress) {
+  return visibleScreenFields(form, screen, makeGet(progress.answers));
+}
 
 describe('Skip takes back what the screen gave, hidden fields included', () => {
   it('unmarks and reverts the 401(k) details answered before the plan was switched off and the screen skipped', () => {

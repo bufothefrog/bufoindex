@@ -1,21 +1,26 @@
 /**
  * The portfolio form's custom renderers, by renderer id (FieldSpec.renderer):
  * the holdings editor (every account's holdings, and the securities they
- * point to) and the class-targets editor (the custom mix, and the custom
- * asset classes). Both edit the profile's portfolio lists through the pure
- * reducers and write back every list a reducer changed, so the relational
- * rules (shared securities, cascading removals) hold on the calculator page
- * and in the wizard alike. The wizard and the calculator page pick them up
- * through RENDERERS in ./index.ts.
+ * point to), the class-targets editor (the custom mix, and the custom asset
+ * classes), this run's new cash per account, and the shared account list
+ * (./accounts.tsx). The holdings and class-targets editors edit the
+ * profile's portfolio lists through the pure reducers and write back every
+ * list a reducer changed, so the relational rules (shared securities,
+ * cascading removals) hold on the calculator page and in the wizard alike.
+ * The wizard and the calculator page pick them up through RENDERERS in
+ * ./index.ts.
  */
 
 import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { AccountSection } from '@/app/tools/portfolio-rebalancing-calculator/components/AccountSection';
 import { TargetsCard } from '@/app/tools/portfolio-rebalancing-calculator/components/TargetsCard';
+import { NullableField } from '@/components/fields/NullableField';
 import type { CustomRendererProps, CustomRenderers } from '@/components/fields/types';
 import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
-import { classTargetsFor } from '@/lib/calculators/portfolio/bindings';
-import { CLASS_TARGETS_RENDERER, HOLDINGS_RENDERER } from '@/lib/calculators/portfolio/fields';
+import { MoneyInput } from '@/components/ui/inputs';
+import { setNewCash } from '@/lib/calculators/portfolio/accountWrites';
+import { classTargetsFor, engineHoldings, engineSecurities } from '@/lib/calculators/portfolio/bindings';
+import { CLASS_TARGETS_RENDERER, HOLDINGS_RENDERER, NEW_CASH_RENDERER } from '@/lib/calculators/portfolio/fields';
 import {
   portfolioWrites,
   readPortfolio,
@@ -23,8 +28,20 @@ import {
   type PortfolioUpdate,
 } from '@/lib/calculators/portfolio/reducers';
 import { calculatorHref } from '@/lib/calculators/registry';
+import { listRows } from '@/lib/fields/runtime';
+import { formatCurrency } from '@/lib/format';
+import {
+  ACCOUNT_PATHS,
+  accountDisplayName,
+  accountLabels,
+  accountsInEffect,
+  newCashFor,
+  normalNewCash,
+  rebalanceCandidates,
+} from '@/lib/profile/accounts';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { cn } from '@/lib/utils';
+import { ACCOUNTS_RENDERERS } from './accounts';
 
 /**
  * The portfolio lists on display, and an update that applies a reducer to
@@ -45,23 +62,27 @@ function usePortfolio({ get, onWrite }: Pick<CustomRendererProps, 'get' | 'onWri
   return [readPortfolio(get), update];
 }
 
-/** Every account's holdings, one group per account, in account order. */
+/** The holdings of every account in effect but cash accounts, one group per account, in account order. */
 function HoldingsEditor({ spec, get, onWrite, error, size }: CustomRendererProps) {
   const id = useId();
   const labelId = `${id}-label`;
   const { describedBy } = fieldMessageIds(id, undefined, error);
   const [portfolio, update] = usePortfolio({ get, onWrite });
   const classTargets = classTargetsFor(get) ?? portfolio.classTargets;
+  const accounts = accountsInEffect(get).rows.filter((account) => account.kind !== 'cash');
+  // The same names as the account list and the new cash card, so two unnamed brokerages read 1 and 2 here too.
+  const labels = accountLabels(get);
 
   return (
     <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-3">
       <p id={labelId} className={cn(size === 'lg' ? 'text-base' : 'text-sm', 'font-medium leading-none')}>
         {spec.label}
       </p>
-      {portfolio.accounts.map((account, index) => (
+      {accounts.map((account, index) => (
         <AccountSection
           key={account.id}
           account={account}
+          label={labels.get(account.id) ?? accountDisplayName(account)}
           index={index}
           holdings={portfolio.holdings}
           securities={portfolio.securities}
@@ -75,14 +96,17 @@ function HoldingsEditor({ spec, get, onWrite, error, size }: CustomRendererProps
   );
 }
 
-/** Each asset class's portfolio-wide target, for the custom target mix. */
+/**
+ * Each asset class's portfolio-wide target, for the custom target mix. The
+ * current mix it shows is that of the rebalanced accounts' holdings only.
+ */
 function ClassTargetsEditor({ spec, get, onWrite, error }: CustomRendererProps) {
   const [portfolio, update] = usePortfolio({ get, onWrite });
   return (
     <TargetsCard
       label={spec.label}
-      holdings={portfolio.holdings}
-      securities={portfolio.securities}
+      holdings={engineHoldings(get)}
+      securities={engineSecurities(get)}
       classTargets={portfolio.classTargets}
       customAssetClasses={portfolio.customAssetClasses}
       update={update}
@@ -91,9 +115,67 @@ function ClassTargetsEditor({ spec, get, onWrite, error }: CustomRendererProps) 
   );
 }
 
+/**
+ * This run's new cash, one row per account the rebalancer can work on:
+ * Auto is the account's normal contributions, Custom the visitor's own
+ * figure (a portfolio.newCash row, kept until set back to Auto).
+ */
+function NewCashEditor({ spec, get, onWrite, error, size }: CustomRendererProps) {
+  const id = useId();
+  const labelId = `${id}-label`;
+  const { describedBy } = fieldMessageIds(id, undefined, error);
+  const candidates = rebalanceCandidates(get);
+  // Distinct across the account list, so two unnamed brokerages get distinct labels here too.
+  const labels = accountLabels(get);
+  const overridden = new Set(listRows(get(ACCOUNT_PATHS.newCash)).map((row) => row.id));
+  const write = (writes: ReturnType<typeof setNewCash>) => {
+    if (writes.length > 0) onWrite(writes);
+  };
+
+  return (
+    <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="space-y-4">
+      <p id={labelId} className={cn(size === 'lg' ? 'text-base' : 'text-sm', 'font-medium leading-none')}>
+        {spec.label}
+      </p>
+      {candidates.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No account can take new cash.</p>
+      ) : (
+        candidates.map((account) => {
+          const name = labels.get(account.id) ?? accountDisplayName(account);
+          const normal = normalNewCash(get, account.id);
+          return (
+            <NullableField
+              key={account.id}
+              label={name}
+              isAuto={!overridden.has(account.id)}
+              autoLabel="Normal contributions"
+              autoValue={formatCurrency(normal)}
+              onAuto={() => write(setNewCash(get, account.id, null))}
+              onCustom={() => write(setNewCash(get, account.id, normal))}
+              size={size}
+            >
+              <MoneyInput
+                name={`${id}-${account.id}`}
+                label={name}
+                value={newCashFor(get, account.id)}
+                showZero
+                onChange={(value) => write(setNewCash(get, account.id, value))}
+                min={0}
+              />
+            </NullableField>
+          );
+        })
+      )}
+      <FieldMessages id={id} error={error} />
+    </div>
+  );
+}
+
 export const PORTFOLIO_RENDERERS: CustomRenderers = {
+  ...ACCOUNTS_RENDERERS,
   [HOLDINGS_RENDERER]: HoldingsEditor,
   [CLASS_TARGETS_RENDERER]: ClassTargetsEditor,
+  [NEW_CASH_RENDERER]: NewCashEditor,
 };
 
 /**

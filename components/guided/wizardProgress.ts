@@ -98,7 +98,8 @@ export function clearField(
  * Next on `screen` (validated by the caller): applies `writes` (a choice made
  * with Enter), then marks every visible path of the screen, its covers and
  * its coupled writes as answered, whatever value they show, so a field left
- * blank is answered with its typical value.
+ * blank is answered with its typical value. A field of the screen that an
+ * earlier Next answered and that is hidden now keeps that answer.
  */
 export function answerScreen(
   form: FormSpec,
@@ -109,13 +110,25 @@ export function answerScreen(
   const answers = writes.length > 0 ? applyWrites(progress.answers, writes) : progress.answers;
   const own = screenPaths(form, screen, makeGet(answers));
   const touched = [...(progress.coupled[screen.id] ?? []), ...coupledPaths(writes, own)];
+  const given = [...own, ...touched];
+  // A field of this screen answered on an earlier Next and hidden now (its
+  // visibleWhen turned false meanwhile, e.g. the emergency fund balance once an
+  // account holds the fund) keeps the value it was answered with: the stored
+  // leaf is untouched, not reverted to its value on arrival.
+  const previous = progress.answered[screen.id] ?? {};
+  const hiddenKept = Object.entries(previous).filter(
+    ([path]) => screen.fields.includes(path) && !isUnder(path, given)
+  );
   return {
     ...progress,
     answers,
-    provided: union(progress.provided, [...own, ...touched]),
+    provided: union(progress.provided, given),
     answered: {
       ...progress.answered,
-      [screen.id]: Object.fromEntries([...own, ...touched].map((path) => [path, getAt(answers, path)])),
+      [screen.id]: Object.fromEntries([
+        ...hiddenKept,
+        ...given.map((path): [string, unknown] => [path, getAt(answers, path)]),
+      ]),
     },
   };
 }

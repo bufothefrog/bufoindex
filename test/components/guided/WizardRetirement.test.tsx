@@ -1,8 +1,9 @@
 /**
  * The retirement intent in the wizard, with the grown RETIREMENT_FORM: two
- * screens after the core (savings, target; the optional Social Security and
- * healthcare screen is left to the calculator page and the profile form, and
- * the claiming age and the assumptions to the calculator page), the skip
+ * screens after the core (the shared accounts screen and the target; the
+ * optional Social Security and healthcare screen is left to the calculator
+ * page and the profile form, and monthly investing, the claiming age and the
+ * assumptions to the calculator page), the skip
  * affordances, and the finish on the calculator path
  * with from=profile and no hash. The wizard mechanics are tested apart in
  * Wizard.test.tsx.
@@ -52,15 +53,15 @@ describe('Wizard, retirement intent', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'See if I am on track to retire' })).toBeInTheDocument();
     expect(screen.getByText('Opens the Retirement Calculator and runs the simulation with your answers.')).toBeInTheDocument();
 
-    // 1. Savings.
-    expect(screen.getByRole('heading', { name: 'What are you investing today?' })).toBeInTheDocument();
+    // 1. The accounts: the example 401(k) with its balance, the example brokerage with its holdings.
+    expect(screen.getByRole('heading', { name: 'What do you have saved and invested?' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
-    expect(screen.getByLabelText('Monthly investing contribution')).toBeInTheDocument();
-    expect(screen.getByLabelText('Invested balance')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('401(k) or similar balance')).toHaveValue('16,225');
+    expect(screen.getByText('$8,775 from 3 holdings')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Monthly investing')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Invested balance')).toHaveValue('');
-    expect(screen.getByText('Grey values are typical. Next uses them for anything left blank.')).toBeInTheDocument();
-    await typeInto('Monthly investing contribution', '900');
+    await typeInto('401(k) or similar balance', '30000');
     await next();
 
     // 2. Target.
@@ -79,7 +80,12 @@ describe('Wizard, retirement intent', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Social Security claiming age' })).not.toBeInTheDocument();
 
     const { profile } = useProfileStore.getState();
-    expect(profile.investing.monthlyContribution).toBe(900);
+    // Monthly investing stays Auto; the accounts are stored as shown, the 401(k) at 30,000.
+    expect(profile.investing.monthlyContribution).toBeNull();
+    expect(profile.portfolio.accounts.map((a) => [a.id, a.balance])).toEqual([
+      ['acc-401k', 30000],
+      ['acc-brok', 0],
+    ]);
     expect(profile.person.retirementAge).toBe(62);
     expect(profile.spending.targetRetirementIncome).toBe(70000);
     expect(profile.person.lifeExpectancy).toBe(90);
@@ -87,8 +93,10 @@ describe('Wizard, retirement intent', () => {
     expect(profile.retirementIncome).toEqual({ socialSecurityBenefit: null, socialSecurityAge: 67, annualHealthcareCost: null });
     expect(profile.provided).toEqual([
       ...CORE_PATHS,
-      'investing.monthlyContribution',
-      'investing.investedBalance',
+      // The accounts screen also answers the lists its editor covers.
+      'portfolio.accounts',
+      'portfolio.holdings',
+      'portfolio.securities',
       'person.retirementAge',
       'spending.targetRetirementIncome',
       'person.lifeExpectancy',
@@ -105,14 +113,14 @@ describe('Wizard, retirement intent', () => {
   });
 
   it('skips a fully answered screen in "remaining" mode', () => {
-    answer([...CORE_PATHS, 'investing.monthlyContribution', 'investing.investedBalance']);
+    answer([...CORE_PATHS, 'portfolio.accounts']);
     render(<Wizard flow="retirement" />);
     expect(screen.getByRole('heading', { name: 'When would you like to retire?' })).toBeInTheDocument();
     expect(screen.getByText('Step 1 of 1')).toBeInTheDocument();
   });
 
   it('shows a broken relation as the screen alert and stays on the screen', async () => {
-    answer([...CORE_PATHS, 'investing.monthlyContribution', 'investing.investedBalance']);
+    answer([...CORE_PATHS, 'portfolio.accounts']);
     render(<Wizard flow="retirement" />);
 
     await typeInto('Target retirement age', '70');

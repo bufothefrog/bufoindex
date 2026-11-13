@@ -81,7 +81,7 @@ describe('NextSteps', () => {
     const finish = linkNamed(/Finish your profile/);
     expect(finish).toHaveAttribute('href', '/start/profile');
     // Counted by topic screen (O14): age, state and filing status make one topic.
-    expect(finish).toHaveTextContent('1 of 14 topics answered.');
+    expect(finish).toHaveTextContent('1 of 13 topics answered.');
     expect(finish).toHaveTextContent('Answer the rest once; every calculator and your overview use it.');
 
     expect(screen.getByText('Try another calculator')).toBeInTheDocument();

@@ -8,6 +8,8 @@
  *
  * Integrity is kept here: removing an account removes its holdings, and a
  * security no holding refers to any more is dropped (pruneUnusedSecurities).
+ * Adding, editing and removing account rows goes through ./accountWrites.ts,
+ * which reads the account list as it is in effect (lib/profile/accounts.ts).
  *
  * New ids are '<prefix>-<n>' with the smallest n from the list's length + 1
  * up that no row of that list uses and no row of any list refers to, so the
@@ -17,9 +19,7 @@
  */
 
 import {
-  DEFAULT_ACCOUNT_TYPE,
   DEFAULT_ASSET_CLASS,
-  type Account,
   type AssetClass,
   type ClassTarget,
   type Holding,
@@ -27,7 +27,7 @@ import {
 } from '@/lib/calculations/portfolioRebalancing';
 import { listRows } from '@/lib/fields/runtime';
 import type { Get, Write } from '@/lib/fields/types';
-import type { FinancialProfile } from '@/lib/profile/types';
+import type { AccountRow, FinancialProfile, NewCashRow } from '@/lib/profile/types';
 
 /** The profile's portfolio lists, which every action reads and returns. */
 export type Portfolio = FinancialProfile['portfolio'];
@@ -35,13 +35,14 @@ export type Portfolio = FinancialProfile['portfolio'];
 /** Applies one action to the lists on display; the renderers hand this to their components. */
 export type PortfolioUpdate = (reduce: (portfolio: Portfolio) => Portfolio) => void;
 
-const LIST_KEYS = ['accounts', 'securities', 'holdings', 'classTargets', 'customAssetClasses'] as const;
+const LIST_KEYS = ['accounts', 'securities', 'holdings', 'newCash', 'classTargets', 'customAssetClasses'] as const;
 
 /** Profile path of each portfolio list. */
 export const PORTFOLIO_LIST_PATHS: Readonly<Record<keyof Portfolio, string>> = {
   accounts: 'portfolio.accounts',
   securities: 'portfolio.securities',
   holdings: 'portfolio.holdings',
+  newCash: 'portfolio.newCash',
   classTargets: 'portfolio.classTargets',
   customAssetClasses: 'portfolio.customAssetClasses',
 };
@@ -50,9 +51,10 @@ export const PORTFOLIO_LIST_PATHS: Readonly<Record<keyof Portfolio, string>> = {
 export function readPortfolio(get: Get): Portfolio {
   const list = <T>(key: keyof Portfolio) => listRows(get(PORTFOLIO_LIST_PATHS[key])) as unknown as T[];
   return {
-    accounts: list<Account>('accounts'),
+    accounts: list<AccountRow>('accounts'),
     securities: list<Security>('securities'),
     holdings: list<Holding>('holdings'),
+    newCash: list<NewCashRow>('newCash'),
     classTargets: list<ClassTarget>('classTargets'),
     customAssetClasses: list<Portfolio['customAssetClasses'][number]>('customAssetClasses'),
   };
@@ -132,17 +134,6 @@ export function updateSecurity(portfolio: Portfolio, id: string, patch: Partial<
 // ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
-
-/** Appends a numbered taxable account with no new cash. */
-export function addAccount(portfolio: Portfolio): Portfolio {
-  const account: Account = {
-    id: nextId('acc', portfolio.accounts, portfolio),
-    name: `Account ${portfolio.accounts.length + 1}`,
-    accountType: DEFAULT_ACCOUNT_TYPE,
-    deposit: 0,
-  };
-  return { ...portfolio, accounts: [...portfolio.accounts, account] };
-}
 
 /** Removes the account and its holdings, then the securities only they held. */
 export function removeAccount(portfolio: Portfolio, id: string): Portfolio {

@@ -76,7 +76,7 @@ export function BaseCard({
             )}>
               {Icon && (
                 <Icon className={cn(
-                  'w-5 h-5',
+                  'w-5 h-5 shrink-0',
                   tone ? TONE_TEXT[tone] : BRAND_ICON
                 )} />
               )}

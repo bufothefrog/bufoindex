@@ -14,16 +14,11 @@
  * - `provided` records leaves by their own path and lists by the list path.
  */
 
-import {
-  DEFAULT_ACCOUNT_TYPE,
-  DEFAULT_ASSET_CLASS,
-  type ClassTarget,
-} from '@/lib/calculations/portfolioRebalancing';
+import { DEFAULT_ASSET_CLASS, type ClassTarget } from '@/lib/calculations/portfolioRebalancing';
 import { DEFAULT_DCA_COMPARISON_INPUTS } from '@/lib/calculations/leverageComparison';
-import { EXAMPLE_FUND_PRICES } from '@/lib/constants/example-prices';
 import { PAY_FREQUENCY_OPTIONS } from '@/lib/constants/frequency';
 import {
-  ACCOUNT_TYPE_OPTIONS,
+  ACCOUNT_KIND_OPTIONS,
   BONUS_FREQUENCY_OPTIONS,
   CONTRIBUTION_TYPE_OPTIONS,
   FILING_STATUS_OPTIONS,
@@ -33,6 +28,7 @@ import {
   TARGET_MIX_OPTIONS,
 } from '@/lib/constants/labels';
 import { RetirementConstants } from '@/lib/constants/retirement';
+import { exampleAccountLists } from './accounts';
 import { derivedEmergencyFundBalance, derivedHsaCoverage, derivedTargetRetirementIncome } from './derived';
 import { getAt, isRecord, setAt } from '@/lib/fields/paths';
 import { isFiniteNumber } from '@/lib/fields/runtime';
@@ -45,6 +41,7 @@ import type {
   FilingStatus,
   FinancialProfile,
   HoldingRow,
+  NewCashRow,
   PayFrequency,
   ProfileListPath,
   ProfilePatch,
@@ -85,10 +82,8 @@ export function presetClassTargets(mix: PresetTargetMix): ClassTarget[] {
 // Defaults
 // ---------------------------------------------------------------------------
 
-/** Id of the worked example's taxable account, which receives the one-off new cash. */
+/** Id of the worked example's taxable brokerage account (exampleAccountLists in ./accounts.ts). */
 export const BROKERAGE_ACCOUNT_ID = 'acc-brok';
-
-const DEFAULT_NEW_CASH = 1000;
 
 /**
  * Take-home pay of the worked example (single, CA, $4,000 gross every two
@@ -117,7 +112,7 @@ const DEFAULT_EMERGENCY_FUND_MONTHS = 3;
 export function getDefaultFinancialProfile(): FinancialProfile {
   const leverage = DEFAULT_DCA_COMPARISON_INPUTS;
   return {
-    version: 2,
+    version: 3,
     updatedAt: 0,
     person: {
       age: 25,
@@ -174,12 +169,10 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       roth: false,
       traditionalMonthly: 0,
       rothMonthly: 0,
-      traditionalBalance: 0,
-      rothBalance: 0,
     },
     investing: {
-      investedBalance: 25000,
-      monthlyContribution: 1500,
+      // Auto: the sum of the normal contributions (monthlyInvestingAuto).
+      monthlyContribution: null,
       taxableMonthlyContribution: 500,
       targetMix: '80-20',
     },
@@ -189,25 +182,14 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       annualHealthcareCost: null,
     },
     debts: [],
-    // The rebalancer's three-fund worked example (Roth IRA plus a taxable
-    // brokerage). The ids are stable so server and client render the same.
-    // Prices and their source: lib/constants/example-prices.ts.
+    // The worked example (exampleAccountLists in ./accounts.ts): a 401(k)
+    // with a typed 16,225 and a brokerage holding VTI, VXUS and BND worth
+    // 8,775, so the example invested total is 25,000. The ids are stable so
+    // server and client render the same. Prices and their source:
+    // lib/constants/example-prices.ts.
     portfolio: {
-      accounts: [
-        { id: 'acc-roth', name: 'Roth IRA', accountType: 'tax-free', deposit: 0 },
-        { id: BROKERAGE_ACCOUNT_ID, name: 'Brokerage', accountType: 'taxable', deposit: DEFAULT_NEW_CASH },
-      ],
-      securities: [
-        { id: 'sec-vti', ticker: 'VTI', name: 'Vanguard Total US Stock', price: EXAMPLE_FUND_PRICES.VTI, assetClass: 'us-stock' },
-        { id: 'sec-vxus', ticker: 'VXUS', name: 'Vanguard Total Intl Stock', price: EXAMPLE_FUND_PRICES.VXUS, assetClass: 'intl-stock' },
-        { id: 'sec-bnd', ticker: 'BND', name: 'Vanguard Total Bond', price: EXAMPLE_FUND_PRICES.BND, assetClass: 'bonds' },
-      ],
-      holdings: [
-        { id: 'hld-roth-vti', accountId: 'acc-roth', securityId: 'sec-vti', shares: 10 },
-        { id: 'hld-roth-bnd', accountId: 'acc-roth', securityId: 'sec-bnd', shares: 5 },
-        { id: 'hld-brok-vti', accountId: BROKERAGE_ACCOUNT_ID, securityId: 'sec-vti', shares: 20 },
-        { id: 'hld-brok-vxus', accountId: BROKERAGE_ACCOUNT_ID, securityId: 'sec-vxus', shares: 15 },
-      ],
+      ...exampleAccountLists(),
+      newCash: [],
       classTargets: presetClassTargets('80-20'),
       customAssetClasses: [],
     },
@@ -257,15 +239,17 @@ export interface ProfileListRows {
   'portfolio.accounts': AccountRow;
   'portfolio.securities': SecurityRow;
   'portfolio.holdings': HoldingRow;
+  'portfolio.newCash': NewCashRow;
   'portfolio.classTargets': ClassTargetRow;
   'portfolio.customAssetClasses': CustomAssetClassRow;
 }
 
 export const PROFILE_LIST_ROW_DEFAULTS: { readonly [P in ProfileListPath]: Readonly<ProfileListRows[P]> } = {
   debts: { id: '', name: '', balance: 0, interestRate: 0, minimumPayment: 0, extraPayment: 0, taxDeductible: false },
-  'portfolio.accounts': { id: '', name: '', accountType: DEFAULT_ACCOUNT_TYPE, deposit: 0 },
+  'portfolio.accounts': { id: '', kind: 'brokerage', name: '', balance: 0, holdsEmergencyFund: false },
   'portfolio.securities': { id: '', ticker: '', price: 0, assetClass: DEFAULT_ASSET_CLASS },
   'portfolio.holdings': { id: '', accountId: '', securityId: '', shares: 0 },
+  'portfolio.newCash': { id: '', amount: 0 },
   'portfolio.classTargets': { accountId: null, assetClass: '', target: 0 },
   'portfolio.customAssetClasses': { id: '', label: '' },
 };
@@ -303,7 +287,7 @@ const RISK_PROFILES: readonly RiskProfile[] = ['tdf', 'custom'];
 
 /**
  * Allowed values for the enum-typed fields, keyed by leaf path, or by list
- * path plus row key for a row field ('portfolio.accounts.accountType').
+ * path plus row key for a row field ('portfolio.accounts.kind').
  */
 export const PROFILE_ENUM_VALUES: Readonly<Record<string, readonly string[]>> = {
   'person.filingStatus': PROFILE_FILING_STATUSES,
@@ -316,7 +300,7 @@ export const PROFILE_ENUM_VALUES: Readonly<Record<string, readonly string[]>> = 
   'assumptions.paycheck.riskTolerance': optionValues(RISK_TOLERANCE_OPTIONS),
   'assumptions.paycheck.optimizationGoal': optionValues(OPTIMIZATION_GOAL_OPTIONS),
   'assumptions.portfolio.mode': ['whole', 'fractional'],
-  'portfolio.accounts.accountType': optionValues(ACCOUNT_TYPE_OPTIONS),
+  'portfolio.accounts.kind': optionValues(ACCOUNT_KIND_OPTIONS),
 };
 
 // ---------------------------------------------------------------------------
@@ -334,10 +318,13 @@ interface ValueRule {
   options?: readonly string[];
   /** Free text that must not be blank. */
   nonEmpty: boolean;
+  /** The smallest number allowed (a row's dollars); below it the value is invalid. */
+  min?: number;
 }
 
 /** The type of each leaf or row field whose default is null. */
 const NULLABLE_TYPES: Readonly<Record<string, ValueType>> = {
+  'investing.monthlyContribution': 'number',
   'retirementIncome.socialSecurityBenefit': 'number',
   'retirementIncome.annualHealthcareCost': 'number',
   'leverage.monthlyContribution': 'number',
@@ -353,12 +340,22 @@ const REQUIRED_ROW_FIELDS: { readonly [P in ProfileListPath]: readonly string[] 
   'portfolio.accounts': ['id'],
   'portfolio.securities': ['id'],
   'portfolio.holdings': ['id', 'accountId', 'securityId'],
+  'portfolio.newCash': ['id'],
   'portfolio.classTargets': ['assetClass'],
   'portfolio.customAssetClasses': ['id'],
 };
 
 /** Row text that must not be blank; a blank value takes the row default instead of dropping the row. */
 const NON_BLANK_ROW_FIELDS: ReadonlySet<string> = new Set(['portfolio.securities.assetClass']);
+
+/**
+ * Row dollars that cannot be negative: a negative (or non-finite) value takes
+ * the row default, 0.
+ */
+const NON_NEGATIVE_ROW_FIELDS: ReadonlySet<string> = new Set([
+  'portfolio.accounts.balance',
+  'portfolio.newCash.amount',
+]);
 
 /** Row fields that may be absent (they have no row default). */
 const OPTIONAL_ROW_FIELDS: Readonly<Record<string, ValueType>> = {
@@ -370,6 +367,7 @@ export const PROFILE_LIST_PATHS: readonly ProfileListPath[] = [
   'portfolio.accounts',
   'portfolio.securities',
   'portfolio.holdings',
+  'portfolio.newCash',
   'portfolio.classTargets',
   'portfolio.customAssetClasses',
 ];
@@ -388,6 +386,7 @@ function ruleFor(key: string, example: unknown, topLevel: boolean, required = fa
     // Free-text leaves (state), required row keys (ids) and asset classes must
     // not be blank; other row text (a name being typed) may be.
     nonEmpty: type === 'string' && !options && (topLevel || required || NON_BLANK_ROW_FIELDS.has(key)),
+    ...(NON_NEGATIVE_ROW_FIELDS.has(key) ? { min: 0 } : {}),
   };
 }
 
@@ -410,7 +409,7 @@ const SECTION_TEMPLATE: Record<string, unknown> = Object.fromEntries(
 );
 
 /**
- * Every leaf path of the v2 profile, in section order. It excludes lists,
+ * Every leaf path of the v3 profile, in section order. It excludes lists,
  * version, updatedAt and provided.
  */
 export const PROFILE_LEAF_PATHS: readonly string[] = collectLeaves(SECTION_TEMPLATE, '', []);
@@ -506,7 +505,7 @@ export function providedPathFor(path: string): string | null {
 
 function matchesRule(rule: ValueRule, value: unknown): boolean {
   if (value === null) return rule.nullable;
-  if (rule.type === 'number') return isFiniteNumber(value);
+  if (rule.type === 'number') return isFiniteNumber(value) && (rule.min === undefined || value >= rule.min);
   if (rule.type === 'boolean') return typeof value === 'boolean';
   if (typeof value !== 'string') return false;
   if (rule.options) return rule.options.includes(value);
@@ -550,6 +549,8 @@ function normalizeRow(list: ProfileListPath, value: unknown): Record<string, unk
     if (valid) out[key] = value[key];
     else if (!rule.optional) out[key] = defaults[key];
   }
+  // The emergency-fund tick is honored only on a brokerage account.
+  if (list === 'portfolio.accounts' && out.kind !== 'brokerage') out.holdsEmergencyFund = false;
   return out;
 }
 
@@ -612,7 +613,8 @@ export function normalizeProvided(paths: readonly unknown[], profile?: Financial
 
 /**
  * Coerces untrusted data (persisted localStorage, a hand-edited payload)
- * into a complete v2 FinancialProfile.
+ * into a complete v3 FinancialProfile. A v2 payload goes through
+ * migrateProfile (./migrate.ts) first.
  *
  * - Leaves: each one that is missing or invalid falls back to the same leaf
  *   in `base` (the defaults unless given). Nullable leaves accept null.
@@ -630,7 +632,7 @@ export function normalizeProfile(
   base: FinancialProfile = getDefaultFinancialProfile()
 ): FinancialProfile {
   const source = isRecord(input) ? input : {};
-  const out: Record<string, unknown> = { version: 2 };
+  const out: Record<string, unknown> = { version: 3 };
   out.updatedAt =
     typeof source.updatedAt === 'number' && Number.isFinite(source.updatedAt) ? source.updatedAt : base.updatedAt;
   for (const section of PROFILE_SECTIONS) {
@@ -722,9 +724,27 @@ function admitWrite(profile: FinancialProfile, path: string, value: unknown): { 
       const rows = getAt(profile, info.list) as readonly unknown[];
       if (info.index >= rows.length || !matchesRule(info.rule, value)) return null;
       if (info.key === 'id' && takenId(rows, info.index, value)) return null;
+      if (info.list === 'portfolio.accounts' && info.key === 'holdsEmergencyFund' && value === true) {
+        // The tick is honored only on a brokerage account (normalizeRow).
+        const row = rows[info.index];
+        if (!isRecord(row) || row.kind !== 'brokerage') return null;
+      }
       return { value };
     }
   }
+}
+
+/**
+ * After a row field write on an account (a kind change away from
+ * 'brokerage'), the row is normalized again so the emergency-fund tick
+ * stays honored only on a brokerage account.
+ */
+function renormalizeAccountRow(profile: FinancialProfile, path: string): FinancialProfile {
+  const info = classifyPath(path);
+  if (!info || info.kind !== 'rowField' || info.list !== 'portfolio.accounts') return profile;
+  const rowPath = `${info.list}.${info.index}`;
+  const row = normalizeRow(info.list, getAt(profile, rowPath));
+  return row && row.holdsEmergencyFund !== getAt(profile, `${rowPath}.holdsEmergencyFund`) ? setAt(profile, rowPath, row) : profile;
 }
 
 /**
@@ -745,6 +765,7 @@ export function applyProfileWrites(
     const admitted = admitWrite(next, write.path, write.value);
     if (!admitted) continue;
     next = setAt(next, write.path, admitted.value);
+    next = renormalizeAccountRow(next, write.path);
     accepted.push(write.path);
   }
   return { profile: next, accepted };

@@ -2,7 +2,9 @@
  * Retirement calculator form (docs/rebuild-plan.md sections 2.12 and 2.14):
  * every field the retirement engine uses, in topic screens. The calculator
  * page shows them all; the retirement intake asks the profile screens after
- * the core (savings and target). The optional Social Security and healthcare
+ * the core (the shared accounts screen and the target). Monthly investing
+ * is a calculator-only control: Auto is the sum of the normal
+ * contributions, Custom one run's own figure. The optional Social Security and healthcare
  * screen is asked by the profile form only, the claiming age is a
  * calculator-only control, and the assumptions are a collapsed card on the
  * page. The basics are the core facts the
@@ -10,10 +12,11 @@
  */
 
 import {
+  ACCOUNTS,
+  ACCOUNTS_SCREEN,
   CORE_FIELDS,
   CORE_SCREENS,
   FILING_STATUS,
-  INVESTED_BALANCE,
   MONTHLY_INVESTING,
   NECESSARY_MONTHLY,
   NET_PAY,
@@ -27,6 +30,7 @@ import {
 import type { FieldSpec, FormSpec, ScreenNote, ScreenSpec } from '@/lib/fields/types';
 import { formatCurrency } from '@/lib/format';
 import { FILING_STATUS_META } from '@/lib/constants/labels';
+import { monthlyInvestingAuto } from '@/lib/profile/accounts';
 import type { FilingStatus } from '@/lib/profile/types';
 import { filingStatusNote, retirementFilingStatus } from './bindings';
 import {
@@ -85,16 +89,11 @@ const BASICS_SCREENS: readonly ScreenSpec[] = CORE_SCREENS.map((screen) => ({
   ...(screen.id === 'about' ? { notes: [FILING_STATUS_NOTE] } : {}),
 }));
 
-// Placeholders show only while a field is empty. The help on the savings,
-// target and Social Security screens stays the intake's, word for word: the
-// wizard asks these screens too.
+// The help on the target and Social Security screens stays the intake's,
+// word for word: the wizard asks these screens too.
 const MONTHLY_SAVINGS = withOverrides(MONTHLY_INVESTING, {
-  placeholder: '2,000',
-  summary: (value) => `saving ${formatCurrency(value as number)}/mo`,
-});
-const STARTING_BALANCE = withOverrides(INVESTED_BALANCE, {
-  placeholder: '10,000',
-  summary: (value) => `${formatCurrency(value as number)} invested`,
+  summary: (value, get) =>
+    `saving ${formatCurrency(typeof value === 'number' ? value : monthlyInvestingAuto(get))}/mo`,
 });
 const RETIRE_AT = withOverrides(RETIREMENT_AGE, { summary: (value) => `retire at ${value as number}` });
 
@@ -102,8 +101,8 @@ export const RETIREMENT_FORM: FormSpec = {
   id: 'retirement',
   fields: [
     ...BASICS,
+    ACCOUNTS,
     MONTHLY_SAVINGS,
-    STARTING_BALANCE,
     RETIRE_AT,
     TARGET_RETIREMENT_INCOME,
     LIFE_EXPECTANCY,
@@ -120,11 +119,15 @@ export const RETIREMENT_FORM: FormSpec = {
   ],
   screens: [
     ...BASICS_SCREENS,
+    ACCOUNTS_SCREEN,
     {
-      id: 'savings',
-      title: 'What are you investing today?',
+      // Calculator-only: Auto follows the contribution answers, so the
+      // profile does not ask it (Surface in lib/fields/types.ts).
+      id: 'monthly-investing',
+      title: 'Monthly investing',
       tier: 'details',
-      fields: [MONTHLY_SAVINGS.path, STARTING_BALANCE.path],
+      surface: 'calculator',
+      fields: [MONTHLY_SAVINGS.path],
     },
     {
       id: 'target',

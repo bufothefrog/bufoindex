@@ -6,9 +6,20 @@
  * The golden fixtures in the bindings tests pin engine inputs for explicit
  * answers. PR 3 changed the defaults those fixtures were built over, so they
  * now build over this profile with every leaf and list marked answered
- * (answeredEverywhere): the expected engine inputs stay exactly as captured,
- * and a stored profile in which every field is answered runs the same
- * numbers as at 3bb0132.
+ * (answeredEverywhere): the expected engine inputs stay exactly as captured.
+ *
+ * Since profile v3 this fixture is not what a stored 3bb0132 profile
+ * migrates to: it keeps the same retirement and leverage inputs (start
+ * 25,000, 1,500 a month), but a stored everything-answered 3bb0132 payload
+ * migrates its answered example lists as the visitor's own (a Roth IRA row
+ * worth 2,875 at the 3bb0132 prices, so the paycheck Roth IRA balance is
+ * 2,875, not 0) and gets other rebalancer inputs.
+ *
+ * Profile v3 keeps the invested money on the account rows. The 3bb0132
+ * default invested 25,000 and saved 1,500 a month; here that is the example
+ * lists with the 3bb0132 fund prices (the brokerage holds 20 x 250 + 15 x 60
+ * = 5,900), the example 401(k) typed at the rest, 19,100, and monthly
+ * investing set to 1,500 (Custom).
  */
 
 import {
@@ -30,8 +41,12 @@ export function defaultProfileAt3bb0132(): FinancialProfile {
     cash: { ...p.cash, emergencyFundBalance: 5000 },
     retirementIncome: { ...p.retirementIncome, socialSecurityBenefit: 30000 },
     workplace: { ...p.workplace, matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
+    investing: { ...p.investing, monthlyContribution: 1500 },
     portfolio: {
       ...p.portfolio,
+      accounts: p.portfolio.accounts.map((account) =>
+        account.id === 'acc-401k' ? { ...account, balance: 19100 } : account
+      ),
       securities: p.portfolio.securities.map((security) => ({
         ...security,
         price: ({ VTI: 250, VXUS: 60, BND: 75 } as Record<string, number>)[security.ticker] ?? security.price,
