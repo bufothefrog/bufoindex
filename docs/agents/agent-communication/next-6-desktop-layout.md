@@ -1,6 +1,8 @@
 # PR 6 hand-off: desktop layout, two small fixes, one test trim
 
-Branch claude/next-6-desktop-layout, built from 1a031eb (staging branch "next" after PR 1 to 5) in seven slices, one commit each:
+Branch claude/next-6-desktop-layout, built from 1a031eb (staging branch "next" after PR 1 to 5) in seven slices, one commit each,
+then three follow-up commits that apply the orchestrating session's decisions D-A to D-C (defaults on open questions 1, 10 and 11
+below) and this note's update:
 
     8d0a95c slice 1: keep the Retire at N label right of the y axis
     a007825 slice 2: trim the savings-rate chart label matrix to 26 rows
@@ -8,7 +10,11 @@ Branch claude/next-6-desktop-layout, built from 1a031eb (staging branch "next" a
     458a3d8 slice 4: add the inputs-above layout variant
     f0e98d6 slice 5: put the leverage inputs in a row above the results
     17d187a slice 6: cap widths on overview, disclaimer and methodology
-    (this commit) slice 7: docs and this note
+    d1b6e12 slice 7: docs and this note
+    90a2964 D-A leverage inputs: start the cards collapsed at every width
+    33cf68e D-B leverage results: keep What next and methodology variables at reading width
+    d6f9ed0 D-C leverage inputs row: let a last card alone span the row from lg to below xl
+    (this commit) hand-off note for PR 6 after the decisions
 
 Layout only: no file under lib/calculations changes, no number or text changes, package.json and package-lock.json are unchanged, no
 new dependency, the stored profile and preferences are untouched, and there is no new toggle, mode or visitor setting. The one new
@@ -32,31 +38,50 @@ questions at the end.
 
 Playwright Chromium against production builds (`next build` / `next start` on Node 26), viewport height 900, with an empty profile (the
 defaults) and a filled profile (defaults plus answers, two debts and the leverage inputs in `provided`). "Before" is a build of 1a031eb in
-a scratch worktree, "after" the build of the slice. "cpl" is the longest line of an element in characters.
+a scratch worktree, "after" the build of the slice (for the leverage numbers below: the build after D-C). The filled profile is
+built with HEAD's own getDefaultFinancialProfile and normalizeProfile: real values, two debts, four accounts. "cpl" is the longest
+line of an element in characters (trailing space not counted).
 
 ## What changed, per page
 
-### Leverage comparison (slices 4 and 5)
+### Leverage comparison (slices 4 and 5, decisions D-A to D-C)
 
 - From 1024 the three input cards (Contributions, What do you have saved and invested?, Assumptions) form a row above the results: two
-  across from 1024 to 1279, three from 1280. Each starts collapsed to its one-line summary, so the inputs can be read without opening a
-  card; each keeps its Show / Hide (and Restore defaults). Below 1024 nothing changes.
+  across from 1024 to 1279, with the last card (Assumptions) spanning the second row, and three across from 1280. Opened at full width
+  the Assumptions fields sit in two columns.
+- Collapse rule: on a calculator with `inputsPlacement="above"` (leverage only) every input card starts collapsed to its one-line
+  summary at every width, phones included, in the server render and the first client render alike. No media query or hook is read,
+  so no card folds after load. An error still forces a card open; the first edit freezes the cards as shown and a toggle pins its
+  card, as before. Each card keeps its Show / Hide (and Restore defaults).
+- **Visible change on phones and at 768:** the leverage Inputs tab now shows three collapsed cards with their summary lines instead
+  of open Contributions and accounts cards (Assumptions was already collapsed). Opening a card works as before; the Results tab is
+  unchanged. The other three calculators are untouched at every width.
+- Until the first results arrive, the results skeleton under the row of inputs holds at least a screen's height from 1024, so the
+  disclaimer below does not show and then jump out of view.
 - The results take the full width: the headline tiles three in a row, a full-width chart, "Monthly vs start of each year" and "Tail and
   drawdown" side by side, and "Model and caveats" prose in two text columns. The dollar caption and the chart caption are capped at
   reading width.
 - In a strip card an opened account editor stacks Kind over Account name (container query; phones, 768 and the side columns unchanged).
+- The "What next?" card at the end of the leverage results sets its body in two columns from 1024 (the profile line and its link on
+  the left, the calculator links on the right) through a `layout="columns"` prop of NextSteps that CalculatorPage passes only with
+  inputs above. The default `layout="stack"` keeps NextSteps on the other three calculators as it was: every box of the card
+  (excluding the one new wrapper div) at identical positions against the base build at 390, 1024 and 1440, empty and filled;
+  /overview, /start/choose and /start/review identical too.
 
 | Check | Before (1a031eb) | After |
 |---|---|---|
-| Page height at 1440, empty / filled | 3583 / 3929 | 2669 / 2955 (limit 2750 / 3050) |
-| Page height at 1024, empty / filled | 3883 / 4249 | 2952 / 3238 |
-| Inputs height, empty / filled | side column 990 / 1286 at 1024, 882 / 1058 at 1440 | strip 182 at 1280, 1440 and 1920; 316 at 1024 (two rows) |
+| Page height at 1440, empty / filled | 3583 / 3929 | 2677 / 2913 (limit 2750 / 3050) |
+| Page height at 1024, empty / filled | 3883 / 4249 | 2980 / 3216 |
+| Inputs height, empty | side column 990 at 1024, 882 at 1440 | strip 182 at 1280, 1440 and 1920; 316 at 1024 (two rows, Assumptions 944 wide) |
+| Cumulative layout shift at 1440, 4x CPU throttle, three runs | 0.0000 each | 0.0000 each (0.1034 with the desktop-only fold, 0.0399 after D-A alone: the disclaimer) |
+| Cumulative layout shift at 1024, same | 0.0000 each | 0.0000, 0.0000, 0.0022 |
 | Headline figures top | 346 at 1440 (tiles 2 + 1) | 510 at 1280 to 1920, 644 at 1024 (limit 600 at 1440); three tiles in one row, bottom 638 (788 at 1024) |
 | Chart | 552x384 at 1440, top 672, half visible | 1180x384 at 1440, svg top 732 (limit 800); 892x384 at 1024 |
 | Tab order at 1440 | inputs before results | the three card toggles and Restore defaults, then the dollar toggle |
 | DataTables at 1024 | 416 wide, no sideways scroll | the same |
-| Longest line in the results (empty profile) | figcaption 94, dollar caption 91 at 1440 | at most 86 at 1024 / 1280, 88 at 1440 / 1920 |
-| Phones and 768, inputs and results tabs | | identical to base (0 px), empty and filled |
+| Longest line in the results (every visible p, li, figcaption) | empty: figcaption 94, dollar caption 91 at 1440; filled: What next 101 | empty and filled: at most 85 at 1024 / 1280, 87 at 1440 / 1920 |
+| Inputs tab, page height at 390 / 768 (empty) | 1857 / 1477, Contributions and accounts open | 1076 / 1053, three collapsed cards |
+| Results tab at 390 / 768 | region 358x3925 / 688x3035 | identical |
 
 ### Retirement calculator (slice 1)
 
@@ -109,7 +134,8 @@ The limit is 90 cpl. At 360 and 390 the disclaimer is unchanged (51 to 55 cpl, s
 ### Methodology (/tools/retirement-calculator/methodology, slice 6)
 
 The page uses the shared `Container` (from `@/components/ui/layouts/ResponsiveGrid`, `px-4 py-8 sm:px-6`), so its left edge matches the
-calculator grid; description paragraphs, purpose and explanation paragraphs and the assumption, limitation and step lists are capped at
+calculator grid; description paragraphs, purpose and explanation paragraphs, the assumption, limitation and step lists and the rows
+under "Variables" (divs; the list gets `max-w-prose text-sm`, the rows' own size, so 65ch is measured at that size) are capped at
 `max-w-prose`. KaTeX display blocks keep the card width, their sideways scroll and their tab stop (11 blocks, 11 tab stops, before and
 after).
 
@@ -123,14 +149,14 @@ after).
 | 1440 | 31 -> 0 | 195 -> 90 | 52 -> 104 (104) | 0 / 0 |
 | 1920 | 31 -> 0 | 195 -> 90 | 292 -> 344 (344) | 0 / 0 |
 
-Page height: identical at 360 and 390 (25278, 23218); it grows on desktop as prose wraps (14678 to 15462 at 1440). Display blocks are
-1164 wide at 1440 (1268 before, the old 1368 px container). The variable rows under "Variables" are div elements, not p or li, and are
-not capped; a few run to about 100 characters at 1440.
+Page height: identical at 360 and 390 (25278, 23218); it grows on desktop as prose wraps (14678 to 15921 at 1440). Display blocks are
+1164 wide at 1440 (1268 before, the old 1368 px container). Variable rows (51 rows in 11 blocks): over 90 cpl 18 -> 0 and longest
+149 -> 79 at 1280 to 1920 (119 -> 79 at 1024); at 390 unchanged (30).
 
 ### No sideways scroll
 
 scrollWidth == innerWidth on all four calculators, /overview, /demo, /start/profile and the methodology page at 360, 390, 768, 1024,
-1280, 1440, 1920 and 2560, empty and filled.
+1280, 1440, 1920 and 2560, empty and filled (re-checked after D-C, without /start/profile: 112 of 112).
 
 ## What the measurements ruled out
 
@@ -158,8 +184,10 @@ named tests unchanged plus one table of 26 rows (296 px x 5 profiles x ages 45, 
 of the y-axis line; against the pre-fix helper 6 rows fail. The file runs in 3.9 s alone (17.7 s before).
 
 Suite counts: 3171 tests in 141 files at 1a031eb; 2810 after slices 1 to 3 (-364 chart rows, +2 helper tests, +1 paycheck test); 2818 in
-142 files after slice 5 (+4 useMediaQuery, +1 CalculatorLayout, +3 leverage); slices 6 and 7 add none (slice 6 is CSS only, which jsdom
-cannot see; it was checked in the browser).
+142 files after slice 5 (+4 media-query hook, +1 CalculatorLayout, +3 leverage); slices 6 and 7 add none (slice 6 is CSS only, which jsdom
+cannot see; it was checked in the browser). After the decisions: 2814 in 141 files (D-A removes the media-query hook test file, -4, and turns
+the three leverage card tests into two that need no media-query mock, -1; D-B adds one NextSteps test; D-C is CSS only). Coverage
+98.5 statements, 94.56 branches, 98.77 functions, 99.06 lines.
 
 Mutation re-run, one mutation at a time against the committed files. Failed tests in the trimmed chart file (of 32) / the helper file
 (of 17) / the untrimmed 1a031eb chart file (of 396):
@@ -215,6 +243,11 @@ M10, M11, M14 and M26 stay known gaps, as the contract allows.
 - /demo "Inputs above" entry: the gallery column is narrow, so the demo row follows its own width (container query) and shows two cards;
   CalculatorLayout itself takes `inputsPlacement="above"` as specified. /demo FieldSection cards at 1024 go from two field columns to one
   (C8 expects this).
+- D-A: the decision named only the fold; with it gone the shift was still 0.0399 (the disclaimer, visible under the short strip while
+  the skeleton showed, moved out of view when the results came). The skeleton's `lg:min-h-screen` under a row of inputs brings it to
+  0.0000; it shows only until the first results.
+- D-B: NextSteps columns and the CSS-only D-C rule have no jsdom-visible effect; they were checked in the browser. The NextSteps test
+  checks that the columns layout keeps the same links in the same order.
 - Phone heights were compared against the base build, not the contract's absolute G2 numbers, which measure something else.
 - Methodology Container: `px-4 py-8 sm:px-6` instead of Container's `p-6`, so phones keep their 16 px padding (page identical at 360 and
   390) and the left edge matches the calculator grid from 640 up.
@@ -223,21 +256,14 @@ M10, M11, M14 and M26 stay known gaps, as the contract allows.
 
 ## Open issues found while building
 
-- **Layout shift on leverage (C11, fails).** Cumulative layout shift at 1440 with a 4x CPU throttle is 0.1034 on every run against
-  0.0000 at 1a031eb: the server and first client render show the tier defaults (Contributions open) and the cards fold once
-  `useMediaQuery` reports lg after hydration. The contract forbids an option to fix it; removing it needs collapsed cards on every width
-  (question 1's alternative).
-- **"What next?" on leverage, filled profile.** The one-line link descriptions of the shared NextSteps footer are 101 cpl at 1024 to
-  1920 (every other results line is 88 or under). Fixing it touches NextSteps or CalculatorPage on every calculator; left open.
-- CalculatorPage now subscribes to the lg media query on every calculator, which adds one render after hydration on desktop with no
-  visible change on the "beside" pages.
-- At 1024 the leverage Assumptions card sits alone at half width in the strip's second row (about 130 px of empty half row).
 - Pre-existing: at 1024 the open Contributions card's "Leverage ratio" select cuts off its value, as the base's 460 px side column does.
+- Resolved by the decisions: the layout shift after load (D-A), the 101 cpl "What next?" lines (D-B), the Assumptions card alone at
+  half width at 1024 (D-C). The media-query hook and the extra render it caused on every calculator are gone.
 
 ## Open questions for the owner (default built meanwhile)
 
-1. Should the leverage input cards start collapsed on desktop only, showing their summary line? They fold just after the page loads.
-   Default: yes, desktop only. Alternative: collapsed on every width, which changes phones and removes the fold.
+1. Should the leverage input cards start collapsed at every width, showing their summary line? Default: yes, every width (phones and
+   768 included). Alternative: open on phones and collapsed on desktop, which costs a visible fold after load on desktop.
 2. Should the leverage "Model and caveats" text sit in two text columns on desktop? Default: yes. Alternative: one column at reading
    width.
 3. Should the leverage "Monthly vs start of each year" and "Tail and drawdown" cards sit side by side on desktop? Default: yes.
@@ -247,3 +273,6 @@ M10, M11, M14 and M26 stay known gaps, as the contract allows.
 7. Should the paycheck Financial Impact show as label over value, without the bordered rows? Default: yes.
 8. Should the header and content edges line up on wide screens (touches every page)? Default: not in PR 6.
 9. On the leverage page, should the headline figures sit three in a row on desktop? Default: yes.
+10. On the leverage page, should the "What next?" card set its links in two columns on desktop, and should the methodology variable
+    rows be capped at reading width? Default: yes.
+11. On the leverage page at 1024 to 1279, should the Assumptions card, alone in the second row, span the row? Default: yes.
