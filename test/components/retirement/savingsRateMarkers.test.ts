@@ -104,16 +104,92 @@ describe('savingsRateMarkers', () => {
 });
 
 describe('savingsRateLabelPositions', () => {
-  const point = (requiredSavingsRate: number) => ({ retirementAge: 60, requiredSavingsRate, requiredMonthlySavings: 0 });
+  // A 326 px chart with the labeled margins and a 60 px y axis: the plot runs
+  // from x 80 to 296 and from y 20 down to the x-axis line at 324.
+  const GEOMETRY = {
+    svgWidth: 326,
+    plot: { x: 80, y: 20, width: 216, height: 304 },
+    dotText: 'Retire at 60',
+    rateText: 'Your savings rate: 24%',
+  };
+  const AXIS_Y = 324;
+  const place = (dot: { x: number; y: number } | null, lineY: number | null) =>
+    savingsRateLabelPositions({ ...GEOMETRY, dot, lineY });
+  const below = (box: { top: number }, y: number) => box.top >= y;
+  const above = (box: { bottom: number }, y: number) => box.bottom <= y;
 
   it('puts the labels on opposite sides of the line, the dot label away from it', () => {
-    expect(savingsRateLabelPositions(20, point(15))).toEqual({ rateLabel: 'insideBottomRight', dotLabel: 'bottom' });
-    expect(savingsRateLabelPositions(20, point(20))).toEqual({ rateLabel: 'insideBottomRight', dotLabel: 'bottom' });
-    expect(savingsRateLabelPositions(20, point(25))).toEqual({ rateLabel: 'insideTopRight', dotLabel: 'top' });
+    // A dot under the line: its label below it, the rate label above the line.
+    const under = place({ x: 200, y: 200 }, 150);
+    expect(under.dotLabel?.textAnchor).toBe('middle');
+    expect(below(under.dotLabel!.box, 200)).toBe(true);
+    expect(above(under.rateLabel!.box, 150)).toBe(true);
+
+    // A dot over the line: its label above it, the rate label below the line.
+    const over = place({ x: 200, y: 100 }, 150);
+    expect(above(over.dotLabel!.box, 100)).toBe(true);
+    expect(below(over.rateLabel!.box, 150)).toBe(true);
+
+    // A dot a few pixels under the line: the line still separates the labels.
+    const near = place({ x: 200, y: 155 }, 150);
+    expect(below(near.dotLabel!.box, 150)).toBe(true);
+    expect(above(near.rateLabel!.box, 150)).toBe(true);
   });
 
-  it('keeps the defaults when there is no line or no dot', () => {
-    expect(savingsRateLabelPositions(null, point(15))).toEqual({ rateLabel: 'insideTopRight', dotLabel: 'top' });
-    expect(savingsRateLabelPositions(20, null)).toEqual({ rateLabel: 'insideTopRight', dotLabel: 'top' });
+  it('puts the label above a dot on the x axis at the right edge, anchored inward', () => {
+    // Retiring at 70 on a nearly flat late curve: the dot sits on the axis at
+    // the plot's right edge, under the line. Below it there is no room.
+    const { dotLabel, rateLabel } = place({ x: 296, y: 320 }, 250);
+    expect(dotLabel!.box.bottom).toBeLessThanOrEqual(AXIS_Y - 2);
+    expect(above(dotLabel!.box, 320)).toBe(true);
+    expect(dotLabel!.textAnchor).toBe('end');
+    expect(dotLabel!.box.right).toBeLessThanOrEqual(326);
+    expect(dotLabel!.box.left).toBeGreaterThanOrEqual(0);
+    // The label is under the line, so the rate label goes above it.
+    expect(below(dotLabel!.box, 250)).toBe(true);
+    expect(above(rateLabel!.box, 250)).toBe(true);
+  });
+
+  it('anchors the label inward at the first plotted age near the left edge', () => {
+    const { dotLabel } = place({ x: 30, y: 100 }, 250);
+    expect(dotLabel!.textAnchor).toBe('start');
+    expect(dotLabel!.box.left).toBeGreaterThanOrEqual(0);
+  });
+
+  it('puts the label beside a dot near the axis when the line leaves no room above it', () => {
+    // A dot 20 px over the axis at mid-plot with the line 12 px over it:
+    // below meets the axis and above meets the line, so the label goes to the
+    // right of the dot.
+    const { dotLabel, rateLabel } = place({ x: 150, y: 304 }, 292);
+    expect(dotLabel!.textAnchor).toBe('start');
+    expect(dotLabel!.box.left).toBeGreaterThan(150);
+    expect(below(dotLabel!.box, 294)).toBe(true);
+    expect(dotLabel!.box.bottom).toBeLessThanOrEqual(AXIS_Y - 2);
+    expect(above(rateLabel!.box, 292)).toBe(true);
+  });
+
+  it('lifts the label over the line when a dot on the axis has the line just over it', () => {
+    // At the right edge, with the line 10 px over a dot on the axis, no spot
+    // next to the dot fits: the label goes above the line, and the rate label,
+    // with no room below the line, above that.
+    const { dotLabel, rateLabel } = place({ x: 296, y: AXIS_Y }, 314);
+    expect(dotLabel!.textAnchor).toBe('end');
+    expect(dotLabel!.box.right).toBeLessThanOrEqual(326);
+    expect(above(dotLabel!.box, 312)).toBe(true);
+    expect(above(rateLabel!.box, dotLabel!.box.top)).toBe(true);
+    expect(rateLabel!.box.top).toBeGreaterThanOrEqual(0);
+  });
+
+  it('keeps the rate label inside the plot when there is no dot', () => {
+    expect(place(null, 150).dotLabel).toBeNull();
+    expect(below(place(null, 150).rateLabel!.box, 150)).toBe(true);
+    // A line on the axis has no room below it.
+    expect(above(place(null, AXIS_Y).rateLabel!.box, AXIS_Y)).toBe(true);
+  });
+
+  it('draws no rate label without a line', () => {
+    const { rateLabel, dotLabel } = place({ x: 200, y: 200 }, null);
+    expect(rateLabel).toBeNull();
+    expect(above(dotLabel!.box, 200)).toBe(true);
   });
 });

@@ -11,6 +11,10 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  useChartWidth,
+  usePlotArea,
+  useXAxisScale,
+  useYAxisScale,
 } from 'recharts';
 import {
   CHART_MARGINS,
@@ -22,7 +26,14 @@ import {
 } from '@/components/ui/charts';
 import type { SavingsRatePoint } from '@/lib/calculations/savingsRate';
 import { formatCurrency, formatPercent } from '@/lib/format';
-import { savingsRateLabelPositions, savingsRateMarkers, type SavingsRateMarkerInputs } from './savingsRateMarkers';
+import {
+  MARKER_DOT_RADIUS,
+  MARKER_LABEL_FONT_SIZE,
+  savingsRateLabelPositions,
+  savingsRateMarkers,
+  type PlacedLabel,
+  type SavingsRateMarkerInputs,
+} from './savingsRateMarkers';
 
 export interface SavingsRateChartProps {
   /** The curve's inputs plus monthlySavings and retirementAge for the visitor's markers. */
@@ -62,6 +73,52 @@ function SavingsTooltip({ active, payload, accentColor }: SavingsTooltipProps) {
   );
 }
 
+interface MarkerLabelsProps {
+  currentSavingsRate: number | null;
+  plannedPoint: SavingsRatePoint | null;
+  rateText: string;
+  dotText: string;
+  fill: string;
+}
+
+/**
+ * The two marker labels, drawn inside the chart so they can read its pixel
+ * geometry; where they go is decided by savingsRateLabelPositions.
+ */
+function MarkerLabels({ currentSavingsRate, plannedPoint, rateText, dotText, fill }: MarkerLabelsProps) {
+  const svgWidth = useChartWidth();
+  const plot = usePlotArea();
+  const xScale = useXAxisScale();
+  const yScale = useYAxisScale();
+  if (svgWidth === undefined || !plot || !xScale || !yScale) return null;
+
+  const lineY = currentSavingsRate === null ? null : (yScale(currentSavingsRate) ?? null);
+  const dotX = plannedPoint ? xScale(plannedPoint.retirementAge) : undefined;
+  const dotY = plannedPoint ? yScale(plannedPoint.requiredSavingsRate) : undefined;
+  const dot = dotX === undefined || dotY === undefined ? null : { x: dotX, y: dotY };
+
+  const { rateLabel, dotLabel } = savingsRateLabelPositions({ svgWidth, plot, dot, lineY, dotText, rateText });
+  const draw = (label: PlacedLabel | null, text: string, className: string) =>
+    label && (
+      <text
+        className={className}
+        x={label.x}
+        y={label.y}
+        textAnchor={label.textAnchor}
+        fill={fill}
+        fontSize={MARKER_LABEL_FONT_SIZE}
+      >
+        {text}
+      </text>
+    );
+  return (
+    <g className="savings-rate-marker-labels">
+      {draw(rateLabel, rateText, 'savings-rate-label')}
+      {draw(dotLabel, dotText, 'planned-age-label')}
+    </g>
+  );
+}
+
 /**
  * The savings rate each retirement age from 45 (or ten years out) to 70
  * requires (lib/calculations/savingsRate), with the visitor's current savings
@@ -94,7 +151,6 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
     [startingAge, targetIncome, startingBalance, accumulationReturn, currentIncome, monthlySavings, retirementAge]
   );
 
-  const labels = savingsRateLabelPositions(currentSavingsRate, plannedPoint);
   const axis = chartAxisProps(theme);
   const mutedLabel = { textAnchor: 'middle', fill: theme.muted } as const;
   const accent = theme.tertiary;
@@ -137,30 +193,29 @@ function SavingsRateChart({ inputs }: SavingsRateChartProps) {
           strokeDasharray="6 4"
           strokeWidth={2}
           ifOverflow="extendDomain"
-          label={{
-            value: `Your savings rate: ${formatPercent(currentSavingsRate / 100, { digits: 0 })}`,
-            position: labels.rateLabel,
-            fill: theme.text,
-            fontSize: 12,
-          }}
         />
       )}
       {plannedPoint && (
         <ReferenceDot
           x={plannedPoint.retirementAge}
           y={plannedPoint.requiredSavingsRate}
-          r={6}
+          r={MARKER_DOT_RADIUS}
           fill={theme.primary}
           stroke={theme.background}
           strokeWidth={2}
-          label={{
-            value: `Retire at ${plannedPoint.retirementAge}`,
-            position: labels.dotLabel,
-            fill: theme.text,
-            fontSize: 12,
-          }}
         />
       )}
+      <MarkerLabels
+        currentSavingsRate={currentSavingsRate}
+        plannedPoint={plannedPoint}
+        rateText={
+          currentSavingsRate === null
+            ? ''
+            : `Your savings rate: ${formatPercent(currentSavingsRate / 100, { digits: 0 })}`
+        }
+        dotText={plannedPoint ? `Retire at ${plannedPoint.retirementAge}` : ''}
+        fill={theme.text}
+      />
     </ComposedChart>
   );
 }
