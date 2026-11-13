@@ -19,6 +19,12 @@ Fixes after review (one commit per area):
     f27ccd5 list card layout: the header wraps on a narrow screen
     6c1bdef methodology: the contribution timing formula in three rows
 
+Fixes after the second review:
+
+    f7330b1 leverage texts: "the same to one decimal place" only when the two printed gaps are the same
+    703b21b methodology: the timing formula in four rows; display formulas scroll in their box and take a tab stop
+    182996a allocator step card: no transfer line for a complete fund or a 0-month target
+
 package.json and package-lock.json are unchanged; no new dependency. The stored profile version stays 3: a profile stored at ec300fd loads
 with three 'monthly' timing leaves and the same provided list. docs/architecture.md, sections "Contribution timing" and "Paycheck
 allocator", describe the model; the methodology page has a "Contribution Timing" entry.
@@ -88,6 +94,9 @@ Default = getDefaultFinancialProfile, nothing touched; today's dollars at 3%. Ow
 | Below one month, employer match not filled | one-month step first | the match is funded before the emergency fund | one emergency step, after the match |
 | Below one month, target above one month, money left after one month | one-month step, then HSA, Roth IRA, 401(k), taxable | the emergency step can take up to the whole remaining target, starving the later steps (pinned in core.test.ts) | one emergency step |
 | Zero-cash default, Emergency Fund card, How to Implement | (starter card) | 'Set automatic transfer for $2,225/month' (the funded amount; the build first printed $750, the target gap / 12) | review fix |
+| Complete emergency fund, How to Implement | 'Set automatic transfer for $0/month' | no transfer line (two lines: total needed, high-yield savings); the first fix round printed 'Set an automatic transfer to the fund' | second review fix |
+| Emergency target of 0 months, How to Implement | 'Set automatic transfer for $0/month' | no transfer line (two lines); the first fix round printed 'Set an automatic transfer to the fund' | second review fix |
+| Unfinished emergency fund with no emergency allocation, How to Implement | 'Set automatic transfer for $X/month', X = (target - cash) / 12 | 'Set an automatic transfer to the fund' (no amount: the card has no funded figure to quote) | review fix |
 | Zero cash (Z, ZD), Notes on This Allocation | 'Deprioritized: Insufficient Emergency Fund' | not listed when the emergency step is funded on the same page | review fix |
 | Zero cash + 24% card, 10-year nominal (today's) | ec300fd: current 155,753 today; optimized 492,992 (366,833); improvement 283,673 (211,079) | current 249,394.38 (185,573); optimized 587,341.00 (437,037); improvement 337,946.62 (251,464). The build first showed optimized 1,090,910.44 (811,740), improvement 841,516 (626,167) | review fix: debt principal earns 24% only until the 8,000 is paid (3.95 months), then 7% |
 | Any visitor with a debt_payoff allocation, 10-year optimized | the extra principal compounds at the debt rate for ten years | the debt rate only until the payments cover the highest-rate debt's balance, then 7%; e.g. default cash + 24% card (8,000): optimized 1,113,485.96 -> 609,916.53 nominal | review fix (the rule was already there at ec300fd) |
@@ -101,13 +110,20 @@ The contract's section 10 sentence "For a visitor below one month without high-i
 not hold for the three allocator classes in the table above (target 0, unfilled match, target above one month with money left over); the
 code follows the section 8 rule as written.
 
-Unchanged after review: a "Work until age X" scenario whose age falls below the current age (custom profile, falling short) shows the
-ec300fd balance; the build had shown the starting balance there (165,764.68 against 364,246 in the pinned case, retirement.test.ts).
+Unchanged after review, for a visitor whose contributions are all monthly: a "Work until age X" scenario whose age falls below the
+current age (custom profile, falling short) shows the ec300fd balance; the build had shown the starting balance there (165,764.68 against
+364,246 in the pinned case, retirement.test.ts). With some yearly timing that degenerate case differs from ec300fd: for a negative horizon
+only the monthly part is subtracted and the yearly part adds nothing (a seeded case: 313,957.26 at ec300fd, 332,880.37 at the build,
+317,415.84 now).
 
 Review fixes with wording only: on the leverage card, a monthly contribution of 0 gives one sentence that the two timings are the same, and
-a difference that prints as 0.0 points says the gaps are the same to one decimal place instead of attributing it to timing. A complete
+a difference under 0.05 points is not attributed to timing: when the two printed gaps are the same it says they are the same to one
+decimal place, and when they print one step apart (for example -6.0% and -6.1% at 1x, $100 a month, 10 years) it says they differ by about
+0.1 percentage points and the timing barely changes the comparison. A complete
 1-month fund reads '(1 month)'. The step and opportunity cards' header row wraps at narrow widths, so the figures drop below the title.
-The methodology Contribution Timing formula is three rows so it fits 360 px (other formulas on that page are wider and unchanged).
+The methodology Contribution Timing formula is four rows (the annuity factor A on its own row, with a variable entry) and fits the
+194 px formula box at 360 px. Every display formula block scrolls sideways inside its box and takes a tab stop named by its LaTeX
+source, so the wider older formulas are reachable by touch, mouse and arrow keys; the page itself does not scroll sideways.
 
 Pinned in test/lib/calculators/contributionTiming.test.ts (the end-to-end test): an ec300fd payload builds the ec300fd engine inputs of
 every calculator, plus yearStartSavings 0 (retirement) and preferences.investedBalance 25,000 (paycheck); the default projection is
