@@ -15,7 +15,8 @@ export interface IncomeData {
   monthlyGross: number;
   monthlyNet: number;
   
-  // Legacy fields for backward compatibility (computed from paycheck values)
+  // Short names for monthlyGross and monthlyNet, plus the monthly bonus
+  // (computed from paycheck values)
   gross: number;
   net: number;
   bonusExpected: number; // Converted to monthly equivalent
@@ -199,6 +200,3 @@ export interface AllocationResult {
     availablePerPaycheck: number;
   };
 }
-
-// State income tax rates moved to lib/constants/states-2026.ts
-// (single source of truth). Import STATE_TAX_RATES_2026 from there.

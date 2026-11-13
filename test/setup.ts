@@ -20,9 +20,9 @@ export interface FinancialMatchers<R = unknown> {
 declare module 'vitest' {
   // Vitest's own Assertion interface defaults its type parameter to `any`;
   // the augmentation must match that shape for declaration merging.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type -- the merged interface must repeat Vitest's `any` default and adds members only through FinancialMatchers
   interface Assertion<T = any> extends FinancialMatchers<T> {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the augmentation adds its members only through FinancialMatchers
   interface AsymmetricMatchersContaining extends FinancialMatchers {}
 }
 

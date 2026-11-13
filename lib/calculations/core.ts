@@ -211,7 +211,7 @@ export function getDefaultProfile(): PaycheckProfile {
       monthlyGross: 5417, // 2500 * 2.17
       monthlyNet: 4123,   // 1900 * 2.17
       
-      // Legacy fields for backward compatibility
+      // Short names for monthlyGross and monthlyNet, plus the monthly bonus
       gross: 5417,
       net: 4123,
       bonusExpected: 0,

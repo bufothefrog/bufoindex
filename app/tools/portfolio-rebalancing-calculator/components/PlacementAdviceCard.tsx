@@ -51,8 +51,8 @@ export function PlacementAdviceCard({ inputs }: PlacementAdviceCardProps) {
       const account = accounts.find(a => a.id === holding.accountId);
       if (!security || !account) continue;
 
-      // Adapt to the Phase 1 placementAdvice signature by constructing a
-      // minimal RebalanceAsset. Only assetClass + accountType are inspected.
+      // placementAdvice takes a RebalanceAsset: build a minimal one. Only
+      // assetClass + accountType are inspected.
       const asset: RebalanceAsset = {
         id: holding.id,
         ticker: security.ticker,

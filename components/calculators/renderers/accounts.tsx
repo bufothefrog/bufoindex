@@ -61,7 +61,7 @@ import {
 } from '@/lib/profile/accounts';
 import { cn } from '@/lib/utils';
 
-/** The answer whose Yes suggests an account of each kind (lib/profile/accounts.ts, section 3 of the PR 4 contract). */
+/** The answer whose Yes suggests an account of each kind (the suggestion rules are in lib/profile/accounts.ts). */
 const SEED_LABEL: Readonly<Partial<Record<AccountKind, string>>> = {
   '401k': HAS_401K.label,
   'roth-401k': HAS_401K.label,

@@ -16,8 +16,7 @@
  * wizard cannot disagree. Reading never rewrites the stored profile: the
  * function returns a new object and the store is not written.
  *
- * The rules (the orchestrating design of PR 3, not a decision of the site
- * owner; change them here):
+ * The rules (change them here):
  * - cash.emergencyFundBalance = 3 x spending.necessaryMonthly;
  * - spending.targetRetirementIncome = 12 x (must-pay costs + the midpoint of
  *   the fun money range), rounded to the nearest 1,000;

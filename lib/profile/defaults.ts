@@ -640,17 +640,17 @@ export function normalizeProfile(
 }
 
 /**
- * Leaves whose stored value, while unanswered, is an old default that PR 3
- * replaced: a stored profile that holds a value there without the path in
- * `provided` held that old default, never confirmed, so it loads as the new
- * default. An answered value is kept. The rule applies to stored payloads,
- * which always carry their own `provided` list, not to a partial patch
- * normalized over a base.
+ * Leaves whose stored value, while unanswered, may be an earlier default
+ * that the current one replaced: a stored profile that holds a value there
+ * without the path in `provided` held that old default, never confirmed, so
+ * it loads as the new default. An answered value is kept. The rule applies
+ * to stored payloads, which always carry their own `provided` list, not to a
+ * partial patch normalized over a base.
  *
  * - retirementIncome.socialSecurityBenefit: the old fixed 30,000 loads as
  *   Auto (null), the estimate from pay.
- * - cash.targetMonths: before PR 3 the removed strategy preset wrote 1 month
- *   (cash-flow investor) or 3 (standard) without marking it provided; it
+ * - cash.targetMonths: a removed strategy preset wrote 1 month (cash-flow
+ *   investor) or 3 (standard) without marking it provided; it
  *   loads as the field's typical 3, so no 1-month target is kept or shown
  *   as typical unless the visitor entered it.
  */
@@ -669,8 +669,8 @@ function loadUnansweredAsDefault(profile: FinancialProfile): FinancialProfile {
 
 /**
  * Leaves the form asks in whole units within a range, whose answered stored
- * value may predate that rule: before PR 3, cash.targetMonths took any
- * number, so a stored answer of 2.5 months would block the allocator (whole
+ * value may predate that rule: cash.targetMonths once took any number, so
+ * a stored answer of 2.5 months would block the allocator (whole
  * months only) while the overview computed with 2.5. An answered value loads
  * as the nearest whole number, half up (2.5 is 3), within the range, and
  * stays answered; every page then reads the same value. Like

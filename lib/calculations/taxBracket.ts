@@ -1,5 +1,5 @@
 /**
- * Federal bracket arithmetic for the paycheck allocator (PR 3, slice c4).
+ * Federal bracket arithmetic for the paycheck allocator.
  * Pure: no React, DOM or storage.
  *
  * - taxableIncome: yearly gross pay minus pre-tax payroll deductions (the
