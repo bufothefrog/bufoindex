@@ -32,7 +32,7 @@ import { getAt, setAt } from '@/lib/fields/paths';
 import type { FinancialProfile, HsaCoverage } from './types';
 
 /** Months of must-pay costs the typical emergency fund balance holds. */
-export const DERIVED_EMERGENCY_FUND_MONTHS = 3;
+const DERIVED_EMERGENCY_FUND_MONTHS = 3;
 
 /** Typical emergency fund balance: three months of must-pay costs. */
 export function derivedEmergencyFundBalance(necessaryMonthly: number): number {

@@ -17,7 +17,7 @@ export interface ReviewTopicRowProps {
 }
 
 /** The link's visible text: "Answer" for a topic with no answer yet, otherwise "Edit". */
-export function reviewLinkLabel(status: TopicStatus): string {
+function reviewLinkLabel(status: TopicStatus): string {
   return status === 'unanswered' ? 'Answer' : 'Edit';
 }
 

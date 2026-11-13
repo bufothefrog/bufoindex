@@ -309,7 +309,7 @@ export const INFLATION_RATE: FieldSpec = {
  * effective federal rate on the target income for the filing status the
  * model runs (the base plan's withdrawal; other scenarios estimate their own).
  */
-export function estimatedEffectiveTaxRate(get: Get): number {
+function estimatedEffectiveTaxRate(get: Get): number {
   return calculateEffectiveTaxRate(
     num(get, TARGET_RETIREMENT_INCOME.path),
     retirementFilingStatus(get(FILING_STATUS.path) as FilingStatus)

@@ -429,7 +429,7 @@ export function retirementBracketRange(filingStatus: FilingStatus, stored: numbe
  * select shows that bracket and validation passes without rewriting
  * storage; the binding reads the same nearest rate (retirementBracketFrom).
  */
-export function retirementBracketOptions(filingStatus: FilingStatus, state: string, stored?: number): FieldOption[] {
+function retirementBracketOptions(filingStatus: FilingStatus, state: string, stored?: number): FieldOption[] {
   const info = getStateTaxInfo(state);
   // Two decimals at most, so 5.09% (GA) is not shown as 5.1%.
   const statePart = info?.hasStateTax ? ` + ${Number((info.rate * 100).toFixed(2))}% ${state}` : '';

@@ -72,7 +72,7 @@ export const BUILTIN_ASSET_CLASS_LABELS: Record<BuiltinAssetClass, string> = {
   'other': 'Other',
 };
 
-export function isBuiltinAssetClass(cls: AssetClass): cls is BuiltinAssetClass {
+function isBuiltinAssetClass(cls: AssetClass): cls is BuiltinAssetClass {
   return (BUILTIN_ASSET_CLASSES as readonly string[]).includes(cls);
 }
 

@@ -45,7 +45,7 @@ export const ANSWERED_WITHOUT_SUMMARY = 'Answered';
  * optional screens there): an unanswered optional topic does not bring up
  * "Answer the remaining questions". The review reads optionality only here.
  */
-export const OPTIONAL_SECTION: string = 'optional';
+const OPTIONAL_SECTION: string = 'optional';
 
 export function isOptionalSection(section: string): boolean {
   return section === OPTIONAL_SECTION;

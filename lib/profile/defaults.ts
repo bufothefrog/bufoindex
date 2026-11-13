@@ -285,7 +285,7 @@ const optionValues = <V extends string | number>(options: readonly { value: V }[
 
 // Vocabularies with a label table take their values from it (one table per vocabulary).
 export const PAY_FREQUENCIES: readonly PayFrequency[] = optionValues(PAY_FREQUENCY_OPTIONS);
-export const PROFILE_FILING_STATUSES: readonly FilingStatus[] = optionValues(FILING_STATUS_OPTIONS);
+const PROFILE_FILING_STATUSES: readonly FilingStatus[] = optionValues(FILING_STATUS_OPTIONS);
 export const TARGET_MIX_PRESETS: readonly TargetMixPreset[] = optionValues(TARGET_MIX_OPTIONS);
 const RISK_PROFILES: readonly RiskProfile[] = ['tdf', 'custom'];
 

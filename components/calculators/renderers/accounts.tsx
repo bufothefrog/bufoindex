@@ -90,7 +90,7 @@ function getAfter(get: Get, writes: readonly Write[]): Get {
  * too.", plus, when an empty account of the same kind would be suggested
  * again (its answer is still Yes), the sentence that says so.
  */
-export function removeAccountMessage(get: Get, account: AccountRow, writes: readonly Write[]): string {
+function removeAccountMessage(get: Get, account: AccountRow, writes: readonly Write[]): string {
   const base = `Delete ${accountLabel(get, account)}? Its holdings will be removed too.`;
   const group = kindGroup(account.kind);
   const suggested = accountsInEffect(getAfter(get, writes)).suggested.find((row) => group.includes(row.kind));

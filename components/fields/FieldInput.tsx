@@ -58,7 +58,7 @@ export type FieldInputDisplayProps = FieldInputProps & {
 export const BLANK_SELECT_LABEL = 'Select';
 
 /** Added to the label of a select's typical option in the wizard: "Individual (typical)". */
-export const TYPICAL_OPTION_SUFFIX = '(typical)';
+const TYPICAL_OPTION_SUFFIX = '(typical)';
 
 /** The wizard's lg is the primitives' xl; md renders them exactly as before. */
 const INPUT_SIZE: Record<FieldSize, InputSize> = { md: 'md', lg: 'xl' };

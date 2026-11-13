@@ -33,7 +33,7 @@ export interface ChoiceGroupProps {
 }
 
 /** The tag on the option the intake's Next would accept. */
-export const TYPICAL_TAG = 'Typical';
+const TYPICAL_TAG = 'Typical';
 
 /**
  * Radio group of OptionCards with the standard keyboard model: Tab enters
