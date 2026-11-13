@@ -363,6 +363,28 @@ describe('FieldSections', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Inflation must be at most 10%.');
   });
 
+  it('keeps a card that an error held open open after the first edit, once the error clears', async () => {
+    const user = userEvent.setup();
+    const ui = (errors: FieldErrors) => (
+      <FieldHarness initial={VALUES}>
+        {({ get, onWrite: write }) => (
+          <FieldSections form={FORM} get={get} errors={errors} onWrite={write} initiallyCollapsed={() => true} />
+        )}
+      </FieldHarness>
+    );
+    const { rerender } = render(ui({ 'assumptions.inflation': 'Inflation must be at most 10%.' }));
+    expect(expanded(/assumptions$/)).toBe(true);
+
+    // An edit in another card freezes every card as it is shown.
+    await user.click(screen.getByRole('button', { name: /about you$/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Gross pay' }), { target: { value: '4000' } });
+    rerender(ui({}));
+
+    expect(expanded(/assumptions$/)).toBe(true);
+    expect(screen.getByRole('textbox', { name: 'Inflation' })).toBeInTheDocument();
+    expect(expanded(/health savings$/)).toBe(false);
+  });
+
   it('uses initiallyCollapsed in place of the tier rule', () => {
     renderSections({ initiallyCollapsed: (s) => s.id === 'hsa' });
     expect(expanded(/about you$/)).toBe(true);
