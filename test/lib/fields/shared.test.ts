@@ -183,16 +183,16 @@ describe('shared cross-field rules', () => {
 
 describe('intakeDerivedWrites', () => {
   it('never derives the target months, whatever an old stored preset says', () => {
-    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'standard' }), new Set())).toEqual([]);
-    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'cashflow-investor', 'cash.targetMonths': 1 }), new Set())).toEqual([]);
+    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'standard' }))).toEqual([]);
+    expect(intakeDerivedWrites(getFrom({ 'strategy.preset': 'cashflow-investor', 'cash.targetMonths': 1 }))).toEqual([]);
   });
 
   it('raises a retirement age at or below the age to age + 1', () => {
-    expect(intakeDerivedWrites(getFrom({ 'person.age': 45, 'person.retirementAge': 45 }), new Set())).toEqual([
+    expect(intakeDerivedWrites(getFrom({ 'person.age': 45, 'person.retirementAge': 45 }))).toEqual([
       { path: 'person.retirementAge', value: 46 },
     ]);
-    expect(intakeDerivedWrites(getFrom({ 'person.age': 45, 'person.retirementAge': 46 }), new Set())).toEqual([]);
-    expect(intakeDerivedWrites(getFrom({ 'person.age': 45 }), new Set())).toEqual([]);
+    expect(intakeDerivedWrites(getFrom({ 'person.age': 45, 'person.retirementAge': 46 }))).toEqual([]);
+    expect(intakeDerivedWrites(getFrom({ 'person.age': 45 }))).toEqual([]);
   });
 });
 

@@ -254,10 +254,10 @@ const GOLDEN_OUTPUT: Record<string, { text: string[]; buttons: string[] }> = {
       "High-Impact Optimizations",
       "Emergency Fund Below One Month of Expenses",
       "HIGH IMPACT",
-      "A month of necessary expenses on hand covers a minor emergency without borrowing at credit-card rates.",
+      "Cash on hand covers less than one month of necessary expenses, so a minor emergency may mean borrowing at credit-card rates.",
       "Impact",
-      "of necessary expenses covered",
-      "1 month",
+      "of necessary expenses on hand",
+      "0.1 months",
       "Time to implement",
       "3-6 months",
       "Setup Emergency Fund",
@@ -311,10 +311,10 @@ const GOLDEN_OUTPUT: Record<string, { text: string[]; buttons: string[] }> = {
       "Open Roth IRA - $717/month",
       "Emergency Fund Below One Month of Expenses",
       "HIGH IMPACT",
-      "A month of necessary expenses on hand covers a minor emergency without borrowing at credit-card rates.",
+      "Cash on hand covers less than one month of necessary expenses, so a minor emergency may mean borrowing at credit-card rates.",
       "Impact",
-      "of necessary expenses covered",
-      "1 month",
+      "of necessary expenses on hand",
+      "0 months",
       "Time to implement",
       "3-6 months",
       "Setup Emergency Fund",
@@ -625,9 +625,10 @@ describe('QuickActions', () => {
 
       const { row, value } = rowFor('Impact');
       expect(
-        within(row).getByText('of necessary expenses covered')
+        within(row).getByText('of necessary expenses on hand')
       ).toBeInTheDocument();
-      expect(value).toHaveTextContent(/^1 month$/);
+      // $1,000 against $3,000 a month: 0.33, rounded down to 0.3 months.
+      expect(value).toHaveTextContent(/^0\.3 months$/);
       expect(row.textContent).not.toMatch(/\$/);
     });
   });

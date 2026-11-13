@@ -44,6 +44,17 @@ export function nearestClaimingAge(stored: unknown): number {
   return nearest;
 }
 
+/**
+ * A note for a stored age that is not one of the choices: the control shows
+ * the nearest choice, while the calculator runs on the stored age until the
+ * visitor picks one ("Saved age 65 is used until you pick one."). Null for
+ * an offered age or a value that is not a number.
+ */
+export function offListClaimingAgeNote(stored: unknown): string | null {
+  if (!isFiniteNumber(stored) || CLAIMING_AGE_CHOICES.some(({ age }) => age === stored)) return null;
+  return `Saved age ${stored} is used until you pick one.`;
+}
+
 /** The label of the offered age nearest to a stored one ("67 (full)"). */
 export function claimingAgeLabel(stored: unknown): string {
   const age = nearestClaimingAge(stored);

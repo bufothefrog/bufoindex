@@ -27,7 +27,7 @@ export interface StepStatus extends FinancialStep {
 }
 
 export const FINANCIAL_STEPS: FinancialStep[] = [
-  { id: 'emergency-1month', name: '1-Month Emergency Fund', category: 'emergency_fund', priority: 1, icon: Shield },
+  { id: 'emergency-1month', name: 'Starter Emergency Fund', category: 'emergency_fund', priority: 1, icon: Shield },
   { id: 'employer-match', name: 'Employer 401k Match', category: 'employer_match', priority: 2, icon: Building2 },
   { id: 'high-interest-debt', name: 'High-Interest Debt (7%+)', category: 'high_interest_debt', priority: 3, icon: CreditCard },
   { id: 'emergency-full', name: 'Complete Emergency Fund', category: 'emergency_fund', priority: 4, icon: Shield },

@@ -104,7 +104,8 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.person).toEqual({ age: 38, state: 'CA', filingStatus: 'marriedJoint', retirementAge: 58, lifeExpectancy: 90 });
     expect(p.income).toEqual({ ...defaults.income, grossPerPaycheck: 2100, netPerPaycheck: 1550, frequency: 'weekly' });
     expect(p.spending).toEqual(V1_ALL_PROVIDED.spending);
-    expect(p.cash).toEqual(V1_ALL_PROVIDED.cash);
+    // The 1 month was never asked in v1 (not in provided): it loads as the typical 3.
+    expect(p.cash).toEqual({ ...V1_ALL_PROVIDED.cash, targetMonths: 3 });
     expect(p.workplace).toEqual({ ...defaults.workplace, ...V1_ALL_PROVIDED.workplace });
     expect(p.investing).toEqual({ investedBalance: 140000, monthlyContribution: 2200, taxableMonthlyContribution: 900, targetMix: '60-40' });
     expect(p.investing).not.toHaveProperty('newCashThisMonth');
@@ -140,9 +141,9 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
   });
 
-  it('loads a v2 profile saved with the removed strategy preset: the leaf and its answer go, the months stay', () => {
+  it('loads a v2 profile saved with the removed strategy preset: the leaf and its answer go, unanswered months load as 3', () => {
     // As saved at 3bb0132: the preset answered, and 1 month written by the cash-flow investor preset
-    // without being marked provided.
+    // without being marked provided. The 1 was never the visitor's answer, so it loads as the typical 3.
     const saved = {
       ...getDefaultFinancialProfile(),
       updatedAt: 1762000000000,
@@ -158,8 +159,19 @@ describe('migrateProfile from an older version (normalize only)', () => {
     expect(p.version).toBe(PROFILE_VERSION);
     expect(p.strategy).toEqual({ leverageRatio: 3 });
     expect(p.strategy).not.toHaveProperty('preset');
-    expect(p.cash.targetMonths).toBe(1);
+    expect(p.cash).toEqual({ emergencyFundBalance: 4000, emergencyFundApy: 0.04, targetMonths: 3 });
     expect(p.provided).toEqual(['person.age', 'strategy.leverageRatio']);
+  });
+
+  it('keeps emergency months the visitor entered, 1 included', () => {
+    const saved = {
+      ...getDefaultFinancialProfile(),
+      cash: { emergencyFundBalance: 4000, emergencyFundApy: 0.04, targetMonths: 1 },
+      provided: ['cash.targetMonths'],
+    };
+    expect(migrateProfile(saved, 2).cash.targetMonths).toBe(1);
+    // A partial patch normalized over a base is not a stored payload: left alone.
+    expect(normalizeProfile({ cash: { targetMonths: 1 } }).cash.targetMonths).toBe(1);
   });
 
   it('treats every version the same: the result is normalizeProfile of the payload', () => {

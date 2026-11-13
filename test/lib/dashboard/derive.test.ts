@@ -133,7 +133,8 @@ describe('summarizeCashBuffer', () => {
   });
 
   it('measures against the stored months whether or not the visitor entered them, up to 60', () => {
-    // A target written by the removed preset (1 month, never marked provided) is kept and used: $3,000.
+    // The summary reads the months it is given, answered or not: 1 month is $3,000. (Loading a stored
+    // profile turns an unanswered 1 into 3 first: lib/profile/defaults.ts UNANSWERED_LOADS_AS.)
     const unmarked = { ...profileWith({ cash: { targetMonths: 1 } }), provided: ['cash.emergencyFundBalance'] };
     expect(summarizeCashBuffer(unmarked).target).toBe(3000);
     const entered = summarizeCashBuffer(profileWith({ cash: { targetMonths: 6 } }));

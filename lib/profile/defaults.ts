@@ -110,6 +110,9 @@ const DEFAULT_NECESSARY_MONTHLY = 3000;
 const DEFAULT_FUN_MONEY_MIN = 300;
 const DEFAULT_FUN_MONEY_MAX = 600;
 
+/** Emergency fund target in months of must-pay costs (the field's typical value). */
+const DEFAULT_EMERGENCY_FUND_MONTHS = 3;
+
 export function getDefaultFinancialProfile(): FinancialProfile {
   const leverage = DEFAULT_DCA_COMPARISON_INPUTS;
   return {
@@ -146,7 +149,7 @@ export function getDefaultFinancialProfile(): FinancialProfile {
       // Derived while unanswered: three months of must-pay costs, 9,000.
       emergencyFundBalance: derivedEmergencyFundBalance(DEFAULT_NECESSARY_MONTHLY),
       emergencyFundApy: 0.04,
-      targetMonths: 3,
+      targetMonths: DEFAULT_EMERGENCY_FUND_MONTHS,
     },
     workplace: {
       has401k: true,
@@ -639,22 +642,33 @@ export function normalizeProfile(
   }
   const profile = out as unknown as FinancialProfile;
   out.provided = Array.isArray(source.provided) ? normalizeProvided(source.provided, profile) : [...base.provided];
-  return Array.isArray(source.provided) ? loadUnansweredAsAuto(profile) : profile;
+  return Array.isArray(source.provided) ? loadUnansweredAsDefault(profile) : profile;
 }
 
 /**
- * Nullable leaves whose Auto (null) replaced a fixed default in PR 3: a
- * stored profile that holds a number there without the path in `provided`
- * holds the old default, never confirmed, so it loads as Auto. An answered
- * number is kept. The rule applies to stored payloads, which always carry
- * their own `provided` list, not to a partial patch normalized over a base.
+ * Leaves whose stored value, while unanswered, is an old default that PR 3
+ * replaced: a stored profile that holds a value there without the path in
+ * `provided` held that old default, never confirmed, so it loads as the new
+ * default. An answered value is kept. The rule applies to stored payloads,
+ * which always carry their own `provided` list, not to a partial patch
+ * normalized over a base.
+ *
+ * - retirementIncome.socialSecurityBenefit: the old fixed 30,000 loads as
+ *   Auto (null), the estimate from pay.
+ * - cash.targetMonths: before PR 3 the removed strategy preset wrote 1 month
+ *   (cash-flow investor) or 3 (standard) without marking it provided; it
+ *   loads as the field's typical 3, so no 1-month target is kept or shown
+ *   as typical unless the visitor entered it.
  */
-const UNANSWERED_LOADS_AS_AUTO: readonly string[] = ['retirementIncome.socialSecurityBenefit'];
+const UNANSWERED_LOADS_AS: Readonly<Record<string, unknown>> = {
+  'retirementIncome.socialSecurityBenefit': null,
+  'cash.targetMonths': DEFAULT_EMERGENCY_FUND_MONTHS,
+};
 
-function loadUnansweredAsAuto(profile: FinancialProfile): FinancialProfile {
+function loadUnansweredAsDefault(profile: FinancialProfile): FinancialProfile {
   const answered = new Set(profile.provided);
-  return UNANSWERED_LOADS_AS_AUTO.reduce(
-    (next, path) => (answered.has(path) ? next : setAt(next, path, null)),
+  return Object.entries(UNANSWERED_LOADS_AS).reduce(
+    (next, [path, value]) => (answered.has(path) || getAt(next, path) === value ? next : setAt(next, path, value)),
     profile
   );
 }

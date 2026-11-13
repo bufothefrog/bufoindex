@@ -102,7 +102,7 @@ describe('ResultsSection', () => {
 
     const steps = screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent);
     expect(steps.slice(0, 9)).toEqual([
-      '1-Month Emergency Fund',
+      'Starter Emergency Fund',
       'Employer 401k Match',
       'High-Interest Debt (7%+)',
       'Complete Emergency Fund',

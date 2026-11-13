@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_FORM, FORMS, PROFILE_FORM, PROFILE_FORM_ORDER, formForFlow, profileFormSection } from '@/lib/calculators/forms';
+import {
+  CORE_FORM,
+  FORMS,
+  PROFILE_FORM,
+  PROFILE_FORM_ORDER,
+  formForFlow,
+  profileCompleteness,
+  profileFormSection,
+} from '@/lib/calculators/forms';
 import {
   CORE_PATHS,
   CORE_START_PATH,
@@ -36,6 +44,7 @@ import {
   getDefaultFinancialProfile,
   isProfilePath,
 } from '@/lib/profile/defaults';
+import { migrateProfile } from '@/lib/profile/migrate';
 import type { FinancialProfile } from '@/lib/profile/types';
 import {
   OLD_CORE_FLOW,
@@ -686,5 +695,29 @@ describe('isProfileFinished', () => {
     expect(isProfileFinished(profileWith(required))).toBe(true);
     expect(isProfileFinished(profileWith([...required, ...optionalPaths]))).toBe(true);
     expect(isProfileFinished(profileWith(optionalPaths))).toBe(false);
+  });
+});
+
+describe('a profile finished at 3bb0132', () => {
+  // Every fact answered except the emergency fund target, which the profile
+  // form of 3bb0132 never asked; the cash-flow investor preset had written
+  // 1 month there without marking it provided.
+  const saved = {
+    ...getDefaultFinancialProfile(),
+    cash: { emergencyFundBalance: 5000, emergencyFundApy: 0.04, targetMonths: 1 },
+    provided: [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS].filter((path) => path !== 'cash.targetMonths'),
+  };
+
+  it('loads the unanswered months as the typical 3, never 1', () => {
+    expect(migrateProfile(saved, 2).cash.targetMonths).toBe(3);
+  });
+
+  it('has one topic left, the emergency fund screen that now asks the months', () => {
+    const profile = migrateProfile(saved, 2);
+    expect(remainingIntakeScreens('profile', profile).map((screen) => screen.id)).toEqual(['emergency-fund']);
+    expect(isProfileFinished(profile)).toBe(false);
+    const completeness = profileCompleteness(profile);
+    expect(completeness.missing.map((screen) => screen.id)).toEqual(['emergency-fund']);
+    expect(completeness.provided).toBe(completeness.total - 1);
   });
 });

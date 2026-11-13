@@ -10,7 +10,7 @@
  *
  * A stored profile whose benefit was never answered (the old default 30000
  * left unconfirmed) loads as Auto: that rule is in normalizeProfile
- * (UNANSWERED_LOADS_AS_AUTO in lib/profile/defaults.ts).
+ * (UNANSWERED_LOADS_AS in lib/profile/defaults.ts).
  */
 
 import { estimateSocialSecurityBenefit } from '@/lib/calculations/socialSecurityEstimate';

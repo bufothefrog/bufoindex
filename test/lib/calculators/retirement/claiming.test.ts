@@ -10,6 +10,7 @@ import {
   claimingAgeBenefits,
   claimingAgeLabel,
   nearestClaimingAge,
+  offListClaimingAgeNote,
 } from '@/lib/calculators/retirement/claiming';
 
 describe('CLAIMING_AGE_CHOICES', () => {
@@ -68,5 +69,15 @@ describe('claimingAgeBenefits', () => {
 
   it('counts a benefit that is not a number as 0', () => {
     expect(claimingAgeBenefits(undefined).map((row) => row.yearlyBenefit)).toEqual([0, 0, 0]);
+  });
+});
+
+describe('offListClaimingAgeNote', () => {
+  it('names a stored age that is not one of the choices, and nothing for an offered age', () => {
+    expect(offListClaimingAgeNote(65)).toBe('Saved age 65 is used until you pick one.');
+    expect(offListClaimingAgeNote(68.5)).toBe('Saved age 68.5 is used until you pick one.');
+    for (const age of [62, 67, 70]) expect(offListClaimingAgeNote(age)).toBeNull();
+    expect(offListClaimingAgeNote(null)).toBeNull();
+    expect(offListClaimingAgeNote('65')).toBeNull();
   });
 });

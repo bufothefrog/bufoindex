@@ -36,6 +36,8 @@ export interface SegmentedControlProps<T extends string> {
   size?: SegmentedControlSize;
   /** Track only: stretch across the container with equal segments. */
   fullWidth?: boolean;
+  /** Ids of the help or error lines under the control, for the group's aria-describedby. */
+  describedBy?: string;
   className?: string;
 }
 
@@ -62,6 +64,7 @@ export function SegmentedControl<T extends string>({
   appearance = 'track',
   size = 'sm',
   fullWidth = false,
+  describedBy,
   className,
 }: SegmentedControlProps<T>) {
   const labelId = useId();
@@ -92,6 +95,7 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={hideLabel ? label : undefined}
       aria-labelledby={hideLabel ? undefined : labelId}
+      aria-describedby={describedBy}
       className={cn(
         cards
           ? cn('grid gap-2', CARD_COLUMNS[options.length] ?? 'grid-cols-1 sm:grid-cols-2')

@@ -304,6 +304,10 @@ describe('RetirementCalculator: the Social Security claiming age', () => {
     // Storage and the run keep 65 until the visitor picks a choice.
     expect(useProfileStore.getState().profile.retirementIncome.socialSecurityAge).toBe(65);
     expect(useRetirementStore.getState().inputs?.socialSecurityAge).toBe(65);
+    // The note says which age the run uses, and the group is described by it.
+    expect(claiming()).toHaveAccessibleDescription('Saved age 65 is used until you pick one.');
+    await userEvent.setup().click(within(claiming()).getByRole('radio', { name: '62 (early)' }));
+    expect(screen.queryByText(/Saved age/)).not.toBeInTheDocument();
   });
 
   it('follows the entered benefit in the table', async () => {

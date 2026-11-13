@@ -445,6 +445,8 @@ describe('paycheck intake: validation', () => {
     expect(errors(60)).toEqual({});
     expect(errors(61)).toEqual({ 'cash.targetMonths': 'Emergency fund target must be between 0 months and 60 months.' });
     expect(errors(-1)).toEqual({ 'cash.targetMonths': 'Emergency fund target must be between 0 months and 60 months.' });
+    // A stored half month (the field took steps of 0.5 before) is not a whole number.
+    expect(errors(2.5)).toEqual({ 'cash.targetMonths': 'Emergency fund target must be a whole number.' });
   });
 
   it('asks the emergency-fund target as a whole number of months, typically 3, with one help line', () => {

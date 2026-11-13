@@ -398,7 +398,8 @@ describe('rehydration from localStorage', () => {
     expect(profile.person).toEqual({ ...v1.person, lifeExpectancy: 90 });
     expect(profile.income).toEqual({ ...getDefaultFinancialProfile().income, ...v1.income });
     expect(profile.spending).toEqual(v1.spending);
-    expect(profile.cash).toEqual(v1.cash);
+    // The months were never asked in v1 (not in provided): an unanswered 1 loads as the typical 3.
+    expect(profile.cash).toEqual({ ...v1.cash, targetMonths: 3 });
     expect(profile.workplace).toEqual({ ...getDefaultFinancialProfile().workplace, ...v1.workplace });
     // The removed strategy preset is dropped with it.
     expect(profile.strategy).toEqual({ leverageRatio: 1.5 });

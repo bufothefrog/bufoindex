@@ -8,7 +8,7 @@
 
 import React, { useId } from 'react';
 import type { CustomRendererProps, CustomRenderers } from '@/components/fields/types';
-import { FieldMessages } from '@/components/ui/FieldMessages';
+import { FieldMessages, fieldMessageIds } from '@/components/ui/FieldMessages';
 import { DataTable, type DataTableColumn } from '@/components/ui/results';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { calculatorHref } from '@/lib/calculators/registry';
@@ -16,6 +16,7 @@ import {
   CLAIMING_AGE_CHOICES,
   claimingAgeBenefits,
   nearestClaimingAge,
+  offListClaimingAgeNote,
   type ClaimingAgeBenefit,
 } from '@/lib/calculators/retirement/claiming';
 import { CLAIMING_AGE_RENDERER } from '@/lib/calculators/retirement/fields';
@@ -32,14 +33,18 @@ const BENEFIT_COLUMNS: readonly DataTableColumn<ClaimingAgeBenefit>[] = [
 
 /**
  * The claiming-age control: the stored age shows as the nearest of the three
- * choices (nothing is written until the visitor picks one), and the table
+ * choices (nothing is written until the visitor picks one; a note under the
+ * control names the stored age the run uses meanwhile), and the table
  * shows the yearly benefit at each age from the benefit in use (the entered
  * one, or the estimate from pay on Auto), through the engine's claiming-age
  * adjustment.
  */
 function ClaimingAgeControl({ spec, get, onWrite, error }: CustomRendererProps) {
   const id = useId();
-  const shown = String(nearestClaimingAge(get(spec.path)));
+  const stored = get(spec.path);
+  const shown = String(nearestClaimingAge(stored));
+  const note = offListClaimingAgeNote(stored) ?? undefined;
+  const { describedBy } = fieldMessageIds(id, note, error);
   const rows = claimingAgeBenefits(resolveSocialSecurityBenefit(get));
   const caption = isSocialSecurityAuto(get)
     ? 'Estimated yearly Social Security benefit at each claiming age'
@@ -53,8 +58,9 @@ function ClaimingAgeControl({ spec, get, onWrite, error }: CustomRendererProps) 
         onChange={(value) => onWrite([{ path: spec.path, value: Number(value) }])}
         size="md"
         fullWidth
+        describedBy={describedBy}
       />
-      <FieldMessages id={id} error={error} />
+      <FieldMessages id={id} help={note} error={error} />
       <DataTable
         caption={caption}
         columns={BENEFIT_COLUMNS}

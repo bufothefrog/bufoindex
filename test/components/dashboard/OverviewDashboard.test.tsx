@@ -56,8 +56,8 @@ describe('with a saved profile', () => {
     expect(screen.getByRole('button', { name: /Reset profile/ })).toBeInTheDocument();
   });
 
-  it('measures the cash buffer against the stored months, also when an old preset wrote them', () => {
-    // A profile saved before slice c1 whose 1 month came from the cash-flow investor preset keeps it.
+  it('measures the cash buffer against the stored months, also an entered 1 month', () => {
+    // An answered 1 is the visitor's own; only an unanswered stored 1 loads as 3 (lib/profile/defaults.ts).
     resetProfileStore({ profile: { person: { age: 30 }, cash: { targetMonths: 1 } } });
     render(<OverviewDashboard />);
     expect(useProfileStore.getState().profile.cash.targetMonths).toBe(1);

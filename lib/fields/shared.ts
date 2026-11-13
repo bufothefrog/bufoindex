@@ -343,8 +343,7 @@ export const RETIREMENT_AFTER_AGE: CrossFieldRule = {
  * The emergency-fund months are never derived: they are the visitor's own
  * answer or the stored value.
  */
-export function intakeDerivedWrites(get: Get, provided: ReadonlySet<string>): Write[] {
-  void provided;
+export function intakeDerivedWrites(get: Get): Write[] {
   const writes: Write[] = [];
   const age = get(AGE.path);
   const retirementAge = get(RETIREMENT_AGE.path);
