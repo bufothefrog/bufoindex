@@ -15,9 +15,10 @@ import { PAYCHECK_FORM } from './form';
 let base: PaycheckProfile | null = null;
 
 /**
- * The allocator's own defaults, for the leaves no binding sets (the fixed
- * federal bracket, withholding, year-to-date amounts, other benefits,
- * isPeakEarnings; see PAYCHECK_ENGINE_ONLY). Its metadata is fixed, so equal
+ * The allocator's own defaults, for the leaves no binding sets
+ * (withholding, year-to-date amounts, other benefits, isPeakEarnings; see
+ * PAYCHECK_ENGINE_ONLY). Its 22% federal bracket is always replaced by the
+ * computed one (currentBracketFrom in ./bindings). Its metadata is fixed, so equal
  * profiles give equal engine inputs (getDefaultProfile stamps Date.now()).
  * toEngineInputs copies on write, so the cached object is never changed.
  */

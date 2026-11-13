@@ -157,7 +157,7 @@ describe('Wizard, paycheck intent', () => {
     expect(screen.getByText('Step 1 of 9')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Tax savings use a fixed 22% federal bracket and one 2026 state rate, whatever your income.'
+        'Tax savings use your 22% federal bracket and one 2026 state rate.'
       )
     ).toBeInTheDocument();
   });

@@ -49,7 +49,7 @@ const ROWS: readonly KeyValueItem[] = [
   { id: 'gross', label: 'Gross pay', subtitle: 'per paycheck', value: 3200, format: 'currency', icon: Wallet },
   { id: 'retirement', label: '401(k) contribution', value: 192, format: 'currency', prefix: '-', icon: PiggyBank },
   { id: 'match', label: 'Employer match', value: 96, format: 'currency', prefix: '+', tone: 'positive', icon: DollarSign },
-  { id: 'note', label: 'Tax bracket', value: '22% (fixed)' },
+  { id: 'note', label: 'Tax bracket', value: '22% (from your pay)' },
 ];
 
 const DETAILS: readonly KeyValueItem[] = [

@@ -3,7 +3,7 @@
  * 'example' profile is the PR 3 default (figures captured on 2026-11-13);
  * the other three were built so their figures stay as captured before. The
  * paycheck, retirement, cash (apart from O16) and automation figures were
- * captured once from the dashboard before slice d1 and must not move; the
+ * captured once (with the 3bb0132 Social Security benefit of $30,000 answered) from the dashboard before slice d1 and must not move; the
  * leverage figures are the comparison page's own (the card now runs the
  * calculator's inputs: the invested balance as the starting balance and 500
  * paths), and the cash-drag return is O16's 7%.
@@ -35,6 +35,8 @@ const PROFILES = {
     spending: { targetRetirementIncome: 80000 },
     cash: { emergencyFundBalance: 5000 },
     workplace: { matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.06 },
+    // The 3bb0132 default benefit, answered (the default is Auto since PR 3).
+    retirementIncome: { socialSecurityBenefit: 30000 },
   },
   /** The PR 3 default profile, with only the age answered (25, its default). */
   example: { person: { age: 25 } },
@@ -47,6 +49,7 @@ const PROFILES = {
     workplace: { has401k: true, matchPercent: 0.5, matchLimit: 0.06, contributionPercent: 0.08 },
     investing: { investedBalance: 250000, monthlyContribution: 2500, taxableMonthlyContribution: 700, targetMix: '60-40' },
     strategy: { leverageRatio: 3 },
+    retirementIncome: { socialSecurityBenefit: 30000 },
   },
   /**
    * Monthly pay, a thin margin, a custom 2-month target, no monthly
@@ -62,6 +65,7 @@ const PROFILES = {
     cash: { emergencyFundBalance: 1500, emergencyFundApy: 0.01, targetMonths: 2 },
     investing: { investedBalance: 40000, monthlyContribution: 0, taxableMonthlyContribution: 0, targetMix: 'custom' },
     strategy: { leverageRatio: 1.5 },
+    retirementIncome: { socialSecurityBenefit: 30000 },
   },
 } satisfies Record<string, ProfilePatch>;
 
@@ -127,8 +131,8 @@ describe('PaycheckCard', () => {
       'rich',
       'Take-home $1,750 per weekly paycheck: $969 necessary expenses, $69 fun money (the minimum), and $712 to allocate.',
       [
-        ['Roth IRATax diversification recommended - consider splitting with Traditional', '$144'],
-        ['401k (Roth + Traditional)Consider splitting between Roth and Traditional 401k for tax diversification', '$279'],
+        ['Roth IRALow tax bracket makes Roth optimal for tax-free growth', '$144'],
+        ['Roth 401kRoth 401k recommended for tax-free growth and retirement flexibility', '$279'],
         ['Taxable InvestmentBuild wealth with tax-efficient index funds (VTI/VTSAX)', '$288'],
       ],
     ],
@@ -374,7 +378,7 @@ describe('AutomationChecklistCard', () => {
       [
         '401(k) payroll deferral$1928% of grossPayroll election at 8% of gross pay, set once in the benefits portal; it comes out before take-home pay.',
         'Roth IRA$144Contribute $144 per paycheck to Roth IRA ($7,500 annually)',
-        '401k (Roth + Traditional)$279+11.6% of grossIncrease 401k (Roth + Traditional) contribution by $279 per paycheck',
+        'Roth 401k$279+11.6% of grossIncrease Roth 401k contribution by $279 per paycheck',
         'Taxable Investment$288Invest $288 per paycheck in low-cost index funds',
       ],
       '0 of 4 set up.',

@@ -22,6 +22,7 @@ import {
   DERIVED_PATHS,
   derivedEmergencyFundBalance,
   derivedHsaCoverage,
+  derivedRetirementBracket,
   derivedTargetRetirementIncome,
   withDerivedValues,
 } from '@/lib/profile/derived';
@@ -60,8 +61,31 @@ describe('the rules', () => {
     expect(derivedHsaCoverage('headOfHousehold')).toBe('individual');
   });
 
+  it('retirement bracket: the 2026 federal bracket of the target income after the standard deduction', () => {
+    // 41,000 - 16,100 = 24,900, single: 12%.
+    expect(derivedRetirementBracket(41000, 'single')).toBe(0.12);
+    // 28,500 - 16,100 = 12,400: on the 10% edge, so 10%; one dollar more is 12%.
+    expect(derivedRetirementBracket(28500, 'single')).toBe(0.1);
+    expect(derivedRetirementBracket(28501, 'single')).toBe(0.12);
+    // 110,000 - 32,200 = 77,800, joint: 12%.
+    expect(derivedRetirementBracket(110000, 'marriedJoint')).toBe(0.12);
+    // 90,000 - 24,150 = 65,850, head of household: 12% (up to 67,450).
+    expect(derivedRetirementBracket(90000, 'headOfHousehold')).toBe(0.12);
+    // 130,000 - 16,100 = 113,900, separate: 24%.
+    expect(derivedRetirementBracket(130000, 'marriedSeparate')).toBe(0.24);
+    // 250,000 - 16,100 = 233,900, single: 32%.
+    expect(derivedRetirementBracket(250000, 'single')).toBe(0.32);
+    // Below the standard deduction: lowest bracket.
+    expect(derivedRetirementBracket(10000, 'single')).toBe(0.1);
+  });
+
   it('lists each derived leaf with the leaves it reads', () => {
-    expect(DERIVED_PATHS).toEqual(['cash.emergencyFundBalance', 'spending.targetRetirementIncome', 'hsa.coverage']);
+    expect(DERIVED_PATHS).toEqual([
+      'cash.emergencyFundBalance',
+      'spending.targetRetirementIncome',
+      'hsa.coverage',
+      'assumptions.paycheck.expectedRetirementBracket',
+    ]);
     expect(Object.keys(DERIVED_DEPENDENCIES)).toEqual([...DERIVED_PATHS]);
   });
 });
@@ -84,6 +108,30 @@ describe('withDerivedValues', () => {
     expect(derived.cash.emergencyFundBalance).toBe(6000);
     expect(derived.spending.targetRetirementIncome).toBe(28000);
     expect(derived.hsa.coverage).toBe('family');
+  });
+
+  it('derives the retirement bracket from the target income as derived or answered, never the stored bracket', () => {
+    // Target unanswered: 12 x (5,000 + 450) = 65,400 -> 65,000; 65,000 - 16,100 = 48,900: 12%.
+    const derivedTarget = withDerivedValues(
+      profileWith({ 'spending.necessaryMonthly': 5000, 'assumptions.paycheck.expectedRetirementBracket': 0.35 }, [
+        'spending.necessaryMonthly',
+      ])
+    );
+    expect(derivedTarget.spending.targetRetirementIncome).toBe(65000);
+    expect(derivedTarget.assumptions.paycheck.expectedRetirementBracket).toBe(0.12);
+    // Target answered at 150,000, joint: 150,000 - 32,200 = 117,800: 22%.
+    const answeredTarget = withDerivedValues(
+      profileWith({ 'spending.targetRetirementIncome': 150000, 'person.filingStatus': 'marriedJoint' }, [
+        'spending.targetRetirementIncome',
+        'person.filingStatus',
+      ])
+    );
+    expect(answeredTarget.assumptions.paycheck.expectedRetirementBracket).toBe(0.22);
+    // The bracket answered: left as stored, even off the seven rates (the binding reads it as the nearest).
+    const answeredBracket = profileWith({ 'spending.targetRetirementIncome': 150000, 'assumptions.paycheck.expectedRetirementBracket': 0.15 }, [
+      'assumptions.paycheck.expectedRetirementBracket',
+    ]);
+    expect(withDerivedValues(answeredBracket).assumptions.paycheck.expectedRetirementBracket).toBe(0.15);
   });
 
   it('never touches an answered derived leaf', () => {
@@ -161,6 +209,7 @@ function storedAndResolved(values: Record<string, unknown>): [FinancialProfile, 
       'cash.emergencyFundBalance': 123457,
       'spending.targetRetirementIncome': 987000,
       'hsa.coverage': values['person.filingStatus'] === 'marriedJoint' ? 'individual' : 'family',
+      'assumptions.paycheck.expectedRetirementBracket': 0.35,
     },
     ['spending.necessaryMonthly', 'person.filingStatus']
   );
@@ -209,7 +258,8 @@ describe('every reader sees the derived value, never the stored one', () => {
 // derived leaf, or calls toEngineInputs, must be reviewed for the same
 // guarantee and added here with its reason.
 const ROOT = join(__dirname, '..', '..', '..');
-const DERIVED_LEAF_SOURCE = /emergencyFundBalance|targetRetirementIncome|hsa\.coverage\b|EMERGENCY_FUND_BALANCE|HSA_COVERAGE\b|toEngineInputs\(/;
+const DERIVED_LEAF_SOURCE =
+  /emergencyFundBalance|targetRetirementIncome|hsa\.coverage\b|EMERGENCY_FUND_BALANCE|HSA_COVERAGE\b|paycheck\.expectedRetirementBracket|EXPECTED_RETIREMENT_BRACKET|toEngineInputs\(/;
 const REVIEWED: Readonly<Record<string, string>> = {
   'lib/profile/derived.ts': 'The rules themselves.',
   'lib/profile/defaults.ts': 'The default values (the rules applied to the defaults).',

@@ -21,9 +21,14 @@
  * - cash.emergencyFundBalance = 3 x spending.necessaryMonthly;
  * - spending.targetRetirementIncome = 12 x (must-pay costs + the midpoint of
  *   the fun money range), rounded to the nearest 1,000;
- * - hsa.coverage = 'family' for married filing jointly, else 'individual'.
+ * - hsa.coverage = 'family' for married filing jointly, else 'individual';
+ * - assumptions.paycheck.expectedRetirementBracket = the 2026 federal
+ *   bracket the target retirement income (answered, or derived by the rule
+ *   above) falls in after the standard deduction for the filing status.
  */
 
+import { federalBracketRate, taxableIncome } from '@/lib/calculations/taxBracket';
+import { getAt, setAt } from '@/lib/fields/paths';
 import type { FinancialProfile, HsaCoverage } from './types';
 
 /** Months of must-pay costs the typical emergency fund balance holds. */
@@ -52,12 +57,32 @@ export function derivedHsaCoverage(filingStatus: FinancialProfile['person']['fil
   return filingStatus === 'marriedJoint' ? 'family' : 'individual';
 }
 
-/** Each derived leaf and how it is computed from the profile. */
+/**
+ * Typical retirement bracket: the 2026 federal bracket a yearly retirement
+ * income falls in after the standard deduction (no payroll deductions).
+ */
+export function derivedRetirementBracket(
+  targetRetirementIncome: number,
+  filingStatus: FinancialProfile['person']['filingStatus']
+): number {
+  return federalBracketRate(
+    taxableIncome({ yearlyGross: targetRetirementIncome, preTaxDeductions: 0, filingStatus }),
+    filingStatus
+  );
+}
+
+/**
+ * Each derived leaf and how it is computed from the profile. The rules run
+ * in this order over the profile as filled so far, so the retirement
+ * bracket reads the target retirement income after its own rule ran.
+ */
 const DERIVED_RULES: Readonly<Record<string, (profile: FinancialProfile) => unknown>> = {
   'cash.emergencyFundBalance': (p) => derivedEmergencyFundBalance(p.spending.necessaryMonthly),
   'spending.targetRetirementIncome': (p) =>
     derivedTargetRetirementIncome(p.spending.necessaryMonthly, p.spending.funMoneyMin, p.spending.funMoneyMax),
   'hsa.coverage': (p) => derivedHsaCoverage(p.person.filingStatus),
+  'assumptions.paycheck.expectedRetirementBracket': (p) =>
+    derivedRetirementBracket(p.spending.targetRetirementIncome, p.person.filingStatus),
 };
 
 /** The leaf paths whose typical value is derived. */
@@ -68,14 +93,16 @@ export const DERIVED_DEPENDENCIES: Readonly<Record<string, readonly string[]>> =
   'cash.emergencyFundBalance': ['spending.necessaryMonthly'],
   'spending.targetRetirementIncome': ['spending.necessaryMonthly', 'spending.funMoneyMin', 'spending.funMoneyMax'],
   'hsa.coverage': ['person.filingStatus'],
+  'assumptions.paycheck.expectedRetirementBracket': ['spending.targetRetirementIncome', 'person.filingStatus'],
 };
 
 /**
  * The profile with every unanswered derived leaf filled from the answers.
  * `answered` defaults to profile.provided; the wizard passes its own list
  * (answered on arrival, answered in this visit, or edited on a screen).
- * Returns the same object when nothing changes. No derived leaf reads
- * another, so the order of the rules does not matter.
+ * Returns the same object when nothing changes. Each rule reads the
+ * profile as filled by the rules before it (the retirement bracket reads
+ * the target retirement income, derived or answered).
  */
 export function withDerivedValues(
   profile: FinancialProfile,
@@ -85,11 +112,9 @@ export function withDerivedValues(
   let out = profile;
   for (const path of DERIVED_PATHS) {
     if (done.has(path)) continue;
-    const value = DERIVED_RULES[path](profile);
-    const [section, key] = path.split('.') as [keyof FinancialProfile, string];
-    const node = out[section] as unknown as Record<string, unknown>;
-    if (node[key] === value) continue;
-    out = { ...out, [section]: { ...node, [key]: value } };
+    const value = DERIVED_RULES[path](out);
+    if (getAt(out, path) === value) continue;
+    out = setAt(out, path, value);
   }
   return out;
 }

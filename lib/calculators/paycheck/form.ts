@@ -82,7 +82,7 @@ const TAXABLE = withOverrides(TAXABLE_MONTHLY, {
   summary: (value) => ((value as number) > 0 ? `taxable ${formatCurrency(value as number)}/mo` : 'no taxable investing'),
 });
 
-/** The core screens, with the tax note (O9) on the one that asks state and filing status. */
+/** The core screens, with the tax note (the federal bracket in use) on the one that asks state and filing status. */
 const PAYCHECK_CORE_SCREENS: readonly ScreenSpec[] = CORE_SCREENS.map((screen) =>
   screen.id === 'about' ? { ...screen, notes: [TAX_NOTE] } : screen
 );

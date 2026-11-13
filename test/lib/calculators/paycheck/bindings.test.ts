@@ -1,26 +1,37 @@
 /**
  * The paycheck bindings and definition: the golden test against the old
  * mapper's output for v1-shaped profiles, the 401(k) truth table, every
- * PaycheckProfile leaf bound or engine-only, the fixed federal bracket and
- * the form relations.
+ * PaycheckProfile leaf bound or engine-only, the computed federal bracket,
+ * the nearest-bracket read of the retirement bracket, the identical figures
+ * of a 22% profile against the 3bb0132 bindings, and the form relations.
  *
  * Golden fixture. The expected engine profiles were captured on 2026-11-12
  * from the former lib/profile/mappers.ts (deleted in phase 5): what its
  * toPaycheckProfile returned for each profile, metadata excluded, written as
  * the leaves that differ from its output for the v1 default (DEFAULT_ENGINE).
- * Non-integer figures are compared to 9 decimals.
+ * Non-integer figures are compared to 9 decimals. One captured leaf changed
+ * on purpose in PR 3 (slice c4): taxes.federalBracket was a fixed 22% and is
+ * now the bracket of the profile's taxable pay, which for the custom profile
+ * is 12% (see that case).
  */
 
 import { describe, expect, it } from 'vitest';
 import { getDefaultProfile } from '@/lib/calculations/core';
-import { PAYCHECK_BINDINGS, PAYCHECK_ENGINE_ONLY, split401k } from '@/lib/calculators/paycheck/bindings';
+import {
+  PAYCHECK_BINDINGS,
+  PAYCHECK_ENGINE_ONLY,
+  RETIREMENT_BRACKET_PATH,
+  currentBracketFrom,
+  split401k,
+} from '@/lib/calculators/paycheck/bindings';
 import { PAYCHECK_CALCULATOR } from '@/lib/calculators/paycheck/definition';
 import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
 import { engineInputsFor, prepareRun } from '@/lib/calculators/runtime';
-import { isDerivedBinding } from '@/lib/fields/binding';
-import { applyWrites } from '@/lib/fields/paths';
+import { type Binding, isDerivedBinding, toEngineInputs } from '@/lib/fields/binding';
+import { applyWrites, makeGet } from '@/lib/fields/paths';
 import type { Write } from '@/lib/fields/types';
 import { applyProfileWrites, getDefaultFinancialProfile, isProfilePath } from '@/lib/profile/defaults';
+import { withDerivedValues } from '@/lib/profile/derived';
 import type { ContributionType, FinancialProfile, ProfilePatch } from '@/lib/profile/types';
 import type { PaycheckProfile } from '@/lib/types';
 import { answeredAt3bb0132, answeredEverywhere, defaultProfileAt3bb0132 } from '@/test/factories/profile-3bb0132';
@@ -212,6 +223,10 @@ describe('golden: engineInputsFor equals the old mapper output for v1-shaped pro
         'income.monthlyNet': near(6716.666666666666),
         'income.gross': 9100,
         'income.net': near(6716.666666666666),
+        // PR 3, slice c4: weekly 2,100 x 52 = 109,200 - 6,552 (6% traditional)
+        // - 32,200 joint standard deduction = 70,448: the 12% joint bracket
+        // (the old mapper's fixed 22% before).
+        'taxes.federalBracket': 0.12,
         'taxes.state': 'CA',
         'taxes.filingStatus': 'marriedJoint',
         'preferences.necessaryExpenses': 4200,
@@ -429,17 +444,134 @@ describe('every PaycheckProfile leaf is bound or engine-only', () => {
   });
 });
 
-describe('the fixed federal bracket (O9)', () => {
-  it.each([
-    ['a low income', 800],
-    ['the default income', 3500],
-    ['a high income', 25000],
-  ])('stays 22%% for %s', (_name, gross) => {
-    const profile = withWrites([
-      { path: 'income.grossPerPaycheck', value: gross },
-      { path: 'income.netPerPaycheck', value: gross * 0.7 },
-    ]);
-    expect(engineInputsFor(PAYCHECK_CALCULATOR, profile).taxes.federalBracket).toBe(0.22);
+describe('the computed federal bracket', () => {
+  /** The 3bb0132 default (TX, single, 6% traditional), all answered, with pay and the given writes. */
+  const bracketOf = (gross: number, writes: Write[] = []) =>
+    engineInputsFor(
+      PAYCHECK_CALCULATOR,
+      withWrites([
+        { path: 'income.grossPerPaycheck', value: gross },
+        { path: 'income.netPerPaycheck', value: gross * 0.7 },
+        ...writes,
+      ])
+    ).taxes.federalBracket;
+
+  it.each<[string, number, Write[], number]>([
+    // 800 x 26 = 20,800 - 1,248 - 16,100 = 3,452: 10%.
+    ['a low income', 800, [], 0.1],
+    // 2,500 x 26 = 65,000 - 3,900 - 16,100 = 45,000: 12%.
+    ['a 12% income', 2500, [], 0.12],
+    // 3,500 x 26 = 91,000 - 5,460 - 16,100 = 69,440: 22%.
+    ['the 3bb0132 default income', 3500, [], 0.22],
+    // 6,000 x 26 = 156,000 - 9,360 - 16,100 = 130,540: 24%.
+    ['a 24% income', 6000, [], 0.24],
+    // 9,500 x 26 = 247,000 - 14,820 - 16,100 = 216,080: 32%.
+    ['a 32% income', 9500, [], 0.32],
+    // 25,000 x 26 = 650,000 - 39,000 - 16,100 = 594,900: 35%.
+    ['a high income', 25000, [], 0.35],
+    // No plan: 2,600 x 26 = 67,600 - 16,100 = 51,500: 22% (with the 6% it would be 47,444: 12%).
+    ['no 401(k)', 2600, [{ path: 'workplace.has401k', value: false }], 0.22],
+    ['a 6% traditional 401(k)', 2600, [], 0.12],
+    // Roth: nothing pre-tax, 51,500: 22%.
+    ['a Roth 401(k)', 2600, [{ path: 'workplace.contributionType', value: 'roth' }], 0.22],
+    // HSA 150 a month: 67,600 - 4,056 - 1,800 - 16,100 = 45,644: 12%.
+    ['HSA payroll contributions', 2650, [{ path: 'hsa.eligible', value: true }, { path: 'hsa.monthlyContribution', value: 150 }], 0.12],
+    // A quarterly 3,000 bonus: 65,000 + 12,000 - 3,900 - 16,100 = 57,000: 22%.
+    ['a regular bonus', 2500, [{ path: 'income.hasBonus', value: true }, { path: 'income.bonusAmount', value: 3000 }, { path: 'income.bonusFrequency', value: 'quarterly' }], 0.22],
+    // Joint: 6,000 x 26 = 156,000 - 9,360 - 32,200 = 114,440: 22%.
+    ['joint filing', 6000, [{ path: 'person.filingStatus', value: 'marriedJoint' }], 0.22],
+    // Head of household: 2,900 x 26 = 75,400 - 4,524 - 24,150 = 46,726: 12%.
+    ['head of household', 2900, [{ path: 'person.filingStatus', value: 'headOfHousehold' }], 0.12],
+  ])('%s', (_name, gross, writes, bracket) => {
+    expect(bracketOf(gross, writes)).toBe(bracket);
+  });
+
+  it('does not count HSA contributions when the HSA is off', () => {
+    // 2,800 x 26 = 72,800 - 4,368 - 16,100 = 52,332: 22%; with 200 a month (2,400) 49,932: 12%.
+    const hsa = (eligible: boolean): Write[] => [
+      { path: 'hsa.eligible', value: eligible },
+      { path: 'hsa.monthlyContribution', value: 200 },
+    ];
+    expect(bracketOf(2800, hsa(true))).toBe(0.12);
+    expect(bracketOf(2800, hsa(false))).toBe(0.22);
+  });
+
+  it('matches the helper the note and the help read', () => {
+    const profile = withWrites([{ path: 'income.grossPerPaycheck', value: 6000 }]);
+    expect(currentBracketFrom(makeGet(profile))).toBe(engineInputsFor(PAYCHECK_CALCULATOR, profile).taxes.federalBracket);
+  });
+});
+
+describe('the retirement bracket read', () => {
+  const readOf = (stored: number) =>
+    engineInputsFor(PAYCHECK_CALCULATOR, withWrites([{ path: RETIREMENT_BRACKET_PATH, value: stored }])).preferences
+      .expectedRetirementBracket;
+
+  it('passes each of the seven rates through and reads any other stored value as the nearest rate', () => {
+    for (const rate of [0.1, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]) expect(readOf(rate)).toBe(rate);
+    expect(readOf(0.15)).toBe(0.12);
+    expect(readOf(0.2)).toBe(0.22);
+    expect(readOf(0.17)).toBe(0.12);
+    // 0 was read by the engine as 80% of the current bracket (17.6%); it is now the 10% bracket.
+    expect(readOf(0)).toBe(0.1);
+  });
+
+  it('does not rewrite the stored value', () => {
+    const profile = withWrites([{ path: RETIREMENT_BRACKET_PATH, value: 0.15 }]);
+    engineInputsFor(PAYCHECK_CALCULATOR, profile);
+    expect(profile.assumptions.paycheck.expectedRetirementBracket).toBe(0.15);
+  });
+
+  it('uses the typical bracket of the target retirement income while unanswered', () => {
+    // The worked example: 41,000 - 16,100 = 24,900: 12%.
+    expect(engineInputsFor(PAYCHECK_CALCULATOR, getDefaultFinancialProfile()).preferences.expectedRetirementBracket).toBe(0.12);
+    // A target of 150,000 answered, single: 133,900: 24%.
+    const p = getDefaultFinancialProfile();
+    const answered = { ...applyWrites(p, [{ path: 'spending.targetRetirementIncome', value: 150000 }]), provided: ['spending.targetRetirementIncome'] };
+    expect(engineInputsFor(PAYCHECK_CALCULATOR, answered).preferences.expectedRetirementBracket).toBe(0.24);
+  });
+});
+
+/**
+ * The bindings as they were at 3bb0132: the federal bracket kept the engine
+ * base's fixed 22% and the retirement bracket was read 1:1.
+ */
+const BINDINGS_AT_3BB0132: readonly Binding<PaycheckProfile>[] = [
+  ...PAYCHECK_BINDINGS.filter(
+    (binding) => binding.engine !== 'taxes.federalBracket' && binding.engine !== 'preferences.expectedRetirementBracket'
+  ),
+  { profile: RETIREMENT_BRACKET_PATH, engine: 'preferences.expectedRetirementBracket' },
+];
+
+describe('a 22% profile with a stored bracket rate gives the figures of 3bb0132', () => {
+  const PROFILES_AT_22: readonly [string, FinancialProfile][] = [
+    ['the 3bb0132 default, all answered', answeredEverywhere(defaultProfileAt3bb0132())],
+    ['the PR 3 worked example, all answered', answeredEverywhere(getDefaultFinancialProfile())],
+    [
+      'joint, 6,000 every two weeks, HSA and debts',
+      withWrites([
+        { path: 'person.filingStatus', value: 'marriedJoint' },
+        { path: 'income.grossPerPaycheck', value: 6000 },
+        { path: 'income.netPerPaycheck', value: 4300 },
+        { path: 'hsa.eligible', value: true },
+        { path: 'hsa.monthlyContribution', value: 300 },
+        {
+          path: 'debts',
+          value: [{ id: 'd1', name: 'Card', balance: 4000, interestRate: 0.24, minimumPayment: 120, extraPayment: 0, taxDeductible: false }],
+        },
+      ]),
+    ],
+  ];
+
+  it.each(PROFILES_AT_22)('%s, for each of the seven stored rates', (_name, base) => {
+    for (const rate of [0.1, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]) {
+      const profile = applyWrites(base, [{ path: RETIREMENT_BRACKET_PATH, value: rate }]);
+      const now = engineInputsFor(PAYCHECK_CALCULATOR, profile);
+      expect(now.taxes.federalBracket).toBe(0.22);
+      const then = toEngineInputs(BINDINGS_AT_3BB0132, PAYCHECK_CALCULATOR.engineBase(), makeGet(withDerivedValues(profile)));
+      expect(now).toEqual(then);
+      expect(PAYCHECK_CALCULATOR.calculate(now)).toEqual(PAYCHECK_CALCULATOR.calculate(then));
+    }
   });
 });
 
