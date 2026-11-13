@@ -7,6 +7,7 @@ Branch claude/next-3-profile-and-defaults, base 3bb0132 (head of PR 2). Four sli
     30878ca c3-social-security-auto
     7e2f6ad c4-retirement-bracket-select
     76923cc fix c1, c6c9494 fix c2, 46dd8c4 fix c3, 6a1ceab fix c4 (see "Review fixes" below)
+    c6c557b fix c1, f080888 fix c4, ab5bc21 fix c1, a00eb28 fix c2 (see "Second fix round" below)
 
 The profile schema version stays 2. No existing file under lib/calculations/ or test/lib/calculations/ changed; new pure modules were added
 (socialSecurityEstimate.ts, taxBracket.ts, with tests of hand-computed values). package.json and package-lock.json are unchanged.
@@ -164,7 +165,7 @@ and the wizard's grey value 1 -> 3. A profile that answered its months keeps the
 - Social Security simplification: current pay stands for the 35-year average of indexed earnings; one worker's own benefit; for married filing jointly the household
   pay counts as one worker's pay; spousal and survivor benefits and bonus pay are not modeled. Rule in lib/calculations/socialSecurityEstimate.ts and
   lib/calculators/retirement/socialSecurity.ts; stated on the methodology page (lib/formulas/retirement-formulas.ts).
-- Unanswered benefit loads as Auto: UNANSWERED_LOADS_AS_AUTO and loadUnansweredAsAuto in lib/profile/defaults.ts. A stored payload with its own provided list that lacks the
+- Unanswered benefit loads as Auto: UNANSWERED_LOADS_AS and loadUnansweredAsDefault in lib/profile/defaults.ts. A stored payload with its own provided list that lacks the
   leaf loads it as null; answered numbers (including 0) and an answered null are kept; a partial patch over a base is left alone.
 
 ## Review fixes
@@ -176,8 +177,8 @@ Three reviewers checked the four slices; one commit per slice fixes what was rea
   emergency fund", and the quick action "Emergency Fund Below One Month of Expenses" shows the months on hand, rounded down ("0.3 months of
   necessary expenses on hand", was "1 month of necessary expenses covered"), with the description "Cash on hand covers less than one month of
   necessary expenses, so a minor emergency may mean borrowing at credit-card rates." (was "A month of necessary expenses on hand covers a minor
-  emergency without borrowing at credit-card rates."). A precision-0 field rejects a fraction: a stored 2.5 months (steps of 0.5 before) now
-  shows "Emergency fund target must be a whole number." on the emergency fund field and the allocator waits for a whole number. The claiming-age
+  emergency without borrowing at credit-card rates."). A precision-0 field rejects a fraction (a stored answered fraction now loads as whole
+  months, see "Second fix round"). The claiming-age
   control shows "Saved age 65 is used until you pick one." under it for a stored age that is not 62, 67 or 70 (the control still shows the
   nearest choice and the run still uses the stored age), and the radio group is described by that note or the error. intakeDerivedWrites lost
   its unused parameter.
@@ -193,7 +194,34 @@ Not changed, by design: a stored retirement bracket of 0.5 failed validation at 
 option and passes, read as 0.37 like the 0, 0.15 and 0.2 reads above. Typing 61 months clamps to 60 with no message, like the other numeric
 inputs.
 
-## Deferred
+## Second fix round
+
+A second reviewer left five findings (S1 to S5); one commit per finding, S4 is this note.
+
+- S1 (c6c557b): lib/constants/financialSteps.ts allocationDisplayLabel / allocationDisplayText map the engine account "1-Month Emergency Fund"
+  to "Starter Emergency Fund", its reasoning to "A first cash buffer for small surprises, built before the steps below and before the full
+  emergency fund target." and "complete 1-month emergency fund" to "complete the starter emergency fund". Used by
+  components/dashboard/PaycheckCard.tsx, lib/dashboard/derive.ts (automation checklist rows) and
+  components/paycheck-allocator/PayrollSetupGuide.tsx (all three automation levels). The engine and comparisons on the raw name are unchanged.
+  Tests: test/lib/constants/financialSteps.test.ts, test/components/StarterStepLabel.test.tsx.
+- S2 (f080888): lib/calculators/paycheck/bindings.ts currentBracketFrom caps the whole 401(k) election (traditional plus Roth) at the 402(g)
+  limit, then takes the traditional share, like the engine's preTaxDeferralShare. Example: single, $9,100 every two weeks, 30% split with 15%
+  Roth: 236,600 - 12,250 - 16,100 = 208,250, 32% (was 24%). Test in test/lib/calculators/paycheck/bindings.test.ts.
+- S3 (ab5bc21): lib/profile/defaults.ts loadAnsweredAsWhole, next to loadUnansweredAsDefault: a stored answered cash.targetMonths loads as the
+  nearest whole month, half up, within 0 to 60, and stays answered (2.5 -> 3, 2.4 -> 2, 61.2 -> 60). The allocator and the overview read the
+  same value; the "must be a whole number" block no longer appears for a stored fraction. Tests in test/lib/profile/defaults.test.ts.
+- S5 (a00eb28): components/fields/FieldInput.tsx gives a blank select its typical option's label as the placeholder, and
+  components/shared/inputs/SelectInput.tsx shows a placeholder in text-muted-foreground (options in text-foreground). Example: HSA coverage
+  when filing jointly shows "Family" muted in the closed control instead of "Select"; a select with no typical value still shows "Select",
+  now muted too. Muted text measures 4.75:1 on the light background and 7.5:1 on the dark one (the input placeholder color). Tests in
+  test/components/fields/FieldInput.test.tsx and test/components/guided/Wizard.test.tsx.
+
+## Open question
+
+- A profile finished at 3bb0132 (16 of 16) loads as 13 of 14 and is asked the emergency fund months screen (see c1 above). Whether such a
+  profile should instead count as complete is not decided.
+
+## Deferred / not done
 
 - Social Security figures stay at 2026 although SSA already shows 2027 figures (bend points 1,340 and 8,077, base 192,300). Changing years means editing only
   lib/constants/social-security-2026.ts. Reason: the task asked for 2026 to match the other 2026 tax constants.
@@ -202,9 +230,14 @@ inputs.
 - docs/rebuild-plan.md O9 rows (about lines 62, 172, 266, 1003, 1234, 1254) still describe a fixed 22%; this note supersedes them for the allocator.
 - docs/architecture.md does not yet describe the Auto benefit modules.
 - The engine's own first step still carries 1-month wording, which lib/calculations/optimization.ts writes and this PR may not change: the
-  allocation account "1-Month Emergency Fund", its reason "Build basic financial security before optimization. One month of expenses provides
-  essential protection." and "Save $N per paycheck to complete 1-month emergency fund". They show on the overview paycheck card, the automation
-  checklist and the payroll setup guide. A later PR allowed to touch lib/calculations can rename them (or the display can map the account name).
+  allocation account "1-Month Emergency Fund", its reason and "Save $N per paycheck to complete 1-month emergency fund". The display now maps
+  them (second fix round, S1); a later PR allowed to touch lib/calculations can rename them at the source and drop the mapping.
+- The partial-progress line of the starter step, "Save $N per paycheck toward emergency fund ($M more needed)", still measures "more needed"
+  against the engine's one-month amount; it names no month count, so the display keeps it as written.
+- The state field of the wizard still shows "Select" when blank; no state field has a typical value today, so S5 covers the select kind only.
+- A blank select's placeholder option is what a screen reader reads as the value ("Family"), as a number input's placeholder is read. The
+  field stays unanswered (value empty, nothing written); the open list still tags the option "(typical)" and the screen's grey-values note
+  stays. A separate accessible "typical" description for the closed select was not added.
 - Engine copy and behavior with a real current bracket (lib/calculations/optimization.ts, frozen here): the currentBracket <= 0.12 branch gives
   the Roth recommendation and the Roth IRA reason "Low tax bracket makes Roth optimal for tax-free growth" for more profiles than the fixed 22%
   did. The reason is advice wording, and the branch ignores the retirement bracket, so it can name Roth when the stored retirement bracket is
