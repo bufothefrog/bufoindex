@@ -239,13 +239,17 @@ describe('engine functions match the published LaTeX on hand-computed fixtures',
     expect(entry.example.explanation).toContain('$4,369.20')
   })
 
-  it('the contribution timing formula renders as three short rows (FV, the yearly term, i) for phone width', () => {
+  it('the contribution timing formula renders as four short rows (FV, the yearly term, A, i) for phone width', () => {
     const entry = retirementEntries.find((f) => f.id === 'retirement-contribution-timing')!
     const rows = entry.latex.replace(/\\begin\{aligned\}|\\end\{aligned\}/g, '').split('\\\\')
-    expect(rows).toHaveLength(3)
+    expect(rows).toHaveLength(4)
     expect(rows[0]).toContain('FV')
-    expect(rows[1]).toContain('Y(1+r)')
-    expect(rows[2]).toContain('i &= (1+r)^{1/12}-1')
+    expect(rows[1]).toContain('Y(1+r)A')
+    // The annuity factor has its own row, so the yearly term stays narrow.
+    expect(rows[1]).not.toContain('\\frac')
+    expect(rows[2]).toContain('A &= \\frac{(1+r)^n-1}{r}')
+    expect(rows[3]).toContain('i &= (1+r)^{1/12}-1')
+    expect(Object.keys(entry.variables)).toContain('A')
     const html = renderLatex(entry.latex, false)
     expect(html).not.toBeNull()
     expect(html).not.toContain('katex-error')

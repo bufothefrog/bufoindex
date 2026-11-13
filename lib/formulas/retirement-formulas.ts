@@ -193,8 +193,9 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
     name: "Contribution Timing",
     functionName: "scheduleFutureValue",
     category: "core",
-    // Three short rows so each fits a 360 px screen.
-    latex: "\\begin{aligned} FV &= m\\frac{(1+i)^{12n}-1}{i} \\\\ &\\quad + Y(1+r)\\frac{(1+r)^n-1}{r} \\\\ i &= (1+r)^{1/12}-1 \\end{aligned}",
+    // Four short rows (the yearly annuity factor A on a row of its own) so
+    // each fits the formula box on a 360 px screen.
+    latex: "\\begin{aligned} FV &= m\\frac{(1+i)^{12n}-1}{i} \\\\ &\\quad + Y(1+r)A \\\\ A &= \\frac{(1+r)^n-1}{r} \\\\ i &= (1+r)^{1/12}-1 \\end{aligned}",
     variables: {
       m: {
         symbol: "m",
@@ -218,6 +219,10 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
         description: "Years of saving (retirement age - current age)",
         unit: "years",
         constraints: "Must be > 0"
+      },
+      A: {
+        symbol: "A",
+        description: "Annuity factor of the n yearly amounts, before the extra year of growth (1+r) from paying at the start of each year"
       }
     },
     description: "Future value of the contributions when part of them is paid monthly and part once a year, at the start of each simulated year. The traditional IRA, Roth IRA and taxable parts of Auto monthly investing can each be set to once a year on the Monthly investing card; everything else is monthly.",
