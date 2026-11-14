@@ -75,7 +75,7 @@ export function rawWith(
 }
 
 /** BOXX at 115 a share, asset class cash. */
-export const BOXX_SECURITY = { id: 'sec-boxx', ticker: 'BOXX', price: 115, assetClass: 'cash' };
+const BOXX_SECURITY = { id: 'sec-boxx', ticker: 'BOXX', price: 115, assetClass: 'cash' };
 
 /**
  * The owner fixture (contract section 7): $6,000 every two weeks, age 25,

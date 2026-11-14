@@ -35,7 +35,6 @@ import { TARGET_MIX_WEIGHTS, presetClassTargets, type PresetTargetMix } from '@/
 import { PORTFOLIO_LIST_PATHS, readPortfolio } from './reducers';
 
 export const TARGET_MIX_PATH = 'investing.targetMix';
-export const ACCOUNTS_PATH = PORTFOLIO_LIST_PATHS.accounts;
 export const SECURITIES_PATH = PORTFOLIO_LIST_PATHS.securities;
 export const HOLDINGS_PATH = PORTFOLIO_LIST_PATHS.holdings;
 export const NEW_CASH_PATH = PORTFOLIO_LIST_PATHS.newCash;

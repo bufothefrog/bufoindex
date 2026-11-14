@@ -33,7 +33,7 @@ const TIER_TOGGLE: Record<Tier, { expand: string; collapse: string; icon: 'edit'
 const WIDE_KINDS: ReadonlySet<FieldKind> = new Set(['choice', 'list', 'custom']);
 
 /** The collapsed line of a card with neither a summary nor a description. */
-export const NOT_ANSWERED = 'Not answered yet';
+const NOT_ANSWERED = 'Not answered yet';
 
 const CARD_HEADER_CLASS = 'p-4 pb-2 sm:p-6 sm:pb-4';
 const CARD_CONTENT_CLASS = 'p-4 pt-0 sm:p-6 sm:pt-0';

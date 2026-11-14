@@ -11,7 +11,6 @@ export { ChoiceGroup } from './ChoiceGroup';
 export type { ChoiceGroupLayout, ChoiceGroupProps } from './ChoiceGroup';
 export { NullableField } from './NullableField';
 export type { NullableFieldProps } from './NullableField';
-export { ScreenNotes } from './ScreenNotes';
 export type { ScreenNotesProps } from './ScreenNotes';
 export type {
   CustomRenderer,

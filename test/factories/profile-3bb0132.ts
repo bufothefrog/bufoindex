@@ -56,7 +56,7 @@ export function defaultProfileAt3bb0132(): FinancialProfile {
 }
 
 /** Every leaf and list path of the profile. */
-export const EVERY_PROFILE_PATH: readonly string[] = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS];
+const EVERY_PROFILE_PATH: readonly string[] = [...PROFILE_LEAF_PATHS, ...PROFILE_LIST_PATHS];
 
 /** The profile with every leaf and list marked answered. */
 export function answeredEverywhere(profile: FinancialProfile): FinancialProfile {
