@@ -157,7 +157,7 @@ The boundary is one-way by design: display helpers must never feed values back i
 
 ## Testing
 
-Vitest 4 + jsdom (`vitest.config.ts`; `@/` aliases repo root). Suites:
+Vitest 5 + jsdom (`vitest.config.ts`; `@/` aliases repo root). Suites:
 
 - `test/lib/calculations/` — one file per calculation module, numeric assertions.
 - `test/lib/utils/` - seeded RNG distribution checks, display-dollar conversion, tax-rate lookups.

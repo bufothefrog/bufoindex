@@ -32,7 +32,7 @@ Details in [`docs/architecture.md`](./docs/architecture.md).
 - **UI:** React 19 + Tailwind CSS 4
 - **State:** Zustand
 - **Charts:** Recharts 3
-- **Tests:** Vitest 4 + Testing Library + jsdom
+- **Tests:** Vitest 5 + Testing Library + jsdom
 
 ## Getting started
 

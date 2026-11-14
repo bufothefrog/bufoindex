@@ -6,7 +6,7 @@ This is reference material for engineers (and Claude Code agents) working in thi
 
 - **Next.js 16 App Router** app under `app/`, deployed via Vercel (`vercel.json`).
 - **TypeScript 6 + React 19 + Tailwind 4 + Recharts 3**.
-- **Vitest 4** with jsdom for tests; `@testing-library/react` for component tests.
+- **Vitest 5** with jsdom for tests; `@testing-library/react` for component tests.
 - **husky + lint-staged** for pre-commit; **GitHub Actions** (`.github/workflows/test.yml`) for CI.
 
 There is no static-site generator, no `content/` directory of markdown articles, no separate quality-gates script, and no philosophy-compliance grep. If you find prose elsewhere in the repo describing those, treat it as stale.
