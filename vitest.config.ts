@@ -53,8 +53,9 @@ export default defineConfig({
     maxWorkers: 4,
     coverage: {
       provider: 'v8',
-      // CI uploads coverage/lcov.info; lcov also writes an HTML view in
-      // coverage/lcov-report/.
+      // CI reads only the text table in the job log and uploads no report.
+      // lcov writes coverage/lcov.info and an HTML view in
+      // coverage/lcov-report/ for local use.
       reporter: ['text', 'lcov'],
       reportOnFailure: true,
       include: [
