@@ -576,8 +576,9 @@ export function calculateRetirementAnalysis(inputs: RetirementInputs): Retiremen
 /**
  * Classify the plan by its projected-to-required balance ratio and its Monte
  * Carlo success rate. The status picks which scenarios are generated.
+ * Exported so its threshold edges can be tested directly.
  */
-function determineRetirementStatus(
+export function determineRetirementStatus(
   balanceRatio: number,
   successRate: number
 ): 'exceeding' | 'onTrack' | 'falling' {

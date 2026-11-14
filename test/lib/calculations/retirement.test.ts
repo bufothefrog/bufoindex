@@ -25,6 +25,7 @@ import {
   calculateTDFAllocation,
   calculateTDFReturnForAge,
   calculateTDFVolatilityForAge,
+  determineRetirementStatus,
   futureValue,
   futureValueOfAnnuity,
   INCOME_PERIOD_MULTIPLIERS,
@@ -1002,6 +1003,33 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     const roundedMonthly = Math.round(affordableToday / 12 / 100) * 100
     expect(reality.name).toContain(`$${roundedMonthly.toLocaleString('en-US')}`)
     expect(reality.name).toContain("today's dollars")
+  })
+})
+
+describe('determineRetirementStatus (which scenarios a plan gets)', () => {
+  it('returns "exceeding" at ratio >= 1.2 with success > 0.85', () => {
+    expect(determineRetirementStatus(1.2, 0.86)).toBe('exceeding')
+    expect(determineRetirementStatus(2.0, 0.99)).toBe('exceeding')
+  })
+
+  it('demotes a high ratio to "onTrack" when success <= 0.85', () => {
+    // Ratio qualifies for exceeding, but the success-rate guard fails; the
+    // onTrack tier (ratio >= 0.9, success >= 0.70) still accepts it.
+    expect(determineRetirementStatus(1.5, 0.80)).toBe('onTrack')
+    expect(determineRetirementStatus(1.2, 0.85)).toBe('onTrack')
+  })
+
+  it('returns "onTrack" between 0.9 and 1.2 with adequate success', () => {
+    expect(determineRetirementStatus(0.9, 0.70)).toBe('onTrack')
+    expect(determineRetirementStatus(1.1, 0.75)).toBe('onTrack')
+  })
+
+  it('returns "falling" below a 0.9 ratio regardless of success rate', () => {
+    expect(determineRetirementStatus(0.89, 0.99)).toBe('falling')
+  })
+
+  it('returns "falling" when the success rate is below 0.70', () => {
+    expect(determineRetirementStatus(1.0, 0.69)).toBe('falling')
   })
 })
 
