@@ -15,7 +15,7 @@ import { CORE_PATHS, EXAMPLE_ROWS_NOTE } from '@/lib/constants/intake';
 import { normalizeProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { beginnerRaw, rawWith } from '@/test/factories/accountsFixtures';
-import { intakePaths } from '@/test/utils/intakeFixture';
+import { intakePaths } from '@/test/utils/intake';
 import { resetRouterMock } from '@/test/utils/navigation';
 import { clearBrowserState, resetProfileStore } from '@/test/utils/stores';
 import { answer } from '@/test/utils/wizard';

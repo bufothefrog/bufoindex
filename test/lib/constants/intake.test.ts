@@ -36,7 +36,7 @@ import {
 } from '@/lib/constants/intake';
 import { makeGet } from '@/lib/fields/paths';
 import { summarizeScreen } from '@/lib/fields/runtime';
-import { CORE_SCREENS } from '@/lib/fields/shared';
+import { CORE_SCREENS, PROFILE_EXTRA_FIELDS, PROFILE_EXTRA_SCREENS } from '@/lib/fields/shared';
 import type { ScreenSpec } from '@/lib/fields/types';
 import {
   PROFILE_LEAF_PATHS,
@@ -46,20 +46,7 @@ import {
 } from '@/lib/profile/defaults';
 import { migrateProfile } from '@/lib/profile/migrate';
 import type { FinancialProfile } from '@/lib/profile/types';
-import {
-  OLD_CORE_FLOW,
-  OLD_CORE_QUESTIONS,
-  OLD_CORE_SCREENS,
-  askedScreen,
-  askedScreens,
-  fromDefaults,
-  intakePaths,
-  oldScreens,
-  type AskedScreen,
-  type OldQuestion,
-  type OldScreen,
-  type OldScreenCopy,
-} from '@/test/utils/intakeFixture';
+import { askedScreen, askedScreens, fromDefaults, intakePaths, type AskedScreen } from '@/test/utils/intake';
 
 const screenIds = (
   flow: IntakeFlow,
@@ -106,27 +93,15 @@ describe('intake intents', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Behaviour-preserving: the provisional forms ask exactly what the intake
-// asked before slice w1. The core and the profile-only screens are pinned
-// here against the old fixture (test/utils/intakeFixture.ts); each
-// calculator's own question set is pinned in its
+// The core and the profile intake, built from the forms. The core's
+// questions are checked here by kind, bounds and options (not by wording);
+// each calculator's own questions are checked in its
 // test/lib/calculators/<id>/form.test.ts, and the profile intake is checked
 // against what those forms ask, so a calculator slice edits only its files.
 // ---------------------------------------------------------------------------
 
-// The old strategy preset screen is gone (slice c1): the preset was removed.
-const OLD_PROFILE_EXTRA_SCREENS: Record<string, OldScreenCopy> = {
-  'cash-buffer': { title: 'What does your emergency fund look like today?' },
-};
-
-const OLD_PROFILE_EXTRA_QUESTIONS: Record<string, OldQuestion> = {
-  'cash.emergencyFundBalance': { path: 'cash.emergencyFundBalance', label: 'Cash set aside for emergencies', kind: 'money', min: 0 },
-  'cash.emergencyFundApy': { path: 'cash.emergencyFundApy', label: 'Interest rate (APY) on that cash', kind: 'percent', min: 0, max: 0.2 },
-};
-
-const OLD_PROFILE_EXTRA_FLOW: readonly OldScreen[] = [
-  ['cash-buffer', 'cash', ['cash.emergencyFundBalance', 'cash.emergencyFundApy']],
-];
+/** The profile-only screens (the emergency-fund balance and rate), as a form. */
+const PROFILE_EXTRA_FORM = { id: 'profile-extra', fields: PROFILE_EXTRA_FIELDS, screens: PROFILE_EXTRA_SCREENS };
 
 /** The section each calculator form's screens take in the profile intake. */
 const FORM_SECTIONS: Record<(typeof PROFILE_FORM_ORDER)[number], string> = {
@@ -139,7 +114,7 @@ const FORM_SECTIONS: Record<(typeof PROFILE_FORM_ORDER)[number], string> = {
 /**
  * What the profile intake should ask, built from what each flow asks: the
  * core, then each calculator's own intake screens in profile order, then the
- * old profile-only screens. A question is asked once, on the first screen
+ * profile-only screens. A question is asked once, on the first screen
  * that asks it; a screen left with no question is dropped.
  */
 function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: string }[] {
@@ -166,8 +141,7 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
       take(id, screen, screen.id === 'accounts' ? 'accounts' : FORM_SECTIONS[id]);
     }
   }
-  const extras = oldScreens(OLD_PROFILE_EXTRA_FLOW, OLD_PROFILE_EXTRA_SCREENS, OLD_PROFILE_EXTRA_QUESTIONS);
-  for (const screen of extras) take('profile-extra', screen, 'cash');
+  for (const spec of PROFILE_EXTRA_SCREENS) take('profile-extra', askedScreen(PROFILE_EXTRA_FORM, spec, get), 'cash');
   for (const id of PROFILE_FORM_ORDER) {
     for (const spec of FORMS[id].screens.filter((screen) => screen.optional)) {
       take(id, askedScreen(FORMS[id], spec, get), 'optional');
@@ -176,9 +150,46 @@ function expectedProfile(get = fromDefaults()): { screen: AskedScreen; section: 
   return out;
 }
 
-describe('behaviour-preserving: the provisional forms carry the old question sets', () => {
-  it('asks the core exactly as before, question by question', () => {
-    expect(askedScreens('core')).toEqual(oldScreens(OLD_CORE_FLOW, OLD_CORE_SCREENS, OLD_CORE_QUESTIONS));
+describe('the core and the profile intake, from the forms', () => {
+  it('asks the core screens with these questions, kinds, bounds and options (the wording is not pinned)', () => {
+    const shape = askedScreens('core').map((screen) => ({
+      id: screen.id,
+      questions: screen.questions.map(({ path, kind, min, max, step, options }) => ({
+        path,
+        kind,
+        min,
+        max,
+        step,
+        options: options?.map((option) => option.value),
+      })),
+    }));
+    const question = (path: string, kind: string, bounds: { min?: number; max?: number; step?: number } = {}, options?: unknown[]) => ({
+      path,
+      kind,
+      min: bounds.min,
+      max: bounds.max,
+      step: bounds.step,
+      options,
+    });
+    expect(shape).toEqual([
+      {
+        id: 'about',
+        questions: [
+          question('person.age', 'number', { min: 16, max: 100, step: 1 }),
+          question('person.state', 'state'),
+          question('person.filingStatus', 'choice', {}, ['single', 'marriedJoint', 'marriedSeparate', 'headOfHousehold']),
+        ],
+      },
+      {
+        id: 'pay',
+        questions: [
+          question('income.grossPerPaycheck', 'money', { min: 0 }),
+          question('income.frequency', 'select', {}, ['weekly', 'bi-weekly', 'semi-monthly', 'monthly']),
+          question('income.netPerPaycheck', 'money', { min: 0 }),
+        ],
+      },
+      { id: 'must-pay', questions: [question('spending.necessaryMonthly', 'money', { min: 0 })] },
+    ]);
   });
 
   it('starts every calculator form that has basics with the core screens, labelled and bounded the same', () => {
@@ -218,7 +229,7 @@ describe('behaviour-preserving: the provisional forms carry the old question set
     }
   });
 
-  it('asks the profile intent the core, each calculator\'s screens once, then the old profile-only screens', () => {
+  it('asks the profile intent the core, each calculator\'s screens once, then the profile-only screens', () => {
     expect(askedScreens('profile')).toEqual(expectedProfile().map(({ screen }) => screen));
     const noPlan = fromDefaults({ 'workplace.has401k': false });
     expect(askedScreens('profile', noPlan)).toEqual(expectedProfile(noPlan).map(({ screen }) => screen));

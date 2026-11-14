@@ -29,7 +29,7 @@ import {
   visibleScreenNotes,
 } from '@/lib/fields/runtime';
 import type { FieldSpec, FormSpec, Get, ScreenSpec } from '@/lib/fields/types';
-import { fromDefaults } from '@/test/utils/intakeFixture';
+import { fromDefaults } from '@/test/utils/intake';
 
 const SCREEN_BUDGET = 30;
 const LINE_BUDGET = 12;

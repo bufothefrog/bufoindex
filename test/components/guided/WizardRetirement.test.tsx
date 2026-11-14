@@ -17,7 +17,7 @@ import { INTAKE_PREWARM } from '@/components/calculators/renderers';
 import { RETIREMENT_INTAKE_PREWARM } from '@/components/calculators/renderers/retirement';
 import { Wizard } from '@/components/guided/Wizard';
 import { CORE_PATHS } from '@/lib/constants/intake';
-import { intakePaths } from '@/test/utils/intakeFixture';
+import { intakePaths } from '@/test/utils/intake';
 import { useProfileStore } from '@/lib/store/profileStore';
 import { retirementRunner } from '@/lib/store/retirementStore';
 import { resetRouterMock, routerMock } from '@/test/utils/navigation';

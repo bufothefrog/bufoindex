@@ -5,6 +5,10 @@
  * profile (the c, y, b and l query keys are stripped and ignored), edits
  * written through to the profile, and invalid inputs keeping the last
  * results, marked out of date.
+ *
+ * The simulation runs through the store's worker runner (in-thread in
+ * jsdom, but still asynchronous), so a test awaits the run (settle) before
+ * it reads results.
  */
 
 import React from 'react';
@@ -36,6 +40,11 @@ const sections = () => [
 ];
 const toggleOf = (section: HTMLElement) =>
   within(within(section).getByRole('group', { name: /^Controls for / })).getByRole('button', { name: /^(Show|Hide|Edit|Done) / });
+
+/** Waits for the run store's latest run to land. */
+async function settle() {
+  await act(() => useLeverageStore.getState().flush());
+}
 
 /** The input cards start collapsed: open Contributions to reach its fields. */
 async function openContributions(user: ReturnType<typeof userEvent.setup>) {
@@ -83,7 +92,7 @@ describe('LeverageComparison page', () => {
     expect(html).not.toContain('median ending balance');
   });
 
-  it('shows no results before hydration, then the comparison for the profile', () => {
+  it('shows no results before hydration, then the comparison for the profile', async () => {
     resetProfileStore({ hydrated: false });
     render(page());
     expect(screen.getByRole('heading', { level: 1, name: 'Leverage Comparison' })).toBeInTheDocument();
@@ -91,6 +100,9 @@ describe('LeverageComparison page', () => {
     expect(screen.queryByText(/median ending balance/)).not.toBeInTheDocument();
 
     act(() => useProfileStore.setState({ hasHydrated: true }));
+    // The run is under way: the loading state holds the results' place.
+    expect(screen.getByRole('status', { name: 'Loading results' })).toBeInTheDocument();
+    await settle();
     expect(screen.queryByRole('status', { name: 'Loading results' })).not.toBeInTheDocument();
     // The default profile: $500 taxable a month for 40 years (age 25 to 65) plus $25,000.
     expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent(
@@ -106,8 +118,9 @@ describe('LeverageComparison page', () => {
     ).toHaveTextContent('$500/mo + $25.0k start');
   });
 
-  it('compares monthly with the same yearly amount at the start of each year, at the default profile', () => {
+  it('compares monthly with the same yearly amount at the start of each year, at the default profile', async () => {
     render(page());
+    await settle();
     const card = screen.getByRole('table', {
       name: "Median ending balances in today's dollars for the index fund and the 2x fund with the same yearly amount invested monthly or at the start of each year; contributions as entered",
     });
@@ -142,23 +155,26 @@ describe('LeverageComparison page', () => {
     );
   });
 
-  it('renders no lump-sum wording anywhere on the page', () => {
+  it('renders no lump-sum wording anywhere on the page', async () => {
     const { container } = render(page());
+    await settle();
     expect(results()).toHaveTextContent('Monthly vs start of each year');
     expect(container.textContent ?? '').not.toMatch(/lump/i);
     expect(document.title).not.toMatch(/lump/i);
     expect(metadata.description ?? '').not.toMatch(/lump/i);
   });
 
-  it('has live results and no Calculate button', () => {
+  it('has live results and no Calculate button', async () => {
     render(page());
+    await settle();
     expect(screen.queryByRole('button', { name: /Calculate|Compare/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /See results/ })).toBeInTheDocument();
   });
 
-  it('ignores the old c, y, b and l query and shows the profile', () => {
+  it('ignores the old c, y, b and l query and shows the profile', async () => {
     window.history.replaceState(null, '', '/tools/leverage-comparison?c=100&y=5&b=0&l=3');
     render(page());
+    await settle();
     expect(window.location.search).toBe('');
     expect(tile('2x fund, median ending balance')).toBeInTheDocument();
     expect(tile('Share of simulated paths where the 2x fund ends behind the index fund')).toHaveTextContent('over 40 years');
@@ -222,6 +238,7 @@ describe('LeverageComparison page', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Monthly contribution' }), { target: { value: '0' } });
     await user.click(within(sourceSwitch('Starting balance')).getByRole('radio', { name: 'Custom' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Starting balance' }), { target: { value: '0' } });
+    await settle();
 
     const status = screen.getAllByRole('status').find((node) => node.textContent?.includes('Results out of date'));
     expect(status).toHaveTextContent('Enter a monthly contribution or a starting balance.');
@@ -235,6 +252,7 @@ describe('LeverageComparison page', () => {
     const market = screen.getByRole('region', { name: 'Assumptions' });
     expect(market).toHaveTextContent('2.0% return');
     await user.click(within(market).getByRole('button', { name: 'Restore defaults for assumptions' }));
+    await settle();
     const { profile } = useProfileStore.getState();
     expect(profile.assumptions.leverage.indexMeanReturn).toBe(0.1);
     expect(profile.provided).not.toContain('assumptions.leverage.indexMeanReturn');
@@ -243,8 +261,9 @@ describe('LeverageComparison page', () => {
   describe('the input cards', () => {
     // No matchMedia stub decides this: the cards start collapsed at every
     // width (the beforeEach stub matches no query).
-    it('start collapsed, each showing its summary line', () => {
+    it('start collapsed, each showing its summary line', async () => {
       render(page());
+      await settle();
       const [contributions, accounts, market] = sections();
       for (const section of sections()) expect(toggleOf(section)).toHaveAttribute('aria-expanded', 'false');
       expect(contributions).toHaveTextContent('$500/mo, 40 years, $25,000 start, 2x fund');

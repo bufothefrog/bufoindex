@@ -139,7 +139,7 @@ export function currentBracketFrom(get: Get): number {
 }
 
 /** The retirement bracket the engine compares with: the stored value read as the nearest bracket rate. */
-export function retirementBracketFrom(get: Get): number {
+function retirementBracketFrom(get: Get): number {
   return nearestBracketRate(get(RETIREMENT_BRACKET_PATH) as number);
 }
 

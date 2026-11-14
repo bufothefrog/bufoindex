@@ -116,7 +116,7 @@ export function calculatorDisclaimer(id: CalculatorId): string {
   return composeDisclaimer(...CALCULATORS[id].disclaimer);
 }
 
-/** The `metadata` export of app/tools/<id>/page.tsx. */
+/** The `metadata` export of the calculator's page, app/tools/<route>/page.tsx (the folder its `path` names). */
 export function calculatorMetadata(id: CalculatorId): Metadata {
   const { shortTitle, metaDescription } = CALCULATORS[id];
   return { title: shortTitle, description: metaDescription };

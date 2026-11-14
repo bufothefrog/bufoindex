@@ -7,10 +7,12 @@
  * in the value column (the dd), which never shrinks. A sentence there would
  * overflow the row and paint over the "Impact" label.
  *
- * The golden table pins every visible string, in order, for eight profiles
- * as the component printed them before the rebuild (c4): the limit math now
- * comes from lib/calculations/contributionLimits and the wording from the
- * shared frequency and format tables, and none of it may change the output.
+ * The per-profile table checks, for eight profiles that between them reach
+ * every action, urgency, frequency and age band: which cards appear and in
+ * which order, the group headings, each card's title and badge, its impact
+ * and time figures, every number in its prose, its button, and the input
+ * section that button opens. The prose itself is not pinned, so a wording
+ * change needs no test edit; a changed number, card or order does.
  */
 
 import React from 'react';
@@ -19,6 +21,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { QuickActions } from '@/components/paycheck-allocator/QuickActions';
 import { CalculatorLayout } from '@/components/ui/layouts/CalculatorLayout';
+import { PAYCHECK_FORM } from '@/lib/calculators/paycheck/form';
 import {
   createPaycheckProfile,
   createBenefitsData,
@@ -66,21 +69,10 @@ function rowFor(label: string, card: HTMLElement = document.body) {
   return { row, term: term as HTMLElement, value: within(row).getByRole('definition') };
 }
 
-/** Every non-empty text node under `root`, trimmed, in document order. */
-function visibleText(root: HTMLElement): string[] {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const out: string[] = [];
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = (node.textContent ?? '').trim();
-    if (text) out.push(text);
-  }
-  return out;
-}
-
 const NO_STAMP = { lastUpdated: 0 };
 
 /** Eight profiles that between them reach every action, urgency, frequency and age band. */
-const GOLDEN_PROFILES: Record<string, PaycheckProfile> = {
+const PROFILES: Record<string, PaycheckProfile> = {
   factory: createPaycheckProfile({ ...NO_STAMP, debts: [createDebtData({ id: 'd' })] }),
   weeklyMatchGap: createPaycheckProfile({
     ...NO_STAMP,
@@ -164,240 +156,157 @@ const GOLDEN_PROFILES: Record<string, PaycheckProfile> = {
   }),
 };
 
-/** What the component printed for each golden profile before the rebuild. */
-const GOLDEN_OUTPUT: Record<string, { text: string[]; buttons: string[] }> = {
+type ScreenId = (typeof PAYCHECK_FORM.screens)[number]['id'];
+
+interface ExpectedCard {
+  title: string;
+  badge: string;
+  /** The figure in the Impact row's value cell. */
+  impact: string;
+  /** The figure in the Time to implement row's value cell. */
+  time: string;
+  /** Every number in the description and the impact qualifier, in order; the words around them are not pinned. */
+  prose: string[];
+  button: string;
+  /** The paycheck form screen whose input section the button opens. */
+  screen: ScreenId;
+}
+
+const MATCH = 'Employer Match Not Fully Captured';
+const HSA = 'No HSA Contributions';
+const ROTH = 'No Roth IRA Contributions';
+const EMERGENCY = 'Emergency Fund Below One Month of Expenses';
+const HIGHEST = 'HIGHEST IMPACT';
+const HIGH = 'HIGH IMPACT';
+const CRITICAL_HEADING = 'Highest-Impact Items';
+const IMPORTANT_HEADING = 'High-Impact Optimizations';
+
+/** What each profile shows: the group headings, then every card in order. */
+const EXPECTED: Record<string, { headings: string[]; cards: ExpectedCard[] }> = {
   factory: {
-    text: [
-      "Highest-Impact Items",
-      "18.0% Debt Accruing Interest",
-      "HIGHEST IMPACT",
-      "This balance accrues interest at 18.0% a year. Paying it down avoids that rate; whether that compares favorably to investing the same dollars depends on the return you expect.",
-      "Impact",
-      "in interest per bi-weekly paycheck",
-      "$35",
-      "Time to implement",
-      "6-24 months",
-      "Create Payoff Plan",
+    headings: [CRITICAL_HEADING],
+    cards: [
+      { title: '18.0% Debt Accruing Interest', badge: HIGHEST, impact: '$35', time: '6-24 months', prose: ['18.0%'], button: 'Create Payoff Plan', screen: 'debts' },
     ],
-    buttons: ["Create Payoff Plan"],
   },
   weeklyMatchGap: {
-    text: [
-      "Highest-Impact Items",
-      "Employer Match Not Fully Captured",
-      "HIGHEST IMPACT",
-      "Your employer matches contributions up to 6% of salary. Contributing below that limit leaves the unmatched portion of the benefit unpaid.",
-      "Impact",
-      "unclaimed match per weekly paycheck",
-      "$42",
-      "Time to implement",
-      "5 minutes",
-      "Increase 401k to 6%",
-      "High-Impact Optimizations",
-      "No HSA Contributions",
-      "HIGH IMPACT",
-      "HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.",
-      "Impact",
-      "deferred tax at your 12% federal bracket",
-      "$44/month",
-      "Time to implement",
-      "5 minutes",
-      "Contribute $367/month to HSA",
-      "No Roth IRA Contributions",
-      "HIGH IMPACT",
-      "Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.",
-      "Impact",
-      "at an assumed 7% return",
-      "$44/month",
-      "Time to implement",
-      "30 minutes",
-      "Open Roth IRA - $625/month",
+    headings: [CRITICAL_HEADING, IMPORTANT_HEADING],
+    cards: [
+      { title: MATCH, badge: HIGHEST, impact: '$42', time: '5 minutes', prose: ['6%'], button: 'Increase 401k to 6%', screen: '401k' },
+      { title: HSA, badge: HIGH, impact: '$44/month', time: '5 minutes', prose: ['65', '12%'], button: 'Contribute $367/month to HSA', screen: 'hsa' },
+      { title: ROTH, badge: HIGH, impact: '$44/month', time: '30 minutes', prose: ['7%'], button: 'Open Roth IRA - $625/month', screen: 'ira-taxable' },
     ],
-    buttons: ["Increase 401k to 6%", "Contribute $367/month to HSA", "Open Roth IRA - $625/month"],
   },
   monthlyAge56Family: {
-    text: [
-      "High-Impact Optimizations",
-      "No HSA Contributions",
-      "HIGH IMPACT",
-      "HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.",
-      "Impact",
-      "deferred tax at your 24% federal bracket",
-      "$195/month",
-      "Time to implement",
-      "5 minutes",
-      "Contribute $813/month to HSA",
-      "No Roth IRA Contributions",
-      "HIGH IMPACT",
-      "Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.",
-      "Impact",
-      "at an assumed 7% return",
-      "$50/month",
-      "Time to implement",
-      "30 minutes",
-      "Open Roth IRA - $717/month",
+    headings: [IMPORTANT_HEADING],
+    cards: [
+      { title: HSA, badge: HIGH, impact: '$195/month', time: '5 minutes', prose: ['65', '24%'], button: 'Contribute $813/month to HSA', screen: 'hsa' },
+      { title: ROTH, badge: HIGH, impact: '$50/month', time: '30 minutes', prose: ['7%'], button: 'Open Roth IRA - $717/month', screen: 'ira-taxable' },
     ],
-    buttons: ["Contribute $813/month to HSA", "Open Roth IRA - $717/month"],
   },
   semiMonthlyDebts: {
-    text: [
-      "Highest-Impact Items",
-      "24.0% Debt Accruing Interest",
-      "HIGHEST IMPACT",
-      "This balance accrues interest at 24.0% a year. Paying it down avoids that rate; whether that compares favorably to investing the same dollars depends on the return you expect.",
-      "Impact",
-      "in interest per semi-monthly paycheck",
-      "$40",
-      "Time to implement",
-      "6-24 months",
-      "Create Payoff Plan",
-      "High-Impact Optimizations",
-      "Emergency Fund Below One Month of Expenses",
-      "HIGH IMPACT",
-      "Cash on hand covers less than one month of necessary expenses, so a minor emergency may mean borrowing at credit-card rates.",
-      "Impact",
-      "of necessary expenses on hand",
-      "0.1 months",
-      "Time to implement",
-      "3-6 months",
-      "Setup Emergency Fund",
+    headings: [CRITICAL_HEADING, IMPORTANT_HEADING],
+    cards: [
+      { title: '24.0% Debt Accruing Interest', badge: HIGHEST, impact: '$40', time: '6-24 months', prose: ['24.0%'], button: 'Create Payoff Plan', screen: 'debts' },
+      { title: EMERGENCY, badge: HIGH, impact: '0.1 months', time: '3-6 months', prose: [], button: 'Setup Emergency Fund', screen: 'emergency-fund' },
     ],
-    buttons: ["Create Payoff Plan", "Setup Emergency Fund"],
   },
-  nothingToDo: {
-    text: [
-    ],
-    buttons: [],
-  },
+  nothingToDo: { headings: [], cards: [] },
   age61Everything: {
-    text: [
-      "Highest-Impact Items",
-      "Employer Match Not Fully Captured",
-      "HIGHEST IMPACT",
-      "Your employer matches contributions up to 5% of salary. Contributing below that limit leaves the unmatched portion of the benefit unpaid.",
-      "Impact",
-      "unclaimed match per bi-weekly paycheck",
-      "$138",
-      "Time to implement",
-      "5 minutes",
-      "Increase 401k to 5%",
-      "29.9% Debt Accruing Interest",
-      "HIGHEST IMPACT",
-      "This balance accrues interest at 29.9% a year. Paying it down avoids that rate; whether that compares favorably to investing the same dollars depends on the return you expect.",
-      "Impact",
-      "in interest per bi-weekly paycheck",
-      "$92",
-      "Time to implement",
-      "6-24 months",
-      "Create Payoff Plan",
-      "High-Impact Optimizations",
-      "No HSA Contributions",
-      "HIGH IMPACT",
-      "HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.",
-      "Impact",
-      "deferred tax at your 32% federal bracket",
-      "$260/month",
-      "Time to implement",
-      "5 minutes",
-      "Contribute $813/month to HSA",
-      "No Roth IRA Contributions",
-      "HIGH IMPACT",
-      "Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.",
-      "Impact",
-      "at an assumed 7% return",
-      "$50/month",
-      "Time to implement",
-      "30 minutes",
-      "Open Roth IRA - $717/month",
-      "Emergency Fund Below One Month of Expenses",
-      "HIGH IMPACT",
-      "Cash on hand covers less than one month of necessary expenses, so a minor emergency may mean borrowing at credit-card rates.",
-      "Impact",
-      "of necessary expenses on hand",
-      "0 months",
-      "Time to implement",
-      "3-6 months",
-      "Setup Emergency Fund",
+    headings: [CRITICAL_HEADING, IMPORTANT_HEADING],
+    cards: [
+      { title: MATCH, badge: HIGHEST, impact: '$138', time: '5 minutes', prose: ['5%'], button: 'Increase 401k to 5%', screen: '401k' },
+      { title: '29.9% Debt Accruing Interest', badge: HIGHEST, impact: '$92', time: '6-24 months', prose: ['29.9%'], button: 'Create Payoff Plan', screen: 'debts' },
+      { title: HSA, badge: HIGH, impact: '$260/month', time: '5 minutes', prose: ['65', '32%'], button: 'Contribute $813/month to HSA', screen: 'hsa' },
+      { title: ROTH, badge: HIGH, impact: '$50/month', time: '30 minutes', prose: ['7%'], button: 'Open Roth IRA - $717/month', screen: 'ira-taxable' },
+      { title: EMERGENCY, badge: HIGH, impact: '0 months', time: '3-6 months', prose: [], button: 'Setup Emergency Fund', screen: 'emergency-fund' },
     ],
-    buttons: ["Increase 401k to 5%", "Create Payoff Plan", "Contribute $813/month to HSA", "Open Roth IRA - $717/month", "Setup Emergency Fund"],
   },
   age50ZeroBracket: {
-    text: [
-      "High-Impact Optimizations",
-      "No Roth IRA Contributions",
-      "HIGH IMPACT",
-      "Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.",
-      "Impact",
-      "at an assumed 7% return",
-      "$50/month",
-      "Time to implement",
-      "30 minutes",
-      "Open Roth IRA - $717/month",
-      "No HSA Contributions",
-      "HIGH IMPACT",
-      "HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.",
-      "Impact",
-      "deferred tax at your 0% federal bracket",
-      "$0/month",
-      "Time to implement",
-      "5 minutes",
-      "Contribute $367/month to HSA",
+    headings: [IMPORTANT_HEADING],
+    cards: [
+      { title: ROTH, badge: HIGH, impact: '$50/month', time: '30 minutes', prose: ['7%'], button: 'Open Roth IRA - $717/month', screen: 'ira-taxable' },
+      { title: HSA, badge: HIGH, impact: '$0/month', time: '5 minutes', prose: ['65', '0%'], button: 'Contribute $367/month to HSA', screen: 'hsa' },
     ],
-    buttons: ["Open Roth IRA - $717/month", "Contribute $367/month to HSA"],
   },
   age54Edge: {
-    text: [
-      "Highest-Impact Items",
-      "7.0% Debt Accruing Interest",
-      "HIGHEST IMPACT",
-      "This balance accrues interest at 7.0% a year. Paying it down avoids that rate; whether that compares favorably to investing the same dollars depends on the return you expect.",
-      "Impact",
-      "in interest per monthly paycheck",
-      "$2",
-      "Time to implement",
-      "6-24 months",
-      "Create Payoff Plan",
-      "High-Impact Optimizations",
-      "No Roth IRA Contributions",
-      "HIGH IMPACT",
-      "Roth IRA contributions are made after tax; qualified withdrawals are untaxed, and contributions themselves can be withdrawn at any time without penalty.",
-      "Impact",
-      "at an assumed 7% return",
-      "$50/month",
-      "Time to implement",
-      "30 minutes",
-      "Open Roth IRA - $717/month",
-      "No HSA Contributions",
-      "HIGH IMPACT",
-      "HSA contributions are deductible, growth is untaxed, and withdrawals for qualified medical costs are untaxed. Non-medical withdrawals after 65 are taxed as income.",
-      "Impact",
-      "deferred tax at your 12% federal bracket",
-      "$44/month",
-      "Time to implement",
-      "5 minutes",
-      "Contribute $367/month to HSA",
+    headings: [CRITICAL_HEADING, IMPORTANT_HEADING],
+    cards: [
+      { title: '7.0% Debt Accruing Interest', badge: HIGHEST, impact: '$2', time: '6-24 months', prose: ['7.0%'], button: 'Create Payoff Plan', screen: 'debts' },
+      { title: ROTH, badge: HIGH, impact: '$50/month', time: '30 minutes', prose: ['7%'], button: 'Open Roth IRA - $717/month', screen: 'ira-taxable' },
+      { title: HSA, badge: HIGH, impact: '$44/month', time: '5 minutes', prose: ['65', '12%'], button: 'Contribute $367/month to HSA', screen: 'hsa' },
     ],
-    buttons: ["Create Payoff Plan", "Open Roth IRA - $717/month", "Contribute $367/month to HSA"],
   },
 };
 
+/** The numbers in `text`: "$1,200", "18.0%", "0.1", "65"; not the 401 of "401k". */
+const numbersIn = (text: string) => text.match(/\$?\d+(?:[.,]\d+)*%?(?!\w)/g) ?? [];
+
+/** What a rendered card shows, in ExpectedCard's shape (screen excepted). */
+function readCard(card: HTMLElement): Omit<ExpectedCard, 'screen'> {
+  const prose = card.cloneNode(true) as HTMLElement;
+  // The prose is what is left without the title, the badge, the value cells and the button.
+  for (const node of Array.from(prose.querySelectorAll('h4, h4 + span, dd, button'))) node.remove();
+  return {
+    title: within(card).getByRole('heading', { level: 4 }).textContent ?? '',
+    badge: card.querySelector('h4 + span')?.textContent ?? '',
+    impact: rowFor('Impact', card).value.textContent ?? '',
+    time: rowFor('Time to implement', card).value.textContent ?? '',
+    prose: numbersIn(prose.textContent ?? ''),
+    button: within(card).getByRole('button').textContent ?? '',
+  };
+}
+
+/** One input section per paycheck form screen, as the calculator page labels them. */
+function mountScreenSections(): Map<HTMLElement, ScreenId> {
+  const sections = new Map<HTMLElement, ScreenId>();
+  for (const formScreen of PAYCHECK_FORM.screens) {
+    const section = document.createElement('section');
+    section.setAttribute('aria-label', formScreen.title);
+    section.scrollIntoView = vi.fn();
+    document.body.appendChild(section);
+    sections.set(section, formScreen.id);
+  }
+  return sections;
+}
+
 describe('QuickActions', () => {
-  describe('golden output', () => {
-    it.each(Object.keys(GOLDEN_PROFILES))('prints exactly the pre-rebuild text for %s', (name) => {
-      const { container } = renderActions(GOLDEN_PROFILES[name]);
-      expect(visibleText(container)).toEqual(GOLDEN_OUTPUT[name].text);
-      expect(screen.queryAllByRole('button').map((button) => button.textContent)).toEqual(GOLDEN_OUTPUT[name].buttons);
+  describe('per profile', () => {
+    it.each(Object.keys(PROFILES))('shows the expected cards, in order, with their figures for %s', (name) => {
+      renderActions(PROFILES[name]);
+      const expected = EXPECTED[name];
+      expect(screen.queryAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(expected.headings);
+      // toEqual ignores the screen, undefined here; the next test clicks through to it.
+      expect(screen.queryAllByRole('article').map(readCard)).toEqual(expected.cards.map((card) => ({ ...card, screen: undefined })));
+      // Every button is a card's own: none outside the cards.
+      expect(screen.queryAllByRole('button')).toHaveLength(expected.cards.length);
+    });
+
+    it.each(Object.keys(PROFILES))('opens the input section of each card for %s', async (name) => {
+      const sections = mountScreenSections();
+      try {
+        renderActions(PROFILES[name]);
+        const user = userEvent.setup();
+        const opened: (ScreenId | undefined)[] = [];
+        for (const button of screen.queryAllByRole('button')) {
+          await user.click(button);
+          opened.push(sections.get(document.activeElement as HTMLElement));
+        }
+        expect(opened).toEqual(EXPECTED[name].cards.map((card) => card.screen));
+      } finally {
+        for (const section of sections.keys()) section.remove();
+      }
     });
 
     it('renders nothing when no action applies', () => {
-      const { container } = renderActions(GOLDEN_PROFILES.nothingToDo);
+      const { container } = renderActions(PROFILES.nothingToDo);
       expect(container).toBeEmptyDOMElement();
     });
   });
 
   describe('cards and groups', () => {
     it('groups the cards under one heading per urgency, most urgent first', () => {
-      renderActions(GOLDEN_PROFILES.age61Everything);
+      renderActions(PROFILES.age61Everything);
 
       expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
         'Highest-Impact Items',
@@ -414,7 +323,7 @@ describe('QuickActions', () => {
     });
 
     it('names each card by its title and badges it with its urgency', () => {
-      renderActions(GOLDEN_PROFILES.weeklyMatchGap);
+      renderActions(PROFILES.weeklyMatchGap);
 
       const match = screen.getByRole('article', { name: 'Employer Match Not Fully Captured' });
       expect(within(match).getByText('HIGHEST IMPACT')).toBeInTheDocument();
@@ -423,14 +332,14 @@ describe('QuickActions', () => {
     });
 
     it('names the highest-rate qualifying debt, not the first one listed', () => {
-      renderActions(GOLDEN_PROFILES.semiMonthlyDebts);
+      renderActions(PROFILES.semiMonthlyDebts);
 
       expect(screen.getByRole('article', { name: '24.0% Debt Accruing Interest' })).toBeInTheDocument();
       expect(screen.queryByRole('article', { name: '9.0% Debt Accruing Interest' })).not.toBeInTheDocument();
     });
 
     it('sizes the HSA action with the 55+ catch-up', () => {
-      renderActions(GOLDEN_PROFILES.monthlyAge56Family);
+      renderActions(PROFILES.monthlyAge56Family);
 
       // Family 8,750 + 1,000 catch-up = 9,750 a year = $813 a month.
       expect(screen.getByRole('button', { name: 'Contribute $813/month to HSA' })).toBeInTheDocument();

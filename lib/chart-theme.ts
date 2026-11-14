@@ -120,9 +120,9 @@ export const CHART_MARGINS = {
 } as const;
 
 /**
- * Spread on every Area, Line and Bar. Recharts' default tween restarts on
- * each data change and dominates the cost of a results update
- * (docs/production-audit.md H2).
+ * Spread on every Area, Line and Bar: charts do not animate. Recharts'
+ * default tween restarts on each data change and dominates the cost of a
+ * results update.
  */
 export const CHART_SERIES_DEFAULTS = { isAnimationActive: false } as const;
 

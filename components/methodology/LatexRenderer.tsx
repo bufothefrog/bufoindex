@@ -15,7 +15,7 @@ export interface LatexRendererProps {
   className?: string;
 }
 
-export function LatexRenderer({
+function LatexRenderer({
   latex,
   html,
   inline = false,

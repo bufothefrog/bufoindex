@@ -19,18 +19,7 @@ import {
 import { resolveOptions, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FieldSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
-import { askedScreens, fromDefaults, type OldQuestion } from '@/test/utils/intakeFixture';
-
-/** The questions the intake asked for the leverage intent before c7 (slice w1's fixture). */
-const OLD_QUESTIONS: Record<string, OldQuestion> = {
-  'person.age': { path: 'person.age', label: 'Your age', kind: 'number', min: 16, max: 100, step: 1 },
-  'leverage:person.retirementAge': { path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', min: 30, max: 85, step: 1 },
-  'investing.taxableMonthlyContribution': { path: 'investing.taxableMonthlyContribution', label: 'Monthly taxable contribution', kind: 'money', help: 'Money you invest each month outside 401(k) and IRA accounts.', min: 0 },
-};
-
-// The old intake also asked investing.investedBalance ("Starting balance"); in
-// v3 the invested balance is the sum of the account list, asked on the
-// shared accounts screen.
+import { askedScreens, fromDefaults } from '@/test/utils/intake';
 
 const spec = (path: string): FieldSpec => LEVERAGE_FORM.fields.find((field) => field.path === path)!;
 const calculatorScreens = (get = fromDefaults()) =>
@@ -67,16 +56,16 @@ describe('leverage form: screens', () => {
     expect(market.title).toBe('Assumptions');
   });
 
-  it('asks the facts and the accounts in the intake, worded as before where they were asked before', () => {
+  it('asks the facts and the accounts in the intake', () => {
     expect(askedScreens('leverage')).toEqual([
       {
         id: 'facts',
         title: 'What goes into the comparison?',
         description: undefined,
         questions: [
-          { ...OLD_QUESTIONS['person.age'], help: undefined, options: undefined },
-          { ...OLD_QUESTIONS['leverage:person.retirementAge'], help: undefined, options: undefined },
-          { ...OLD_QUESTIONS['investing.taxableMonthlyContribution'], options: undefined, max: undefined, step: undefined },
+          { path: 'person.age', label: 'Your age', kind: 'number', help: undefined, options: undefined, min: 16, max: 100, step: 1 },
+          { path: 'person.retirementAge', label: 'Age you plan to stop contributing', kind: 'number', help: undefined, options: undefined, min: 30, max: 85, step: 1 },
+          { path: 'investing.taxableMonthlyContribution', label: 'Monthly taxable contribution', kind: 'money', help: 'Money you invest each month outside 401(k) and IRA accounts.', options: undefined, min: 0, max: undefined, step: undefined },
         ],
       },
       {
@@ -90,19 +79,6 @@ describe('leverage form: screens', () => {
     ]);
     const market = LEVERAGE_FORM.screens[3];
     expect(market.question).toBe('Which market assumptions should the comparison use?');
-  });
-
-  it('still asks every question the old intake asked', () => {
-    const intake = getIntakeScreens('leverage', fromDefaults()).flatMap((s) => s.fields);
-    const asked = new Set([...CORE_PATHS, ...intake]);
-    for (const question of Object.values(OLD_QUESTIONS)) expect(asked.has(question.path), question.path).toBe(true);
-    // The leverage ratio (calculator-only) and the market assumptions stay on the comparison page.
-    expect(intake).toEqual([
-      'person.age',
-      'person.retirementAge',
-      'investing.taxableMonthlyContribution',
-      'portfolio.accounts',
-    ]);
   });
 
   it('takes the typical values on Next on the facts screen', () => {

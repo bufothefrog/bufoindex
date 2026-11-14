@@ -226,7 +226,7 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
       }
     },
     description: "Future value of the contributions when part of them is paid monthly and part once a year, at the start of each simulated year. The traditional IRA, Roth IRA and taxable parts of Auto monthly investing can each be set to once a year on the Monthly investing card; everything else is monthly.",
-    purpose: "Grow the same yearly dollars on the schedule they are actually paid, so the projected balance, the scenarios, coast, the savings-rate curve and the inflation breakeven reflect when the money goes in",
+    purpose: "Grow the same yearly dollars on the schedule they are actually paid, so the projected balance, the scenarios, coast and the savings-rate curve reflect when the money goes in",
     example: {
       inputs: { m: 0, Y: 1200, r: 0.10, n: 3 },
       output: 4369.20,

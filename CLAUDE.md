@@ -2,7 +2,7 @@
 
 BufoIndex is a personal-finance calculator suite: **Next.js 16 (App Router) + React 19 + TypeScript 6 + Tailwind CSS 4 + Vitest 4**, deployed to Vercel (no static-site generator, no GitHub Pages). Calculators live under `app/tools/`, financial logic under `lib/calculations/`, each calculator's form and wiring under `lib/calculators/<id>/`, shared UI under `components/`.
 
-Deeper references: `docs/architecture.md` (calculation layer, Monte Carlo, shared profile and run stores, theming), `docs/redesign-guided-flow.md` (the guided flow and field tiers), `docs/rebuild-plan.md` (the target architecture and the decisions behind it), `docs/agents.md` (process and multi-agent coordination), `CONTRIBUTING.md`.
+Deeper references: `docs/architecture.md` (calculation layer, Monte Carlo, shared profile and run stores, theming), `docs/redesign-guided-flow.md` (what remains of the guided-flow design: the visitor's path, the intake wizard, calculator page tiers), `docs/rebuild-plan.md` (the finished rebuild plan, kept as history; code comments cite its sections, and where it differs from the code the code is right), `docs/open-items.md` (likely defects, open questions with the defaults built, known limits), `docs/agents.md` (process and multi-agent coordination), `CONTRIBUTING.md`.
 
 ## What this project is
 
@@ -12,7 +12,7 @@ Current calculators:
 - **Paycheck Allocator** (`app/tools/paycheck-allocator/`, UI in `components/paycheck-allocator/`) - monthly allocation across fixed costs, tax-advantaged accounts, and flex spending, with bracket-aware tax math.
 - **Retirement Calculator** (`app/tools/retirement-calculator/`) - seeded Monte Carlo modeling (run in a web worker) with Social Security, healthcare, TDF glide path, scenario comparison, and a today's/nominal-dollars display toggle.
 - **Portfolio Rebalancer** (`app/tools/portfolio-rebalancing-calculator/`) - multi-account rebalancing with custom asset classes and placement advice.
-- **Leverage Comparison** (`app/tools/leverage-comparison/`) - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded paths.
+- **Leverage Comparison** (`app/tools/leverage-comparison/`) - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded paths (run in a web worker).
 
 ## Project layout
 
@@ -46,12 +46,15 @@ contexts/                # ThemeContext.tsx
 lib/
   calculations/          # Pure financial logic (retirement.ts holds the Monte Carlo engine)
   calculators/           # registry.ts, forms.ts, runtime.ts, types.ts,
-                         #   <id>/{form,fields,bindings,definition,headline}.ts per calculator
+                         #   <id>/{form,fields,bindings,definition,headline}.ts per calculator;
+                         #   retirement/ adds claiming.ts, income.ts, socialSecurity.ts
   fields/                # Field schema: types, paths, runtime (validation), binding, shared
-  profile/               # The shared profile: types, defaults, migrate (+ migrateV2), accounts, accountTypes
+  profile/               # The shared profile: types, defaults, derived (typical values of
+                         #   unanswered leaves), migrate (+ migrateV2), accounts, accountTypes
   store/                 # profileStore, preferencesStore, createCalculatorStore + one run
                          #   store per calculator
-  workers/               # createWorkerRunner, exposeCalculation, retirementWorker
+  workers/               # createWorkerRunner, exposeCalculation, retirementWorker,
+                         #   leverageWorker
   constants/             # Sourced constants: irs-2026.ts, states-2026.ts, retirement.ts, ...
   utils/                 # index.ts (cn, clamp, formatNumberWithCommas, tax-rate helpers),
                          #   random.ts (seeded LCG + Box-Muller), displayDollars.ts,
@@ -71,7 +74,7 @@ test/
 - **Dev server:** `npm run dev`; **Build:** `npm run build`; **Type check:** `npm run type-check`; **Lint:** `npm run lint`
 - **Tests:** `npm run test` (watch) / `npm run test:run` (one-shot) / `npm run test:coverage` (instruments all of `lib/` and enforces the thresholds in `vitest.config.ts`)
 - **Pre-commit (husky + lint-staged):** `eslint --fix` + `tsc --noEmit` on staged TS/TSX.
-- **CI (`.github/workflows/test.yml`):** type-check, lint with `--max-warnings=0` (any warning fails the build), and the test suite with coverage and the Codecov upload, all on Node 26 only (the version Vercel builds with; `engines.node` is `26.x`, `.nvmrc` says `26`), then separate Node 26 production-build and audit jobs. The audit job blocks on `npm audit --audit-level=high --omit=dev` (production dependencies only) and also runs the full `npm audit --audit-level=high` as a non-blocking report.
+- **CI (`.github/workflows/test.yml`):** type-check, lint with `--max-warnings=0` (any warning fails the build), and the test suite with coverage (the run fails below the floors in `vitest.config.ts`), all on Node 26 only (the version Vercel builds with; `engines.node` is `26.x`, `.nvmrc` says `26`); separate Node 26 production-build and audit jobs run side by side with that job. The audit job blocks on `npm audit --audit-level=high --omit=dev` (production dependencies only) and also runs the full `npm audit --audit-level=high` as a non-blocking report.
 
 There is no editorial-language grep gate, no orchestration shell script wrapping these commands, and no benchmark workflow in CI. Don't add one without discussion.
 

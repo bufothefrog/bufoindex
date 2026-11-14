@@ -32,7 +32,7 @@ A change is ready when:
 - `npm run build` succeeds,
 - the design-system rules in `CLAUDE.md` are respected (semantic classes, `useChartTheme()`, `/demo` parity for new shared components).
 
-Coverage floors are enforced in `vitest.config.ts` — a global floor across the covered `lib/` code and a separate floor for `lib/calculations/`, each set just under the measured coverage — and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
+Coverage floors are enforced in `vitest.config.ts` (a global floor across the covered `lib/` code and a separate floor for `lib/calculations/`, each set just under the measured coverage), and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing (financial calculations and user-visible behaviors) and skip exhaustive coverage of trivial code.
 
 ## Tests
 
@@ -76,7 +76,7 @@ Chart components live with their calculator (e.g. `app/tools/retirement-calculat
 - Orchestration shell scripts that wrap `npm run` commands. The husky hook and CI workflow already invoke type-check, lint, test, and build directly — adding a wrapper layer just hides what's happening.
 - A benchmark CI job that does not run real benchmarks. If you need perf data, write actual benchmarks in `test/` and run them deliberately; a job that reports numbers it never measured is worse than no job at all.
 - An editorial-language grep gate. Voice and tone belong in code review, not in a CI step that fails the build over a word list.
-- Sprint-numbered process documents. Documentation should describe what's true, not what someone planned to do six months ago.
+- Sprint-numbered process documents. Documentation should describe what's true, not what someone planned to do six months ago. A note in `docs/agents/agent-communication/` is working memory for work in flight: when its work merges, move anything still open into `docs/open-items.md` and delete the note.
 
 ## Quick references
 

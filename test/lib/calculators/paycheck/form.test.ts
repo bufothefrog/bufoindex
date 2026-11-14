@@ -3,8 +3,7 @@
  * docs/rebuild-plan.md sections 2.12 to 2.14): the screens in order, the
  * fields on each, the visibility rules, the validation messages, 'remaining'
  * mode with its six screens after the core (the assumptions stay on the
- * page), the skip labels, the tax
- * note, and every question the old intake asked still asked.
+ * page), the skip labels and the tax note.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -29,45 +28,12 @@ import {
 import type { Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, getProfileValue } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
-import {
-  OLD_CORE_FLOW,
-  OLD_CORE_QUESTIONS,
-  OLD_CORE_SCREENS,
-  askedScreens,
-  fromDefaults,
-  intakePaths,
-  oldScreens,
-  type OldQuestion,
-  type OldScreen,
-  type OldScreenCopy,
-} from '@/test/utils/intakeFixture';
+import { askedScreens, fromDefaults, intakePaths } from '@/test/utils/intake';
 
 const FORM = FORMS.paycheck;
 
 /** The paycheck screens after the core that the intake asks, in order (section 2.12). */
 const AFTER_CORE = ['spending-bonus', 'emergency-fund', '401k', 'hsa', 'ira-taxable', 'debts'];
-
-/** The questions the old paycheck intake asked, captured before w1 (see intakeFixture). */
-const OLD_SCREENS: Record<string, OldScreenCopy> = {
-  'fun-money': { title: 'How much fun money do you want each month?' },
-  workplace: { title: 'Does your employer offer a 401(k) or similar plan?' },
-  match: { title: 'How does the employer match work?' },
-};
-
-const OLD_QUESTIONS: Record<string, OldQuestion> = {
-  'spending.funMoneyMin': { path: 'spending.funMoneyMin', label: 'At least, per month', kind: 'money', min: 0 },
-  'spending.funMoneyMax': { path: 'spending.funMoneyMax', label: 'At most, per month', kind: 'money', min: 0 },
-  'workplace.has401k': { path: 'workplace.has401k', label: 'Workplace retirement plan', kind: 'choice', options: [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] },
-  'workplace.matchPercent': { path: 'workplace.matchPercent', label: 'Employer match rate', kind: 'percent', help: 'Per dollar you contribute; 50% means 50 cents.', min: 0, max: 2 },
-  'workplace.matchLimit': { path: 'workplace.matchLimit', label: 'Matched up to this share of your pay', kind: 'percent', help: 'The 4% in "100% of the first 4%".', min: 0, max: 1 },
-};
-
-const OLD_FLOW: readonly OldScreen[] = [
-  ...OLD_CORE_FLOW,
-  ['fun-money', 'paycheck', ['spending.funMoneyMin', 'spending.funMoneyMax']],
-  ['workplace', 'paycheck', ['workplace.has401k']],
-  ['match', 'paycheck', ['workplace.matchPercent', 'workplace.matchLimit']],
-];
 
 const screen = (id: string) => FORM.screens.find((s) => s.id === id)!;
 
@@ -488,26 +454,22 @@ describe('paycheck intake: validation', () => {
   });
 });
 
-describe('paycheck intake: every old question is still asked', () => {
-  it('asks each old paycheck question with its old wording, kind and help; the matched share is capped at 25% now', () => {
-    const old = oldScreens(OLD_FLOW, { ...OLD_CORE_SCREENS, ...OLD_SCREENS }, { ...OLD_CORE_QUESTIONS, ...OLD_QUESTIONS });
-    // The intake asks the shared core, then the paycheck screens ('remaining'
-    // mode); the paycheck form's own basics show on the calculator page only.
-    const asked = new Map(
-      [...askedScreens('core'), ...askedScreens('paycheck').slice(3)].flatMap((s) => s.questions).map((q) => [q.path, q])
-    );
-    const oldQuestions = old.flatMap((s) => s.questions);
-    expect(oldQuestions).toHaveLength(12);
-    for (const question of oldQuestions) {
-      const expected = question.path === 'workplace.matchLimit' ? { ...question, max: 0.25 } : question;
-      expect(asked.get(question.path), question.path).toEqual(expected);
-    }
+describe('paycheck intake: the spending and plan questions', () => {
+  it('asks the fun money, the plan and the match terms with these kinds, bounds and options (the wording is not pinned)', () => {
+    const asked = new Map(askedScreens('paycheck').flatMap((s) => s.questions).map((q) => [q.path, q]));
+    const shape = (path: string) => {
+      const question = asked.get(path);
+      return question && { kind: question.kind, min: question.min, max: question.max, options: question.options?.map((o) => o.value) };
+    };
+    expect(shape('spending.funMoneyMin')).toEqual({ kind: 'money', min: 0, max: undefined, options: undefined });
+    expect(shape('spending.funMoneyMax')).toEqual({ kind: 'money', min: 0, max: undefined, options: undefined });
+    expect(shape('workplace.has401k')).toEqual({ kind: 'boolean', min: undefined, max: undefined, options: [true, false] });
+    expect(shape('workplace.matchPercent')).toEqual({ kind: 'percent', min: 0, max: 2, options: undefined });
+    expect(shape('workplace.matchLimit')).toEqual({ kind: 'percent', min: 0, max: 0.25, options: undefined });
   });
 
-  it('keeps the old core screens, and the page\'s basics word them as the core does', () => {
-    const old = oldScreens(OLD_CORE_FLOW, OLD_CORE_SCREENS, OLD_CORE_QUESTIONS);
-    expect(askedScreens('core')).toEqual(old);
-    expect(askedScreens('paycheck').slice(0, 3)).toEqual(old);
+  it('words the page\'s basics as the core does', () => {
+    expect(askedScreens('paycheck').slice(0, 3)).toEqual(askedScreens('core'));
   });
 });
 
