@@ -108,7 +108,7 @@ Summary of what the build follows:
    the profile.
 8. **z1 is removed.** Nothing is left to delete later. /demo (x2) has no ScenarioBanner entry.
 
-### 0.2 Amendments from the production audit (docs/production-audit.md)
+### 0.2 Amendments from the production audit (of 2026-10-08; deleted, in git history)
 
 These fold measured fixes into the slices that already own the code:
 

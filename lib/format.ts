@@ -2,9 +2,9 @@
  * Display formatters shared by every calculator, the dashboard and the
  * methodology pages (display only; nothing here feeds back into a model).
  *
- * Each Intl.NumberFormat is built once at module scope: constructing one costs
- * about 30 microseconds against under 1 for a cached instance
- * (docs/production-audit.md, H7).
+ * Rule: build each Intl.NumberFormat once at module scope and reuse it, never
+ * per call. Constructing one costs about 30 microseconds against under 1 for
+ * a cached instance.
  *
  * Default outputs were checked to be byte-identical to the legacy formatters
  * these replaced (the formatCurrency / formatPercent copies in lib/utils and
