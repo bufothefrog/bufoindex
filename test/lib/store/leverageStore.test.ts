@@ -200,7 +200,8 @@ describe('the worker runner', () => {
   });
 
   it('falls back to the in-thread simulation when the worker cannot start', async () => {
-    const create = vi.fn(() => {
+    // A constructor (called with new) that throws, as a blocked worker script does.
+    const create = vi.fn(function BlockedWorker() {
       throw new Error('Worker scripts are blocked');
     });
     vi.stubGlobal('Worker', create);
