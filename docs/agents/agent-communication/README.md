@@ -5,7 +5,7 @@ When parallel agents work in this repo, each one drops a short note here describ
 Keep notes short. A useful entry is a few sections, not a checklist:
 
 ```
-# 2026-05-09 — refactor PortfolioRebalancing inputs
+# 2026-05-09 - refactor PortfolioRebalancing inputs
 
 ## Claimed
 - components/calculators/PortfolioRebalancing/*
@@ -23,4 +23,4 @@ Keep notes short. A useful entry is a few sections, not a checklist:
 - Single-account mode has no test for the empty-holdings edge case; flagged for follow-up.
 ```
 
-If you delete or rename a note, that's fine — they're working memory for an in-flight session, not permanent records. Once the work merges, the note can go.
+A note is working memory for work in flight, not a permanent record. When its work merges, move anything still open into `docs/open-items.md` (one line per item) and delete the note; git history keeps it.
