@@ -2,7 +2,7 @@
 
 BufoIndex is a personal-finance calculator suite: **Next.js 16 (App Router) + React 19 + TypeScript 6 + Tailwind CSS 4 + Vitest 4**, deployed to Vercel (no static-site generator, no GitHub Pages). Calculators live under `app/tools/`, financial logic under `lib/calculations/`, each calculator's form and wiring under `lib/calculators/<id>/`, shared UI under `components/`.
 
-Deeper references: `docs/architecture.md` (calculation layer, Monte Carlo, shared profile and run stores, theming), `docs/redesign-guided-flow.md` (the guided flow and field tiers), `docs/rebuild-plan.md` (the target architecture and the decisions behind it), `docs/agents.md` (process and multi-agent coordination), `CONTRIBUTING.md`.
+Deeper references: `docs/architecture.md` (calculation layer, Monte Carlo, shared profile and run stores, theming), `docs/redesign-guided-flow.md` (what remains of the guided-flow design: the visitor's path, the intake wizard, calculator page tiers), `docs/rebuild-plan.md` (the finished rebuild plan, kept as history; code comments cite its sections, and where it differs from the code the code is right), `docs/open-items.md` (likely defects, open questions with the defaults built, known limits), `docs/agents.md` (process and multi-agent coordination), `CONTRIBUTING.md`.
 
 ## What this project is
 
@@ -46,9 +46,11 @@ contexts/                # ThemeContext.tsx
 lib/
   calculations/          # Pure financial logic (retirement.ts holds the Monte Carlo engine)
   calculators/           # registry.ts, forms.ts, runtime.ts, types.ts,
-                         #   <id>/{form,fields,bindings,definition,headline}.ts per calculator
+                         #   <id>/{form,fields,bindings,definition,headline}.ts per calculator;
+                         #   retirement/ adds claiming.ts, income.ts, socialSecurity.ts
   fields/                # Field schema: types, paths, runtime (validation), binding, shared
-  profile/               # The shared profile: types, defaults, migrate (+ migrateV2), accounts, accountTypes
+  profile/               # The shared profile: types, defaults, derived (typical values of
+                         #   unanswered leaves), migrate (+ migrateV2), accounts, accountTypes
   store/                 # profileStore, preferencesStore, createCalculatorStore + one run
                          #   store per calculator
   workers/               # createWorkerRunner, exposeCalculation, retirementWorker,
