@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import type { TestingLibraryMatchers } from '@testing-library/jest-dom/matchers'
 import { expect } from 'vitest'
 
 // Global test configuration
@@ -18,12 +19,19 @@ export interface FinancialMatchers<R = unknown> {
 }
 
 declare module 'vitest' {
-  // Vitest's own Assertion interface defaults its type parameter to `any`;
-  // the augmentation must match that shape for declaration merging.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type -- the merged interface must repeat Vitest's `any` default and adds members only through FinancialMatchers
-  interface Assertion<T = any> extends FinancialMatchers<T> {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the augmentation adds its members only through FinancialMatchers
-  interface AsymmetricMatchersContaining extends FinancialMatchers {}
+  // Vitest 5 types custom matchers through Matchers<R, T> (R is the
+  // matcher's return type, T the received type); Assertion and
+  // AsymmetricMatchersContaining both extend it. It no longer reads the
+  // global jest.Matchers, which is where the main '@testing-library/jest-dom'
+  // types put the DOM matchers, so they are added here as well. The type
+  // parameters must repeat Vitest's declaration exactly for the merge.
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- declaration merging requires Vitest's second type parameter even though these matchers do not use it
+    T = unknown,
+  >
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jest-dom's first parameter is the asymmetric-matcher type; its own Vitest entry passes `any` too
+    extends FinancialMatchers<R>, TestingLibraryMatchers<any, R> {}
 }
 
 /**

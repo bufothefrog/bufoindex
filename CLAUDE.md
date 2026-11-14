@@ -1,6 +1,6 @@
 # BufoIndex Developer Guide
 
-BufoIndex is a personal-finance calculator suite: **Next.js 16 (App Router) + React 19 + TypeScript 6 + Tailwind CSS 4 + Vitest 4**, deployed to Vercel (no static-site generator, no GitHub Pages). Calculators live under `app/tools/`, financial logic under `lib/calculations/`, each calculator's form and wiring under `lib/calculators/<id>/`, shared UI under `components/`.
+BufoIndex is a personal-finance calculator suite: **Next.js 16 (App Router) + React 19 + TypeScript 6 + Tailwind CSS 4 + Vitest 5**, deployed to Vercel (no static-site generator, no GitHub Pages). Calculators live under `app/tools/`, financial logic under `lib/calculations/`, each calculator's form and wiring under `lib/calculators/<id>/`, shared UI under `components/`.
 
 Deeper references: `docs/architecture.md` (calculation layer, Monte Carlo, shared profile and run stores, theming), `docs/redesign-guided-flow.md` (what remains of the guided-flow design: the visitor's path, the intake wizard, calculator page tiers), `docs/rebuild-plan.md` (the finished rebuild plan, kept as history; code comments cite its sections, and where it differs from the code the code is right), `docs/open-items.md` (likely defects, open questions with the defaults built, known limits), `docs/agents.md` (process and multi-agent coordination), `CONTRIBUTING.md`.
 

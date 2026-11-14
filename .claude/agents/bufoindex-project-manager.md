@@ -37,7 +37,7 @@ A useful split is often: one agent on the calculation module + tests, one on the
 ## What not to do
 - Don't recreate sprint-numbered process documents, "quality-gates" shell scripts, "philosophy-compliance" greps, or benchmark CI jobs. Those were removed for cause; `docs/agents.md` documents why.
 - Don't add backwards-compatibility shims, removal notices, or commented-out code. Delete cleanly.
-- Don't introduce new build/test infrastructure casually. The current toolchain (Next 16, TS 6, Vitest 4, ESLint, Husky, lint-staged) covers what's needed.
+- Don't introduce new build/test infrastructure casually. The current toolchain (Next 16, TS 6, Vitest 5, ESLint, Husky, lint-staged) covers what's needed.
 
 ## When you're not the right tool
 If the request is a single-file edit, a one-shot question, a refactor confined to one module, or anything where coordination overhead would dominate — decline politely and recommend doing it directly without spawning sub-agents.
