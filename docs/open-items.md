@@ -80,7 +80,7 @@ session that built it, to be confirmed or changed.
 - An unanswered stored Social Security benefit loads as Auto, and an unanswered stored emergency fund target loads as 3
   months (`UNANSWERED_LOADS_AS`, lib/profile/defaults.ts:657). Not an owner decision. (PR 3)
 - Old saved inputs of the previous site ('retirement-calculator', 'paycheck-allocator-storage') stay in localStorage
-  unread, and a version 1 'bufo-profile' loses its new-cash value. This reads the owner's "we do not need to preserve
+  unread, and a version 1 'bufo-profile' loses its new-cash value and its old displayMode. This reads the owner's "we do not need to preserve
   any functionality from old version of website"; the detail is not an owner decision. (PR 1)
 
 ### Accounts and the rebalancer
@@ -172,6 +172,13 @@ session that built it, to be confirmed or changed.
   not exist. When no account can take new cash it stays and reads "No account can take new cash."
   (components/calculators/renderers/portfolio.tsx:141). (PR 4)
 - The holdings editor has no per-account target column; targets are portfolio-wide. (PR 4)
+- A version 2 profile that typed the emergency fund and also held it in a brokerage account keeps that double count
+  after migration: the account migrates as an ordinary brokerage row, so the emergency fund and the invested total
+  stay as in version 2 until the visitor ticks "Holds my emergency fund" on that account (lib/profile/migrateV2.ts,
+  run from lib/profile/migrate.ts:33). (PR 4, example 6)
+- Typical values a version 2 visitor accepted with Next migrate as money the visitor entered: the example Roth IRA
+  (4,100) and Brokerage (8,775) rows become the visitor's own account rows, so the paycheck allocator's Roth IRA
+  balance can read 4,100 with ira.roth answered No (lib/profile/migrateV2.ts). (PR 4, example 8)
 - Not in the account model: per-account yields, cash accounts that are not the emergency fund, routing new cash to
   more than the first account of each kind, importing holdings, a rebalancer option to exclude an account, stronger
   rebalancer example numbers. (PR 4)
@@ -196,7 +203,13 @@ session that built it, to be confirmed or changed.
   (lib/calculations/retirement.ts:657), the 0.90 multiplier of the on-track conservative scenario
   (lib/calculations/retirement.ts:767), and the `Math.max` in `fiYearsEarlier` (lib/calculations/projections.ts:215).
 - Test gaps in the savings-rate label placement (savingsRateLabelPositions): mutations M10 (no right bound), M11
-  (offLine always true), M14 (rate label overlaps the dot) and M26 (dot radius doubled) fail no test. (PR 6)
+  (offLine always true), M14 (rate label overlaps the dot) and M26 (dot radius doubled) fail no test, and neither do
+  the weakest readings of M19, M21 and M27 (below baseline at dot.y + DOT_GAP + ASCENT, the line read at rate + 1
+  point, above with bottomAt at dot.y - DOT_GAP). (PR 6)
+- Some PR 6 layout rules are checked only in a browser, and no unit test fails when one is reverted: the NextSteps
+  columns layout (components/guided/NextSteps.tsx), the rule that lets a last input card alone span the row from lg
+  to below xl and the results skeleton's `lg:min-h-screen` (components/calculators/shared/CalculatorPage.tsx), and the
+  account editor's container query (components/calculators/renderers/accounts.tsx). (PR 6)
 - The leverage page at 1280 px logs a Recharts "width(0) and height(0)" console warning now and then.
 - Shared-layer constraints (rebuild 1): a list row's field callbacks see only that row, so a row whose options depend
   on another list needs a custom renderer; `validateFields` has no surface filter, so a page validates per screen; a
@@ -225,7 +238,7 @@ headers, /demo noindex).
   (app/start/page.tsx:22-25).
 - W2 (rest): beyond the baseline headers, there is no script-src or style-src content security policy, no HSTS
   header from the app and no Cross-Origin-Opener-Policy; whether Vercel adds HSTS is unverified.
-- W3: `compiler.removeConsole` strips every console call in production, error and warn included (next.config.js:4-6);
+- W3: `compiler.removeConsole` strips every console call in production, error and warn included (`compiler.removeConsole` in next.config.js);
   app/error.tsx does not log the error it receives; there is no app/global-error.tsx.
 - W4: no real-user measurement (no Speed Insights, no web-vitals reporting); adding it touches the privacy copy, so it
   is the owner's call.
