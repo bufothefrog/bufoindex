@@ -32,7 +32,7 @@ A change is ready when:
 - `npm run build` succeeds,
 - the design-system rules in `CLAUDE.md` are respected (semantic classes, `useChartTheme()`, `/demo` parity for new shared components).
 
-Coverage floors are enforced in `vitest.config.ts` — a global floor across the covered `lib/` code and a higher bar for `lib/calculations/` — and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
+Coverage floors are enforced in `vitest.config.ts` — a global floor across the covered `lib/` code and a separate floor for `lib/calculations/`, each set just under the measured coverage — and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
 
 ## Tests
 
@@ -67,7 +67,7 @@ A useful agent-communication entry is just a few sections: claimed files, what w
 
 ## Calculator additions / changes
 
-A calculator is five files in `lib/calculators/<id>/` (`form.ts`, `fields.ts`, `bindings.ts`, `definition.ts`, `headline.ts`), registered in `lib/calculators/registry.ts`, with its page under `app/tools/<id>/` and any custom field renderers in `components/calculators/renderers/`. The rule and what each file holds are in the "A calculator is five files" convention in `CLAUDE.md`; pure financial logic goes in `lib/calculations/` with a matching test in `test/lib/calculations/`.
+A calculator is five files in `lib/calculators/<id>/` (`form.ts`, `fields.ts`, `bindings.ts`, `definition.ts`, `headline.ts`), registered in `lib/calculators/registry.ts`, with its page under the route its registry entry names (`path`, e.g. `app/tools/paycheck-allocator/`) and any custom field renderers in `components/calculators/renderers/`. The rule and what each file holds are in the "A calculator is five files" convention in `CLAUDE.md`; pure financial logic goes in `lib/calculations/` with a matching test in `test/lib/calculations/`.
 
 Chart components live with their calculator (e.g. `app/tools/retirement-calculator/components/`) and take their colors from `useChartTheme()`.
 

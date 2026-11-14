@@ -156,4 +156,4 @@ Vitest 4 + jsdom (`vitest.config.ts`; `@/` aliases repo root). Suites:
 - `test/components/` — Testing Library component tests.
 - `test/factories/test-data-factory.ts` — shared mock builders.
 
-Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts`: a global floor for everything covered, and a higher statements/branches bar for `lib/calculations/` — the layer where a wrong number is a bug rather than a styling issue.
+Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts`: a global floor for everything covered, and a separate statements/branches floor for `lib/calculations/` (the layer where a wrong number is a bug rather than a styling issue), each set just under the measured coverage.

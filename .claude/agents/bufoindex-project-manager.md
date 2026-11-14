@@ -30,7 +30,7 @@ Before declaring the coordinated work done:
 Coverage thresholds are enforced by `vitest.config.ts`, and CI fails when they are not met. Above them, cover what's load-bearing (financial calculations and user-visible behaviors) and skip exhaustive coverage of trivial code.
 
 ## Calculator-shaped work
-A new or substantially-changed calculator follows the "A calculator is five files" rule in `CLAUDE.md` (`lib/calculators/<id>/`, registered in `lib/calculators/registry.ts`), plus its page under `app/tools/<id>/`, pure logic in `lib/calculations/` with a test in `test/lib/calculations/`, and a `/demo` entry for new shared components.
+A new or substantially-changed calculator follows the "A calculator is five files" rule in `CLAUDE.md` (`lib/calculators/<id>/`, registered in `lib/calculators/registry.ts`), plus its page under the route its registry entry names (`path`, e.g. `app/tools/paycheck-allocator/`), pure logic in `lib/calculations/` with a test in `test/lib/calculations/`, and a `/demo` entry for new shared components.
 
 A useful split is often: one agent on the calculation module + tests, one on the page/components, with the integrator wiring them at the end.
 
