@@ -45,15 +45,9 @@ next-env.d.ts
 coverage/
 *.lcov
 .nyc_output
-test-results/
-playwright-report/
-playwright/.cache/
 
 # Caches
 .cache/
-.parcel-cache/
-.sass-cache/
-.stylelintcache
 .eslintcache
 .turbo/
 
@@ -75,16 +69,6 @@ pnpm-lock.yaml
 
 # Vercel
 .vercel
-
-# Stale perf-monitoring artifacts (the system was removed; ignored so leftovers
-# from old branches don't get committed by accident)
-performance-baseline.json
-performance-report-*.json
-performance-dashboard.json
-.performance-alerts.json
-.performance-baselines.json
-.performance-history.json
-quality-check.log
 
 # Claude Code local files (keep agents synced)
 .claude/**/*.local
