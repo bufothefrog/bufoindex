@@ -133,6 +133,8 @@ describe('useLeverageStore', () => {
       { path: 'leverage.startingBalance', value: 0 },
     ]);
     useLeverageStore.getState().submit(profile(), { immediate: true });
+    await useLeverageStore.getState().flush();
+    expect(simulateSpy).toHaveBeenCalledTimes(1);
     const after = useLeverageStore.getState();
     expect(after.errors).toEqual({ calculation: 'Enter a monthly contribution or a starting balance.' });
     expect(after.stale).toBe(true);
@@ -144,6 +146,8 @@ describe('useLeverageStore', () => {
     await run();
     useProfileStore.getState().setValues([{ path: 'strategy.leverageRatio', value: 3.5 }]);
     useLeverageStore.getState().submit(profile(), { immediate: true });
+    await useLeverageStore.getState().flush();
+    expect(simulateSpy).toHaveBeenCalledTimes(1);
     expect(useLeverageStore.getState().errors).toEqual({
       'strategy.leverageRatio': 'Leverage ratio must be between 1 and 3.',
     });

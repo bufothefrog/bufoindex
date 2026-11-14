@@ -238,6 +238,7 @@ describe('LeverageComparison page', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Monthly contribution' }), { target: { value: '0' } });
     await user.click(within(sourceSwitch('Starting balance')).getByRole('radio', { name: 'Custom' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Starting balance' }), { target: { value: '0' } });
+    await settle();
 
     const status = screen.getAllByRole('status').find((node) => node.textContent?.includes('Results out of date'));
     expect(status).toHaveTextContent('Enter a monthly contribution or a starting balance.');
