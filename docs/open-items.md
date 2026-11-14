@@ -80,8 +80,9 @@ session that built it, to be confirmed or changed.
 - An unanswered stored Social Security benefit loads as Auto, and an unanswered stored emergency fund target loads as 3
   months (`UNANSWERED_LOADS_AS`, lib/profile/defaults.ts:657). Not an owner decision. (PR 3)
 - Old saved inputs of the previous site ('retirement-calculator', 'paycheck-allocator-storage') stay in localStorage
-  unread, and a version 1 'bufo-profile' loses its new-cash value and its old displayMode. This reads the owner's "we do not need to preserve
-  any functionality from old version of website"; the detail is not an owner decision. (PR 1)
+  unread, and a version 1 'bufo-profile' loses its new-cash value and its old displayMode. This reads the owner's
+  "we do not need to preserve any functionality from old version of website"; the detail is not an owner decision.
+  (PR 1)
 
 ### Accounts and the rebalancer
 
@@ -163,6 +164,10 @@ session that built it, to be confirmed or changed.
 - Debt step: `calculateHighInterestDebt` removes only the extra payment from the money left, so a card's minimum
   payment stays available and can fund the emergency step (lib/calculations/optimization.ts:208-213). Fixing it moves
   allocations for every visitor with high-interest debt. (PR 5)
+- Retirement withdrawal tax: the engine takes only single and married filing jointly (`retirementFilingStatus`,
+  lib/calculators/retirement/bindings.ts:45; `calculateEffectiveTaxRate`, lib/calculations/retirement.ts:361), so
+  married filing separately and head of household run as single, although lib/constants/irs-2026.ts has brackets and
+  deductions for all four. The retirement page says so in a note (`filingStatusNote`). (rebuild 3, PR 2)
 - `contributionParts` caps the 401(k) deferral at the 402(g) limit and computes the match on the capped deferral; the
   paycheck allocator's ten-year projection (lib/calculations/projections.ts) does not cap it, so the two differ for a
   high election. IRA monthly amounts are capped in neither. (PR 4)
@@ -238,7 +243,7 @@ headers, /demo noindex).
   (app/start/page.tsx:22-25).
 - W2 (rest): beyond the baseline headers, there is no script-src or style-src content security policy, no HSTS
   header from the app and no Cross-Origin-Opener-Policy; whether Vercel adds HSTS is unverified.
-- W3: `compiler.removeConsole` strips every console call in production, error and warn included (`compiler.removeConsole` in next.config.js);
+- W3: `compiler.removeConsole` strips every console call in production, error and warn included (next.config.js);
   app/error.tsx does not log the error it receives; there is no app/global-error.tsx.
 - W4: no real-user measurement (no Speed Insights, no web-vitals reporting); adding it touches the privacy copy, so it
   is the owner's call.
