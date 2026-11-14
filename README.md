@@ -54,7 +54,6 @@ Node 26 is required (`engines` in `package.json` is `26.x`; `.nvmrc` says `26`),
 | `npm run type-check`    | `tsc --noEmit`                   |
 | `npm run test`          | Vitest watch mode                |
 | `npm run test:run`      | Vitest one-shot                  |
-| `npm run test:ui`       | Vitest browser UI                |
 | `npm run test:coverage` | Vitest one-shot + v8 coverage    |
 
 Pre-commit (husky + lint-staged) runs `eslint --fix` and `tsc --noEmit` on staged TypeScript. CI runs type-check, a zero-warning lint gate (`--max-warnings=0`), and the tests with coverage on Node 26 only, plus separate Node 26 production-build and dependency-audit jobs (the audit blocks on high or critical advisories in production dependencies and reports dev-dependency advisories without failing).
