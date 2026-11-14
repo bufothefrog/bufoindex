@@ -1,5 +1,8 @@
 # BufoIndex DRY refactor: target architecture and migration plan
 
+> **History.** This is the finished rebuild plan, kept as a record of the decisions behind the code (code comments cite
+> its section numbers). It is not updated. Where it differs from the code, docs/architecture.md and the code are right.
+
 Status: all five phases have landed. Their hand-off notes (rebuild-1-foundations.md to rebuild-5-cleanup.md) were deleted once merged and are in git history; what they left open is in docs/open-items.md. The original status line below is kept as a record.
 
 Later change (next-3 follow-up stack, slice c1-profile-versus-calculator): strategy.preset and its screen, labels and cash-buffer rule were removed; the leverage ratio and the Social Security claiming age became calculator-only questions (surface 'calculator'); cash.targetMonths moved to the emergency fund screen. The tables and lists below that name them describe the plan as written at the time.
