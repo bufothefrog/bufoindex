@@ -73,6 +73,10 @@ session that built it, to be confirmed or changed.
 - The current federal bracket is computed from pay: yearly gross minus the traditional 401(k) share (capped at the
   402(g) limit) minus HSA payroll money (capped) minus the standard deduction (`currentBracketFrom` in
   lib/calculators/paycheck/bindings.ts, lib/calculations/taxBracket.ts). Not an owner decision. (PR 3)
+- The Social Security Auto estimate treats current gross pay as the 35-year earnings average, counts one worker's own
+  benefit (a joint filer's pay as one worker's pay), and models no spousal or survivor benefit and no bonus pay
+  (lib/calculations/socialSecurityEstimate.ts, lib/calculators/retirement/income.ts; stated on the methodology page).
+  Not an owner decision. (PR 3)
 - An unanswered stored Social Security benefit loads as Auto, and an unanswered stored emergency fund target loads as 3
   months (`UNANSWERED_LOADS_AS`, lib/profile/defaults.ts:657). Not an owner decision. (PR 3)
 - Old saved inputs of the previous site ('retirement-calculator', 'paycheck-allocator-storage') stay in localStorage
