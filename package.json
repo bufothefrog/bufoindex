@@ -75,5 +75,8 @@
   },
   "engines": {
     "node": "26.x"
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true
   }
 }
