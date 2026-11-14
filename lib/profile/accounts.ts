@@ -14,7 +14,7 @@
  * or anything under lib/calculators, because those import it. It uses
  * literal paths.
  *
- * Rules (the orchestrating design of PR 4, not a decision of the site owner):
+ * Rules:
  * - An account's value is its holdings when they are worth more than 0,
  *   otherwise its typed balance.
  * - While the list is unanswered (the example list), a stored row shows only

@@ -15,9 +15,8 @@ import {
   calculateIncomeTaxRate,
   calculateHSATaxRate,
   getFICARate,
-  calculateMarginalTaxRate,
 } from '@/lib/utils'
-import { CONTRIBUTION_LIMITS, TAX_BRACKETS } from '@/lib/types'
+import { CONTRIBUTION_LIMITS_2026, FEDERAL_TAX_BRACKETS_2026 } from '@/lib/constants/irs-2026'
 
 describe('Tax Rate Functions', () => {
   describe('calculateIncomeTaxRate (federal + state only, no FICA)', () => {
@@ -64,13 +63,6 @@ describe('Tax Rate Functions', () => {
       // 22% federal + 9.3% CA + 2.35% (Medicare + additional) = 32.85%
       expect(rate).toBeCloseTo(0.22 + 0.093 + 0.0235, 4)
     })
-
-    it('should match old calculateMarginalTaxRate for income below SS wage base', () => {
-      // For incomes below SS wage base, HSA rate should equal old marginal rate
-      const hsaRate = calculateHSATaxRate(0.22, 'CA', 100000)
-      const oldMarginalRate = calculateMarginalTaxRate(0.22, 'CA')
-      expect(hsaRate).toBeCloseTo(oldMarginalRate, 4)
-    })
   })
 
   describe('getFICARate', () => {
@@ -93,7 +85,7 @@ describe('Tax Rate Functions', () => {
 
 describe('2026 IRS Constants Verification', () => {
   describe('contribution limits (IRS Notice 2025-67)', () => {
-    const limits = CONTRIBUTION_LIMITS[2026]
+    const limits = CONTRIBUTION_LIMITS_2026
 
     it('should have correct 401k limits', () => {
       expect(limits.traditional401k).toBe(24500)
@@ -125,7 +117,7 @@ describe('2026 IRS Constants Verification', () => {
   })
 
   describe('tax brackets (Rev. Proc. 2025-32, OBBBA)', () => {
-    const brackets = TAX_BRACKETS[2026]
+    const brackets = FEDERAL_TAX_BRACKETS_2026
 
     it('should have correct 2026 single brackets', () => {
       expect(brackets.single[0]).toEqual({ min: 0, max: 12400, rate: 0.10 })
@@ -135,9 +127,9 @@ describe('2026 IRS Constants Verification', () => {
     })
 
     it('should have correct 2026 MFJ brackets', () => {
-      expect(brackets.marriedJoint[0]).toEqual({ min: 0, max: 24800, rate: 0.10 })
-      expect(brackets.marriedJoint[1]).toEqual({ min: 24800, max: 100800, rate: 0.12 })
-      expect(brackets.marriedJoint[6]).toEqual({ min: 768700, max: Infinity, rate: 0.37 })
+      expect(brackets.marriedFilingJointly[0]).toEqual({ min: 0, max: 24800, rate: 0.10 })
+      expect(brackets.marriedFilingJointly[1]).toEqual({ min: 24800, max: 100800, rate: 0.12 })
+      expect(brackets.marriedFilingJointly[6]).toEqual({ min: 768700, max: Infinity, rate: 0.37 })
     })
   })
 })

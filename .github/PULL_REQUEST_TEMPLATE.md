@@ -9,8 +9,9 @@
 ## Verification
 
 - [ ] `npm run type-check` passes
-- [ ] `npm run lint` passes
+- [ ] `npm run lint -- --max-warnings=0` passes (any warning fails CI)
 - [ ] `npm run test:run` passes (new behavior has tests)
+- [ ] `npm run build` succeeds
 - [ ] Checked in both light and dark mode (for UI changes)
 
 ## Notes for review

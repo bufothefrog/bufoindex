@@ -94,7 +94,6 @@ const RESULTS: RetirementResults = {
   ],
   netWorthByAge: { 25: 10000, 60: 2_500_000, 61: 2_450_000 },
   withdrawalsByAge: { 61: 100_000 },
-  insights: [],
   initialWithdrawalRate: 0.032,
 };
 

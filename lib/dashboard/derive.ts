@@ -189,7 +189,7 @@ export function buildChecklistRows(
 /* ------------------------------------------------------------------ */
 
 /** Extra monthly savings used for the one-line "biggest lever" hint. */
-export const LEVER_EXTRA_MONTHLY = 500;
+const LEVER_EXTRA_MONTHLY = 500;
 
 export interface RetirementLever {
   extraMonthly: number;

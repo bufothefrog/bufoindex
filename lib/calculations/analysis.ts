@@ -1,5 +1,6 @@
 import { AllocationItem, PaycheckProfile, SkippedItem } from '../types';
-import { formatCurrency, formatPercent, calculateOpportunityCost } from './core';
+import { formatCurrency, formatPercent } from '@/lib/format';
+import { calculateOpportunityCost } from './core';
 import { calculateIncomeTaxRate } from '../utils';
 import { monthlyRateOf } from './contributionSchedule';
 
@@ -340,38 +341,6 @@ function calculateTwentyYearDebtOpportunityCost(
   const debtSavings = monthlyExtra * months; // Simplified - actual calculation would need debt balance and rate
   
   return Math.max(0, futureValue - debtSavings);
-}
-
-/**
- * Analyze investment fee impact
- */
-export function analyzeInvestmentFees(
-  portfolioValue: number, 
-  currentFeeRatio: number
-): SkippedItem | null {
-  const optimalFeeRatio = 0.0003; // Target ultra-low-cost index funds
-  const excessFees = currentFeeRatio - optimalFeeRatio;
-  
-  if (excessFees > 0.002) { // Only flag if fees >0.2% excessive
-    const annualExcessFees = portfolioValue * excessFees;
-    const twentyYearCost = calculateOpportunityCost(annualExcessFees, 20);
-    
-    return {
-      id: 'high-investment-fees',
-      item: 'High Investment Fees',
-      reason: `Paying ${formatPercent(currentFeeRatio)} vs optimal ${formatPercent(optimalFeeRatio)} fees`,
-      opportunityCost: {
-        monthly: annualExcessFees / 12,
-        annual: annualExcessFees,
-        twentyYear: twentyYearCost,
-      },
-      alternative: 'Switch to low-cost index funds (VTI, VTSAX) with <0.05% expense ratios',
-      riskLevel: 'low',
-      education: 'High fees compound against you - a 1% fee can cost 25% of your returns over 30 years',
-    };
-  }
-  
-  return null;
 }
 
 /**

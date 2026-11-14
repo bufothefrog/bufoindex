@@ -22,22 +22,15 @@ If anything you read elsewhere contradicts those files, those files win.
 ## Quality bar (from `docs/agents.md`)
 Before declaring the coordinated work done:
 - `npm run type-check` clean
-- `npm run lint` passes (under the warning ceiling)
+- `npm run lint -- --max-warnings=0` passes (zero warnings, as in CI)
 - `npm run test:run` passes; new logic has tests
 - `npm run build` succeeds
-- design-system rules respected (semantic Tailwind classes, `getChartTheme()` for charts, `/demo` parity for new shared components)
+- design-system rules respected (semantic Tailwind classes, `useChartTheme()` for charts, `/demo` parity for new shared components)
 
-There is no fixed coverage requirement. Cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
+Coverage thresholds are enforced by `vitest.config.ts`, and CI fails when they are not met. Above them, cover what's load-bearing (financial calculations and user-visible behaviors) and skip exhaustive coverage of trivial code.
 
 ## Calculator-shaped work
-A new or substantially-changed calculator typically touches:
-- `app/tools/<calculator-name>/page.tsx` (and subroutes)
-- `lib/calculations/<calculator-name>.ts` — pure logic, no React
-- `lib/types/` — shared input/output types
-- `components/calculators/` or a calculator-specific subdir
-- `test/lib/calculations/<calculator-name>.test.ts`
-- optionally `test/components/<Component>.test.tsx`
-- optionally a `/demo` entry for new shared components
+A new or substantially-changed calculator follows the "A calculator is five files" rule in `CLAUDE.md` (`lib/calculators/<id>/`, registered in `lib/calculators/registry.ts`), plus its page under the route its registry entry names (`path`, e.g. `app/tools/paycheck-allocator/`), pure logic in `lib/calculations/` with a test in `test/lib/calculations/`, and a `/demo` entry for new shared components.
 
 A useful split is often: one agent on the calculation module + tests, one on the page/components, with the integrator wiring them at the end.
 

@@ -25,6 +25,7 @@ import {
   calculateTDFAllocation,
   calculateTDFReturnForAge,
   calculateTDFVolatilityForAge,
+  determineRetirementStatus,
   futureValue,
   futureValueOfAnnuity,
   INCOME_PERIOD_MULTIPLIERS,
@@ -41,8 +42,6 @@ import {
   STANDARD_DEDUCTIONS_2026,
   FEDERAL_TAX_BRACKETS_2026,
 } from '@/lib/constants/irs-2026'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 
 /**
  * Helper: produce a deterministic, typical-case set of retirement inputs
@@ -703,11 +702,7 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     expect(result.scenarios.length).toBeGreaterThan(0)
     expect(typeof result.netWorthByAge).toBe('object')
     expect(typeof result.withdrawalsByAge).toBe('object')
-    expect(Array.isArray(result.insights)).toBe(true)
     expect(typeof result.initialWithdrawalRate).toBe('number')
-    expect(result.scenarioAnalysis).toBeDefined()
-    expect(result.coastFireAnalysis).toBeDefined()
-    expect(result.inflationAnalysis).toBeDefined()
   })
 
   it('is deterministic across repeated runs (seeded Monte Carlo)', () => {
@@ -716,12 +711,6 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     expect(a.scenarios.map((s) => s.successProbability)).toEqual(
       b.scenarios.map((s) => s.successProbability),
     )
-  })
-
-  it('limits insights to a maximum of 3 entries', () => {
-    // The prioritizeInsights cap is 3 by design; verify the contract.
-    const result = calculateRetirementAnalysis(makeInputs())
-    expect(result.insights.length).toBeLessThanOrEqual(3)
   })
 
   it('emits a netWorthByAge entry for every age from start to lifeExpectancy', () => {
@@ -940,7 +929,7 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       targetIncome: 200000, // wildly out of reach
     })
     const result = calculateRetirementAnalysis(inputs)
-    expect(result.scenarioAnalysis?.status).toBe('falling')
+    expect(result.scenarios.some((s) => s.id === 'current-plan-falling-short')).toBe(true)
     // Falling-short branch always emits the reality scenarios.
     expect(result.scenarios.some((s) => s.id === 'reality-age')).toBe(true)
     expect(result.scenarios.some((s) => s.id === 'reality-income')).toBe(true)
@@ -953,7 +942,12 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       targetIncome: 30000,
     })
     const result = calculateRetirementAnalysis(inputs)
-    expect(result.scenarioAnalysis?.status).toBe('exceeding')
+    expect(result.scenarios.some((s) => s.id === 'current-plan-exceeding')).toBe(true)
+  })
+
+  it('drives an "on track" status when the plan roughly meets its target', () => {
+    const result = calculateRetirementAnalysis(makeInputs({ riskProfile: 'tdf' }))
+    expect(result.scenarios.some((s) => s.id === 'current-plan-baseline')).toBe(true)
   })
 
   it('gives the "live on affordable income" scenario a high success probability (4% rule, no double inflation)', () => {
@@ -976,7 +970,7 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
       riskProfile: 'custom',
     })
     const result = calculateRetirementAnalysis(inputs)
-    expect(result.scenarioAnalysis?.status).toBe('falling')
+    expect(result.scenarios.some((s) => s.id === 'current-plan-falling-short')).toBe(true)
 
     const reality = result.scenarios.find((s) => s.id === 'reality-income')
     expect(reality).toBeDefined()
@@ -1009,6 +1003,33 @@ describe('calculateRetirementAnalysis (orchestrator)', () => {
     const roundedMonthly = Math.round(affordableToday / 12 / 100) * 100
     expect(reality.name).toContain(`$${roundedMonthly.toLocaleString('en-US')}`)
     expect(reality.name).toContain("today's dollars")
+  })
+})
+
+describe('determineRetirementStatus (which scenarios a plan gets)', () => {
+  it('returns "exceeding" at ratio >= 1.2 with success > 0.85', () => {
+    expect(determineRetirementStatus(1.2, 0.86)).toBe('exceeding')
+    expect(determineRetirementStatus(2.0, 0.99)).toBe('exceeding')
+  })
+
+  it('demotes a high ratio to "onTrack" when success <= 0.85', () => {
+    // Ratio qualifies for exceeding, but the success-rate guard fails; the
+    // onTrack tier (ratio >= 0.9, success >= 0.70) still accepts it.
+    expect(determineRetirementStatus(1.5, 0.80)).toBe('onTrack')
+    expect(determineRetirementStatus(1.2, 0.85)).toBe('onTrack')
+  })
+
+  it('returns "onTrack" between 0.9 and 1.2 with adequate success', () => {
+    expect(determineRetirementStatus(0.9, 0.70)).toBe('onTrack')
+    expect(determineRetirementStatus(1.1, 0.75)).toBe('onTrack')
+  })
+
+  it('returns "falling" below a 0.9 ratio regardless of success rate', () => {
+    expect(determineRetirementStatus(0.89, 0.99)).toBe('falling')
+  })
+
+  it('returns "falling" when the success rate is below 0.70', () => {
+    expect(determineRetirementStatus(1.0, 0.69)).toBe('falling')
   })
 })
 

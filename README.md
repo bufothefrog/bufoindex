@@ -92,7 +92,7 @@ docs/                    # architecture.md, agents.md, agents/ (patterns, coordi
 
 ## Testing
 
-Every module in `lib/calculations/` has a matching suite in `test/lib/calculations/`; utilities are covered in `test/lib/utils/`, the field schema in `test/lib/fields/`, calculator wiring in `test/lib/calculators/`, the profile in `test/lib/profile/`, stores in `test/lib/store/`, the formula registry in `test/lib/formulas/`, and components in `test/components/` (`npm run test:run`). Calculation tests assert real numeric values, hand-computed where practical. Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts` (a higher bar for `lib/calculations/` than for the rest), and CI fails when they are not met.
+Every module in `lib/calculations/` has a matching suite in `test/lib/calculations/`; utilities are covered in `test/lib/utils/`, the field schema in `test/lib/fields/`, calculator wiring in `test/lib/calculators/`, the profile in `test/lib/profile/`, stores in `test/lib/store/`, the formula registry in `test/lib/formulas/`, and components in `test/components/` (`npm run test:run`). Calculation tests assert real numeric values, hand-computed where practical. Coverage is instrumented across `lib/` (type-only modules excluded) with floors defined in `vitest.config.ts` (a global floor and a separate floor for `lib/calculations/`, each set just under the measured coverage), and CI fails when they are not met.
 
 ## Development process
 

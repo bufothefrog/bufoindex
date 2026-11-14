@@ -41,8 +41,8 @@ CI lints with `--max-warnings=0`, so leave no warnings behind. It also runs
   figures belong in `lib/constants/` with a source comment (e.g. the IRS
   Revenue Procedure number). See `lib/constants/irs-2026.ts` for the pattern.
 - **Use semantic theme tokens**, never raw palette classes (`bg-blue-500`,
-  `text-gray-600`, hex literals). Charts must use `getChartTheme()` from
-  `@/lib/chart-theme`. Check both light and dark mode.
+  `text-gray-600`, hex literals). Charts must take their colors from
+  `useChartTheme()` (`@/components/ui/charts`). Check both light and dark mode.
 - **Compose existing components** from `components/ui/` before writing new
   ones. The `/demo` page catalogs what exists.
 - **Neutral tone.** Calculators show the math and let the reader judge; copy
@@ -51,7 +51,7 @@ CI lints with `--max-warnings=0`, so leave no warnings behind. It also runs
 ## Reporting calculation errors
 
 Math bugs are the highest-value reports. Please include the inputs that
-reproduce the issue (a share URL is ideal), the value shown, and the value you
+reproduce the issue (the input values, one per field), the value shown, and the value you
 expected with your reasoning or a source.
 
 ## License

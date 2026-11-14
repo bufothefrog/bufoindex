@@ -61,7 +61,7 @@ import {
 } from '@/lib/profile/accounts';
 import { cn } from '@/lib/utils';
 
-/** The answer whose Yes suggests an account of each kind (lib/profile/accounts.ts, section 3 of the PR 4 contract). */
+/** The answer whose Yes suggests an account of each kind (the suggestion rules are in lib/profile/accounts.ts). */
 const SEED_LABEL: Readonly<Partial<Record<AccountKind, string>>> = {
   '401k': HAS_401K.label,
   'roth-401k': HAS_401K.label,
@@ -90,7 +90,7 @@ function getAfter(get: Get, writes: readonly Write[]): Get {
  * too.", plus, when an empty account of the same kind would be suggested
  * again (its answer is still Yes), the sentence that says so.
  */
-export function removeAccountMessage(get: Get, account: AccountRow, writes: readonly Write[]): string {
+function removeAccountMessage(get: Get, account: AccountRow, writes: readonly Write[]): string {
   const base = `Delete ${accountLabel(get, account)}? Its holdings will be removed too.`;
   const group = kindGroup(account.kind);
   const suggested = accountsInEffect(getAfter(get, writes)).suggested.find((row) => group.includes(row.kind));

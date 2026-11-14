@@ -115,7 +115,7 @@ export function isCoreReady(profile: FinancialProfile): boolean {
 }
 
 /** Where an intent's intake leads: the seeded calculator, or the overview for 'profile'. */
-export function intentDestination(intent: IntakeIntent, profile: FinancialProfile): string {
+function intentDestination(intent: IntakeIntent, profile: FinancialProfile): string {
   return intent === 'profile' ? '/overview' : INTAKE_DESTINATION[intent](profile);
 }
 

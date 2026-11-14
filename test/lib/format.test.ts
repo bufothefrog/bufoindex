@@ -1,10 +1,8 @@
 /**
  * Tests for the shared display formatters (lib/format.ts).
  *
- * Every expectation is a literal string, worked out from the legacy code
- * paths the new functions replace (Intl en-US rounding is half away from
- * zero; Number.prototype.toFixed rounds the exact binary value). The last
- * block compares the new functions to the legacy ones over the same inputs.
+ * Every expectation is a literal string (Intl en-US rounding is half away
+ * from zero; Number.prototype.toFixed rounds the exact binary value).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -23,49 +21,6 @@ import {
 } from '@/lib/format';
 
 const MINUS = '\u2212';
-
-// The leverage results' own formatters, frozen here as they were when slice
-// c7 deleted app/tools/leverage-comparison/components/format.ts, so the
-// parity block below keeps comparing against them.
-
-/** $950, $12.3k, $633k, $1.20M, $12.4M */
-function formatCompactCurrency(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? MINUS : '';
-  if (abs >= 1_000_000) {
-    const m = abs / 1_000_000;
-    return `${sign}$${m >= 10 ? m.toFixed(1) : m.toFixed(2)}M`;
-  }
-  if (abs >= 1_000) {
-    const k = abs / 1_000;
-    return `${sign}$${k >= 100 ? k.toFixed(0) : k.toFixed(1)}k`;
-  }
-  return `${sign}$${abs.toFixed(0)}`;
-}
-
-/** +$54.8k, or the U+2212 minus for a negative; $0 when it rounds to zero. */
-function formatSignedCompactCurrency(value: number): string {
-  if (Math.abs(value) < 0.5) return '$0';
-  return value > 0 ? `+${formatCompactCurrency(value)}` : formatCompactCurrency(value);
-}
-
-/** 0.434 -> "43%"; 0.0795 with 2 digits -> "7.95%" */
-function formatPct(fraction: number, digits = 0): string {
-  return `${(fraction * 100).toFixed(digits)}%`;
-}
-
-/** 0.095 -> "+9.5%", the U+2212 minus for a negative; rounds to zero -> "0.0%" */
-function formatSignedPct(fraction: number, digits = 1): string {
-  const rounded = Number((fraction * 100).toFixed(digits));
-  const text = `${Math.abs(rounded).toFixed(digits)}%`;
-  if (rounded === 0) return text;
-  return rounded > 0 ? `+${text}` : `${MINUS}${text}`;
-}
-
-/** 2 -> "2x", 1.5 -> "1.5x" */
-function formatLeverage(ratio: number): string {
-  return `${Number(ratio.toFixed(2))}x`;
-}
 
 describe('formatCurrency', () => {
   const cases: Array<[number, CurrencyFormatOptions | undefined, string]> = [
@@ -93,6 +48,11 @@ describe('formatCurrency', () => {
     [633_400, { compact: true }, '$633k'],
     [1_200_000, { compact: true }, '$1.20M'],
     [12_400_000, { compact: true }, '$12.4M'],
+    // Exactly at each compact edge: the larger unit or the shorter form wins.
+    [1_000, { compact: true }, '$1.0k'],
+    [100_000, { compact: true }, '$100k'],
+    [1_000_000, { compact: true }, '$1.00M'],
+    [10_000_000, { compact: true }, '$10.0M'],
     [-59_300, { compact: true }, `${MINUS}$59.3k`],
     [-0.3, { compact: true }, `${MINUS}$0`],
     [1234.5, { compact: true, cents: true }, '$1.2k'],
@@ -179,7 +139,9 @@ describe('formatPercent', () => {
 
 describe('formatMultiple', () => {
   it.each([
+    [1, '1x'],
     [2, '2x'],
+    [3, '3x'],
     [1.5, '1.5x'],
     [2.25, '2.25x'],
     [2.256, '2.26x'],
@@ -213,6 +175,7 @@ describe('formatMonths', () => {
     [0.96, '1 month'],
     [2.04, '2 months'],
     [3.25, '3.3 months'],
+    [12, '12 months'],
     [-1, '-1 months'],
   ])('formatMonths(%s) -> %s', (value, expected) => {
     expect(formatMonths(value)).toBe(expected);
@@ -302,70 +265,5 @@ describe('formatValue', () => {
 
   it.each(cases)('formatValue(%s, %s) -> %s', (value, kind, expected) => {
     expect(formatValue(value, kind)).toBe(expected);
-  });
-});
-
-describe('parity with the legacy formatters (delete each case when its legacy formatter is deleted)', () => {
-  const MONEY = [0, 0.4, 0.5, -0.5, 1, 950, 999.6, 1234, 1234.5, -1234.4, 12_345, 99_960, 578_000, -59_300, 1_200_000, 12_400_000, 1e9, NaN];
-  const FRACTIONS = [0, 0.0004, -0.0004, 0.003, -0.003, 0.07, 0.075, 0.0795, 0.095, -0.1, 0.12345, 0.125, 0.434, 1, 12.345];
-  const RATIOS = [1, 1.5, 2, 2.25, 2.256, 2.999, 3];
-
-  it('leverage formatCompactCurrency equals formatCurrency(n, { compact: true })', () => {
-    for (const n of [...MONEY, -0.3]) {
-      expect(formatCurrency(n, { compact: true })).toBe(formatCompactCurrency(n));
-    }
-  });
-
-  it('leverage formatSignedCompactCurrency equals formatCurrency(n, { compact: true, signed: true })', () => {
-    for (const n of [...MONEY, -0.4, -54_800]) {
-      expect(formatCurrency(n, { compact: true, signed: true })).toBe(formatSignedCompactCurrency(n));
-    }
-  });
-
-  // formatPct printed "-0.0%" for small negatives;
-  // the new function prints that as "0.0%". Every other output is identical.
-  const unsignedZero = (legacy: string) => (/^-0(\.0+)?%$/.test(legacy) ? legacy.slice(1) : legacy);
-
-  it('leverage formatPct equals formatPercent(f, { digits }), negative zero aside', () => {
-    for (const f of FRACTIONS) {
-      for (const digits of [0, 1, 2]) {
-        expect(formatPercent(f, { digits })).toBe(unsignedZero(formatPct(f, digits)));
-      }
-      expect(formatPercent(f, { digits: 0 })).toBe(unsignedZero(formatPct(f)));
-    }
-    expect(formatPct(-0.0004, 1)).toBe('-0.0%');
-  });
-
-  it('leverage formatSignedPct equals formatPercent(f, { digits, signed: true })', () => {
-    for (const f of FRACTIONS) {
-      for (const digits of [0, 1, 2]) {
-        expect(formatPercent(f, { digits, signed: true })).toBe(formatSignedPct(f, digits));
-      }
-      expect(formatPercent(f, { digits: 1, signed: true })).toBe(formatSignedPct(f));
-    }
-  });
-
-  it('leverage formatLeverage equals formatMultiple(r)', () => {
-    for (const r of RATIOS) {
-      expect(formatMultiple(r)).toBe(formatLeverage(r));
-    }
-  });
-
-  // The dashboard's own formatMultiple and formatMonths copies were deleted in
-  // slice d1; the dashboard now calls these. Pinned to what the copies printed.
-  it('formatMultiple prints the leverage ratios as the dashboard did', () => {
-    expect([1, 1.5, 2, 3].map((v) => formatMultiple(v))).toEqual(['1x', '1.5x', '2x', '3x']);
-  });
-
-  it('formatMonths prints months on hand as the dashboard did', () => {
-    expect([0, 0.96, 1, 2.04, 2.5, 3.25, 12].map((v) => formatMonths(v))).toEqual([
-      '0 months',
-      '1 month',
-      '1 month',
-      '2 months',
-      '2.5 months',
-      '3.3 months',
-      '12 months',
-    ]);
   });
 });

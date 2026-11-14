@@ -15,12 +15,11 @@ import {
   calculateTaxableInvestment
 } from './optimization';
 import { identifySkippedOptimizations } from './analysis';
-import { calculateProjections, calculateOptimizationScore } from './projections';
+import { calculateProjections } from './projections';
 
 /**
  * Paycheck frequency conversion utilities
  */
-export { FREQUENCY_MULTIPLIERS } from '../constants/frequency';
 import { FREQUENCY_MULTIPLIERS } from '../constants/frequency';
 
 /**
@@ -168,14 +167,10 @@ export function calculateOptimalAllocation(profile: PaycheckProfile): Allocation
   // Step 4: Calculate future projections
   const projections = calculateProjections(updatedProfile, allocations);
 
-  // Step 5: Calculate optimization score
-  const optimizationScore = calculateOptimizationScore(updatedProfile, allocations, skippedItems);
-  
   return {
     allocations,
     skippedItems,
     projections,
-    optimizationScore,
     funMoneyAllocated: minFunMoneyMonthly, // Keep monthly for compatibility
     funMoneyRange: {
       min: minFunMoneyMonthly,
@@ -216,7 +211,7 @@ export function getDefaultProfile(): PaycheckProfile {
       monthlyGross: 5417, // 2500 * 2.17
       monthlyNet: 4123,   // 1900 * 2.17
       
-      // Legacy fields for backward compatibility
+      // Short names for monthlyGross and monthlyNet, plus the monthly bonus
       gross: 5417,
       net: 4123,
       bonusExpected: 0,
@@ -297,90 +292,6 @@ export function getDefaultProfile(): PaycheckProfile {
     source: 'user_input',
   };
 }
-
-/**
- * Validate profile data and return errors
- */
-export function validateProfile(profile: PaycheckProfile): Record<string, string> {
-  const errors: Record<string, string> = {};
-  
-  // Income validation
-  if (profile.income.gross <= 0) {
-    errors.grossIncome = 'Gross income must be greater than 0';
-  }
-  
-  if (profile.income.net <= 0) {
-    errors.netIncome = 'Net income must be greater than 0';
-  }
-  
-  if (profile.income.net >= profile.income.gross) {
-    errors.netIncome = 'Net income cannot be greater than gross income';
-  }
-  
-  // Tax bracket validation
-  const validBrackets = [0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37];
-  if (!validBrackets.includes(profile.taxes.federalBracket)) {
-    errors.federalBracket = 'Please select a valid federal tax bracket';
-  }
-  
-  // Benefits validation
-  if (profile.benefits.employer401k.available) {
-    if (profile.benefits.employer401k.matchPercent < 0 || profile.benefits.employer401k.matchPercent > 1) {
-      errors.employerMatch = 'Employer match percentage must be between 0% and 100%';
-    }
-    
-    if (profile.benefits.employer401k.currentContribution < 0 || profile.benefits.employer401k.currentContribution > 1) {
-      errors.currentContribution = 'Current contribution must be between 0% and 100%';
-    }
-  }
-  
-  // Debt validation
-  profile.debts.forEach((debt, index) => {
-    if (debt.balance <= 0) {
-      errors[`debt_${index}_balance`] = 'Debt balance must be greater than 0';
-    }
-    
-    if (debt.interestRate < 0 || debt.interestRate > 0.50) {
-      errors[`debt_${index}_rate`] = 'Interest rate must be between 0% and 50%';
-    }
-    
-    if (debt.minimumPayment <= 0) {
-      errors[`debt_${index}_payment`] = 'Minimum payment must be greater than 0';
-    }
-  });
-  
-  // Preferences validation
-  if (profile.preferences.emergencyFundMonths < 0 || profile.preferences.emergencyFundMonths > 12) {
-    errors.emergencyFundMonths = 'Emergency fund target must be between 0 and 12 months';
-  }
-  
-  if (profile.preferences.funMoney.min < 0) {
-    errors.funMoneyMin = 'Fun money minimum cannot be negative';
-  }
-  
-  if (profile.preferences.funMoney.max < profile.preferences.funMoney.min) {
-    errors.funMoneyMax = 'Fun money maximum must be greater than minimum';
-  }
-  
-  return errors;
-}
-
-/**
- * Calculate estimated monthly expenses based on profile
- */
-export function estimateMonthlyExpenses(profile: PaycheckProfile): number {
-  // Basic estimation: net income minus typical savings/discretionary spending
-  const baseLiving = profile.income.net * 0.7; // Assume 70% goes to fixed expenses
-  const debtPayments = profile.debts.reduce((sum, debt) => sum + debt.minimumPayment, 0);
-  
-  return baseLiving + debtPayments;
-}
-
-/**
- * Currency and percentage display, from the shared formatters (byte-identical
- * default output).
- */
-export { formatCurrency, formatPercent } from '@/lib/format';
 
 /**
  * Calculate compound growth

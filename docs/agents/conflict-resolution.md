@@ -16,7 +16,7 @@ Short playbook for when two agents (or two engineers) collide while working in p
 
 ## Interface conflict
 
-**Symptom:** two agents shipped incompatible signatures for a shared type or function (e.g. `lib/types/`, a calculation, or a shared component prop).
+**Symptom:** two agents shipped incompatible signatures for a shared type or function (e.g. a calculator's `definition.ts`, a calculation, or a shared component prop).
 
 1. The agent that owns the definition (or the integrator) picks the final signature.
 2. All call sites are updated to match.

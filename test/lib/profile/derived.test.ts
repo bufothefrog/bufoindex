@@ -18,7 +18,6 @@ import { summarizeCashBuffer } from '@/lib/dashboard/derive';
 import { getAt, setAt } from '@/lib/fields/paths';
 import { getDefaultFinancialProfile, normalizeProfile } from '@/lib/profile/defaults';
 import {
-  DERIVED_DEPENDENCIES,
   DERIVED_PATHS,
   derivedEmergencyFundBalance,
   derivedHsaCoverage,
@@ -79,14 +78,13 @@ describe('the rules', () => {
     expect(derivedRetirementBracket(10000, 'single')).toBe(0.1);
   });
 
-  it('lists each derived leaf with the leaves it reads', () => {
+  it('lists the derived leaves in rule order', () => {
     expect(DERIVED_PATHS).toEqual([
       'cash.emergencyFundBalance',
       'spending.targetRetirementIncome',
       'hsa.coverage',
       'assumptions.paycheck.expectedRetirementBracket',
     ]);
-    expect(Object.keys(DERIVED_DEPENDENCIES)).toEqual([...DERIVED_PATHS]);
   });
 });
 

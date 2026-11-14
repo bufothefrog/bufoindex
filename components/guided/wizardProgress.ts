@@ -52,7 +52,7 @@ export function isUnder(path: string, paths: readonly string[]): boolean {
  * writes (onChange) to paths on no field of this screen. They are answers
  * too, so the screen saves and marks them as the calculator page would.
  */
-export function coupledPaths(writes: readonly Write[], own: readonly string[]): string[] {
+function coupledPaths(writes: readonly Write[], own: readonly string[]): string[] {
   return writes.map((w) => w.path).filter((path) => !isUnder(path, own));
 }
 
@@ -196,7 +196,7 @@ export function skipScreens(
  * skipScreens. Edits made after a screen was answered and not confirmed
  * again with Next are not in it.
  */
-export function confirmedProfile(
+function confirmedProfile(
   seed: FinancialProfile,
   progress: WizardProgress,
   order: readonly Pick<ScreenSpec, 'id'>[]

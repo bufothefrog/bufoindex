@@ -61,14 +61,14 @@ function plural(count: number, one: string, many: string): string {
  * cash. Every account rebalancedAccounts returns meets it, so it holds
  * whenever the rebalancer works on an account.
  */
-export function hasTargetsInEffect(get: Get): boolean {
+function hasTargetsInEffect(get: Get): boolean {
   return rebalanceCandidates(get).some(
     (account) => hasHoldings(get, account.id) || normalNewCash(get, account.id) > 0 || newCashFor(get, account.id) > 0
   );
 }
 
 /** True while an account in effect, other than a cash account, has a holding (the holdings screen shows). */
-export function hasHoldingsInEffect(get: Get): boolean {
+function hasHoldingsInEffect(get: Get): boolean {
   return accountsInEffect(get).rows.some((account) => account.kind !== 'cash' && hasHoldings(get, account.id));
 }
 

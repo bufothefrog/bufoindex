@@ -6,8 +6,9 @@
  *
  * Bounds follow plan section 2.3: the match rate 0-200% and its limit 0-25%
  * of pay, the 401(k) contribution 0-100%, and debt rates 0-50%. The
- * emergency fund target months are a shared fact (lib/fields/shared.ts). The old engine-side checks (validateProfile,
- * O18) live on as these bounds and the fun-money relation.
+ * emergency fund target months are a shared fact (lib/fields/shared.ts). The
+ * engine has no input checks of its own: these bounds and the fun-money
+ * relation are the paycheck allocator's input rules.
  */
 
 import { limitHsa } from '@/lib/calculations/contributionLimits';
@@ -428,7 +429,7 @@ export function retirementBracketRange(filingStatus: FilingStatus, stored: numbe
  * select shows that bracket and validation passes without rewriting
  * storage; the binding reads the same nearest rate (retirementBracketFrom).
  */
-export function retirementBracketOptions(filingStatus: FilingStatus, state: string, stored?: number): FieldOption[] {
+function retirementBracketOptions(filingStatus: FilingStatus, state: string, stored?: number): FieldOption[] {
   const info = getStateTaxInfo(state);
   // Two decimals at most, so 5.09% (GA) is not shown as 5.1%.
   const statePart = info?.hasStateTax ? ` + ${Number((info.rate * 100).toFixed(2))}% ${state}` : '';

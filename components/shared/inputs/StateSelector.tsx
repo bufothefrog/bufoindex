@@ -23,7 +23,7 @@ export interface StateOption {
 }
 
 // Complete list of US states and DC with 2025 tax rates
-export const US_STATES: StateOption[] = [
+const US_STATES: StateOption[] = [
   { code: 'AL', name: 'Alabama', hasIncomeTax: true, rate: 0.05 },
   { code: 'AK', name: 'Alaska', hasIncomeTax: false, rate: 0 },
   { code: 'AZ', name: 'Arizona', hasIncomeTax: true, rate: 0.042 },

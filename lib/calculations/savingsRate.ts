@@ -5,7 +5,7 @@
  * implies for the target income, and that contribution as a share of the
  * current income.
  *
- * Moved from the retirement calculator's SavingsRateChart (rebuild slice c2).
+ * The retirement calculator's SavingsRateChart plots this series.
  * The target income and the required contribution are in today's dollars:
  * the target is not inflated to the retirement year.
  *

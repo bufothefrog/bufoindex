@@ -15,7 +15,8 @@ export interface IncomeData {
   monthlyGross: number;
   monthlyNet: number;
   
-  // Legacy fields for backward compatibility (computed from paycheck values)
+  // Short names for monthlyGross and monthlyNet, plus the monthly bonus
+  // (computed from paycheck values)
   gross: number;
   net: number;
   bonusExpected: number; // Converted to monthly equivalent
@@ -174,23 +175,10 @@ export interface ProjectionData {
   };
 }
 
-export interface OptimizationScore {
-  overall: number; // 0-100
-  breakdown: {
-    taxEfficiency: number;
-    employerBenefits: number;
-    debtStrategy: number;
-    emergencyFundSize: number;
-    accountPrioritization: number;
-  };
-  comparison: number; // Score with current strategy
-}
-
 export interface AllocationResult {
   allocations: AllocationItem[];
   skippedItems: SkippedItem[];
   projections: ProjectionData;
-  optimizationScore: OptimizationScore;
   funMoneyAllocated: number; // Monthly amount for compatibility
   funMoneyRange: {
     min: number;
@@ -212,24 +200,3 @@ export interface AllocationResult {
     availablePerPaycheck: number;
   };
 }
-
-// Constants - imported from single source of truth
-import {
-  FEDERAL_TAX_BRACKETS_2026,
-  CONTRIBUTION_LIMITS_2026,
-} from '../constants/irs-2026';
-
-// Re-export with legacy keyed structure for backward compatibility
-export const TAX_BRACKETS = {
-  2026: {
-    single: FEDERAL_TAX_BRACKETS_2026.single,
-    marriedJoint: FEDERAL_TAX_BRACKETS_2026.marriedFilingJointly,
-  }
-} as const;
-
-export const CONTRIBUTION_LIMITS = {
-  2026: CONTRIBUTION_LIMITS_2026,
-} as const;
-
-// State income tax rates moved to lib/constants/states-2026.ts
-// (single source of truth). Import STATE_TAX_RATES_2026 from there.

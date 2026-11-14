@@ -6,7 +6,6 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as financialSteps from '@/lib/constants/financialSteps';
 import { FINANCIAL_STEPS } from '@/lib/constants/financialSteps';
 
 describe('FINANCIAL_STEPS', () => {
@@ -30,18 +29,6 @@ describe('FINANCIAL_STEPS', () => {
   it('names no starter or one-month step', () => {
     for (const step of FINANCIAL_STEPS) {
       expect(`${step.id} ${step.name}`).not.toMatch(/1-?month|starter|one month/i);
-    }
-  });
-
-  it('no longer exports the starter-step display helpers', () => {
-    for (const name of [
-      'ENGINE_STARTER_FUND_ACCOUNT',
-      'STARTER_FUND_LABEL',
-      'STARTER_FUND_REASONING',
-      'allocationDisplayLabel',
-      'allocationDisplayText',
-    ]) {
-      expect(financialSteps).not.toHaveProperty(name);
     }
   });
 });

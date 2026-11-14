@@ -30,9 +30,8 @@ import {
   updateLegacyIncomeFields,
   paycheckToMonthly,
   calculateCompoundGrowth,
-  formatCurrency,
-  formatPercent,
 } from '@/lib/calculations/core'
+import { formatCurrency, formatPercent } from '@/lib/format'
 import { ALLOCATION_PRIORITY } from '@/lib/calculations/optimization'
 import { calculateStepStatus } from '@/lib/utils/stepStatusUtils'
 import { FINANCIAL_STEPS, StepStatus } from '@/lib/constants/financialSteps'
@@ -1341,48 +1340,6 @@ describe('projections', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Optimization score
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('optimization score', () => {
-  it('keeps the overall score and every breakdown component within [0, 100]', () => {
-    const bad = collect((c, report) => {
-      const s = c.result.optimizationScore
-      if (!(s.overall >= 0 && s.overall <= 100)) report(`overall = ${s.overall}`)
-      for (const [k, v] of Object.entries(s.breakdown)) {
-        if (!(v >= 0 && v <= 100)) report(`breakdown.${k} = ${v}`)
-      }
-      if (!(s.comparison >= 0 && s.comparison <= 100)) report(`comparison = ${s.comparison}`)
-    })
-    expect(bad).toEqual([])
-  })
-
-  /**
-   * Regression guard for: the recommendation is an increment on what the profile
-   * already does, so grading both on one rubric can never put the plan below the
-   * status quo it contains.
-   *
-   * Trigger profiles: `weekly | zero-paycheck | 401k-zero-percent-match |
-   * hsa-family | debt-low-interest | ef-zero | age-50 |
-   * prefs-necessary-above-net-income` scored overall 44 against comparison 50,
-   * and `bi-weekly | typical-paycheck | 401k-contribution-above-100pct` scored
-   * 61 against 75, because `comparison` came from a separate formula that graded
-   * the profile on a 40-point base capped at 75 while `overall` graded only the
-   * allocations.
-   */
-  it('never scores the recommended plan below the typical-advice comparison', () => {
-    const bad = collect((c, report) => {
-      const s = c.result.optimizationScore
-      if (s.overall < s.comparison) report(`overall ${s.overall} < comparison ${s.comparison}`)
-    })
-    expect(bad).toEqual([])
-    // Both numbers move across the grid, so the comparison is a real one.
-    expect(new Set(GRID.map((c) => c.result.optimizationScore.comparison)).size).toBeGreaterThan(1)
-    expect(GRID.some((c) => c.result.optimizationScore.overall > c.result.optimizationScore.comparison)).toBe(true)
-  })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Step statuses
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2024,7 +1981,7 @@ describe('inputs collected by the UI', () => {
    * `bonusAmount`, `bonusFrequency`) are collected by the UI and converted to
    * `income.bonusExpected` by core.ts `updateLegacyIncomeFields`, but no
    * downstream calculation reads `bonusExpected`, so a bonus never changes a
-   * single allocation, skipped item, projection or score.
+   * single allocation, skipped item or projection.
    */
   it('produces identical results with and without a bonus (bonus inputs are inert)', () => {
     const withoutBonus = runCase(baseSelection({ bonus: BONUSES[0] }))
@@ -2033,7 +1990,6 @@ describe('inputs collected by the UI', () => {
       expect(withBonus.result.allocations).toEqual(withoutBonus.result.allocations)
       expect(withBonus.result.skippedItems).toEqual(withoutBonus.result.skippedItems)
       expect(withBonus.result.projections).toEqual(withoutBonus.result.projections)
-      expect(withBonus.result.optimizationScore).toEqual(withoutBonus.result.optimizationScore)
     }
   })
 
@@ -2057,8 +2013,7 @@ describe('inputs collected by the UI', () => {
    *
    * Trigger profile: `prefs-funmoney-min-above-max` (min 800, max 200) —
    * reachable because the max input is not constrained to the min, and
-   * `validateProfile` only reports the error, it never blocks
-   * `calculateOptimalAllocation`. It reported
+   * nothing in `calculateOptimalAllocation` rejects that input. It reported
    * `{ min: 800, max: 200, difference: -600 }`.
    *
    * A second, quieter case: `Number(max) || minFunMoneyMonthly || 0` treated a

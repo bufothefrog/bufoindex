@@ -40,7 +40,7 @@ export interface CalculatorDefinition<E, R> {
   calculate: (inputs: E) => R;
   /**
    * Delay between a submit and the run. 0 dispatches synchronously on
-   * submit. Phase 3 values: retirement 300 (off-thread), paycheck 150,
+   * submit. Current values: retirement 300 (off-thread), paycheck 150,
    * portfolio 0, leverage 250 (audit H3).
    */
   debounceMs: number;

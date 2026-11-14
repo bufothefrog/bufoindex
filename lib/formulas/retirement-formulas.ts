@@ -731,7 +731,7 @@ const retirementFormulas: Omit<FormulaRegistryEntry, 'id' | 'filePath' | 'valida
 /**
  * Register all retirement formulas with the global registry
  */
-export function registerRetirementFormulas() {
+function registerRetirementFormulas() {
   retirementFormulas.forEach((formula) => {
     const { functionName, ...metadata } = formula;
     const formulaId = `retirement-${metadata.name.toLowerCase().replace(/\s+/g, '-')}`;

@@ -3,7 +3,7 @@
  *
  * Covers identifySkippedOptimizations (emergency-fund sizing/APY checks,
  * Roth-vs-Traditional strategy, debt-payment strategy, low-interest debt
- * prepayment, missed employer match) and analyzeInvestmentFees.
+ * prepayment, missed employer match).
  *
  * All opportunity-cost expectations are hand-computed from the module's
  * stated assumptions: 7% expected market return, compound opportunity cost
@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { identifySkippedOptimizations, analyzeInvestmentFees } from '@/lib/calculations/analysis'
+import { identifySkippedOptimizations } from '@/lib/calculations/analysis'
 import type { PaycheckProfile, SkippedItem } from '@/lib/types'
 import {
   createPaycheckProfile,
@@ -22,8 +22,6 @@ import {
   createEmployerBenefits,
   createDebtData,
 } from '@/test/factories/test-data-factory'
-// Side-effect import: registers the toBeCloseToCurrency custom matcher.
-import '@/test/utils/financial-test-helpers'
 
 /** Find a skipped item by id, or undefined. */
 function findItem(items: SkippedItem[], id: string): SkippedItem | undefined {
@@ -665,27 +663,5 @@ describe('identifySkippedOptimizations', () => {
     })
 
     expect(identifySkippedOptimizations(profile)).toEqual([])
-  })
-})
-
-describe('analyzeInvestmentFees', () => {
-  it('flags fees more than 0.2% above the 0.03% optimal ratio', () => {
-    // $100,000 at 1.00% vs optimal 0.03%: excess = 0.97% -> $970/yr
-    //   monthly = 970 / 12 = $80.8333
-    //   twentyYear = 970 * (1.07^20 - 1.02^20) = 970 * (3.8696845 - 1.4859474) = $2,312.22
-    const item = analyzeInvestmentFees(100000, 0.01)
-
-    expect(item).not.toBeNull()
-    expect(item!.id).toBe('high-investment-fees')
-    expect(item!.opportunityCost.monthly).toBeCloseToCurrency(80.83)
-    expect(item!.opportunityCost.annual).toBeCloseToCurrency(970)
-    expect(item!.opportunityCost.twentyYear).toBeCloseToCurrency(2312.22)
-    expect(item!.riskLevel).toBe('low')
-  })
-
-  it('returns null for low-cost funds and at exactly the 0.2% excess boundary', () => {
-    expect(analyzeInvestmentFees(100000, 0.0005)).toBeNull()
-    // excess = 0.0023 - 0.0003 = 0.002 exactly, condition is strictly > 0.002
-    expect(analyzeInvestmentFees(100000, 0.0023)).toBeNull()
   })
 })

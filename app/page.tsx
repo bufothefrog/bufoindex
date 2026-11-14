@@ -1,7 +1,7 @@
 import type { Metadata, Route } from 'next'
 import Link from 'next/link'
 import { ArrowRight, ClipboardList, LockKeyhole, MonitorSmartphone, Sigma } from 'lucide-react'
-import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard'
+import LazyContinueProfileCard from '@/components/guided/LazyContinueProfileCard'
 import { buttonVariants } from '@/components/ui/button'
 import { CALCULATORS, SITE_DISCLAIMER, calculatorHref } from '@/lib/calculators/registry'
 import { CORE_START_PATH, getIntentOption, type IntakeIntent } from '@/lib/constants/intake'
@@ -133,7 +133,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <ContinueProfileCard className="md:mx-auto md:max-w-xl" />
+        <LazyContinueProfileCard className="md:mx-auto md:max-w-xl" />
       </div>
 
       <section aria-labelledby="what-you-can-learn" className="space-y-4">

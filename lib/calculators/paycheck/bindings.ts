@@ -21,7 +21,7 @@
  *   emergency fund while none does).
  * - The invested total (investedBalance): every account in effect except
  *   the emergency-fund accounts, for the net worth the projections start
- *   from. This leaf is new in PR 5; the old mapper had no such value.
+ *   from.
  * - The current federal bracket (currentBracketFrom): the 2026 bracket of
  *   yearly gross pay (bonus included) minus the traditional 401(k) share
  *   and HSA payroll contributions (each capped at its 2026 limit) minus the

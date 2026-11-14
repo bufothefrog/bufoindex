@@ -16,10 +16,10 @@ import {
 } from '@/lib/calculations/contributionLimits';
 import {
   calculateAdditional401k,
+  calculateHighInterestDebt,
   calculateHSAOptimal,
   calculateMegaBackdoorRoth,
   calculateRothIRA,
-  hasHighInterestDebt,
 } from '@/lib/calculations/optimization';
 import type { PaycheckProfile } from '@/lib/types';
 import {
@@ -141,7 +141,7 @@ describe('HIGH_INTEREST_THRESHOLD', () => {
     expect(HIGH_INTEREST_THRESHOLD).toBe(0.07);
     const at = roomProfile(30, { debts: [createDebtData({ interestRate: HIGH_INTEREST_THRESHOLD })] });
     const above = roomProfile(30, { debts: [createDebtData({ interestRate: HIGH_INTEREST_THRESHOLD + 0.0001 })] });
-    expect(hasHighInterestDebt(at)).toBe(false);
-    expect(hasHighInterestDebt(above)).toBe(true);
+    expect(calculateHighInterestDebt(at, 100_000)).toBeNull();
+    expect(calculateHighInterestDebt(above, 100_000)).not.toBeNull();
   });
 });

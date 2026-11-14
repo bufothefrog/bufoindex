@@ -17,7 +17,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
  * subscribe without setState-in-effect cascades. The same localStorage key
  * is read by the pre-paint inline script in app/layout.tsx — keep in sync.
  */
-export const THEME_STORAGE_KEY = 'bufo-theme';
+const THEME_STORAGE_KEY = 'bufo-theme';
 
 const themeListeners = new Set<() => void>();
 

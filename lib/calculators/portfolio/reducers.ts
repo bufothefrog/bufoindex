@@ -132,19 +132,6 @@ export function updateSecurity(portfolio: Portfolio, id: string, patch: Partial<
 }
 
 // ---------------------------------------------------------------------------
-// Accounts
-// ---------------------------------------------------------------------------
-
-/** Removes the account and its holdings, then the securities only they held. */
-export function removeAccount(portfolio: Portfolio, id: string): Portfolio {
-  return pruneUnusedSecurities({
-    ...portfolio,
-    accounts: portfolio.accounts.filter((a) => a.id !== id),
-    holdings: portfolio.holdings.filter((h) => h.accountId !== id),
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Holdings
 // ---------------------------------------------------------------------------
 

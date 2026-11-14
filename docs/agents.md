@@ -30,16 +30,16 @@ A change is ready when:
 - lint passes with zero warnings,
 - relevant tests pass and you've added tests for new logic,
 - `npm run build` succeeds,
-- the design-system rules in `CLAUDE.md` are respected (semantic classes, `getChartTheme()`, `/demo` parity for new shared components).
+- the design-system rules in `CLAUDE.md` are respected (semantic classes, `useChartTheme()`, `/demo` parity for new shared components).
 
-Coverage floors are enforced in `vitest.config.ts` — a global floor across the covered `lib/` code and a higher bar for `lib/calculations/` — and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
+Coverage floors are enforced in `vitest.config.ts` — a global floor across the covered `lib/` code and a separate floor for `lib/calculations/`, each set just under the measured coverage — and CI runs `npm run test:coverage`, so an unmet floor fails the build. Above those floors, cover what's load-bearing — financial calculations and user-visible behaviors — and skip exhaustive coverage of trivial code.
 
 ## Tests
 
 - Calculation tests live in `test/lib/calculations/*.test.ts`. They import from `@/lib/calculations/*` and assert numeric results.
 - Component tests live in `test/components/`.
 - Shared mocks live in `test/factories/test-data-factory.ts`. It is imported by multiple test files — if you change a factory signature, update the callers.
-- Vitest config: `vitest.config.ts`. Tests run with `pool: 'threads'`, max 4 threads, 10s timeout. The `@/` and `@/test` aliases resolve to repo root and `./test`.
+- Vitest config: `vitest.config.ts`. Tests run with `pool: 'threads'`, max 4 threads, 10s timeout. The `@/` alias resolves to the repo root.
 - Setup: `test/setup.ts`.
 
 ## Multi-agent coordination
@@ -67,16 +67,9 @@ A useful agent-communication entry is just a few sections: claimed files, what w
 
 ## Calculator additions / changes
 
-A new calculator typically touches:
+A calculator is five files in `lib/calculators/<id>/` (`form.ts`, `fields.ts`, `bindings.ts`, `definition.ts`, `headline.ts`), registered in `lib/calculators/registry.ts`, with its page under the route its registry entry names (`path`, e.g. `app/tools/paycheck-allocator/`) and any custom field renderers in `components/calculators/renderers/`. The rule and what each file holds are in the "A calculator is five files" convention in `CLAUDE.md`; pure financial logic goes in `lib/calculations/` with a matching test in `test/lib/calculations/`.
 
-- `app/tools/<calculator-name>/page.tsx` (and any subroutes) — the page shell.
-- `lib/calculations/<calculator-name>.ts` — pure logic, no React.
-- `lib/types/` — shared input/output types.
-- `components/calculators/` or a calculator-specific subdir — UI specific to this tool.
-- `test/lib/calculations/<calculator-name>.test.ts` — unit tests for the logic.
-- Optionally `test/components/<Component>.test.tsx`.
-
-Reuse existing inputs from `components/ui/inputs/` and `components/shared/inputs/` (see `CLAUDE.md` for the hierarchy). Chart components live with their calculator (e.g. `app/tools/retirement-calculator/components/`) and must pull theme via `getChartTheme()`.
+Chart components live with their calculator (e.g. `app/tools/retirement-calculator/components/`) and take their colors from `useChartTheme()`.
 
 ## What not to recreate
 

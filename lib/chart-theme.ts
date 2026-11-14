@@ -30,7 +30,7 @@ export const CHART_FONT_MONO_FALLBACK =
 /**
  * Sage color variants for consistent theming
  */
-export const getSageVariants = () => ({
+const getSageVariants = () => ({
   sage50: '#f6f7f6',
   sage100: '#e3e8e3',
   sage200: '#c7d1c7',

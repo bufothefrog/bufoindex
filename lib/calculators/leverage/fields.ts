@@ -104,7 +104,7 @@ export const LEVERAGE_RATIO: FieldSpec = {
 // Market assumptions
 // ---------------------------------------------------------------------------
 
-export const INDEX_MEAN_RETURN: FieldSpec = {
+const INDEX_MEAN_RETURN: FieldSpec = {
   path: 'assumptions.leverage.indexMeanReturn',
   kind: 'percent',
   label: 'Index expected annual return',
@@ -116,7 +116,7 @@ export const INDEX_MEAN_RETURN: FieldSpec = {
   summary: (value) => (isFiniteNumber(value) ? `${formatPercent(value, { digits: 1 })} return` : null),
 };
 
-export const INDEX_VOLATILITY: FieldSpec = {
+const INDEX_VOLATILITY: FieldSpec = {
   path: 'assumptions.leverage.indexVolatility',
   kind: 'percent',
   label: 'Index annual volatility',
@@ -127,7 +127,7 @@ export const INDEX_VOLATILITY: FieldSpec = {
   summary: (value) => (isFiniteNumber(value) ? `${formatPercent(value, { digits: 1 })} volatility` : null),
 };
 
-export const FINANCING_RATE: FieldSpec = {
+const FINANCING_RATE: FieldSpec = {
   path: 'assumptions.leverage.financingRate',
   kind: 'percent',
   label: 'Financing rate on borrowed exposure',
@@ -139,7 +139,7 @@ export const FINANCING_RATE: FieldSpec = {
   summary: (value) => (isFiniteNumber(value) ? `${formatPercent(value, { digits: 2 })} financing` : null),
 };
 
-export const EXPENSE_RATIO: FieldSpec = {
+const EXPENSE_RATIO: FieldSpec = {
   path: 'assumptions.leverage.expenseRatio',
   kind: 'percent',
   label: 'Leveraged fund expense ratio',
@@ -149,7 +149,7 @@ export const EXPENSE_RATIO: FieldSpec = {
   tier: 'assumption',
 };
 
-export const INDEX_EXPENSE_RATIO: FieldSpec = {
+const INDEX_EXPENSE_RATIO: FieldSpec = {
   path: 'assumptions.leverage.indexExpenseRatio',
   kind: 'percent',
   label: 'Index fund expense ratio',

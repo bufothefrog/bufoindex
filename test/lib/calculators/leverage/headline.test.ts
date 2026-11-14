@@ -81,13 +81,8 @@ describe('leverageHeadline', () => {
     });
   });
 
-  it('prints the share behind as a whole percent, exactly as (p * 100).toFixed(0) did', () => {
+  it('gives the share behind as a fraction rounded to a whole percent', () => {
     const result = simulateDcaComparison(DEFAULT_DCA_COMPARISON_INPUTS);
-    for (let paths = 0; paths <= 500; paths += 1) {
-      const p = paths / 500;
-      const [, , behind] = shown({ ...result, probLeveragedBehindDca: p });
-      expect(behind.value, String(p)).toBe(`${(p * 100).toFixed(0)}%`);
-    }
     const [, , exact] = leverageHeadline(
       { ...result, probLeveragedBehindDca: 0.434 },
       DEFAULT_DCA_COMPARISON_INPUTS,
