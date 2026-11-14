@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import HomePage from '@/app/page';
 import sitemap from '@/app/sitemap';
+import { metadata as demoMetadata } from '@/app/demo/page';
 import { EmptyOverview } from '@/components/dashboard/EmptyOverview';
 import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompletenessCard';
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
@@ -172,5 +173,10 @@ describe('sitemap', () => {
     expect(urls).toContain('https://bufoindex.com/tools/leverage-comparison');
     expect(urls.filter((url) => url.includes('/start'))).toEqual([]);
     expect(urls.filter((url) => url.includes('/overview'))).toEqual([]);
+    expect(urls.filter((url) => url.includes('/demo'))).toEqual([]);
+  });
+
+  it('keeps the /demo component gallery out of search results', () => {
+    expect(demoMetadata.robots).toEqual({ index: false, follow: false });
   });
 });
