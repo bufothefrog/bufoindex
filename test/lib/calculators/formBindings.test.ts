@@ -18,7 +18,7 @@ import { RETIREMENT_CALCULATOR } from '@/lib/calculators/retirement/definition';
 import type { CalculatorDefinition } from '@/lib/calculators/types';
 import { toEngineInputs } from '@/lib/fields/binding';
 import type { Get } from '@/lib/fields/types';
-import { fromDefaults } from '@/test/utils/intakeFixture';
+import { fromDefaults } from '@/test/utils/intake';
 
 /** Profiles that between them make every binding read every path it can. */
 const STATES: readonly Get[] = [

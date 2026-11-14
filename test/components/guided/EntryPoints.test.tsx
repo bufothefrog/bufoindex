@@ -8,7 +8,7 @@ import { ProfileCompletenessCard } from '@/components/dashboard/ProfileCompleten
 import { ContinueProfileCard } from '@/components/guided/ContinueProfileCard';
 import { profileCompleteness } from '@/lib/calculators/forms';
 import { CORE_PATHS } from '@/lib/constants/intake';
-import { intakePaths } from '@/test/utils/intakeFixture';
+import { intakePaths } from '@/test/utils/intake';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS, getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 

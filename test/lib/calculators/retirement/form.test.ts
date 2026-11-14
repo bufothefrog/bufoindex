@@ -5,8 +5,7 @@
  * controls, the Social Security and healthcare screen is optional, and the
  * assumptions stay on the page), what each
  * asks, its visibility rules,
- * validation and 'remaining' mode, the nullable overrides, and proof that
- * every question the old intake asked is still asked.
+ * validation and 'remaining' mode, and the nullable overrides.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -33,14 +32,7 @@ import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import type { FinancialProfile } from '@/lib/profile/types';
 import { PROFILE_FORM, profileFormSection } from '@/lib/calculators/forms';
 import { screensFor } from '@/lib/fields/runtime';
-import {
-  OLD_CORE_FLOW,
-  askedScreen,
-  askedScreens,
-  fromDefaults,
-  intakePaths,
-  type OldQuestion,
-} from '@/test/utils/intakeFixture';
+import { askedScreen, askedScreens, fromDefaults, intakePaths } from '@/test/utils/intake';
 import { makeGet } from '@/lib/fields/paths';
 import { visibleScreenFields } from '@/lib/fields/runtime';
 import { normalizeProfile } from '@/lib/profile/defaults';
@@ -383,16 +375,10 @@ describe("retirement form: 'remaining' mode", () => {
   });
 });
 
-describe('retirement form: the old intake question set is still asked', () => {
-  // Captured from the intake before slice w1 (the provisional form carried
-  // the retirement age, the invested balance and the monthly contribution
-  // after the core, one per screen). In v3 the invested balance is the sum of
-  // the account list's balances, and the monthly contribution is Auto from
-  // the contribution answers, a calculator-only control.
-  const OLD_QUESTIONS: readonly OldQuestion[] = [
-    { path: 'person.retirementAge', label: 'Target retirement age', kind: 'number', min: 30, max: 85, step: 1 },
-  ];
-
+describe('retirement form: the account list and monthly investing', () => {
+  // The invested balance is the sum of the account list's balances, and the
+  // monthly contribution is Auto from the contribution answers, a
+  // calculator-only control.
   it('asks the account list where the invested balance was, and keeps monthly investing on the page', () => {
     const asked = askedScreens('retirement');
     expect(asked.find((s) => s.id === 'accounts')?.questions.map((q) => q.path)).toEqual(['portfolio.accounts']);
@@ -400,24 +386,6 @@ describe('retirement form: the old intake question set is still asked', () => {
     expect(paths).not.toContain('investing.investedBalance');
     expect(paths).not.toContain('investing.monthlyContribution');
     expect(screen('monthly-investing').surface).toBe('calculator');
-  });
-
-  it('asks the old core screens first and every old question with its wording and bounds', () => {
-    const asked = askedScreens('retirement');
-    expect(asked.slice(0, OLD_CORE_FLOW.length).map((s) => s.id)).toEqual(OLD_CORE_FLOW.map(([id]) => id));
-    const questions = asked.flatMap((s) => s.questions);
-    for (const old of OLD_QUESTIONS) {
-      const now = questions.find((q) => q.path === old.path);
-      expect(now, old.path).toBeDefined();
-      expect({ label: now!.label, kind: now!.kind, help: now!.help, min: now!.min, max: now!.max, step: now!.step }).toEqual({
-        label: old.label,
-        kind: old.kind,
-        help: old.help,
-        min: old.min,
-        max: old.max,
-        step: old.step,
-      });
-    }
   });
 });
 

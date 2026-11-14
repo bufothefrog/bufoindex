@@ -39,7 +39,7 @@ import { makeGet } from '@/lib/fields/paths';
 import { relationErrors, resolveOptions, resolveText, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FormSpec, Get } from '@/lib/fields/types';
 import { PAY_FREQUENCIES, PROFILE_ENUM_VALUES, isProfilePath, normalizeProfile } from '@/lib/profile/defaults';
-import { fromDefaults } from '@/test/utils/intakeFixture';
+import { fromDefaults } from '@/test/utils/intake';
 import { ownerRaw } from '@/test/factories/accountsFixtures';
 
 const SHARED = [

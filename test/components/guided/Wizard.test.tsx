@@ -7,7 +7,7 @@ import { Wizard } from '@/components/guided/Wizard';
 import { FORMS, PROFILE_FORM_SECTION_LABELS, profileFormSection } from '@/lib/calculators/forms';
 import { CORE_PATHS, getIntakeScreens, isCoreComplete, remainingIntakeScreens } from '@/lib/constants/intake';
 import { makeGet } from '@/lib/fields/paths';
-import { intakePaths } from '@/test/utils/intakeFixture';
+import { intakePaths } from '@/test/utils/intake';
 import type { FieldOption, FormSpec, Get } from '@/lib/fields/types';
 import { getDefaultFinancialProfile } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';

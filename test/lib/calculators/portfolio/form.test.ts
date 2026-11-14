@@ -20,13 +20,15 @@ import { applyWrites, makeGet } from '@/lib/fields/paths';
 import { fieldWrites, resolveText, screensFor, summarizeScreen, visibleScreenNotes } from '@/lib/fields/runtime';
 import type { FieldSpec } from '@/lib/fields/types';
 import { getDefaultFinancialProfile, presetClassTargets } from '@/lib/profile/defaults';
-import { askedScreens, fromDefaults, intakePaths, type OldQuestion } from '@/test/utils/intakeFixture';
+import { askedScreens, fromDefaults, intakePaths } from '@/test/utils/intake';
 
-/** The questions the intake asked for the portfolio intent before c5 (slice w1's fixture), after the core. */
-const OLD_QUESTIONS: Record<string, OldQuestion> = {
-  'investing.newCashThisMonth': { path: 'investing.newCashThisMonth', label: 'New cash to invest this month', kind: 'money', help: 'Money to invest now.', min: 0 },
-  'investing.targetMix': { path: 'investing.targetMix', label: 'Target mix', kind: 'choice', options: [{ value: '100-0', label: '100% stocks' }, { value: '80-20', label: '80% stocks, 20% bonds' }, { value: '60-40', label: '60% stocks, 40% bonds' }] },
-};
+/** The target mix options, Custom last. */
+const TARGET_MIX_OPTIONS = [
+  { value: '100-0', label: '100% stocks' },
+  { value: '80-20', label: '80% stocks, 20% bonds' },
+  { value: '60-40', label: '60% stocks, 40% bonds' },
+  { value: 'custom', label: 'Custom', description: 'Set a target for each asset class.' },
+];
 
 const SETTINGS_PATHS = [
   'assumptions.portfolio.mode',
@@ -95,10 +97,7 @@ describe('portfolio form: screens', () => {
             label: 'Target mix',
             kind: 'choice',
             help: undefined,
-            options: [
-              ...OLD_QUESTIONS['investing.targetMix'].options!,
-              { value: 'custom', label: 'Custom', description: 'Set a target for each asset class.' },
-            ],
+            options: TARGET_MIX_OPTIONS,
             min: undefined,
             max: undefined,
             step: undefined,
@@ -124,7 +123,7 @@ describe('portfolio form: screens', () => {
     ]);
   });
 
-  it('still asks every question the old intake asked: the mix as before, the new cash on the calculator page', () => {
+  it('asks the mix and the lists in the intake, and the new cash on the calculator page only', () => {
     // The form lists the new cash too; the intake never shows its calculator-only screen.
     expect(intakePaths('portfolio')).toEqual([
       'investing.targetMix',
@@ -140,10 +139,8 @@ describe('portfolio form: screens', () => {
       'portfolio.accounts',
       'portfolio.holdings',
     ]);
-    expect(asked).toContain(OLD_QUESTIONS['investing.targetMix'].path);
-    // The v1 investing.newCashThisMonth is no profile path now: its one home is
-    // the per-account new cash, a calculator-only question, Auto from the
-    // normal contributions.
+    // The new cash is the per-account new cash, a calculator-only question,
+    // Auto from the normal contributions.
     expect(spec('portfolio.newCash')).toMatchObject({ kind: 'custom', label: 'New cash this month', renderer: 'portfolio-new-cash' });
     expect(PORTFOLIO_FORM.screens.find((screen) => screen.fields.includes('portfolio.newCash'))?.surface).toBe('calculator');
   });
@@ -200,10 +197,7 @@ describe('portfolio form: switching the target mix to Custom', () => {
 
 describe('portfolio form: the fields', () => {
   it('offers every target mix, Custom included', () => {
-    expect(spec('investing.targetMix').options).toEqual([
-      ...OLD_QUESTIONS['investing.targetMix'].options!,
-      { value: 'custom', label: 'Custom', description: 'Set a target for each asset class.' },
-    ]);
+    expect(spec('investing.targetMix').options).toEqual(TARGET_MIX_OPTIONS);
   });
 
   it('edits the holdings and class targets with custom renderers that cover their sibling lists', () => {

@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { LearnChooser } from '@/components/guided/LearnChooser';
 import { Wizard } from '@/components/guided/Wizard';
 import { CORE_PATHS } from '@/lib/constants/intake';
-import { intakePaths } from '@/test/utils/intakeFixture';
+import { intakePaths } from '@/test/utils/intake';
 import { PROFILE_LEAF_PATHS, PROFILE_LIST_PATHS } from '@/lib/profile/defaults';
 import { useProfileStore } from '@/lib/store/profileStore';
 
