@@ -12,7 +12,7 @@ Current calculators:
 - **Paycheck Allocator** (`app/tools/paycheck-allocator/`, UI in `components/paycheck-allocator/`) - monthly allocation across fixed costs, tax-advantaged accounts, and flex spending, with bracket-aware tax math.
 - **Retirement Calculator** (`app/tools/retirement-calculator/`) - seeded Monte Carlo modeling (run in a web worker) with Social Security, healthcare, TDF glide path, scenario comparison, and a today's/nominal-dollars display toggle.
 - **Portfolio Rebalancer** (`app/tools/portfolio-rebalancing-calculator/`) - multi-account rebalancing with custom asset classes and placement advice.
-- **Leverage Comparison** (`app/tools/leverage-comparison/`) - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded paths.
+- **Leverage Comparison** (`app/tools/leverage-comparison/`) - monthly contributions into a daily-reset leveraged fund against the same contributions into a plain index fund, over seeded paths (run in a web worker).
 
 ## Project layout
 
@@ -51,7 +51,8 @@ lib/
   profile/               # The shared profile: types, defaults, migrate (+ migrateV2), accounts, accountTypes
   store/                 # profileStore, preferencesStore, createCalculatorStore + one run
                          #   store per calculator
-  workers/               # createWorkerRunner, exposeCalculation, retirementWorker
+  workers/               # createWorkerRunner, exposeCalculation, retirementWorker,
+                         #   leverageWorker
   constants/             # Sourced constants: irs-2026.ts, states-2026.ts, retirement.ts, ...
   utils/                 # index.ts (cn, clamp, formatNumberWithCommas, tax-rate helpers),
                          #   random.ts (seeded LCG + Box-Muller), displayDollars.ts,

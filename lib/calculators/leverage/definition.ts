@@ -1,8 +1,9 @@
 /**
  * The leverage comparison as a CalculatorDefinition (docs/rebuild-plan.md
  * section 2.6): its form, its bindings, the engine's own check and the
- * simulation. The simulation is cheap (tens of milliseconds), so it runs
- * in-thread, 250 ms after the last edit (audit H3).
+ * simulation. It runs 250 ms after the last edit (audit H3). Pure; a run
+ * takes tens of milliseconds (more on a slow phone), so it runs off-thread
+ * through the runner that lib/store/leverageStore.ts adds.
  */
 
 import {
