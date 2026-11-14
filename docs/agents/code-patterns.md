@@ -58,7 +58,7 @@ export interface ExampleCardProps {
   className?: string;
 }
 
-export function ExampleCard({ value, onChange, className }: ExampleCardProps) {
+export default function ExampleCard({ value, onChange, className }: ExampleCardProps) {
   // ...
   return <div className={className}>{/* ... */}</div>;
 }
@@ -66,7 +66,7 @@ export function ExampleCard({ value, onChange, className }: ExampleCardProps) {
 
 Conventions:
 
-- Named export of the component **and** the props type.
+- Typed props, a named export of the props type, and a default export of the component (the rule in `CLAUDE.md`).
 - Props interfaces use JSDoc on each prop so editor hover shows useful info.
 - Theming uses semantic Tailwind classes (`bg-background`, `text-muted-foreground`, `border-border`, `bg-sage-*`) — see `CLAUDE.md`.
 - Charts sit in a `ChartFrame` and pull colors from `useChartTheme()` in `@/components/ui/charts` (it wraps `getChartTheme()` from `@/lib/chart-theme` and follows theme changes). Never hardcode chart colors.
